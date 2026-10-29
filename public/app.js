@@ -546,14 +546,16 @@
   }
 
   function updatePlayPauseButton() {
-    const playIcon = elements.playPauseBtn.querySelector('.play-icon');
-    const pauseIcon = elements.playPauseBtn.querySelector('.pause-icon');
-    if (state.isPlaying) {
-      playIcon.style.display = 'none';
-      pauseIcon.style.display = 'block';
-    } else {
-      playIcon.style.display = 'block';
-      pauseIcon.style.display = 'none';
+    const playIcon = elements.playPauseBtn?.querySelector('.play-icon');
+    const pauseIcon = elements.playPauseBtn?.querySelector('.pause-icon');
+    if (playIcon && pauseIcon) {
+      if (state.isPlaying) {
+        playIcon.style.display = 'none';
+        pauseIcon.style.display = 'block';
+      } else {
+        playIcon.style.display = 'block';
+        pauseIcon.style.display = 'none';
+      }
     }
 
     if (elements.mobPlayPauseBtn) {
@@ -676,16 +678,20 @@
       state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
     }
 
-    elements.volumeFill.style.width = `${(state.isMuted ? 0 : state.volume) * 100}%`;
+    if (elements.volumeFill) {
+      elements.volumeFill.style.width = `${(state.isMuted ? 0 : state.volume) * 100}%`;
+    }
 
-    const volHigh = elements.volumeBtn.querySelector('.vol-high');
-    const volMuted = elements.volumeBtn.querySelector('.vol-muted');
-    if (state.isMuted) {
-      volHigh.style.display = 'none';
-      volMuted.style.display = 'block';
-    } else {
-      volHigh.style.display = 'block';
-      volMuted.style.display = 'none';
+    const volHigh = elements.volumeBtn?.querySelector('.vol-high');
+    const volMuted = elements.volumeBtn?.querySelector('.vol-muted');
+    if (volHigh && volMuted) {
+      if (state.isMuted) {
+        volHigh.style.display = 'none';
+        volMuted.style.display = 'block';
+      } else {
+        volHigh.style.display = 'block';
+        volMuted.style.display = 'none';
+      }
     }
   }
 
@@ -759,7 +765,7 @@
       elements.lyricsLinesContainer.innerHTML = `
         <div style="text-align: center; color: var(--text-secondary); padding: 60px 0;">
           <p style="font-size: 1.2rem; margin-bottom: 8px;">No synchronized lyrics available for this song.</p>
-          <p style="font-size: 0.9rem; color: var(--text-muted);">Enjoy the pure ad-free full audio stream!</p>
+          <p style="font-size: 0.9rem; color: var(--text-muted);">Enjoy the music!</p>
         </div>
       `;
     } catch (err) {
@@ -1359,7 +1365,7 @@
     state.activePlaylistId = playlistId;
 
     let title = 'Liked Songs';
-    let desc = 'Your hand-picked collection of favorite ad-free songs.';
+    let desc = 'Your collection of favorite songs.';
     let tracks = [];
     let isCustom = false;
 
@@ -2028,6 +2034,7 @@
         elements.shortcutsModal.style.display = 'none';
         if (elements.mobilePlayerModal) elements.mobilePlayerModal.style.display = 'none';
       }
+    });
     if (elements.navDownloaded) {
       elements.navDownloaded.addEventListener('click', () => {
         renderPlaylistView('downloaded');
@@ -2082,7 +2089,7 @@
       });
     }
 
-    console.log('🌊 MusiSurf Client Initialized — 100% Ad-Free & Full Length Music Ready');
+    console.log('🌊 MusiSurf Client Initialized');
   }
 
   // Run on DOM ready
