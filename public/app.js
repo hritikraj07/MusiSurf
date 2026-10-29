@@ -435,11 +435,9 @@
     updateHeartIcon(track.id);
 
     // Update Lyrics view headers
-    elements.lyricsTrackTitle.textContent = track.title;
-    elements.lyricsTrackArtist.textContent = track.artist;
-    elements.lyricsAlbumCover.src = track.image;
-    elements.vizTrackTitle.textContent = track.title;
-    elements.vizTrackArtist.textContent = track.artist;
+    if (elements.lyricsTrackTitle) elements.lyricsTrackTitle.textContent = track.title;
+    if (elements.lyricsTrackArtist) elements.lyricsTrackArtist.textContent = track.artist;
+    if (elements.lyricsAlbumCover) elements.lyricsAlbumCover.src = track.image || '';
 
     // Setup MediaSession for lockscreen / headphone controls
     if ('mediaSession' in navigator) {
@@ -462,6 +460,7 @@
       const blobUrl = URL.createObjectURL(offlineRecord.audioBlob);
       elements.audio.src = blobUrl;
       elements.audio.volume = state.isMuted ? 0 : state.volume;
+      elements.audio.load();
       elements.audio.play().catch(err => {
         console.warn('Offline playback error:', err);
       });
@@ -479,17 +478,10 @@
         state.ytPlayer.stopVideo();
       }
 
-      elements.audio.onerror = () => {
-        if (!elements.audio.src.includes('/api/stream') && track.audioUrl) {
-          console.warn('Direct stream error, switching to MusiSurf stream proxy...');
-          elements.audio.src = `/api/stream?url=${encodeURIComponent(track.audioUrl)}`;
-          elements.audio.volume = state.isMuted ? 0 : state.volume;
-          elements.audio.play().catch(e => console.warn('Stream proxy play retry failed:', e));
-        }
-      };
-
       elements.audio.src = track.audioUrl;
       elements.audio.volume = state.isMuted ? 0 : state.volume;
+      elements.audio.load();
+
       const playPromise = elements.audio.play();
       if (playPromise !== undefined) {
         playPromise.catch(err => {
@@ -497,6 +489,7 @@
           if (track.audioUrl && !elements.audio.src.includes('/api/stream')) {
             elements.audio.src = `/api/stream?url=${encodeURIComponent(track.audioUrl)}`;
             elements.audio.volume = state.isMuted ? 0 : state.volume;
+            elements.audio.load();
             elements.audio.play().catch(proxyErr => console.warn('Stream proxy fallback failed:', proxyErr));
           }
         });
@@ -1962,9 +1955,14 @@
     // Audio Element Native Events
     elements.audio.addEventListener('ended', onTrackEnded);
     elements.audio.addEventListener('error', (err) => {
-      console.warn('Direct stream error, attempting fallback:', err);
-      // Auto-fallback to YouTube if direct URL fails
-      if (state.currentTrack && !state.currentTrack.isFallbackAttempted) {
+      console.warn('Audio stream error event:', err);
+      if (state.currentTrack?.audioUrl && !elements.audio.src.includes('/api/stream')) {
+        console.log('Switching to MusiSurf stream proxy after error...');
+        elements.audio.src = `/api/stream?url=${encodeURIComponent(state.currentTrack.audioUrl)}`;
+        elements.audio.volume = state.isMuted ? 0 : state.volume;
+        elements.audio.load();
+        elements.audio.play().catch(e => console.warn('Proxy retry error:', e));
+      } else if (state.currentTrack && !state.currentTrack.isFallbackAttempted) {
         state.currentTrack.isFallbackAttempted = true;
         fetch(`/api/search?q=${encodeURIComponent(state.currentTrack.title + ' ' + state.currentTrack.artist)}&source=youtube`)
           .then(r => r.json())
@@ -1972,7 +1970,8 @@
             if (data.results && data.results.length > 0) {
               playTrack(data.results[0]);
             }
-          });
+          })
+          .catch(e => console.warn('YouTube fallback failed:', e));
       }
     });
 
