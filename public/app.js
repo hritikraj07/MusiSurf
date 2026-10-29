@@ -44,8 +44,7 @@
       home: document.getElementById('homeView'),
       search: document.getElementById('searchView'),
       playlist: document.getElementById('playlistView'),
-      lyrics: document.getElementById('lyricsView'),
-      visualizer: document.getElementById('visualizerView')
+      lyrics: document.getElementById('lyricsView')
     },
     contentScroll: document.getElementById('contentScroll'),
 
@@ -67,8 +66,6 @@
     clearSearchBtn: document.getElementById('clearSearchBtn'),
     historyBackBtn: document.getElementById('historyBackBtn'),
     historyForwardBtn: document.getElementById('historyForwardBtn'),
-    visualizerToggleHeader: document.getElementById('visualizerToggleHeader'),
-    lyricsToggleHeader: document.getElementById('lyricsToggleHeader'),
 
     // Home View
     greetingHeading: document.getElementById('greetingHeading'),
@@ -108,12 +105,6 @@
     lyricsScrollBody: document.getElementById('lyricsScrollBody'),
     closeLyricsBtn: document.getElementById('closeLyricsBtn'),
 
-    // Visualizer View
-    visualizerCanvas: document.getElementById('visualizerCanvas'),
-    vizTrackTitle: document.getElementById('vizTrackTitle'),
-    vizTrackArtist: document.getElementById('vizTrackArtist'),
-    closeVizBtn: document.getElementById('closeVizBtn'),
-
     // Queue Drawer
     queueDrawer: document.getElementById('queueDrawer'),
     queueBtn: document.getElementById('queueBtn'),
@@ -145,7 +136,6 @@
     volumeBar: document.getElementById('volumeBar'),
     volumeFill: document.getElementById('volumeFill'),
     lyricsBtn: document.getElementById('lyricsBtn'),
-    visualizerBtn: document.getElementById('visualizerBtn'),
 
     // PWA & Mobile Navigation
     pwaInstallBtn: document.getElementById('pwaInstallBtn'),
@@ -324,7 +314,6 @@
         duration: track.duration,
         durationStr: track.durationStr,
         source: track.source,
-        quality: '320kbps Offline Stored',
         audioBlob: blob,
         downloadedAt: Date.now()
       };
@@ -469,7 +458,7 @@
       navigator.mediaSession.metadata = new MediaMetadata({
         title: track.title,
         artist: track.artist,
-        album: track.album || 'MusiSurf Ad-Free',
+        album: track.album || 'MusiSurf',
         artwork: [{ src: track.image, sizes: '500x500', type: 'image/jpeg' }]
       });
     }
@@ -477,7 +466,7 @@
     // Determine playback mechanism
     const offlineRecord = track.audioBlob ? track : state.offlineTracks.find(t => t.id === track.id);
     if (offlineRecord && offlineRecord.audioBlob) {
-      // Offline Stored Audio Playback (Zero Internet Needed!)
+      // Offline Stored Audio Playback
       if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.stopVideo === 'function') {
         state.ytPlayer.stopVideo();
       }
@@ -485,16 +474,9 @@
       const blobUrl = URL.createObjectURL(offlineRecord.audioBlob);
       elements.audio.src = blobUrl;
       elements.audio.volume = state.isMuted ? 0 : state.volume;
-      elements.audio.play().then(() => {
-        initAudioContext();
-        if (audioCtx && audioCtx.state === 'suspended') {
-          audioCtx.resume();
-        }
-      }).catch(err => {
+      elements.audio.play().catch(err => {
         console.warn('Offline playback error:', err);
       });
-
-      showToast(`Playing "${track.title}" (Offline Mode • Stored Locally)`, '⚡');
     } else if (track.source === 'youtube' || !track.hasDirectAudio) {
       // YouTube Engine
       elements.audio.pause();
@@ -503,25 +485,17 @@
         state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
         state.ytPlayer.playVideo();
       }
-      showToast(`Playing "${track.title}" (Ad-Free Universal)`, '🎵');
     } else {
-      // JioSaavn Direct 320kbps Lossless Stream
+      // Direct Stream
       if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.stopVideo === 'function') {
         state.ytPlayer.stopVideo();
       }
 
       elements.audio.src = track.audioUrl;
       elements.audio.volume = state.isMuted ? 0 : state.volume;
-      elements.audio.play().then(() => {
-        initAudioContext();
-        if (audioCtx && audioCtx.state === 'suspended') {
-          audioCtx.resume();
-        }
-      }).catch(err => {
-        console.warn('Playback error, user gesture required:', err);
+      elements.audio.play().catch(err => {
+        console.warn('Playback error:', err);
       });
-
-      showToast(`Playing "${track.title}" (320kbps • Ad-Free)`, '⚡');
     }
 
     state.isPlaying = true;
@@ -1097,9 +1071,6 @@
         <div class="card-info">
           <span class="card-title">${track.title}</span>
           <span class="card-artist">${track.artist}</span>
-          <div class="card-badge-row">
-            <span class="card-badge">Full Song • Ad-Free</span>
-          </div>
         </div>
       `;
 
@@ -1136,6 +1107,8 @@
   }
 
   async function performSearch(query) {
+    if (!query) return;
+    switchView('search');
     elements.searchBrowseSection.style.display = 'none';
     elements.searchResultsWrapper.style.display = 'none';
     elements.searchEmptyState.style.display = 'none';
@@ -1173,9 +1146,8 @@
       <div class="top-result-meta">
         <span class="top-result-artist">${top.artist}</span>
         <span class="top-result-pill">Song</span>
-        <span class="top-result-pill" style="background: rgba(29, 185, 84, 0.2); color: var(--accent-primary);">100% Ad-Free</span>
       </div>
-      <button class="top-result-play-btn" title="Play Full Song">
+      <button class="top-result-play-btn" title="Play">
         <svg viewBox="0 0 24 24" fill="currentColor">
           <polygon points="5 3 19 12 5 21 5 3"/>
         </svg>
@@ -1204,7 +1176,6 @@
           <th class="col-num">#</th>
           <th class="col-title">Title</th>
           <th class="col-album">Album</th>
-          <th class="col-source">Quality</th>
           <th class="col-actions"></th>
           <th class="col-duration">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1290,9 +1261,6 @@
         </div>
       </td>
       <td class="col-album">${track.album || 'Single'}</td>
-      <td class="col-source">
-        <span class="quality-badge">${track.quality || '320kbps HD'}</span>
-      </td>
       <td class="col-actions">
         <button class="song-action-btn ${isLiked ? 'liked' : ''}" title="${isLiked ? 'Liked' : 'Like'}">
           <svg viewBox="0 0 24 24" fill="${isLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
@@ -1305,7 +1273,7 @@
             <line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
         </button>
-        <button class="song-action-btn download-song-trigger" title="Download Song (320kbps MP4)">
+        <button class="song-action-btn download-song-trigger" title="Download Song">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
             <polyline points="7 10 12 15 17 10"/>
@@ -1516,7 +1484,6 @@
           <div class="queue-card-title">${state.currentTrack.title}</div>
           <div class="queue-card-artist">${state.currentTrack.artist}</div>
         </div>
-        <span class="quality-badge" style="font-size: 0.65rem;">Now Surfing</span>
       `;
     } else {
       elements.queueNowPlaying.innerHTML = '<span style="color: var(--text-muted); font-size: 0.85rem;">Nothing currently playing</span>';
@@ -1579,18 +1546,15 @@
     });
 
     // Update active nav button
-    elements.navHome.classList.toggle('active', viewName === 'home');
-    elements.navSearch.classList.toggle('active', viewName === 'search');
-    elements.navExplore.classList.toggle('active', viewName === 'explore');
-    elements.navLiked.classList.toggle('active', viewName === 'liked');
+    if (elements.navHome) elements.navHome.classList.toggle('active', viewName === 'home');
+    if (elements.navSearch) elements.navSearch.classList.toggle('active', viewName === 'search');
+    if (elements.navExplore) elements.navExplore.classList.toggle('active', viewName === 'explore');
+    if (elements.navLiked) elements.navLiked.classList.toggle('active', viewName === 'liked');
 
-    elements.lyricsToggleHeader.classList.toggle('active', viewName === 'lyrics');
-    elements.lyricsBtn.classList.toggle('active', viewName === 'lyrics');
-    elements.visualizerToggleHeader.classList.toggle('active', viewName === 'visualizer');
-    elements.visualizerBtn.classList.toggle('active', viewName === 'visualizer');
+    if (elements.lyricsBtn) elements.lyricsBtn.classList.toggle('active', viewName === 'lyrics');
 
     // Scroll to top
-    elements.contentScroll.scrollTop = 0;
+    if (elements.contentScroll) elements.contentScroll.scrollTop = 0;
   }
 
   // Modal Helpers
@@ -1668,6 +1632,16 @@
 
     // Header Search
     elements.globalSearchInput.addEventListener('input', handleSearchInput);
+    elements.globalSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        clearTimeout(searchDebounceTimer);
+        const query = elements.globalSearchInput.value.trim();
+        if (query) {
+          switchView('search');
+          performSearch(query);
+        }
+      }
+    });
     elements.clearSearchBtn.addEventListener('click', () => {
       elements.globalSearchInput.value = '';
       elements.clearSearchBtn.style.display = 'none';
@@ -1820,30 +1794,8 @@
         switchView('lyrics');
       }
     };
-    elements.lyricsBtn.addEventListener('click', toggleLyricsView);
-    elements.lyricsToggleHeader.addEventListener('click', toggleLyricsView);
-    elements.closeLyricsBtn.addEventListener('click', () => switchView('home'));
-
-    // Visualizer View Toggle
-    const toggleVisualizerView = () => {
-      if (state.currentView === 'visualizer') {
-        switchView(state.previousView || 'home');
-      } else {
-        switchView('visualizer');
-      }
-    };
-    elements.visualizerBtn.addEventListener('click', toggleVisualizerView);
-    elements.visualizerToggleHeader.addEventListener('click', toggleVisualizerView);
-    elements.closeVizBtn.addEventListener('click', () => switchView('home'));
-
-    // Visualizer Modes
-    document.querySelectorAll('.viz-mode-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.viz-mode-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        state.vizMode = btn.dataset.mode;
-      });
-    });
+    if (elements.lyricsBtn) elements.lyricsBtn.addEventListener('click', toggleLyricsView);
+    if (elements.closeLyricsBtn) elements.closeLyricsBtn.addEventListener('click', () => switchView('home'));
 
     // Expand Album Art click
     elements.playerCoverWrapper.addEventListener('click', () => {
@@ -2063,8 +2015,6 @@
         toggleMute();
       } else if (e.key.toLowerCase() === 'l') {
         toggleLyricsView();
-      } else if (e.key.toLowerCase() === 'v') {
-        toggleVisualizerView();
       } else if (e.key.toLowerCase() === 'q') {
         elements.queueDrawer.classList.toggle('open');
       } else if (e.key === '/') {
@@ -2119,7 +2069,6 @@
     renderSidebarPlaylists();
     setupEventListeners();
     loadTrendingShelves();
-    startVisualizer();
     updateProgress();
 
     // Register PWA Service Worker for Mobile Caching and Installation

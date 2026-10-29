@@ -92,8 +92,6 @@ function transformSaavnSong(item) {
     duration: durationSec,
     durationStr: formatDuration(durationSec),
     source: 'saavn',
-    quality: '320kbps Lossless HQ',
-    isAdFree: true,
     hasDirectAudio: true
   };
 }
@@ -170,8 +168,6 @@ async function searchYouTube(query, limit = 10) {
             duration: durationSec,
             durationStr: durationStr,
             source: 'youtube',
-            quality: 'Universal Full Length',
-            isAdFree: true,
             hasDirectAudio: false
           });
 
@@ -204,18 +200,16 @@ app.get('/api/search', async (req, res) => {
     } else if (source === 'youtube') {
       results = await searchYouTube(query, 15);
     } else {
-      // Parallel search both sources
-      const [saavnSongs, ytSongs] = await Promise.all([
-        searchSaavn(query, 20),
-        searchYouTube(query, 8)
-      ]);
-
-      // Prioritize direct 320kbps Saavn tracks, then append YouTube tracks
-      results = [...saavnSongs, ...ytSongs];
-
-      // If Saavn returned nothing, YouTube takes over completely
-      if (saavnSongs.length === 0) {
-        results = ytSongs;
+      // Fast search: Query Saavn first (instant direct audio)
+      const saavnSongs = await searchSaavn(query, 25);
+      if (saavnSongs && saavnSongs.length >= 8) {
+        results = saavnSongs;
+      } else {
+        // Parallel fallback to YouTube with a 2.5s safety timeout
+        const ytPromise = searchYouTube(query, 10);
+        const timeoutPromise = new Promise(resolve => setTimeout(() => resolve([]), 2500));
+        const ytSongs = await Promise.race([ytPromise, timeoutPromise]);
+        results = [...(saavnSongs || []), ...(ytSongs || [])];
       }
     }
 
@@ -231,43 +225,66 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-// Curated Trending & Discover Playlists
-const TRENDING_SECTIONS = [
+// Curated Trending & Discover Categories
+const TRENDING_CATEGORIES = [
   {
     id: 'global-hits',
     title: "Global Top Hits",
     subtitle: "The most played anthems worldwide right now",
-    queries: ['Blinding Lights The Weeknd', 'Shape of You Ed Sheeran', 'Levitating Dua Lipa', 'Starboy The Weeknd', 'Stay The Kid LAROI', 'As It Was Harry Styles', 'Flowers Miley Cyrus', 'Espresso Sabrina Carpenter']
+    query: "Top Hits Global"
   },
   {
     id: 'chill-lofi',
     title: "Chill & Lo-Fi Waves",
     subtitle: "Relax, study, code, and surf the mellow beats",
-    queries: ['Lofi Beats Study', 'Chillhop beats to relax', 'Coffee Shop Lofi', 'Night Lofi Jazz', 'Cozy Winter Lofi']
+    query: "Lofi Beats Chill Study"
   },
   {
     id: 'electronic-energy',
     title: "Electronic & Gym Energy",
     subtitle: "High octane basslines and peak workout motivation",
-    queries: ['The Business Tiesto', 'Titanium David Guetta', 'Closer The Chainsmokers', 'Faded Alan Walker', 'Wake Me Up Avicii', 'Animals Martin Garrix']
+    query: "EDM Dance Party Hits"
   },
   {
     id: 'acoustic-soul',
     title: "Acoustic & Midnight R&B",
     subtitle: "Soulful vocals, late night drives, and warm vibes",
-    queries: ['Die For You The Weeknd', 'Until I Found You Stephen Sanchez', 'Snooze SZA', 'Golden Hour JVKE', 'Peaches Justin Bieber']
+    query: "Acoustic Pop Romance"
   },
   {
     id: 'bollywood-pop',
     title: "Desi & Bollywood Beats",
     subtitle: "Trending charts, romantic melodies, and festive vibes",
-    queries: ['Arijit Singh romantic hits', 'Diljit Dosanjh hits', 'AP Dhillon Brown Munde', 'Kesariya Brahmastra', 'Chaleya Jawan']
+    query: "Trending Bollywood Hits"
   }
 ];
 
-// Cache for trending data
 let trendingCache = null;
 let trendingCacheTime = 0;
+
+async function fetchTrendingData() {
+  const sections = await Promise.all(
+    TRENDING_CATEGORIES.map(async (cat) => {
+      const tracks = await searchSaavn(cat.query, 8);
+      return {
+        id: cat.id,
+        title: cat.title,
+        subtitle: cat.subtitle,
+        tracks: tracks || []
+      };
+    })
+  );
+  return sections.filter(s => s.tracks.length > 0);
+}
+
+// Pre-warm cache on server startup
+fetchTrendingData().then(data => {
+  if (data && data.length > 0) {
+    trendingCache = data;
+    trendingCacheTime = Date.now();
+    console.log(`⚡ Pre-cached ${data.length} trending music sections in memory!`);
+  }
+}).catch(err => console.warn('Preload trending warning:', err.message));
 
 app.get('/api/trending', async (req, res) => {
   const now = Date.now();
@@ -276,34 +293,17 @@ app.get('/api/trending', async (req, res) => {
   }
 
   try {
-    const sections = [];
-
-    for (const sec of TRENDING_SECTIONS) {
-      const sectionTracks = [];
-      // Pick 4-6 queries per section
-      for (const q of sec.queries.slice(0, 6)) {
-        const results = await searchSaavn(q, 1);
-        if (results && results.length > 0) {
-          sectionTracks.push(results[0]);
-        }
-      }
-
-      if (sectionTracks.length > 0) {
-        sections.push({
-          id: sec.id,
-          title: sec.title,
-          subtitle: sec.subtitle,
-          tracks: sectionTracks
-        });
-      }
+    const sections = await fetchTrendingData();
+    if (sections && sections.length > 0) {
+      trendingCache = sections;
+      trendingCacheTime = now;
     }
-
-    trendingCache = sections;
-    trendingCacheTime = now;
-
-    res.json({ success: true, sections });
+    res.json({ success: true, sections: trendingCache || sections });
   } catch (err) {
     console.error('Trending fetch error:', err);
+    if (trendingCache) {
+      return res.json({ success: true, sections: trendingCache });
+    }
     res.status(500).json({ success: false, error: 'Failed to load trending music' });
   }
 });

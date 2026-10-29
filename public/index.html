@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MusiSurf — 100% Ad-Free Music Streaming | Full Length Songs</title>
-  <meta name="description" content="Stream millions of songs in full length with zero ads on MusiSurf. Ultra-fast, high-quality audio streaming, real-time synchronized lyrics, and personalized playlists.">
+  <title>MusiSurf — Web Player</title>
+  <meta name="description" content="Stream millions of full songs on MusiSurf. Ultra-fast music streaming, real-time synchronized lyrics, and personalized playlists.">
   
-  <!-- Favicon -->
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%231DB954'><path d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/></svg>">
+  <!-- Favicon: Green Music Note -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%231DB954'><path d='M12 3.5v10.55A4 4 0 1 0 14 17.5V7.5h4.5a1.5 1.5 0 0 0 1.5-1.5V4a.5.5 0 0 0-.5-.5H12z'/></svg>">
   
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -34,32 +34,13 @@
       <div class="sidebar-brand">
         <a href="#" class="brand-link" id="navBrand">
           <div class="brand-logo-container">
-            <svg class="brand-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z" fill="url(#brandGrad)"/>
-              <defs>
-                <linearGradient id="brandGrad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-                  <stop stop-color="#1DB954"/>
-                  <stop offset="1" stop-color="#00F2FE"/>
-                </linearGradient>
-              </defs>
+            <svg class="brand-icon" viewBox="0 0 24 24" fill="#1DB954" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 3.5v10.55A4 4 0 1 0 14 17.5V7.5h4.5a1.5 1.5 0 0 0 1.5-1.5V4a.5.5 0 0 0-.5-.5H12z"/>
             </svg>
             <span class="brand-pulse"></span>
           </div>
           <span class="brand-name">Musi<span class="brand-highlight">Surf</span></span>
         </a>
-      </div>
-
-      <!-- Ad-Free Guarantee Shield Badge -->
-      <div class="ad-free-badge-container">
-        <div class="ad-free-shield">
-          <svg class="shield-icon" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
-          </svg>
-          <div class="shield-text">
-            <span class="shield-title">100% AD-FREE</span>
-            <span class="shield-sub">Full Length Unlocked</span>
-          </div>
-        </div>
       </div>
 
       <!-- Navigation Links -->
@@ -154,7 +135,7 @@
       <div class="sidebar-footer">
         <div class="stats-row">
           <span class="stat-indicator"></span>
-          <span class="stat-text">Direct 320kbps Streams</span>
+          <span class="stat-text">Connected</span>
         </div>
         <div class="shortcuts-hint" id="openShortcutsBtn" role="button" tabindex="0">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -210,38 +191,7 @@
           </div>
         </div>
 
-        <div class="header-right">
-          <!-- PWA Mobile / Desktop Install Button -->
-          <button class="header-action-btn install-app-btn" id="pwaInstallBtn" title="Install MusiSurf on Mobile or Desktop">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            <span class="btn-text">Install App</span>
-          </button>
-
-          <div class="ad-free-pill">
-            <span class="live-dot"></span>
-            <span>Zero Ads</span>
-          </div>
-
-          <button class="header-action-btn" id="visualizerToggleHeader" title="Live Audio Visualizer">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M2 10v3M6 6v11M10 3v18M14 8v7M18 5v13M22 10v3"/>
-            </svg>
-            <span class="btn-text">Visualizer</span>
-          </button>
-
-          <button class="header-action-btn" id="lyricsToggleHeader" title="Synchronized Lyrics">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-              <line x1="12" x2="12" y1="19" y2="22"/>
-            </svg>
-            <span class="btn-text">Lyrics</span>
-          </button>
-        </div>
+        <div class="header-right"></div>
       </header>
 
       <!-- Offline Status Banner -->
@@ -290,7 +240,7 @@
           <div class="shelves-container" id="shelvesContainer">
             <div class="loading-shelves">
               <div class="spinner-ring"></div>
-              <span>Surfing high quality streams...</span>
+              <span>Loading songs...</span>
             </div>
           </div>
         </section>
@@ -302,8 +252,8 @@
             <div class="search-filter-row">
               <span class="search-filter-label">Filter:</span>
               <button class="source-pill active" data-source="all">All Sources</button>
-              <button class="source-pill" data-source="saavn">Direct 320kbps HD (Zero Ads)</button>
-              <button class="source-pill" data-source="youtube">YouTube Audio Engine</button>
+              <button class="source-pill" data-source="saavn">Direct Stream</button>
+              <button class="source-pill" data-source="youtube">YouTube Engine</button>
             </div>
 
             <!-- Search Quick Suggestions / Genres when search is empty -->
@@ -353,7 +303,7 @@
                 <span class="eq-bar"></span>
                 <span class="eq-bar"></span>
               </div>
-              <p>Searching full-length songs with zero ads...</p>
+              <p>Searching songs...</p>
             </div>
 
             <!-- Active Results Section -->
@@ -380,8 +330,7 @@
               <!-- Full Search Results Table -->
               <div class="all-results-container">
                 <div class="results-header-row">
-                  <h3 class="results-subheading">All Full-Length Tracks (<span id="resultsCount">0</span>)</h3>
-                  <span class="ad-free-tag">✓ 100% Ad-Free Audio Stream</span>
+                  <h3 class="results-subheading">Songs (<span id="resultsCount">0</span>)</h3>
                 </div>
                 <div class="full-songs-table" id="fullSongsTable">
                   <!-- Populated by JS -->
@@ -452,7 +401,6 @@
                   <th class="col-num">#</th>
                   <th class="col-title">Title</th>
                   <th class="col-album">Album</th>
-                  <th class="col-source">Quality</th>
                   <th class="col-actions"></th>
                   <th class="col-duration">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -503,32 +451,6 @@
               <div class="lyrics-lines-container" id="lyricsLinesContainer">
                 <!-- Lines injected here with data-time for instant seeking -->
               </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- FULL-SCREEN AUDIO VISUALIZER VIEW -->
-        <section class="view-section" id="visualizerView">
-          <div class="visualizer-wrapper">
-            <div class="visualizer-header">
-              <div class="visualizer-info">
-                <h2 id="vizTrackTitle">Track Title</h2>
-                <p id="vizTrackArtist">Artist</p>
-              </div>
-              <div class="visualizer-controls">
-                <button class="viz-mode-btn active" data-mode="bars">Spectrum Bars</button>
-                <button class="viz-mode-btn" data-mode="wave">Neon Wave</button>
-                <button class="viz-mode-btn" data-mode="circle">Radial Orbit</button>
-                <button class="close-view-btn" id="closeVizBtn">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div class="canvas-container">
-              <canvas id="visualizerCanvas"></canvas>
             </div>
           </div>
         </section>
@@ -586,9 +508,9 @@
 
         <div class="player-track-info">
           <div class="track-title-wrapper">
-            <span class="player-title" id="playerTitle">Select a song to surf</span>
+            <span class="player-title" id="playerTitle"></span>
           </div>
-          <span class="player-artist" id="playerArtist">MusiSurf Ad-Free</span>
+          <span class="player-artist" id="playerArtist"></span>
         </div>
 
         <button class="player-heart-btn" id="playerHeartBtn" title="Save to Liked Songs">
@@ -597,7 +519,7 @@
           </svg>
         </button>
 
-        <button class="player-icon-btn download-song-btn" id="playerDownloadBtn" title="Download Song (Full-Length Ad-Free Audio)">
+        <button class="player-icon-btn download-song-btn" id="playerDownloadBtn" title="Download Song">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
             <polyline points="7 10 12 15 17 10"/>
@@ -677,13 +599,6 @@
           </svg>
         </button>
 
-        <!-- Visualizer Trigger -->
-        <button class="player-icon-btn" id="visualizerBtn" title="Audio Spectrum Visualizer (V)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M2 10v3M6 6v11M10 3v18M14 8v7M18 5v13M22 10v3"/>
-          </svg>
-        </button>
-
         <!-- Queue Drawer Trigger -->
         <button class="player-icon-btn" id="queueBtn" title="Play Queue (Q)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -716,12 +631,6 @@
               <div class="volume-handle"></div>
             </div>
           </div>
-        </div>
-
-        <!-- Ad-Free Shield status badge in player -->
-        <div class="player-shield-badge" title="MusiSurf Stream: 100% Ad-Free Direct Stream">
-          <span class="badge-dot"></span>
-          <span>Ad-Free</span>
         </div>
       </div>
     </footer>
@@ -969,10 +878,6 @@
           <div class="shortcut-row">
             <span class="shortcut-desc">Toggle Synced Lyrics</span>
             <kbd class="shortcut-key">L</kbd>
-          </div>
-          <div class="shortcut-row">
-            <span class="shortcut-desc">Toggle Visualizer</span>
-            <kbd class="shortcut-key">V</kbd>
           </div>
           <div class="shortcut-row">
             <span class="shortcut-desc">Toggle Queue Drawer</span>
