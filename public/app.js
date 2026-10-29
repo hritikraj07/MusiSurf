@@ -225,7 +225,10 @@
       if (storedPlaylists) state.customPlaylists = JSON.parse(storedPlaylists);
 
       const storedVol = localStorage.getItem('musisurf_volume');
-      if (storedVol !== null) state.volume = parseFloat(storedVol);
+      if (storedVol !== null) {
+        const v = parseFloat(storedVol);
+        state.volume = (!isNaN(v) && v > 0.05) ? v : 0.8;
+      }
     } catch (e) {
       console.warn('Error loading local storage data:', e);
     }
@@ -473,24 +476,32 @@
         state.ytPlayer.playVideo();
       }
     } else {
-      // Direct Stream with proxy fallback for resilience
+      // Audio Stream via same-origin /api/stream proxy for 100% reliable 206 streaming without CORS/adblocker blocks
       if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.stopVideo === 'function') {
         state.ytPlayer.stopVideo();
       }
 
-      elements.audio.src = track.audioUrl;
-      elements.audio.volume = state.isMuted ? 0 : state.volume;
-      elements.audio.load();
+      // Ensure volume is audible and unmuted
+      if (state.isMuted || state.volume <= 0.05) {
+        setVolume(0.8);
+      } else {
+        elements.audio.volume = state.volume;
+      }
 
+      const streamUrl = track.streamUrl || (track.audioUrl ? `/api/stream?url=${encodeURIComponent(track.audioUrl)}` : null);
+      if (!streamUrl && !track.audioUrl) {
+        showToast('Audio stream unavailable for this track', '⚠');
+        return;
+      }
+
+      elements.audio.src = streamUrl || track.audioUrl;
       const playPromise = elements.audio.play();
       if (playPromise !== undefined) {
         playPromise.catch(err => {
-          console.warn('Direct play error, falling back to stream proxy:', err);
-          if (track.audioUrl && !elements.audio.src.includes('/api/stream')) {
-            elements.audio.src = `/api/stream?url=${encodeURIComponent(track.audioUrl)}`;
-            elements.audio.volume = state.isMuted ? 0 : state.volume;
-            elements.audio.load();
-            elements.audio.play().catch(proxyErr => console.warn('Stream proxy fallback failed:', proxyErr));
+          console.warn('Stream proxy play rejected, trying direct CDN stream:', err);
+          if (track.audioUrl && elements.audio.src.includes('/api/stream')) {
+            elements.audio.src = track.audioUrl;
+            elements.audio.play().catch(directErr => console.warn('Direct stream fallback failed:', directErr));
           }
         });
       }
@@ -507,13 +518,13 @@
 
   function togglePlayPause() {
     if (!state.currentTrack) {
-      // If nothing is playing, play first song from queue or trending
+      // If nothing is playing, play first song from queue or quick picks or shelves
       if (state.queue.length > 0) {
         playTrack(state.queue[0]);
       } else {
-        const firstCard = document.querySelector('.track-card');
-        if (firstCard && firstCard._trackData) {
-          playTrack(firstCard._trackData);
+        const firstSong = document.querySelector('.quick-pick-tile')?._trackData || document.querySelector('.track-card')?._trackData;
+        if (firstSong) {
+          playTrack(firstSong);
         }
       }
       return;
@@ -1067,6 +1078,7 @@
     tracks.forEach(track => {
       const tile = document.createElement('div');
       tile.className = 'quick-pick-tile';
+      tile._trackData = track;
       tile.innerHTML = `
         <img src="${track.image}" alt="${track.title}" class="quick-pick-img">
         <div class="quick-pick-info">

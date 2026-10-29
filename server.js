@@ -89,6 +89,7 @@ function transformSaavnSong(item) {
     year: item.year || more.release_date?.substring(0, 4) || '',
     image: image,
     audioUrl: audioUrl, // 320kbps direct ad-free audio stream
+    streamUrl: audioUrl ? `/api/stream?url=${encodeURIComponent(audioUrl)}` : null,
     duration: durationSec,
     durationStr: formatDuration(durationSec),
     source: 'saavn',
