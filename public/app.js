@@ -22,6 +22,7 @@
     previousView: 'home',
     searchSource: 'all',
     likedSongs: [],
+    offlineTracks: [],
     customPlaylists: [],
     activePlaylistId: null,
     lyrics: [],
@@ -53,12 +54,15 @@
     navSearch: document.getElementById('navSearchBtn'),
     navExplore: document.getElementById('navExploreBtn'),
     navLiked: document.getElementById('navLikedBtn'),
+    navDownloaded: document.getElementById('navDownloadedBtn'),
     navBrand: document.getElementById('navBrand'),
     customPlaylistsList: document.getElementById('customPlaylistsList'),
     createPlaylistBtn: document.getElementById('createPlaylistBtn'),
     likedCountMeta: document.getElementById('likedCountMeta'),
+    downloadedCountMeta: document.getElementById('downloadedCountMeta'),
 
-    // Header
+    // Header & Offline Banner
+    offlineBanner: document.getElementById('offlineBanner'),
     globalSearchInput: document.getElementById('globalSearchInput'),
     clearSearchBtn: document.getElementById('clearSearchBtn'),
     historyBackBtn: document.getElementById('historyBackBtn'),
@@ -149,6 +153,7 @@
     mobNavHome: document.getElementById('mobNavHome'),
     mobNavSearch: document.getElementById('mobNavSearch'),
     mobNavLiked: document.getElementById('mobNavLiked'),
+    mobNavDownloaded: document.getElementById('mobNavDownloaded'),
     mobNavInstall: document.getElementById('mobNavInstall'),
 
     // Mobile Fullscreen Player Modal
@@ -261,6 +266,112 @@
     }
   }
 
+  // ==========================================================================
+  // INDEXEDDB OFFLINE STORAGE FOR IN-APP OFFLINE PLAYBACK
+  // ==========================================================================
+  const OFFLINE_DB_NAME = 'MusiSurfOfflineDB';
+  const OFFLINE_STORE_NAME = 'downloaded_songs';
+  let dbPromise = null;
+
+  function getOfflineDB() {
+    if (!dbPromise) {
+      dbPromise = new Promise((resolve, reject) => {
+        const req = indexedDB.open(OFFLINE_DB_NAME, 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(OFFLINE_STORE_NAME)) {
+            db.createObjectStore(OFFLINE_STORE_NAME, { keyPath: 'id' });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    return dbPromise;
+  }
+
+  async function saveSongOfflineBlob(track) {
+    if (!track) return;
+    if (!track.audioUrl) {
+      downloadSong(track);
+      return;
+    }
+
+    showToast(`Saving "${track.title}" for in-app offline play...`, '⏳');
+    try {
+      let res;
+      try {
+        res = await fetch(track.audioUrl);
+        if (!res.ok) throw new Error('Direct fetch failed');
+      } catch (err) {
+        // Fallback to local server proxy if direct fetch is blocked by CORS
+        const proxyUrl = `/api/download?url=${encodeURIComponent(track.audioUrl)}&title=${encodeURIComponent(track.title)}`;
+        res = await fetch(proxyUrl);
+      }
+      if (!res.ok) throw new Error('Audio stream fetch failed');
+      const blob = await res.blob();
+
+      const db = await getOfflineDB();
+      const tx = db.transaction(OFFLINE_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(OFFLINE_STORE_NAME);
+
+      const record = {
+        id: track.id,
+        title: track.title,
+        artist: track.artist,
+        album: track.album || 'Single',
+        image: track.image,
+        duration: track.duration,
+        durationStr: track.durationStr,
+        source: track.source,
+        quality: '320kbps Offline Stored',
+        audioBlob: blob,
+        downloadedAt: Date.now()
+      };
+
+      store.put(record);
+
+      tx.oncomplete = () => {
+        const existingIdx = state.offlineTracks.findIndex(t => t.id === track.id);
+        if (existingIdx >= 0) {
+          state.offlineTracks[existingIdx] = record;
+        } else {
+          state.offlineTracks.unshift(record);
+        }
+        updateDownloadedCountUI();
+        showToast(`Saved "${track.title}" for offline playback!`, '⚡');
+        if (state.currentView === 'downloaded') {
+          renderPlaylistView('downloaded');
+        }
+      };
+    } catch (err) {
+      console.warn('Offline in-app save error:', err);
+      downloadSong(track);
+    }
+  }
+
+  async function loadOfflineTracks() {
+    try {
+      const db = await getOfflineDB();
+      const tx = db.transaction(OFFLINE_STORE_NAME, 'readonly');
+      const store = tx.objectStore(OFFLINE_STORE_NAME);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        state.offlineTracks = req.result || [];
+        updateDownloadedCountUI();
+      };
+    } catch (e) {
+      console.warn('Error loading offline tracks:', e);
+    }
+  }
+
+  function updateDownloadedCountUI() {
+    if (elements.downloadedCountMeta) {
+      const count = state.offlineTracks.length;
+      elements.downloadedCountMeta.textContent = `${count} song${count === 1 ? '' : 's'} • Offline Ready`;
+    }
+  }
+
   // YouTube Iframe API Initialization
   window.onYouTubeIframeAPIReady = function () {
     state.ytPlayer = new YT.Player('ytPlayer', {
@@ -364,7 +475,27 @@
     }
 
     // Determine playback mechanism
-    if (track.source === 'youtube' || !track.hasDirectAudio) {
+    const offlineRecord = track.audioBlob ? track : state.offlineTracks.find(t => t.id === track.id);
+    if (offlineRecord && offlineRecord.audioBlob) {
+      // Offline Stored Audio Playback (Zero Internet Needed!)
+      if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.stopVideo === 'function') {
+        state.ytPlayer.stopVideo();
+      }
+
+      const blobUrl = URL.createObjectURL(offlineRecord.audioBlob);
+      elements.audio.src = blobUrl;
+      elements.audio.volume = state.isMuted ? 0 : state.volume;
+      elements.audio.play().then(() => {
+        initAudioContext();
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+      }).catch(err => {
+        console.warn('Offline playback error:', err);
+      });
+
+      showToast(`Playing "${track.title}" (Offline Mode • Stored Locally)`, '⚡');
+    } else if (track.source === 'youtube' || !track.hasDirectAudio) {
       // YouTube Engine
       elements.audio.pause();
       if (state.ytReady && state.ytPlayer && track.ytId) {
@@ -461,13 +592,14 @@
     }
   }
 
-  // Direct Audio Downloader for Mobile and Desktop
+  // Direct Audio Downloader for Mobile and Desktop + In-App Offline Cache
   function downloadSong(track) {
     if (!track) {
       showToast('No song currently selected to download', 'ℹ');
       return;
     }
     if (track.audioUrl) {
+      // 1. Download file to device's Downloads directory
       const downloadUrl = `/api/download?url=${encodeURIComponent(track.audioUrl)}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`;
       const a = document.createElement('a');
       a.href = downloadUrl;
@@ -475,7 +607,9 @@
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      showToast(`Downloading "${track.title}" (320kbps full track)...`, '⬇');
+
+      // 2. Also save to IndexedDB for seamless in-app offline playback
+      saveSongOfflineBlob(track);
     } else if (track.ytId) {
       showToast(`Opening YouTube audio stream for "${track.title}"...`, '⬇');
       window.open(`https://www.youtube.com/watch?v=${track.ytId}`, '_blank');
@@ -1269,6 +1403,20 @@
           <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
         </svg>
       `;
+    } else if (playlistId === 'downloaded') {
+      title = 'Downloaded Songs';
+      desc = 'Stored locally on your device. Listen anywhere 100% offline with zero internet!';
+      tracks = state.offlineTracks;
+      elements.deletePlaylistBtn.style.display = 'none';
+      elements.playlistCoverArt.innerHTML = `
+        <div style="width: 100%; height: 100%; background: linear-gradient(135deg, #0575E6 0%, #00F260 100%); display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 75px; height: 75px; color: #fff;">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </div>
+      `;
     } else {
       const pl = state.customPlaylists.find(p => p.id === playlistId);
       if (pl) {
@@ -1803,7 +1951,7 @@
 
     // Mobile Bottom Navigation Tabs
     const updateMobNav = (btnId) => {
-      [elements.mobNavHome, elements.mobNavSearch, elements.mobNavLiked, elements.mobNavInstall].forEach(btn => {
+      [elements.mobNavHome, elements.mobNavSearch, elements.mobNavLiked, elements.mobNavDownloaded, elements.mobNavInstall].forEach(btn => {
         if (btn) btn.classList.toggle('active', btn.id === btnId);
       });
     };
@@ -1820,6 +1968,10 @@
     if (elements.mobNavLiked) elements.mobNavLiked.addEventListener('click', () => {
       renderPlaylistView('liked');
       updateMobNav('mobNavLiked');
+    });
+    if (elements.mobNavDownloaded) elements.mobNavDownloaded.addEventListener('click', () => {
+      renderPlaylistView('downloaded');
+      updateMobNav('mobNavDownloaded');
     });
 
     // Mobile Mini-Player Bar Click -> Opens Fullscreen Mobile Player
@@ -1926,7 +2078,33 @@
         elements.shortcutsModal.style.display = 'none';
         if (elements.mobilePlayerModal) elements.mobilePlayerModal.style.display = 'none';
       }
-    });
+    if (elements.navDownloaded) {
+      elements.navDownloaded.addEventListener('click', () => {
+        renderPlaylistView('downloaded');
+      });
+    }
+
+    // Network connection status changes
+    function handleNetworkChange() {
+      const isOnline = navigator.onLine;
+      if (elements.offlineBanner) {
+        elements.offlineBanner.style.display = isOnline ? 'none' : 'flex';
+      }
+      if (!isOnline) {
+        showToast('Offline Mode: Internet disconnected. Playing from your Downloaded songs.', '⚡');
+        if (state.offlineTracks.length > 0 && state.currentView === 'home') {
+          renderPlaylistView('downloaded');
+        }
+      } else {
+        showToast('Internet reconnected!', '🌐');
+      }
+    }
+
+    window.addEventListener('online', handleNetworkChange);
+    window.addEventListener('offline', handleNetworkChange);
+    if (!navigator.onLine && elements.offlineBanner) {
+      elements.offlineBanner.style.display = 'flex';
+    }
   }
 
   // ==========================================================================
@@ -1934,6 +2112,7 @@
   // ==========================================================================
   function init() {
     loadStoredData();
+    loadOfflineTracks();
     setDynamicGreeting();
     setVolume(state.volume);
     updateLikedCountUI();

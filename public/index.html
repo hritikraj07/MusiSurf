@@ -128,6 +128,21 @@
             </div>
           </div>
 
+          <!-- Downloaded Songs (Offline Listening in MusiSurf) -->
+          <div class="library-item downloaded-songs-item" id="navDownloadedBtn" data-view="downloaded">
+            <div class="downloaded-icon-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            </div>
+            <div class="library-item-info">
+              <span class="library-item-title">Downloaded</span>
+              <span class="library-item-meta" id="downloadedCountMeta">0 songs • Offline Ready</span>
+            </div>
+          </div>
+
           <!-- User Created Playlists -->
           <div class="custom-playlists-container" id="customPlaylistsList">
             <!-- Dynamically populated -->
@@ -228,6 +243,20 @@
           </button>
         </div>
       </header>
+
+      <!-- Offline Status Banner -->
+      <div class="offline-banner" id="offlineBanner" style="display: none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="1" y1="1" x2="23" y2="23"/>
+          <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+          <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+          <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
+          <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+          <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+          <line x1="12" y1="20" x2="12.01" y2="20"/>
+        </svg>
+        <span>Offline Mode: You are offline. Enjoy playing your saved Downloaded songs!</span>
+      </div>
 
       <!-- View Containers -->
       <div class="content-scroll" id="contentScroll">
@@ -719,13 +748,19 @@
         </svg>
         <span>Liked</span>
       </button>
-      <button class="mobile-nav-item" id="mobNavInstall" title="Download MusiSurf App">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <button class="mobile-nav-item" id="mobNavDownloaded" data-view="downloaded" title="Offline Music">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
           <polyline points="7 10 12 15 17 10"/>
           <line x1="12" y1="15" x2="12" y2="3"/>
         </svg>
-        <span>Install</span>
+        <span>Offline</span>
+      </button>
+      <button class="mobile-nav-item" id="mobNavInstall" title="Download MusiSurf App">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+        </svg>
+        <span>App</span>
       </button>
     </nav>
 
