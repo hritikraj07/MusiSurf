@@ -1,0 +1,32 @@
+{
+  "name": "MusiSurf — 100% Ad-Free Music Streaming",
+  "short_name": "MusiSurf",
+  "description": "Stream millions of full-length songs with zero ads, real-time synced lyrics, and high-quality 320kbps audio.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "background_color": "#08090b",
+  "theme_color": "#121212",
+  "orientation": "portrait",
+  "categories": ["music", "entertainment", "audio"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
