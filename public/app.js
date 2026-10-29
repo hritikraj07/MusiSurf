@@ -51,7 +51,6 @@
     // Nav & Sidebar
     navHome: document.getElementById('navHomeBtn'),
     navSearch: document.getElementById('navSearchBtn'),
-    navExplore: document.getElementById('navExploreBtn'),
     navLiked: document.getElementById('navLikedBtn'),
     navDownloaded: document.getElementById('navDownloadedBtn'),
     navBrand: document.getElementById('navBrand'),
@@ -394,20 +393,9 @@
     });
   };
 
-  // Audio Context Setup for Visualizer
+  // Audio Context Setup (non-interfering, direct audio without CORS muting)
   function initAudioContext() {
-    if (audioCtx) return;
-    try {
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      audioCtx = new AudioContextClass();
-      analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      audioSourceNode = audioCtx.createMediaElementSource(elements.audio);
-      audioSourceNode.connect(analyser);
-      analyser.connect(audioCtx.destination);
-    } catch (err) {
-      console.warn('Web Audio API not supported or failed to init:', err);
-    }
+    // Web Audio media node intentionally omitted to allow direct cross-origin audio streaming
   }
 
   // ==========================================================================
@@ -486,16 +474,33 @@
         state.ytPlayer.playVideo();
       }
     } else {
-      // Direct Stream
+      // Direct Stream with proxy fallback for resilience
       if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.stopVideo === 'function') {
         state.ytPlayer.stopVideo();
       }
 
+      elements.audio.onerror = () => {
+        if (!elements.audio.src.includes('/api/stream') && track.audioUrl) {
+          console.warn('Direct stream error, switching to MusiSurf stream proxy...');
+          elements.audio.src = `/api/stream?url=${encodeURIComponent(track.audioUrl)}`;
+          elements.audio.volume = state.isMuted ? 0 : state.volume;
+          elements.audio.play().catch(e => console.warn('Stream proxy play retry failed:', e));
+        }
+      };
+
       elements.audio.src = track.audioUrl;
       elements.audio.volume = state.isMuted ? 0 : state.volume;
-      elements.audio.play().catch(err => {
-        console.warn('Playback error:', err);
-      });
+      const playPromise = elements.audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(err => {
+          console.warn('Direct play error, falling back to stream proxy:', err);
+          if (track.audioUrl && !elements.audio.src.includes('/api/stream')) {
+            elements.audio.src = `/api/stream?url=${encodeURIComponent(track.audioUrl)}`;
+            elements.audio.volume = state.isMuted ? 0 : state.volume;
+            elements.audio.play().catch(proxyErr => console.warn('Stream proxy fallback failed:', proxyErr));
+          }
+        });
+      }
     }
 
     state.isPlaying = true;
@@ -533,8 +538,16 @@
       }
     } else {
       if (elements.audio.paused) {
-        elements.audio.play();
-        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        const resumePromise = elements.audio.play();
+        if (resumePromise !== undefined) {
+          resumePromise.catch(err => {
+            if (state.currentTrack?.audioUrl && !elements.audio.src.includes('/api/stream')) {
+              elements.audio.src = `/api/stream?url=${encodeURIComponent(state.currentTrack.audioUrl)}`;
+              elements.audio.volume = state.isMuted ? 0 : state.volume;
+              elements.audio.play().catch(e => console.warn('Proxy resume error:', e));
+            }
+          });
+        }
         state.isPlaying = true;
       } else {
         elements.audio.pause();
@@ -990,6 +1003,42 @@
     elements.greetingHeading.textContent = greeting;
   }
 
+  // Deduplicate and Shuffle to ensure no identical album thumbnails on home page
+  function deduplicateAndShuffleAlbums(tracks, max = 10) {
+    if (!tracks || !Array.isArray(tracks)) return [];
+    const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+    const seenAlbums = new Set();
+    const seenImages = new Set();
+    const seenTitles = new Set();
+    const unique = [];
+
+    for (const t of shuffled) {
+      if (!t || !t.audioUrl) continue;
+      const albumKey = (t.album || '').trim().toLowerCase();
+      const isSingle = !albumKey || albumKey === 'single' || albumKey === 'singles';
+      const titleKey = (t.title || '').trim().toLowerCase().replace(/\(.*\)|\[.*\]|- .*/g, '').trim();
+      let imgKey = t.image || '';
+      try {
+        const u = new URL(t.image);
+        imgKey = u.pathname.split('/').pop() || t.image;
+      } catch (e) {
+        imgKey = t.image;
+      }
+
+      if (!isSingle && seenAlbums.has(albumKey)) continue;
+      if (imgKey && seenImages.has(imgKey)) continue;
+      if (titleKey && seenTitles.has(titleKey)) continue;
+
+      if (!isSingle) seenAlbums.add(albumKey);
+      if (imgKey) seenImages.add(imgKey);
+      if (titleKey) seenTitles.add(titleKey);
+
+      unique.push(t);
+      if (unique.length >= max) break;
+    }
+    return unique;
+  }
+
   async function loadTrendingShelves() {
     try {
       const res = await fetch('/api/trending');
@@ -1002,14 +1051,16 @@
 
       elements.shelvesContainer.innerHTML = '';
 
-      // Populate Quick Picks with first 6 songs
+      // Populate Quick Picks with 6 songs from distinct albums and distinct thumbnails
       const allTracks = [];
       data.sections.forEach(sec => allTracks.push(...sec.tracks));
-      renderQuickPicks(allTracks.slice(0, 6));
+      const quickPicks = deduplicateAndShuffleAlbums(allTracks, 6);
+      renderQuickPicks(quickPicks);
 
-      // Populate Curated Shelves
+      // Populate Curated Shelves - strictly unique albums & shuffled on each home load
       data.sections.forEach(section => {
-        const shelf = createShelfElement(section);
+        const distinctTracks = deduplicateAndShuffleAlbums(section.tracks, 10);
+        const shelf = createShelfElement({ ...section, tracks: distinctTracks });
         elements.shelvesContainer.appendChild(shelf);
       });
     } catch (err) {
@@ -1628,10 +1679,12 @@
       switchView('search');
       elements.globalSearchInput.focus();
     });
-    elements.navExplore.addEventListener('click', () => {
-      switchView('search');
-      elements.globalSearchInput.focus();
-    });
+    if (elements.navExplore) {
+      elements.navExplore.addEventListener('click', () => {
+        switchView('search');
+        elements.globalSearchInput.focus();
+      });
+    }
     elements.navLiked.addEventListener('click', () => {
       renderPlaylistView('liked');
     });
@@ -1768,12 +1821,54 @@
       elements.progressHoverTime.textContent = formatTime(pct * dur);
     });
 
-    // Volume Interactions
-    elements.volumeBtn.addEventListener('click', toggleMute);
-    elements.volumeBar.addEventListener('click', (e) => {
+    // Movable Volume Slider (Interactive Drag for Mouse & Touch)
+    let isDraggingVolume = false;
+
+    function handleVolumeChange(e) {
       const rect = elements.volumeBar.getBoundingClientRect();
-      const pct = (e.clientX - rect.left) / rect.width;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       setVolume(pct);
+    }
+
+    elements.volumeBtn.addEventListener('click', toggleMute);
+
+    elements.volumeBar.addEventListener('mousedown', (e) => {
+      isDraggingVolume = true;
+      elements.volumeBar.classList.add('dragging');
+      handleVolumeChange(e);
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDraggingVolume) return;
+      handleVolumeChange(e);
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDraggingVolume) {
+        isDraggingVolume = false;
+        elements.volumeBar.classList.remove('dragging');
+      }
+    });
+
+    // Touch support for mobile devices
+    elements.volumeBar.addEventListener('touchstart', (e) => {
+      isDraggingVolume = true;
+      elements.volumeBar.classList.add('dragging');
+      handleVolumeChange(e);
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!isDraggingVolume) return;
+      handleVolumeChange(e);
+    }, { passive: false });
+
+    window.addEventListener('touchend', () => {
+      if (isDraggingVolume) {
+        isDraggingVolume = false;
+        elements.volumeBar.classList.remove('dragging');
+      }
     });
 
     // Queue Drawer Toggle
@@ -2082,6 +2177,7 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').then((reg) => {
+          reg.update(); // Immediately check for updates
           console.log('🌊 MusiSurf Service Worker registered:', reg.scope);
         }).catch((err) => {
           console.warn('SW registration:', err);

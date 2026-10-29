@@ -24,7 +24,7 @@
   <link rel="apple-touch-icon" href="/icons/icon.svg">
   
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.css?v=2.5">
 </head>
 <body class="theme-dark">
   <div id="app" class="app-layout">
@@ -62,14 +62,6 @@
                 <path d="m21 21-4.3-4.3"/>
               </svg>
               <span>Search</span>
-            </button>
-          </li>
-          <li class="nav-item">
-            <button class="nav-btn" id="navExploreBtn" data-view="explore">
-              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="12 2 19 21 12 17 5 21 12 2"/>
-              </svg>
-              <span>Discover & Charts</span>
             </button>
           </li>
         </ul>
@@ -432,7 +424,6 @@
                 </div>
               </div>
               <div class="lyrics-header-actions">
-                <span class="synced-badge">⚡ Live Synced Lyrics</span>
                 <button class="close-view-btn" id="closeLyricsBtn">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"/>
@@ -783,7 +774,7 @@
     </div>
 
     <!-- Native Audio Element for Direct 320kbps Streams -->
-    <audio id="audioPlayer" preload="auto" crossorigin="anonymous"></audio>
+    <audio id="audioPlayer" preload="auto"></audio>
 
     <!-- Hidden / Controlled YouTube Iframe Container for Universal Fallback -->
     <div id="youtubePlayerContainer" class="yt-hidden-player">
@@ -899,6 +890,6 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js"></script>
+  <script src="/app.js?v=2.5"></script>
 </body>
 </html>

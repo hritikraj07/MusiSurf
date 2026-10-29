@@ -2358,15 +2358,19 @@ html, body {
 
 .volume-bar {
   flex: 1;
-  height: 4px;
+  height: 6px;
   background-color: rgba(255, 255, 255, 0.2);
-  border-radius: 2px;
+  border-radius: 3px;
   position: relative;
   cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
   transition: height var(--transition-fast);
 }
 
-.volume-bar:hover {
+.volume-bar:hover,
+.volume-bar.dragging {
   height: 6px;
 }
 
@@ -2377,29 +2381,36 @@ html, body {
   height: 100%;
   width: 80%;
   background-color: #fff;
-  border-radius: 2px;
+  border-radius: 3px;
+  pointer-events: none;
   transition: background-color var(--transition-fast);
 }
 
-.volume-bar:hover .volume-fill {
+.volume-bar:hover .volume-fill,
+.volume-bar.dragging .volume-fill {
   background-color: var(--accent-primary);
 }
 
 .volume-handle {
   position: absolute;
-  right: -6px;
+  right: -7px;
   top: 50%;
-  transform: translateY(-50%) scale(0);
-  width: 12px;
-  height: 12px;
+  transform: translateY(-50%) scale(1);
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background-color: #fff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
-  transition: transform var(--transition-fast);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  cursor: grab;
+  pointer-events: auto;
+  transition: transform 0.15s ease, background-color 0.15s ease;
 }
 
-.volume-bar:hover .volume-handle {
-  transform: translateY(-50%) scale(1);
+.volume-handle:hover,
+.volume-bar.dragging .volume-handle {
+  transform: translateY(-50%) scale(1.25);
+  background-color: var(--accent-primary);
+  cursor: grabbing;
 }
 
 .player-shield-badge {

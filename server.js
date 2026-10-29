@@ -225,52 +225,110 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-// Curated Trending & Discover Categories
+// Deduplicate and Shuffle tracks ensuring unique albums, thumbnails, and titles
+function deduplicateAndShuffle(tracks, max = 10) {
+  if (!tracks || !Array.isArray(tracks)) return [];
+
+  // Fisher-Yates Shuffle
+  const shuffled = [...tracks];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  const seenAlbums = new Set();
+  const seenImages = new Set();
+  const seenTitles = new Set();
+  const uniqueTracks = [];
+
+  for (const track of shuffled) {
+    if (!track || !track.audioUrl) continue;
+
+    // Normalize album name (ignore generic 'single')
+    const rawAlbum = (track.album || '').trim().toLowerCase();
+    const isSingle = !rawAlbum || rawAlbum === 'single' || rawAlbum === 'singles';
+    
+    // Normalize track title
+    const normTitle = (track.title || '').trim().toLowerCase().replace(/\(.*\)|\[.*\]|- .*/g, '').trim();
+
+    // Extract image signature (e.g. filename from CDN URL)
+    let imgKey = '';
+    if (track.image) {
+      try {
+        const u = new URL(track.image);
+        imgKey = u.pathname.split('/').pop() || track.image;
+      } catch (e) {
+        imgKey = track.image;
+      }
+    }
+
+    // Reject duplicates of album, thumbnail, or title
+    if (!isSingle && seenAlbums.has(rawAlbum)) continue;
+    if (imgKey && seenImages.has(imgKey)) continue;
+    if (normTitle && seenTitles.has(normTitle)) continue;
+
+    if (!isSingle) seenAlbums.add(rawAlbum);
+    if (imgKey) seenImages.add(imgKey);
+    if (normTitle) seenTitles.add(normTitle);
+
+    uniqueTracks.push(track);
+    if (uniqueTracks.length >= max) break;
+  }
+
+  return uniqueTracks;
+}
+
+// Curated Trending & Discover Categories with Diverse Multi-Artist Queries
 const TRENDING_CATEGORIES = [
   {
     id: 'global-hits',
     title: "Global Top Hits",
     subtitle: "The most played anthems worldwide right now",
-    query: "Top Hits Global"
+    queries: ["Dua Lipa", "The Weeknd", "Taylor Swift", "Post Malone", "Ed Sheeran", "Billie Eilish", "Harry Styles", "Bruno Mars"]
   },
   {
     id: 'chill-lofi',
     title: "Chill & Lo-Fi Waves",
     subtitle: "Relax, study, code, and surf the mellow beats",
-    query: "Lofi Beats Chill Study"
+    queries: ["Lofi Hip Hop", "Chillhop Beats", "Coffee Lofi", "Late Night Lofi", "Peaceful Piano", "Study Beats Instrumentals"]
   },
   {
     id: 'electronic-energy',
     title: "Electronic & Gym Energy",
     subtitle: "High octane basslines and peak workout motivation",
-    query: "EDM Dance Party Hits"
+    queries: ["Avicii", "Martin Garrix", "David Guetta", "Calvin Harris", "Alan Walker", "Tiësto", "Swedish House Mafia"]
   },
   {
     id: 'acoustic-soul',
     title: "Acoustic & Midnight R&B",
     subtitle: "Soulful vocals, late night drives, and warm vibes",
-    query: "Acoustic Pop Romance"
+    queries: ["Acoustic Hits", "Adele", "John Legend", "Sam Smith", "Lewis Capaldi", "Norah Jones", "Coldplay Acoustic"]
   },
   {
     id: 'bollywood-pop',
     title: "Desi & Bollywood Beats",
     subtitle: "Trending charts, romantic melodies, and festive vibes",
-    query: "Trending Bollywood Hits"
+    queries: ["Arijit Singh", "Diljit Dosanjh", "Shreya Ghoshal", "Atif Aslam", "Badshah", "Pritam", "Sidhu Moose Wala", "A.R. Rahman"]
   }
 ];
 
-let trendingCache = null;
+let trendingSectionsCache = null;
 let trendingCacheTime = 0;
 
 async function fetchTrendingData() {
   const sections = await Promise.all(
     TRENDING_CATEGORIES.map(async (cat) => {
-      const tracks = await searchSaavn(cat.query, 8);
+      // Query multiple diverse artists/queries to guarantee distinct albums & thumbnails
+      const queryPromises = cat.queries.slice(0, 4).map(q => searchSaavn(q, 6));
+      const resultsArray = await Promise.all(queryPromises);
+      const combinedTracks = resultsArray.flat();
+
+      const uniqueTracks = deduplicateAndShuffle(combinedTracks, 10);
       return {
         id: cat.id,
         title: cat.title,
         subtitle: cat.subtitle,
-        tracks: tracks || []
+        tracks: uniqueTracks
       };
     })
   );
@@ -280,31 +338,86 @@ async function fetchTrendingData() {
 // Pre-warm cache on server startup
 fetchTrendingData().then(data => {
   if (data && data.length > 0) {
-    trendingCache = data;
+    trendingSectionsCache = data;
     trendingCacheTime = Date.now();
-    console.log(`⚡ Pre-cached ${data.length} trending music sections in memory!`);
+    console.log(`⚡ Pre-cached ${data.length} trending music sections with unique albums!`);
   }
 }).catch(err => console.warn('Preload trending warning:', err.message));
 
 app.get('/api/trending', async (req, res) => {
   const now = Date.now();
-  if (trendingCache && now - trendingCacheTime < 1000 * 60 * 30) {
-    return res.json({ success: true, sections: trendingCache });
+  if (trendingSectionsCache && now - trendingCacheTime < 1000 * 60 * 20) {
+    // Return a fresh shuffle of the distinct album tracks so home page is always dynamic
+    const dynamicSections = trendingSectionsCache.map(sec => ({
+      ...sec,
+      tracks: [...sec.tracks].sort(() => Math.random() - 0.5)
+    }));
+    return res.json({ success: true, sections: dynamicSections });
   }
 
   try {
     const sections = await fetchTrendingData();
     if (sections && sections.length > 0) {
-      trendingCache = sections;
+      trendingSectionsCache = sections;
       trendingCacheTime = now;
     }
-    res.json({ success: true, sections: trendingCache || sections });
+    const targetSections = trendingSectionsCache || sections;
+    const dynamicSections = targetSections.map(sec => ({
+      ...sec,
+      tracks: [...sec.tracks].sort(() => Math.random() - 0.5)
+    }));
+    res.json({ success: true, sections: dynamicSections });
   } catch (err) {
     console.error('Trending fetch error:', err);
-    if (trendingCache) {
-      return res.json({ success: true, sections: trendingCache });
+    if (trendingSectionsCache) {
+      return res.json({ success: true, sections: trendingSectionsCache });
     }
     res.status(500).json({ success: false, error: 'Failed to load trending music' });
+  }
+});
+
+// Resilient Stream Proxy with HTTP Range Support & Full Length Audio
+app.get('/api/stream', async (req, res) => {
+  const audioUrl = req.query.url;
+  if (!audioUrl || !audioUrl.startsWith('http')) {
+    return res.status(400).send('Invalid audio URL');
+  }
+
+  try {
+    const range = req.headers.range;
+    const fetchHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    };
+    if (range) {
+      fetchHeaders['Range'] = range;
+    }
+
+    const audioRes = await fetch(audioUrl, { headers: fetchHeaders });
+    if (!audioRes.ok && audioRes.status !== 206) {
+      return res.status(audioRes.status).send('Streaming upstream error');
+    }
+
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Content-Type', audioRes.headers.get('content-type') || 'audio/mp4');
+
+    if (audioRes.headers.get('content-range')) {
+      res.setHeader('Content-Range', audioRes.headers.get('content-range'));
+      res.status(206);
+    } else {
+      res.status(audioRes.status);
+    }
+
+    if (audioRes.headers.get('content-length')) {
+      res.setHeader('Content-Length', audioRes.headers.get('content-length'));
+    }
+
+    const { Readable } = require('stream');
+    const stream = Readable.fromWeb(audioRes.body);
+    stream.pipe(res);
+  } catch (err) {
+    console.error('Stream proxy error:', err.message);
+    res.status(500).send('Stream error');
   }
 });
 
@@ -420,10 +533,15 @@ app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`===============================================`);
-  console.log(`🌊 MusiSurf Music Streaming Server Active!`);
-  console.log(`🎵 Ad-Free & Full-Length Song Streaming Ready`);
-  console.log(`🌐 Local URL: http://localhost:${PORT}`);
-  console.log(`===============================================`);
-});
+if (require.main === module || !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`===============================================`);
+    console.log(`🌊 MusiSurf Music Streaming Server Active!`);
+    console.log(`🎵 Ad-Free & Full-Length Song Streaming Ready`);
+    console.log(`🌐 Local URL: http://localhost:${PORT}`);
+    console.log(`===============================================`);
+  });
+}
+
+module.exports = app;
+
