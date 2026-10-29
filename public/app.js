@@ -18,7 +18,7 @@
     repeatMode: 'off', // 'off', 'all', 'one'
     volume: 0.8,
     isMuted: false,
-    currentView: 'home', // 'home', 'search', 'explore', 'liked', 'playlist', 'lyrics', 'visualizer'
+    currentView: 'home', // 'home', 'search', 'explore', 'liked', 'playlist', 'lyrics', 'localMusic'
     previousView: 'home',
     searchSource: 'all',
     likedSongs: [],
@@ -30,7 +30,15 @@
     activeLyricIndex: -1,
     vizMode: 'bars', // 'bars', 'wave', 'circle'
     ytPlayer: null,
-    ytReady: false
+    ytReady: false,
+    settings: {
+      removeDeadSilence: true
+    },
+    userQueuedCount: 0,
+    localTracks: [],
+    isTrimmingStartSilence: false,
+    trailingSilenceFrames: 0,
+    allAvailableTracks: []
   };
 
   // DOM Elements
@@ -44,7 +52,8 @@
       home: document.getElementById('homeView'),
       search: document.getElementById('searchView'),
       playlist: document.getElementById('playlistView'),
-      lyrics: document.getElementById('lyricsView')
+      lyrics: document.getElementById('lyricsView'),
+      localMusic: document.getElementById('localMusicView')
     },
     contentScroll: document.getElementById('contentScroll'),
 
@@ -53,11 +62,13 @@
     navSearch: document.getElementById('navSearchBtn'),
     navLiked: document.getElementById('navLikedBtn'),
     navDownloaded: document.getElementById('navDownloadedBtn'),
+    navLocalMusic: document.getElementById('navLocalMusicBtn'),
     navBrand: document.getElementById('navBrand'),
     customPlaylistsList: document.getElementById('customPlaylistsList'),
     createPlaylistBtn: document.getElementById('createPlaylistBtn'),
     likedCountMeta: document.getElementById('likedCountMeta'),
     downloadedCountMeta: document.getElementById('downloadedCountMeta'),
+    localCountMeta: document.getElementById('localCountMeta'),
 
     // Header & Offline Banner
     offlineBanner: document.getElementById('offlineBanner'),
@@ -177,9 +188,24 @@
     modalPlaylistPickerList: document.getElementById('modalPlaylistPickerList'),
     closeAddToPlaylistBtn: document.getElementById('closeAddToPlaylistBtn'),
 
-    shortcutsModal: document.getElementById('shortcutsModal'),
-    openShortcutsBtn: document.getElementById('openShortcutsBtn'),
-    closeShortcutsModalBtn: document.getElementById('closeShortcutsModalBtn'),
+    settingsModal: document.getElementById('settingsModal'),
+    openSettingsBtn: document.getElementById('openSettingsBtn'),
+    headerSettingsBtn: document.getElementById('headerSettingsBtn'),
+    closeSettingsModalBtn: document.getElementById('closeSettingsModalBtn'),
+    deadSilenceOnRadio: document.getElementById('deadSilenceOnRadio'),
+    deadSilenceOffRadio: document.getElementById('deadSilenceOffRadio'),
+
+    // Local Music View
+    localTrackCount: document.getElementById('localTrackCount'),
+    localTotalTime: document.getElementById('localTotalTime'),
+    localAudioFileInput: document.getElementById('localAudioFileInput'),
+    localDropZone: document.getElementById('localDropZone'),
+    localTracksContainer: document.getElementById('localTracksContainer'),
+    localTracksTable: document.getElementById('localTracksTable'),
+    localTracksTbody: document.getElementById('localTracksTbody'),
+    localEmptyState: document.getElementById('localEmptyState'),
+    playAllLocalBtn: document.getElementById('playAllLocalBtn'),
+    clearAllLocalBtn: document.getElementById('clearAllLocalBtn'),
 
     toastContainer: document.getElementById('toastContainer')
   };
@@ -396,9 +422,43 @@
     });
   };
 
-  // Audio Context Setup (non-interfering, direct audio without CORS muting)
+  // Web Audio Context for Dead Silence & Spectrum Detection
   function initAudioContext() {
-    // Web Audio media node intentionally omitted to allow direct cross-origin audio streaming
+    if (audioSourceNode) return;
+    try {
+      const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtxClass) return;
+      if (!audioCtx) audioCtx = new AudioCtxClass();
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.2;
+      
+      // Connect HTML5 audio through analyser for silence detection
+      audioSourceNode = audioCtx.createMediaElementSource(elements.audio);
+      audioSourceNode.connect(analyser);
+      analyser.connect(audioCtx.destination);
+    } catch (e) {
+      console.warn('AudioContext analysis setup note:', e.message);
+    }
+  }
+
+  function getAudioSignalLevel() {
+    if (!analyser) return -1;
+    try {
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      analyser.getByteFrequencyData(dataArray);
+      let sum = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        sum += dataArray[i];
+      }
+      return sum / bufferLength;
+    } catch (e) {
+      return -1;
+    }
   }
 
   // ==========================================================================
@@ -410,6 +470,7 @@
     // Set queue if provided
     if (queueList && Array.isArray(queueList)) {
       state.queue = [...queueList];
+      state.userQueuedCount = 0;
       state.queueIndex = state.queue.findIndex(t => t.id === track.id);
       if (state.queueIndex === -1) {
         state.queue.unshift(track);
@@ -421,6 +482,12 @@
     }
 
     state.currentTrack = track;
+
+    // Reset silence trimmer state for new track
+    if (state.settings.removeDeadSilence) {
+      state.isTrimmingStartSilence = true;
+      state.trailingSilenceFrames = 0;
+    }
 
     // Update Player UI Metadata
     elements.playerTitle.textContent = track.title;
@@ -453,57 +520,75 @@
     }
 
     // Determine playback mechanism
-    const offlineRecord = track.audioBlob ? track : state.offlineTracks.find(t => t.id === track.id);
-    if (offlineRecord && offlineRecord.audioBlob) {
-      // Offline Stored Audio Playback
+    if (track.isLocal && track.fileBlob) {
+      // Local device storage file playback (100% on device)
       if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.stopVideo === 'function') {
         state.ytPlayer.stopVideo();
       }
 
-      const blobUrl = URL.createObjectURL(offlineRecord.audioBlob);
+      const blobUrl = URL.createObjectURL(track.fileBlob);
       elements.audio.src = blobUrl;
       elements.audio.volume = state.isMuted ? 0 : state.volume;
       elements.audio.load();
       elements.audio.play().catch(err => {
-        console.warn('Offline playback error:', err);
+        console.warn('Local storage audio play error:', err);
       });
-    } else if (track.source === 'youtube' || !track.hasDirectAudio) {
-      // YouTube Engine
-      elements.audio.pause();
-      if (state.ytReady && state.ytPlayer && track.ytId) {
-        state.ytPlayer.loadVideoById(track.ytId);
-        state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
-        state.ytPlayer.playVideo();
-      }
+      initAudioContext();
     } else {
-      // Audio Stream via same-origin /api/stream proxy for 100% reliable 206 streaming without CORS/adblocker blocks
-      if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.stopVideo === 'function') {
-        state.ytPlayer.stopVideo();
-      }
+      const offlineRecord = track.audioBlob ? track : state.offlineTracks.find(t => t.id === track.id);
+      if (offlineRecord && offlineRecord.audioBlob) {
+        // Offline Stored Audio Playback
+        if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.stopVideo === 'function') {
+          state.ytPlayer.stopVideo();
+        }
 
-      // Ensure volume is audible and unmuted
-      if (state.isMuted || state.volume <= 0.05) {
-        setVolume(0.8);
-      } else {
-        elements.audio.volume = state.volume;
-      }
-
-      const streamUrl = track.streamUrl || (track.audioUrl ? `/api/stream?url=${encodeURIComponent(track.audioUrl)}` : null);
-      if (!streamUrl && !track.audioUrl) {
-        showToast('Audio stream unavailable for this track', '⚠');
-        return;
-      }
-
-      elements.audio.src = streamUrl || track.audioUrl;
-      const playPromise = elements.audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(err => {
-          console.warn('Stream proxy play rejected, trying direct CDN stream:', err);
-          if (track.audioUrl && elements.audio.src.includes('/api/stream')) {
-            elements.audio.src = track.audioUrl;
-            elements.audio.play().catch(directErr => console.warn('Direct stream fallback failed:', directErr));
-          }
+        const blobUrl = URL.createObjectURL(offlineRecord.audioBlob);
+        elements.audio.src = blobUrl;
+        elements.audio.volume = state.isMuted ? 0 : state.volume;
+        elements.audio.load();
+        elements.audio.play().catch(err => {
+          console.warn('Offline playback error:', err);
         });
+        initAudioContext();
+      } else if (track.source === 'youtube' || !track.hasDirectAudio) {
+        // YouTube Engine
+        elements.audio.pause();
+        if (state.ytReady && state.ytPlayer && track.ytId) {
+          state.ytPlayer.loadVideoById(track.ytId);
+          state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
+          state.ytPlayer.playVideo();
+        }
+      } else {
+        // Audio Stream via same-origin /api/stream proxy for 100% reliable 206 streaming without CORS/adblocker blocks
+        if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.stopVideo === 'function') {
+          state.ytPlayer.stopVideo();
+        }
+
+        // Ensure volume is audible and unmuted
+        if (state.isMuted || state.volume <= 0.05) {
+          setVolume(0.8);
+        } else {
+          elements.audio.volume = state.volume;
+        }
+
+        const streamUrl = track.streamUrl || (track.audioUrl ? `/api/stream?url=${encodeURIComponent(track.audioUrl)}` : null);
+        if (!streamUrl && !track.audioUrl) {
+          showToast('Audio stream unavailable for this track', '⚠');
+          return;
+        }
+
+        elements.audio.src = streamUrl || track.audioUrl;
+        const playPromise = elements.audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(err => {
+            console.warn('Stream proxy play rejected, trying direct CDN stream:', err);
+            if (track.audioUrl && elements.audio.src.includes('/api/stream')) {
+              elements.audio.src = track.audioUrl;
+              elements.audio.play().catch(directErr => console.warn('Direct stream fallback failed:', directErr));
+            }
+          });
+        }
+        initAudioContext();
       }
     }
 
@@ -611,8 +696,34 @@
     }
   }
 
+  // Add Track to Queue (inserts at top of upcoming queue, and successive adds queue right after)
+  function addToQueue(track) {
+    if (!track) return;
+
+    if (!state.currentTrack || state.queue.length === 0) {
+      playTrack(track);
+      showToast(`Playing "${track.title}"`, '▶');
+      return;
+    }
+
+    // Place at the top of the upcoming queue (after currently playing track + any previous user-queued songs)
+    const insertIndex = Math.min(state.queue.length, (state.queueIndex + 1) + (state.userQueuedCount || 0));
+    state.queue.splice(insertIndex, 0, track);
+    state.userQueuedCount = (state.userQueuedCount || 0) + 1;
+
+    updateQueueDrawerUI();
+    showToast(`Added to top of queue: "${track.title}"`, '➕');
+  }
+
   function nextTrack() {
-    if (state.queue.length === 0) return;
+    if (state.queue.length === 0) {
+      if (state.allAvailableTracks && state.allAvailableTracks.length > 0) {
+        state.queue = [...state.allAvailableTracks];
+        state.queueIndex = 0;
+        playTrack(state.queue[0]);
+      }
+      return;
+    }
 
     if (state.repeatMode === 'one' && state.currentTrack) {
       seekTo(0);
@@ -625,8 +736,20 @@
       if (state.repeatMode === 'all') {
         nextIdx = 0;
       } else {
-        return; // End of queue
+        // AUTOPLAY: Don't stop! Keep music flowing by picking unplayed songs from home/trending
+        const unplayed = (state.allAvailableTracks || []).filter(t => !state.queue.some(q => q.id === t.id));
+        if (unplayed.length > 0) {
+          const batch = unplayed.slice(0, 10);
+          state.queue.push(...batch);
+        } else {
+          // Loop seamlessly if entire catalog was played
+          nextIdx = 0;
+        }
       }
+    }
+
+    if (state.userQueuedCount && state.userQueuedCount > 0) {
+      state.userQueuedCount--;
     }
 
     state.queueIndex = nextIdx;
@@ -653,12 +776,12 @@
   }
 
   function onTrackEnded() {
-    if (state.repeatMode === 'one') {
+    if (state.repeatMode === 'one' && state.currentTrack) {
       seekTo(0);
-      togglePlayPause();
-    } else {
-      nextTrack();
+      playTrack(state.currentTrack);
+      return;
     }
+    nextTrack();
   }
 
   function getCurrentPlaybackTime() {
@@ -717,7 +840,7 @@
     setVolume(state.isMuted ? 0 : (state.volume || 0.8));
   }
 
-  // Real-time Progress Bar Loop
+  // Real-time Progress Bar Loop with Intelligent Dead Silence Trimmer
   function updateProgress() {
     if (state.isPlaying && state.currentTrack) {
       const cur = getCurrentPlaybackTime();
@@ -735,6 +858,40 @@
         if (elements.audio.buffered && elements.audio.buffered.length > 0) {
           const bufEnd = elements.audio.buffered.end(elements.audio.buffered.length - 1);
           elements.progressBuffer.style.width = `${Math.min(100, (bufEnd / dur) * 100)}%`;
+        }
+      }
+
+      // Check Intelligent Dead Silence Removal (Start & Ending ONLY - Middle is untouched)
+      if (state.settings.removeDeadSilence && dur > 6 && !elements.audio.paused && !elements.audio.seeking) {
+        // 1. START SILENCE ONLY (first 3.5 seconds)
+        if (state.isTrimmingStartSilence && cur < 3.5) {
+          const signal = getAudioSignalLevel();
+          if (signal !== -1 && signal < 3) {
+            // Dead silence detected at intro: skip forward
+            seekTo(Math.min(cur + 0.15, 3.5));
+          } else if (signal >= 3) {
+            // Sound wave / music detected! Stop intro trimming immediately
+            state.isTrimmingStartSilence = false;
+          }
+        } else if (cur >= 3.5 && state.isTrimmingStartSilence) {
+          state.isTrimmingStartSilence = false;
+        }
+
+        // 2. END SILENCE ONLY (last 4.5 seconds of song)
+        // Note: Middle of song (cur between 3.5 and dur - 4.5) is NEVER altered
+        if (cur >= dur - 4.5) {
+          const signal = getAudioSignalLevel();
+          if (signal !== -1 && signal < 3) {
+            state.trailingSilenceFrames = (state.trailingSilenceFrames || 0) + 1;
+            // When silent for consecutive frames or within 0.8s of end, conclude track
+            if (state.trailingSilenceFrames >= 15 || cur >= dur - 0.8) {
+              state.trailingSilenceFrames = 0;
+              state.isTrimmingStartSilence = false;
+              onTrackEnded();
+            }
+          } else {
+            state.trailingSilenceFrames = 0;
+          }
         }
       }
 
@@ -1277,6 +1434,15 @@
           <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
         </svg>
       </button>
+      <button class="song-action-btn add-to-queue-trigger" title="Add to Queue">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="8" y1="6" x2="21" y2="6"/>
+          <line x1="8" y1="12" x2="21" y2="12"/>
+          <line x1="8" y1="18" x2="16" y2="18"/>
+          <line x1="19" y1="15" x2="19" y2="21"/>
+          <line x1="16" y1="18" x2="22" y2="18"/>
+        </svg>
+      </button>
       <button class="song-action-btn download-song-trigger" title="Download Full Track (320kbps)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -1288,6 +1454,11 @@
     `;
 
     row.addEventListener('click', (e) => {
+      if (e.target.closest('.add-to-queue-trigger')) {
+        e.stopPropagation();
+        addToQueue(track);
+        return;
+      }
       if (e.target.closest('.download-song-trigger')) {
         e.stopPropagation();
         downloadSong(track);
@@ -1329,6 +1500,15 @@
             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
           </svg>
         </button>
+        <button class="song-action-btn add-to-queue-trigger" title="Add to Queue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="8" y1="6" x2="21" y2="6"/>
+            <line x1="8" y1="12" x2="21" y2="12"/>
+            <line x1="8" y1="18" x2="16" y2="18"/>
+            <line x1="19" y1="15" x2="19" y2="21"/>
+            <line x1="16" y1="18" x2="22" y2="18"/>
+          </svg>
+        </button>
         <button class="song-action-btn add-to-playlist-trigger" title="Add to Playlist">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"/>
@@ -1347,6 +1527,11 @@
     `;
 
     tr.addEventListener('click', (e) => {
+      if (e.target.closest('.add-to-queue-trigger')) {
+        e.stopPropagation();
+        addToQueue(track);
+        return;
+      }
       if (e.target.closest('.download-song-trigger')) {
         e.stopPropagation();
         downloadSong(track);
@@ -1612,8 +1797,13 @@
     if (elements.navSearch) elements.navSearch.classList.toggle('active', viewName === 'search');
     if (elements.navExplore) elements.navExplore.classList.toggle('active', viewName === 'explore');
     if (elements.navLiked) elements.navLiked.classList.toggle('active', viewName === 'liked');
+    if (elements.navLocalMusic) elements.navLocalMusic.classList.toggle('active', viewName === 'localMusic');
 
     if (elements.lyricsBtn) elements.lyricsBtn.classList.toggle('active', viewName === 'lyrics');
+
+    if (viewName === 'localMusic') {
+      updateLocalMusicUI();
+    }
 
     // Scroll to top
     if (elements.contentScroll) elements.contentScroll.scrollTop = 0;
@@ -1668,6 +1858,249 @@
     }
 
     elements.addToPlaylistModal.style.display = 'flex';
+  }
+
+  // ==========================================================================
+  // SETTINGS CONTROLLER (Dead Silence Remover & Keyboard Shortcuts)
+  // ==========================================================================
+  function loadSettings() {
+    try {
+      const saved = localStorage.getItem('musisurf_settings');
+      if (saved) {
+        state.settings = { ...state.settings, ...JSON.parse(saved) };
+      }
+    } catch (e) {}
+
+    if (elements.deadSilenceOnRadio && elements.deadSilenceOffRadio) {
+      if (state.settings.removeDeadSilence) {
+        elements.deadSilenceOnRadio.checked = true;
+      } else {
+        elements.deadSilenceOffRadio.checked = true;
+      }
+    }
+  }
+
+  function saveSettings() {
+    try {
+      localStorage.setItem('musisurf_settings', JSON.stringify(state.settings));
+    } catch (e) {}
+  }
+
+  // ==========================================================================
+  // LOCAL MUSIC STORAGE & PLAYBACK (100% Private to Device)
+  // ==========================================================================
+  const LOCAL_DB_NAME = 'MusiSurfLocalDB';
+  const LOCAL_STORE_NAME = 'local_music_files';
+  let localDbPromise = null;
+
+  function getLocalDB() {
+    if (!localDbPromise) {
+      localDbPromise = new Promise((resolve, reject) => {
+        const req = indexedDB.open(LOCAL_DB_NAME, 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(LOCAL_STORE_NAME)) {
+            db.createObjectStore(LOCAL_STORE_NAME, { keyPath: 'id' });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    return localDbPromise;
+  }
+
+  async function loadLocalTracksFromDB() {
+    try {
+      const db = await getLocalDB();
+      const tx = db.transaction(LOCAL_STORE_NAME, 'readonly');
+      const store = tx.objectStore(LOCAL_STORE_NAME);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        state.localTracks = req.result || [];
+        updateLocalMusicUI();
+      };
+    } catch (e) {
+      console.warn('Error loading local tracks:', e);
+    }
+  }
+
+  async function saveLocalTrackToDB(track) {
+    try {
+      const db = await getLocalDB();
+      const tx = db.transaction(LOCAL_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(LOCAL_STORE_NAME);
+      store.put(track);
+      tx.oncomplete = () => {
+        const existingIdx = state.localTracks.findIndex(t => t.id === track.id);
+        if (existingIdx !== -1) {
+          state.localTracks[existingIdx] = track;
+        } else {
+          state.localTracks.unshift(track);
+        }
+        updateLocalMusicUI();
+        showToast(`Saved "${track.title}" to Local Files`, '📁');
+      };
+    } catch (e) {
+      console.warn('Error saving local track to DB:', e);
+    }
+  }
+
+  async function deleteLocalTrackFromDB(trackId) {
+    try {
+      const db = await getLocalDB();
+      const tx = db.transaction(LOCAL_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(LOCAL_STORE_NAME);
+      store.delete(trackId);
+      tx.oncomplete = () => {
+        state.localTracks = state.localTracks.filter(t => t.id !== trackId);
+        updateLocalMusicUI();
+        showToast('Removed from Local Files');
+      };
+    } catch (e) {
+      console.warn('Error deleting local track:', e);
+    }
+  }
+
+  async function clearAllLocalTracksFromDB() {
+    if (!confirm('Are you sure you want to remove all local files from MusiSurf? (Your actual device files will not be deleted)')) return;
+    try {
+      const db = await getLocalDB();
+      const tx = db.transaction(LOCAL_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(LOCAL_STORE_NAME);
+      store.clear();
+      tx.oncomplete = () => {
+        state.localTracks = [];
+        updateLocalMusicUI();
+        showToast('Cleared all local files');
+      };
+    } catch (e) {
+      console.warn('Error clearing local tracks:', e);
+    }
+  }
+
+  const DEFAULT_LOCAL_COVER = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%238A2387"/><stop offset="50%" stop-color="%23E94057"/><stop offset="100%" stop-color="%23F27121"/></linearGradient></defs><rect width="100" height="100" rx="8" fill="url(%23g)"/><path d="M40 70V30l28-6v40M40 50l28-6" stroke="%23fff" stroke-width="5" stroke-linecap="round" fill="none"/><circle cx="34" cy="70" r="8" fill="%23fff"/><circle cx="62" cy="64" r="8" fill="%23fff"/></svg>';
+
+  function updateLocalMusicUI() {
+    const count = state.localTracks.length;
+    if (elements.localCountMeta) elements.localCountMeta.textContent = `${count} songs • On Device`;
+    if (elements.localTrackCount) elements.localTrackCount.textContent = `${count} songs`;
+
+    const totalSeconds = state.localTracks.reduce((acc, t) => acc + (t.duration || 0), 0);
+    const totalMinutes = Math.round(totalSeconds / 60);
+    if (elements.localTotalTime) elements.localTotalTime.textContent = `${totalMinutes} min`;
+
+    if (count === 0) {
+      if (elements.localEmptyState) elements.localEmptyState.style.display = 'flex';
+      if (elements.localTracksContainer) elements.localTracksContainer.style.display = 'none';
+      if (elements.playAllLocalBtn) elements.playAllLocalBtn.style.display = 'none';
+      if (elements.clearAllLocalBtn) elements.clearAllLocalBtn.style.display = 'none';
+      if (elements.localTracksTbody) elements.localTracksTbody.innerHTML = '';
+      return;
+    }
+
+    if (elements.localEmptyState) elements.localEmptyState.style.display = 'none';
+    if (elements.localTracksContainer) elements.localTracksContainer.style.display = 'block';
+    if (elements.playAllLocalBtn) elements.playAllLocalBtn.style.display = 'inline-flex';
+    if (elements.clearAllLocalBtn) elements.clearAllLocalBtn.style.display = 'inline-flex';
+
+    if (elements.localTracksTbody) {
+      elements.localTracksTbody.innerHTML = '';
+      state.localTracks.forEach((track, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = state.currentTrack?.id === track.id ? 'playing' : '';
+        tr.dataset.trackId = track.id;
+
+        tr.innerHTML = `
+          <td class="col-num">${idx + 1}</td>
+          <td class="col-title">
+            <div class="table-title-cell">
+              <img src="${track.image || DEFAULT_LOCAL_COVER}" alt="${track.title}" class="table-cover">
+              <div>
+                <div class="table-title-main">${track.title}</div>
+                <div class="table-artist-sub">${track.artist || 'Local File'}</div>
+              </div>
+            </div>
+          </td>
+          <td class="col-album">${track.fileName || track.album || 'Device Storage'}</td>
+          <td class="col-actions">
+            <button class="song-action-btn add-to-queue-trigger" title="Add to Queue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="8" y1="6" x2="21" y2="6"/>
+                <line x1="8" y1="12" x2="21" y2="12"/>
+                <line x1="8" y1="18" x2="16" y2="18"/>
+                <line x1="19" y1="15" x2="19" y2="21"/>
+                <line x1="16" y1="18" x2="22" y2="18"/>
+              </svg>
+            </button>
+            <button class="song-action-btn delete-local-trigger" title="Remove from Local Files">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </td>
+          <td class="col-duration">${track.durationStr || '--:--'}</td>
+        `;
+
+        tr.addEventListener('click', (e) => {
+          if (e.target.closest('.delete-local-trigger')) {
+            e.stopPropagation();
+            deleteLocalTrackFromDB(track.id);
+            return;
+          }
+          if (e.target.closest('.add-to-queue-trigger')) {
+            e.stopPropagation();
+            addToQueue(track);
+            return;
+          }
+          playTrack(track, state.localTracks);
+        });
+
+        elements.localTracksTbody.appendChild(tr);
+      });
+    }
+  }
+
+  function handleLocalAudioFiles(fileList) {
+    if (!fileList || fileList.length === 0) return;
+    Array.from(fileList).forEach(file => {
+      const isAudio = file.type.startsWith('audio/') || /\.(mp3|m4a|wav|flac|ogg|aac)$/i.test(file.name);
+      if (!isAudio) return;
+
+      const cleanTitle = file.name.replace(/\.[^/.]+$/, "");
+      const track = {
+        id: 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+        title: cleanTitle,
+        artist: 'Local Artist',
+        album: 'Device Storage',
+        fileName: file.name,
+        fileSize: (file.size / (1024 * 1024)).toFixed(1) + ' MB',
+        duration: 0,
+        durationStr: '--:--',
+        image: DEFAULT_LOCAL_COVER,
+        isLocal: true,
+        fileBlob: file,
+        hasDirectAudio: true,
+        addedAt: Date.now()
+      };
+
+      const tempAudio = new Audio();
+      const objectUrl = URL.createObjectURL(file);
+      tempAudio.src = objectUrl;
+      tempAudio.onloadedmetadata = () => {
+        if (tempAudio.duration && isFinite(tempAudio.duration)) {
+          track.duration = Math.round(tempAudio.duration);
+          track.durationStr = formatTime(track.duration);
+        }
+        URL.revokeObjectURL(objectUrl);
+        saveLocalTrackToDB(track);
+      };
+      tempAudio.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        saveLocalTrackToDB(track);
+      };
+    });
   }
 
   // ==========================================================================
@@ -1945,23 +2378,102 @@
     });
 
     // Add to Playlist Modal Close
-    elements.closeAddToPlaylistBtn.addEventListener('click', () => {
-      elements.addToPlaylistModal.style.display = 'none';
-    });
+    if (elements.closeAddToPlaylistBtn) {
+      elements.closeAddToPlaylistBtn.addEventListener('click', () => {
+        elements.addToPlaylistModal.style.display = 'none';
+      });
+    }
 
-    // Shortcuts Modal
-    elements.openShortcutsBtn.addEventListener('click', () => {
-      elements.shortcutsModal.style.display = 'flex';
-    });
-    elements.closeShortcutsModalBtn.addEventListener('click', () => {
-      elements.shortcutsModal.style.display = 'none';
-    });
+    // Settings Modal
+    const openSettingsModal = () => {
+      loadSettings();
+      if (elements.settingsModal) elements.settingsModal.style.display = 'flex';
+    };
+    const closeSettingsModal = () => {
+      if (elements.settingsModal) elements.settingsModal.style.display = 'none';
+    };
+
+    if (elements.openSettingsBtn) elements.openSettingsBtn.addEventListener('click', openSettingsModal);
+    if (elements.headerSettingsBtn) elements.headerSettingsBtn.addEventListener('click', openSettingsModal);
+    if (elements.closeSettingsModalBtn) elements.closeSettingsModalBtn.addEventListener('click', closeSettingsModal);
+
+    if (elements.deadSilenceOnRadio) {
+      elements.deadSilenceOnRadio.addEventListener('change', () => {
+        state.settings.removeDeadSilence = true;
+        saveSettings();
+        showToast('Dead silence removal enabled (intro & outro only)', '✨');
+      });
+    }
+
+    if (elements.deadSilenceOffRadio) {
+      elements.deadSilenceOffRadio.addEventListener('change', () => {
+        state.settings.removeDeadSilence = false;
+        saveSettings();
+        showToast('Dead silence removal disabled', '⚙');
+      });
+    }
+
+    // Local Files Event Listeners
+    if (elements.navLocalMusic) {
+      elements.navLocalMusic.addEventListener('click', () => switchView('localMusic'));
+    }
+
+    if (elements.localDropZone) {
+      ['dragenter', 'dragover'].forEach(name => {
+        elements.localDropZone.addEventListener(name, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          elements.localDropZone.classList.add('drag-over');
+        });
+      });
+      ['dragleave', 'drop'].forEach(name => {
+        elements.localDropZone.addEventListener(name, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          elements.localDropZone.classList.remove('drag-over');
+        });
+      });
+      elements.localDropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        if (dt && dt.files && dt.files.length > 0) {
+          handleLocalAudioFiles(dt.files);
+        }
+      });
+      elements.localDropZone.addEventListener('click', () => {
+        elements.localAudioFileInput?.click();
+      });
+    }
+
+    if (elements.localAudioFileInput) {
+      elements.localAudioFileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+          handleLocalAudioFiles(e.target.files);
+          e.target.value = '';
+        }
+      });
+    }
+
+    if (elements.playAllLocalBtn) {
+      elements.playAllLocalBtn.addEventListener('click', () => {
+        if (state.localTracks.length > 0) {
+          playTrack(state.localTracks[0], state.localTracks);
+        }
+      });
+    }
+
+    if (elements.clearAllLocalBtn) {
+      elements.clearAllLocalBtn.addEventListener('click', () => {
+        clearAllLocalTracksFromDB();
+      });
+    }
 
     // Close Modals on Backdrop Click
-    [elements.createPlaylistModal, elements.addToPlaylistModal, elements.shortcutsModal].forEach(modal => {
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) modal.style.display = 'none';
-      });
+    [elements.createPlaylistModal, elements.addToPlaylistModal, elements.settingsModal].forEach(modal => {
+      if (modal) {
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) modal.style.display = 'none';
+        });
+      }
     });
 
     // Audio Element Native Events
@@ -2133,11 +2645,14 @@
         e.preventDefault();
         switchView('search');
         elements.globalSearchInput.focus();
+      } else if (e.key === '?') {
+        e.preventDefault();
+        if (typeof openSettingsModal === 'function') openSettingsModal();
       } else if (e.key === 'Escape') {
         elements.queueDrawer.classList.remove('open');
         elements.createPlaylistModal.style.display = 'none';
         elements.addToPlaylistModal.style.display = 'none';
-        elements.shortcutsModal.style.display = 'none';
+        if (elements.settingsModal) elements.settingsModal.style.display = 'none';
         if (elements.mobilePlayerModal) elements.mobilePlayerModal.style.display = 'none';
       }
     });
@@ -2176,6 +2691,8 @@
   function init() {
     loadStoredData();
     loadOfflineTracks();
+    loadSettings();
+    loadLocalTracksFromDB();
     setDynamicGreeting();
     setVolume(state.volume);
     updateLikedCountUI();
