@@ -2,11 +2,23 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const CryptoJS = require('crypto-js');
-const { Ytdl } = require('@distube/ytdl-core');
 
-const ytdl = new Ytdl();
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Lazy-loaded YouTube audio stream extractor for serverless safety
+let ytdlInstance = null;
+async function getYtdl() {
+  if (ytdlInstance) return ytdlInstance;
+  try {
+    const { Ytdl } = await import('@distube/ytdl-core');
+    ytdlInstance = new Ytdl();
+    return ytdlInstance;
+  } catch (err) {
+    console.warn('ytdl dynamic load note:', err.message);
+    return null;
+  }
+}
 
 app.use(cors());
 app.use(express.json());
@@ -613,14 +625,16 @@ async function fetchTrendingData() {
   return sections.filter(s => s.tracks.length > 0);
 }
 
-// Pre-warm cache on server startup
-fetchTrendingData().then(data => {
-  if (data && data.length > 0) {
-    trendingSectionsCache = data;
-    trendingCacheTime = Date.now();
-    console.log(`⚡ Pre-cached ${data.length} trending music sections with unique albums!`);
-  }
-}).catch(err => console.warn('Preload trending warning:', err.message));
+// Pre-warm cache on standalone server startup (skip on Vercel cold boot)
+if (!process.env.VERCEL) {
+  fetchTrendingData().then(data => {
+    if (data && data.length > 0) {
+      trendingSectionsCache = data;
+      trendingCacheTime = Date.now();
+      console.log(`⚡ Pre-cached ${data.length} trending music sections with unique albums!`);
+    }
+  }).catch(err => console.warn('Preload trending warning:', err.message));
+}
 
 app.get('/api/trending', async (req, res) => {
   const now = Date.now();
@@ -790,22 +804,7 @@ app.get('/api/download', async (req, res) => {
     }
   }
 
-  // 2. If YouTube track ID is provided (ytId)
-  if (ytId) {
-    try {
-      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-      res.setHeader('Content-Type', 'audio/mp4');
-
-      const stream = await ytdl.download(ytId, {
-        filter: { hasAudio: true, hasVideo: false }
-      });
-      return stream.pipe(res);
-    } catch (err) {
-      console.warn('YouTube audio stream download note:', err.message);
-    }
-  }
-
-  // 3. Fallback: Search Saavn for studio audio stream using song title and artist
+  // 2. High-quality studio audio search on Saavn using song title and artist
   if (rawTitle) {
     try {
       const matchTracks = await searchSaavn(`${rawTitle} ${rawArtist}`.trim(), 5);
@@ -820,7 +819,25 @@ app.get('/api/download', async (req, res) => {
         }
       }
     } catch (err) {
-      console.warn('Saavn fallback search error:', err.message);
+      console.warn('Saavn fallback search note:', err.message);
+    }
+  }
+
+  // 3. YouTube audio stream via ytId using safe lazy-loaded extractor
+  if (ytId) {
+    try {
+      const ytdl = await getYtdl();
+      if (ytdl) {
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+        res.setHeader('Content-Type', 'audio/mp4');
+
+        const stream = await ytdl.download(ytId, {
+          filter: { hasAudio: true, hasVideo: false }
+        });
+        return stream.pipe(res);
+      }
+    } catch (err) {
+      console.warn('YouTube audio stream download note:', err.message);
     }
   }
 
