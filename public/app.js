@@ -38,6 +38,7 @@
     localTracks: [],
     isTrimmingStartSilence: false,
     trailingSilenceFrames: 0,
+    isDraggingProgress: false,
     allAvailableTracks: []
   };
 
@@ -820,29 +821,38 @@
     }
   }
 
-  // Direct Audio Downloader for Mobile and Desktop + In-App Offline Cache
+  // Direct Audio Downloader for Mobile and Desktop (Saves directly into device Downloads folder)
   function downloadSong(track) {
     if (!track) {
       showToast('No song currently selected to download', 'ℹ');
       return;
     }
-    if (track.audioUrl) {
-      // 1. Download file to device's Downloads directory
-      const downloadUrl = `/api/download?url=${encodeURIComponent(track.audioUrl)}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`;
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.setAttribute('download', `${track.title} - ${track.artist}.mp4`);
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
 
-      // 2. Also save to IndexedDB for seamless in-app offline playback
-      saveSongOfflineBlob(track);
+    const cleanTitle = (track.title || 'Track').replace(/[\\/:*?"<>|]/g, '').trim();
+    const cleanArtist = (track.artist || 'MusiSurf').replace(/[\\/:*?"<>|]/g, '').trim();
+    const downloadFilename = `${cleanTitle} - ${cleanArtist}.mp4`;
+
+    showToast(`Downloading "${track.title}" to your Downloads folder...`, '⬇');
+
+    let downloadUrl = '';
+    if (track.audioUrl) {
+      downloadUrl = `/api/download?url=${encodeURIComponent(track.audioUrl)}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`;
     } else if (track.ytId) {
-      showToast(`Opening YouTube audio stream for "${track.title}"...`, '⬇');
-      window.open(`https://www.youtube.com/watch?v=${track.ytId}`, '_blank');
+      downloadUrl = `/api/download?ytId=${encodeURIComponent(track.ytId)}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`;
     } else {
-      showToast('Download stream unavailable for this track', '⚠');
+      downloadUrl = `/api/download?title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`;
+    }
+
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.setAttribute('download', downloadFilename);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    // Save to IndexedDB if direct audio can be stored for offline listening
+    if (track.audioUrl) {
+      saveSongOfflineBlob(track);
     }
   }
 
@@ -993,6 +1003,8 @@
   // Real-time Progress Bar Loop with Intelligent Dead Silence Trimmer
   function updateProgress() {
     if (state.isPlaying && state.currentTrack) {
+      if (state.isDraggingProgress) return; // Don't override while user is actively dragging scrubber
+
       const cur = getCurrentPlaybackTime();
       const dur = getTotalDuration();
 
@@ -2435,23 +2447,123 @@
       updateQueueDrawerUI();
     });
 
-    // Scrubber Interactions
-    elements.progressBar.addEventListener('click', (e) => {
-      const rect = elements.progressBar.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const pct = Math.max(0, Math.min(1, clickX / rect.width));
-      const targetTime = pct * getTotalDuration();
-      seekTo(targetTime);
-    });
+    // Interactive Draggable Scrubber Engine (Desktop & Mobile, Mouse & Touch)
+    function setupDraggableScrubber(barEl, fillEl, timeLabelEl, isMobileScrubber = false) {
+      if (!barEl) return;
 
-    elements.progressBar.addEventListener('mousemove', (e) => {
-      const rect = elements.progressBar.getBoundingClientRect();
-      const hoverX = e.clientX - rect.left;
-      const pct = Math.max(0, Math.min(1, hoverX / rect.width));
-      const dur = getTotalDuration();
-      elements.progressHoverTime.style.left = `${hoverX}px`;
-      elements.progressHoverTime.textContent = formatTime(pct * dur);
-    });
+      let isDragging = false;
+      let dragPct = 0;
+
+      function updateScrubUI(pct) {
+        dragPct = Math.max(0, Math.min(1, pct));
+        const dur = getTotalDuration();
+        const displayTime = formatTime(dragPct * dur);
+
+        if (fillEl) fillEl.style.width = `${dragPct * 100}%`;
+        if (timeLabelEl) timeLabelEl.textContent = displayTime;
+
+        // Keep desktop and mobile scrubber bars in sync during drag
+        if (elements.progressFill && fillEl !== elements.progressFill) {
+          elements.progressFill.style.width = `${dragPct * 100}%`;
+        }
+        if (elements.mobProgressFill && fillEl !== elements.mobProgressFill) {
+          elements.mobProgressFill.style.width = `${dragPct * 100}%`;
+        }
+        if (elements.currentTimeLabel) elements.currentTimeLabel.textContent = displayTime;
+        if (elements.mobCurrentTime) elements.mobCurrentTime.textContent = displayTime;
+
+        if (elements.progressHoverTime && !isMobileScrubber) {
+          const rect = barEl.getBoundingClientRect();
+          elements.progressHoverTime.style.left = `${dragPct * rect.width}px`;
+          elements.progressHoverTime.textContent = displayTime;
+        }
+      }
+
+      function getClientX(e) {
+        if (e.touches && e.touches.length > 0) return e.touches[0].clientX;
+        if (e.changedTouches && e.changedTouches.length > 0) return e.changedTouches[0].clientX;
+        return e.clientX;
+      }
+
+      function handleStart(e) {
+        isDragging = true;
+        state.isDraggingProgress = true;
+        barEl.classList.add('scrubbing');
+        const rect = barEl.getBoundingClientRect();
+        const clientX = getClientX(e);
+        const pct = (clientX - rect.left) / rect.width;
+        updateScrubUI(pct);
+        e.preventDefault();
+      }
+
+      function handleMove(e) {
+        if (!isDragging) return;
+        const rect = barEl.getBoundingClientRect();
+        const clientX = getClientX(e);
+        const pct = (clientX - rect.left) / rect.width;
+        updateScrubUI(pct);
+        e.preventDefault();
+      }
+
+      function handleEnd(e) {
+        if (!isDragging) return;
+        isDragging = false;
+        barEl.classList.remove('scrubbing');
+        const dur = getTotalDuration();
+        if (dur > 0) {
+          seekTo(dragPct * dur);
+        }
+        setTimeout(() => {
+          state.isDraggingProgress = false;
+        }, 80);
+      }
+
+      // Mouse drag events
+      barEl.addEventListener('mousedown', (e) => {
+        handleStart(e);
+        const onMouseMove = (ev) => handleMove(ev);
+        const onMouseUp = (ev) => {
+          handleEnd(ev);
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+        };
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+      });
+
+      // Touch drag events (Mobile phones & tablets)
+      barEl.addEventListener('touchstart', (e) => {
+        handleStart(e);
+      }, { passive: false });
+
+      window.addEventListener('touchmove', (e) => {
+        if (isDragging) handleMove(e);
+      }, { passive: false });
+
+      window.addEventListener('touchend', (e) => {
+        if (isDragging) handleEnd(e);
+      });
+      window.addEventListener('touchcancel', (e) => {
+        if (isDragging) handleEnd(e);
+      });
+
+      // Hover preview time for desktop
+      if (!isMobileScrubber && elements.progressHoverTime) {
+        barEl.addEventListener('mousemove', (e) => {
+          if (isDragging) return;
+          const rect = barEl.getBoundingClientRect();
+          const hoverX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+          const pct = hoverX / rect.width;
+          const dur = getTotalDuration();
+          elements.progressHoverTime.style.left = `${hoverX}px`;
+          elements.progressHoverTime.textContent = formatTime(pct * dur);
+        });
+      }
+    }
+
+    // Attach to both Desktop and Mobile Scrubber
+    setupDraggableScrubber(elements.progressBar, elements.progressFill, elements.currentTimeLabel, false);
+    setupDraggableScrubber(elements.mobProgressBar, elements.mobProgressFill, elements.mobCurrentTime, true);
 
     // Movable Volume Slider (Interactive Drag for Mouse & Touch)
     let isDraggingVolume = false;
@@ -2813,13 +2925,48 @@
       if (state.currentTrack) toggleLikeSong(state.currentTrack);
     });
 
-    // Mobile scrubber seek
-    if (elements.mobProgressBar) {
-      elements.mobProgressBar.addEventListener('click', (e) => {
-        const rect = elements.mobProgressBar.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const pct = Math.max(0, Math.min(1, clickX / rect.width));
-        seekTo(pct * getTotalDuration());
+    // Draggable Mobile Player Modal (Swipe down on top/handle to collapse)
+    if (elements.mobilePlayerModal) {
+      let startY = 0;
+      let currentY = 0;
+      let isDraggingModal = false;
+
+      const modalEl = elements.mobilePlayerModal;
+
+      modalEl.addEventListener('touchstart', (e) => {
+        // Trigger swipe down when starting near top handle or header
+        if (modalEl.scrollTop <= 5 && e.touches[0].clientY < 260) {
+          isDraggingModal = true;
+          startY = e.touches[0].clientY;
+          currentY = startY;
+          modalEl.style.transition = 'none';
+        }
+      }, { passive: true });
+
+      modalEl.addEventListener('touchmove', (e) => {
+        if (!isDraggingModal) return;
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - startY;
+        if (deltaY > 0) {
+          modalEl.style.transform = `translateY(${deltaY}px)`;
+          e.preventDefault();
+        }
+      }, { passive: false });
+
+      modalEl.addEventListener('touchend', () => {
+        if (!isDraggingModal) return;
+        isDraggingModal = false;
+        const deltaY = currentY - startY;
+        modalEl.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
+        if (deltaY > 80) {
+          modalEl.style.transform = 'translateY(100%)';
+          setTimeout(() => {
+            modalEl.style.display = 'none';
+            modalEl.style.transform = 'translateY(0)';
+          }, 240);
+        } else {
+          modalEl.style.transform = 'translateY(0)';
+        }
       });
     }
 

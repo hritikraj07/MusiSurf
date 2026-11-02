@@ -528,12 +528,14 @@ html, body {
   align-items: center;
   gap: 16px;
   flex: 1;
+  min-width: 0;
   max-width: 650px;
 }
 
 .history-controls {
   display: flex;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .history-btn {
@@ -547,6 +549,7 @@ html, body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  flex-shrink: 0;
   transition: all var(--transition-fast);
 }
 
@@ -568,6 +571,7 @@ html, body {
 /* Search Box */
 .search-box-wrapper {
   flex: 1;
+  min-width: 0;
 }
 
 .search-box {
@@ -579,6 +583,7 @@ html, body {
   border-radius: 500px;
   height: 44px;
   padding: 0 16px;
+  min-width: 0;
   transition: all var(--transition-fast);
 }
 
@@ -605,6 +610,7 @@ html, body {
   font-size: 0.9rem;
   font-family: inherit;
   font-weight: 500;
+  min-width: 0;
 }
 
 .search-input::placeholder {
@@ -639,12 +645,14 @@ html, body {
   border-radius: 4px;
   color: var(--text-secondary);
   margin-left: 8px;
+  flex-shrink: 0;
 }
 
 .header-right {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .ad-free-pill {
@@ -2276,10 +2284,14 @@ html, body {
   border-radius: 2px;
   position: relative;
   cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
   transition: height var(--transition-fast);
 }
 
-.progress-bar:hover {
+.progress-bar:hover,
+.progress-bar.scrubbing {
   height: 6px;
 }
 
@@ -2304,7 +2316,8 @@ html, body {
   transition: background-color var(--transition-fast);
 }
 
-.progress-bar:hover .progress-fill {
+.progress-bar:hover .progress-fill,
+.progress-bar.scrubbing .progress-fill {
   background-color: var(--accent-primary);
 }
 
@@ -2321,8 +2334,10 @@ html, body {
   transition: transform var(--transition-fast);
 }
 
-.progress-bar:hover .progress-handle {
-  transform: translateY(-50%) scale(1);
+.progress-bar:hover .progress-handle,
+.progress-bar.scrubbing .progress-handle {
+  transform: translateY(-50%) scale(1.2);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.85);
 }
 
 .progress-hover-time {
@@ -2891,6 +2906,17 @@ html, body {
   margin-top: 2px;
 }
 
+.mobile-player-drag-handle {
+  width: 38px;
+  height: 4px;
+  border-radius: 2px;
+  background-color: rgba(255, 255, 255, 0.3);
+  margin: 0 auto 16px;
+  cursor: grab;
+  touch-action: none;
+  flex-shrink: 0;
+}
+
 .mobile-player-scrubber-wrap {
   margin-bottom: 28px;
 }
@@ -2898,6 +2924,20 @@ html, body {
 .mobile-player-scrubber-wrap .progress-bar {
   height: 6px;
   border-radius: 3px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  position: relative;
+  cursor: pointer;
+}
+
+.mobile-player-scrubber-wrap .progress-bar::before {
+  content: '';
+  position: absolute;
+  top: -14px;
+  bottom: -14px;
+  left: 0;
+  right: 0;
 }
 
 .mobile-player-scrubber-wrap .progress-fill {
@@ -2908,6 +2948,11 @@ html, body {
   width: 16px;
   height: 16px;
   transform: translateY(-50%) scale(1);
+}
+
+.mobile-player-scrubber-wrap .progress-bar.scrubbing .progress-handle {
+  transform: translateY(-50%) scale(1.35);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.9);
 }
 
 .mobile-player-times {
@@ -3099,13 +3144,66 @@ html, body {
   }
 
   .top-header {
-    height: 60px;
-    padding: 0 12px;
+    height: 56px;
+    padding: 0 10px;
+    gap: 8px;
+  }
+
+  .header-left {
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .history-controls {
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .history-btn {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+  }
+
+  .search-box-wrapper {
+    flex: 1;
+    min-width: 0;
   }
 
   .search-box {
-    height: 40px;
-    padding: 0 12px;
+    height: 38px;
+    padding: 0 10px;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .search-input-icon {
+    width: 16px;
+    height: 16px;
+    margin-right: 0;
+    flex-shrink: 0;
+  }
+
+  .search-input {
+    min-width: 0;
+    font-size: 0.82rem;
+    text-overflow: ellipsis;
+  }
+
+  .search-shortcut-badge {
+    display: none !important;
+  }
+
+  .header-right {
+    flex-shrink: 0;
+    margin-left: 2px;
+  }
+
+  .header-settings-btn {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
   }
 
   .ad-free-pill {

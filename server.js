@@ -2,7 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const CryptoJS = require('crypto-js');
+const { Ytdl } = require('@distube/ytdl-core');
 
+const ytdl = new Ytdl();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -755,9 +757,10 @@ app.get('/api/lyrics', async (req, res) => {
   }
 });
 
-// Direct Song Downloader for Mobile and Desktop
+// Direct Song Downloader for Mobile and Desktop (Downloads files into user's Downloads folder)
 app.get('/api/download', async (req, res) => {
   const audioUrl = req.query.url;
+  const ytId = req.query.ytId;
   const rawTitle = req.query.title || 'song';
   const rawArtist = req.query.artist || '';
   
@@ -767,29 +770,61 @@ app.get('/api/download', async (req, res) => {
   }
   const filename = `${cleanName || 'MusiSurf-Track'}.mp4`;
 
-  if (!audioUrl || !audioUrl.startsWith('http')) {
-    return res.status(400).send('Invalid audio URL');
+  // 1. If direct 320kbps audioUrl is provided (JioSaavn)
+  if (audioUrl && audioUrl.startsWith('http')) {
+    try {
+      const audioRes = await fetch(audioUrl);
+      if (audioRes.ok) {
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+        res.setHeader('Content-Type', audioRes.headers.get('content-type') || 'audio/mp4');
+        if (audioRes.headers.get('content-length')) {
+          res.setHeader('Content-Length', audioRes.headers.get('content-length'));
+        }
+
+        const { Readable } = require('stream');
+        const stream = Readable.fromWeb(audioRes.body);
+        return stream.pipe(res);
+      }
+    } catch (err) {
+      console.warn('Direct stream download note:', err.message);
+    }
   }
 
-  try {
-    const audioRes = await fetch(audioUrl);
-    if (!audioRes.ok) {
-      return res.status(audioRes.status).send('Failed to stream audio file');
-    }
+  // 2. If YouTube track ID is provided (ytId)
+  if (ytId) {
+    try {
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+      res.setHeader('Content-Type', 'audio/mp4');
 
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-    res.setHeader('Content-Type', audioRes.headers.get('content-type') || 'audio/mp4');
-    if (audioRes.headers.get('content-length')) {
-      res.setHeader('Content-Length', audioRes.headers.get('content-length'));
+      const stream = await ytdl.download(ytId, {
+        filter: { hasAudio: true, hasVideo: false }
+      });
+      return stream.pipe(res);
+    } catch (err) {
+      console.warn('YouTube audio stream download note:', err.message);
     }
-
-    const { Readable } = require('stream');
-    const stream = Readable.fromWeb(audioRes.body);
-    stream.pipe(res);
-  } catch (err) {
-    console.error('Download error:', err.message);
-    res.status(500).send('Download error');
   }
+
+  // 3. Fallback: Search Saavn for studio audio stream using song title and artist
+  if (rawTitle) {
+    try {
+      const matchTracks = await searchSaavn(`${rawTitle} ${rawArtist}`.trim(), 5);
+      if (matchTracks && matchTracks.length > 0 && matchTracks[0].audioUrl) {
+        const audioRes = await fetch(matchTracks[0].audioUrl);
+        if (audioRes.ok) {
+          res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+          res.setHeader('Content-Type', audioRes.headers.get('content-type') || 'audio/mp4');
+          const { Readable } = require('stream');
+          const stream = Readable.fromWeb(audioRes.body);
+          return stream.pipe(res);
+        }
+      }
+    } catch (err) {
+      console.warn('Saavn fallback search error:', err.message);
+    }
+  }
+
+  res.status(404).send('Audio stream unavailable for download');
 });
 
 // Status and Info
