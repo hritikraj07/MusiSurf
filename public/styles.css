@@ -349,6 +349,14 @@ html, body {
   background-color: rgba(255, 255, 255, 0.1);
 }
 
+/* Remove Downloaded folder from library on website/desktop only */
+@media (min-width: 769px) {
+  #navDownloadedBtn,
+  .downloaded-songs-item {
+    display: none !important;
+  }
+}
+
 .liked-icon-box {
   width: 44px;
   height: 44px;

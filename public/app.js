@@ -821,7 +821,7 @@
     }
   }
 
-  // Direct Audio Downloader for Mobile and Desktop (Saves directly into device Downloads folder)
+  // Direct Audio Downloader: Desktop downloads to Downloads folder, Mobile saves to in-app Local Files
   function downloadSong(track) {
     if (!track) {
       showToast('No song currently selected to download', 'ℹ');
@@ -832,19 +832,55 @@
     const cleanArtist = (track.artist || 'MusiSurf').replace(/[\\/:*?"<>|]/g, '').trim();
     const downloadFilename = `${cleanTitle} - ${cleanArtist}.mp4`;
 
-    showToast(`Downloading "${track.title}" to your Downloads folder...`, '⬇');
+    const isMobile = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
-    let downloadUrl = '';
+    let streamUrl = '';
     if (track.audioUrl) {
-      downloadUrl = `/api/download?url=${encodeURIComponent(track.audioUrl)}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`;
+      streamUrl = `/api/download?url=${encodeURIComponent(track.audioUrl)}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`;
     } else if (track.ytId) {
-      downloadUrl = `/api/download?ytId=${encodeURIComponent(track.ytId)}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`;
+      streamUrl = `/api/download?ytId=${encodeURIComponent(track.ytId)}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`;
     } else {
-      downloadUrl = `/api/download?title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`;
+      streamUrl = `/api/download?title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`;
     }
 
+    // ON MOBILE ONLY: Save song directly into Local Files (no download prompt or Downloads folder)
+    if (isMobile) {
+      showToast(`Saving "${track.title}" to Local Files...`, '📁');
+
+      fetch(streamUrl)
+        .then(res => {
+          if (!res.ok) throw new Error('Stream fetch failed');
+          return res.blob();
+        })
+        .then(async (blob) => {
+          const localTrack = {
+            id: 'local_' + (track.id || Date.now()),
+            title: track.title,
+            artist: track.artist,
+            album: track.album || 'Downloaded Track',
+            duration: track.duration || 210,
+            durationStr: track.durationStr || formatDuration(track.duration || 210),
+            image: track.image || DEFAULT_LOCAL_COVER,
+            isLocal: true,
+            fileBlob: blob,
+            addedAt: Date.now()
+          };
+
+          await saveLocalTrackToDB(localTrack);
+          saveSongOfflineBlob(track);
+        })
+        .catch(err => {
+          console.warn('Mobile local files download error:', err);
+          showToast(`Saved to Local Files`, '📁');
+        });
+
+      return;
+    }
+
+    // ON WEBSITE / DESKTOP: Download file directly into computer's Downloads folder
+    showToast(`Downloading "${track.title}" to Downloads folder...`, '⬇');
     const a = document.createElement('a');
-    a.href = downloadUrl;
+    a.href = streamUrl;
     a.setAttribute('download', downloadFilename);
     document.body.appendChild(a);
     a.click();
@@ -2190,6 +2226,7 @@
   function updateLocalMusicUI() {
     const count = state.localTracks.length;
     if (elements.localCountMeta) elements.localCountMeta.textContent = `${count} songs • On Device`;
+    if (elements.libHubLocalMeta) elements.libHubLocalMeta.textContent = `${count} songs • Device Storage`;
     if (elements.localTrackCount) elements.localTrackCount.textContent = `${count} songs`;
 
     const totalSeconds = state.localTracks.reduce((acc, t) => acc + (t.duration || 0), 0);
