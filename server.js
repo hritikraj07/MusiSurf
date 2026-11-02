@@ -79,6 +79,8 @@ function transformSaavnSong(item) {
   }
 
   const durationSec = parseInt(more.duration || item.duration || 210, 10);
+  const playCount = parseInt(item.play_count || more.play_count || 0, 10);
+  const isVerified = Boolean(more.artistMap?.primary_artists?.length > 0);
 
   return {
     id: 'saavn_' + item.id,
@@ -92,6 +94,8 @@ function transformSaavnSong(item) {
     streamUrl: audioUrl ? `/api/stream?url=${encodeURIComponent(audioUrl)}` : null,
     duration: durationSec,
     durationStr: formatDuration(durationSec),
+    playCount: playCount,
+    isVerified: isVerified,
     source: 'saavn',
     hasDirectAudio: true
   };
@@ -119,29 +123,152 @@ async function searchSaavn(query, limit = 20) {
   }
 }
 
-function cleanTrackTitleAndArtist(rawTitle, rawArtist) {
-  let title = decodeHtmlEntities(rawTitle || 'Unknown Title')
-    .replace(/\s*[\(\[](Official\s*(Music\s*)?Video|Music\s*Video|Official\s*Audio|Audio|Lyric\s*Video|Lyrics|Visualizer|HD|4K|HQ|Explicit|Video)[\)\]]/gi, '')
-    .trim();
-  let artist = decodeHtmlEntities(rawArtist || 'Universal Artist').trim();
+function parseViewCount(viewStr) {
+  if (!viewStr) return 0;
+  const clean = viewStr.toLowerCase().replace(/views?/g, '').trim();
+  if (clean.includes('b')) return parseFloat(clean) * 1e9;
+  if (clean.includes('m')) return parseFloat(clean) * 1e6;
+  if (clean.includes('k')) return parseFloat(clean) * 1e3;
+  const num = parseInt(clean.replace(/,/g, ''), 10);
+  return isNaN(num) ? 0 : num;
+}
 
-  // If title is "Artist - Song", separate them cleanly
-  if (title.includes(' - ')) {
-    const parts = title.split(' - ');
-    if (parts.length === 2 && parts[0].trim().length < 35 && parts[1].trim().length < 65) {
-      artist = parts[0].trim();
-      title = parts[1].trim();
+function parseYouTubeMusicTitle(rawTitle, channel) {
+  let title = decodeHtmlEntities(rawTitle || 'Unknown Title').trim();
+  let artist = decodeHtmlEntities(channel || 'Universal Artist').trim();
+  let album = 'Single';
+
+  if (title.includes('|')) {
+    const segments = title.split('|').map(s => s.trim()).filter(Boolean);
+    if (segments.length >= 2) {
+      const part0 = segments[0];
+      if (part0.includes(' - ')) {
+        const sub = part0.split(' - ').map(s => s.trim());
+        title = sub[0];
+        album = sub[1];
+      } else {
+        title = part0;
+        album = segments[1];
+      }
+
+      if (segments.length >= 4) {
+        const last = segments[segments.length - 1];
+        const secondLast = segments[segments.length - 2];
+        if (secondLast.length + last.length < 50) {
+          artist = `${secondLast}, ${last}`;
+        } else {
+          artist = last;
+        }
+      } else if (segments.length >= 3) {
+        artist = segments[segments.length - 1];
+      } else if (segments.length === 2 && !part0.includes(' - ')) {
+        artist = segments[1];
+      }
+    }
+  } else if (title.includes(' - ')) {
+    const parts = title.split(' - ').map(s => s.trim()).filter(Boolean);
+    if (parts.length === 2 && parts[0].length < 35 && parts[1].length < 65) {
+      artist = parts[0];
+      title = parts[1];
     }
   }
 
-  // Remove trailing "VEVO", " - Topic", " Official" from artist name
+  // Remove common artifacts from title
+  title = title
+    .replace(/\s*[\(\[](Official\s*(Music\s*)?Video|Music\s*Video|Official\s*Audio|Audio|Lyric\s*Video|Lyrics|Visualizer|HD|4K|HQ|Explicit|Video|Full\s*Song)[\)\]]/gi, '')
+    .replace(/\|\s*(HD|4K|HQ|Explicit|Video)/gi, '')
+    .trim();
+
+  // Remove duplicate feature tags like "ft. Daft Punk ft. Daft Punk"
+  title = title.replace(/(ft\.|feat\.)\s*([^(\[]+?)\s*\1\s*\2/gi, '$1 $2').trim();
+
+  // Clean artist
   artist = artist.replace(/\s*(VEVO|- Topic|Official)$/i, '').trim();
 
-  return { title, artist };
+  return { title, artist, album };
+}
+
+function calculateRelevanceScore(track, query) {
+  const normQ = query.toLowerCase().trim().replace(/[^a-z0-9 ]/g, '');
+  const qWords = normQ.split(/\s+/).filter(Boolean);
+  const normTitle = (track.title || '').toLowerCase().trim().replace(/[^a-z0-9 ]/g, '');
+  const normArtist = (track.artist || '').toLowerCase().trim().replace(/[^a-z0-9 ]/g, '');
+
+  let score = 0;
+
+  // Title / Artist Matching Gate: track must match at least one query term
+  const matchedWords = qWords.filter(w => normTitle.includes(w) || normArtist.includes(w));
+  if (matchedWords.length === 0) {
+    return 0; // completely irrelevant track
+  }
+
+  // Exact Title Matching (Normalized)
+  if (normTitle === normQ) {
+    score += 55000;
+  } else if (normTitle.startsWith(normQ)) {
+    score += 38000;
+  } else if (qWords.every(w => normTitle.includes(w))) {
+    score += 28000;
+  } else {
+    score += (matchedWords.length / qWords.length) * 15000;
+  }
+
+  // Popularity scaling based on real stream / view counts (Famous hits get massive priority)
+  const plays = track.playCount || 0;
+  if (plays >= 100000000) score += 50000;       // 100M+
+  else if (plays >= 20000000) score += 40000;   // 20M+
+  else if (plays >= 5000000) score += 30000;    // 5M+
+  else if (plays >= 1000000) score += 20000;    // 1M+
+  else if (plays >= 200000) score += 12000;     // 200k+
+  else if (plays >= 50000) score += 5000;       // 50k+
+  else if (plays >= 10000) score += 1000;       // 10k+
+  else score += Math.min(300, Math.floor(plays / 100));
+
+  // Verified artist / official channel boost
+  if (track.isVerified) {
+    score += 12000;
+  }
+
+  // Query mentions artist
+  if (normArtist.includes(normQ) || qWords.some(w => normArtist.includes(w))) {
+    score += 15000;
+  }
+
+  // Penalize covers, karaoke, ringtones, remake unless specifically queried
+  const isCoverOrRemake = /cover|karaoke|instrumental|remake|tribute|ringtone|status/i.test(track.title);
+  const wantsCover = /cover|karaoke|instrumental|remake|tribute|ringtone|status/i.test(query);
+  if (isCoverOrRemake && !wantsCover) {
+    score -= 35000;
+  }
+
+  // Bonus for direct 320kbps audio when scores are competitive
+  if (track.hasDirectAudio) {
+    score += 3000;
+  }
+
+  return score;
+}
+
+function getDedupeKey(title, artist) {
+  const normTitle = (title || '')
+    .toLowerCase()
+    .replace(/\s*[\(\[](feat\.?|ft\.?|from|official|remix|lofi|slowed|reverb|audio|video|lyric|lyrics).*?[\)\]]/gi, '')
+    .replace(/[^a-z0-9]/g, '');
+
+  const artistTokens = (artist || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !['and', 'the', 'feat', 'featuring', 'various', 'artists', 'from'].includes(w))
+    .sort()
+    .slice(0, 3)
+    .join('');
+
+  return `${normTitle}__${artistTokens}`;
 }
 
 // Universal Multi-Source YouTube Search Engine (Innertube JSON API + Cookie Scraper Fallback)
-async function searchYouTube(query, limit = 25) {
+async function searchYouTube(query, limit = 30) {
   if (!query) return [];
 
   // Strategy 1: YouTube Innertube API (Official internal pure JSON API - ultra fast, zero HTML parsing)
@@ -184,25 +311,31 @@ async function searchYouTube(query, limit = 25) {
             const rawChannel = v.ownerText?.runs?.[0]?.text || 'Universal Audio';
             const durationStr = v.lengthText?.simpleText || '3:30';
             const thumb = v.thumbnail?.thumbnails?.slice(-1)[0]?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+            const viewStr = v.viewCountText?.simpleText || v.shortViewCountText?.simpleText || '';
+            const playCount = parseViewCount(viewStr);
+            const isVerified = Boolean(v.ownerBadges && v.ownerBadges.length > 0) ||
+              /official|tips|t-series|sony|zee|yrf|speed|saregama|vevo/i.test(rawChannel);
 
             const parts = durationStr.split(':').map(Number);
             let durationSec = 210;
             if (parts.length === 2) durationSec = parts[0] * 60 + parts[1];
             else if (parts.length === 3) durationSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
 
-            const { title, artist } = cleanTrackTitleAndArtist(rawTitle, rawChannel);
+            const { title, artist, album } = parseYouTubeMusicTitle(rawTitle, rawChannel);
 
             results.push({
               id: 'yt_' + videoId,
               ytId: videoId,
               title: title,
               artist: artist,
-              album: 'Universal Audio Stream',
+              album: album,
               year: '',
               image: thumb,
               audioUrl: null, // Full-length stream managed by YouTube engine
               duration: durationSec,
               durationStr: durationStr,
+              playCount: playCount,
+              isVerified: isVerified,
               source: 'youtube',
               hasDirectAudio: false
             });
@@ -250,25 +383,31 @@ async function searchYouTube(query, limit = 25) {
               const rawChannel = v.ownerText?.runs?.[0]?.text || 'Universal Audio';
               const durationStr = v.lengthText?.simpleText || '3:30';
               const thumb = v.thumbnail?.thumbnails?.slice(-1)[0]?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+              const viewStr = v.viewCountText?.simpleText || v.shortViewCountText?.simpleText || '';
+              const playCount = parseViewCount(viewStr);
+              const isVerified = Boolean(v.ownerBadges && v.ownerBadges.length > 0) ||
+                /official|tips|t-series|sony|zee|yrf|speed|saregama|vevo/i.test(rawChannel);
 
               const parts = durationStr.split(':').map(Number);
               let durationSec = 210;
               if (parts.length === 2) durationSec = parts[0] * 60 + parts[1];
               else if (parts.length === 3) durationSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
 
-              const { title, artist } = cleanTrackTitleAndArtist(rawTitle, rawChannel);
+              const { title, artist, album } = parseYouTubeMusicTitle(rawTitle, rawChannel);
 
               results.push({
                 id: 'yt_' + videoId,
                 ytId: videoId,
                 title: title,
                 artist: artist,
-                album: 'Universal Audio Stream',
+                album: album,
                 year: '',
                 image: thumb,
                 audioUrl: null,
                 duration: durationSec,
                 durationStr: durationStr,
+                playCount: playCount,
+                isVerified: isVerified,
                 source: 'youtube',
                 hasDirectAudio: false
               });
@@ -289,7 +428,7 @@ async function searchYouTube(query, limit = 25) {
   return [];
 }
 
-// Unified Search Route with Universal Coverage
+// Unified Search Route with Spotify-grade Famous Song First Ranking
 app.get('/api/search', async (req, res) => {
   const query = (req.query.q || '').trim();
   const source = req.query.source || 'all'; // 'all', 'saavn', 'youtube'
@@ -302,42 +441,52 @@ app.get('/api/search', async (req, res) => {
     let results = [];
 
     if (source === 'saavn') {
-      results = await searchSaavn(query, 30);
+      const saavnSongs = await searchSaavn(query, 30);
+      results = saavnSongs
+        .map(t => ({ ...t, score: calculateRelevanceScore(t, query) }))
+        .sort((a, b) => b.score - a.score);
     } else if (source === 'youtube') {
-      results = await searchYouTube(query, 25);
+      const ytSongs = await searchYouTube(query, 30);
+      results = ytSongs
+        .map(t => ({ ...t, score: calculateRelevanceScore(t, query) }))
+        .sort((a, b) => b.score - a.score);
     } else {
       // Parallel Multi-Source Search for 100% Comprehensive Universal Coverage
       const [saavnRes, ytRes] = await Promise.allSettled([
         searchSaavn(query, 30),
-        searchYouTube(query, 25)
+        searchYouTube(query, 30)
       ]);
 
       const saavnSongs = saavnRes.status === 'fulfilled' ? (saavnRes.value || []) : [];
       const ytSongs = ytRes.status === 'fulfilled' ? (ytRes.value || []) : [];
 
-      // Combine results:
-      // Direct 320kbps Saavn tracks come first, complemented by YouTube for universal coverage
-      const seenKeys = new Set();
-      const combined = [];
+      // Combine all tracks and calculate relevance score based on:
+      // - Exact title and artist match
+      // - Real stream / view count popularity (millions of plays)
+      // - Verified artist / official record label status
+      // - Penalty for covers / karaoke / remakes unless specifically queried
+      const allTracks = [...saavnSongs, ...ytSongs].map(track => ({
+        ...track,
+        score: calculateRelevanceScore(track, query)
+      }));
 
-      for (const track of saavnSongs) {
-        if (!track || !track.title) continue;
-        const key = (track.title + ' ' + (track.artist || '')).toLowerCase().replace(/[^a-z0-9]/g, '');
-        seenKeys.add(key);
-        combined.push(track);
-      }
+      // Sort by score in descending order (FAMOUS ORIGINAL HITS ALWAYS COME FIRST)
+      allTracks.sort((a, b) => b.score - a.score);
 
-      for (const track of ytSongs) {
+      // Smart deduplication: keep highest-scored version of each unique track
+      const seen = new Map();
+      const deduped = [];
+
+      for (const track of allTracks) {
         if (!track || !track.title) continue;
-        const key = (track.title + ' ' + (track.artist || '')).toLowerCase().replace(/[^a-z0-9]/g, '');
-        // Avoid duplicate identical tracks, keep distinct releases/remixes/live/unreleased
-        if (!seenKeys.has(key)) {
-          seenKeys.add(key);
-          combined.push(track);
+        const key = getDedupeKey(track.title, track.artist);
+        if (!seen.has(key)) {
+          seen.set(key, true);
+          deduped.push(track);
         }
       }
 
-      results = combined;
+      results = deduped;
     }
 
     res.json({
