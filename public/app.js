@@ -65,7 +65,6 @@
     navDownloaded: document.getElementById('navDownloadedBtn'),
     navLocalMusic: document.getElementById('navLocalMusicBtn'),
     navBrand: document.getElementById('navBrand'),
-    sidebarLibraryHeader: document.querySelector('.library-title-group'),
     customPlaylistsList: document.getElementById('customPlaylistsList'),
     createPlaylistBtn: document.getElementById('createPlaylistBtn'),
     likedCountMeta: document.getElementById('likedCountMeta'),
@@ -1927,7 +1926,8 @@
     if (elements.navHome) elements.navHome.classList.toggle('active', viewName === 'home');
     if (elements.navSearch) elements.navSearch.classList.toggle('active', viewName === 'search');
     if (elements.navExplore) elements.navExplore.classList.toggle('active', viewName === 'explore');
-    if (elements.navLiked) elements.navLiked.classList.toggle('active', viewName === 'liked');
+    if (elements.navLiked) elements.navLiked.classList.toggle('active', viewName === 'liked' || (viewName === 'playlist' && state.activePlaylistId === 'liked'));
+    if (elements.navDownloaded) elements.navDownloaded.classList.toggle('active', viewName === 'downloaded' || (viewName === 'playlist' && state.activePlaylistId === 'downloaded'));
     if (elements.navLocalMusic) elements.navLocalMusic.classList.toggle('active', viewName === 'localMusic');
 
     if (elements.lyricsBtn) elements.lyricsBtn.classList.toggle('active', viewName === 'lyrics');
@@ -2760,12 +2760,6 @@
         elements.createPlaylistModal.style.display = 'flex';
         elements.playlistNameInput.focus();
       });
-    }
-
-    // Sidebar "Your Library" header click -> Library View
-    if (elements.sidebarLibraryHeader) {
-      elements.sidebarLibraryHeader.style.cursor = 'pointer';
-      elements.sidebarLibraryHeader.addEventListener('click', () => switchView('library'));
     }
 
     // Mobile Mini-Player Bar Click -> Opens Fullscreen Mobile Player
