@@ -2744,9 +2744,11 @@ html, body {
   -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--border-subtle);
   z-index: 300;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   align-items: center;
-  justify-content: space-around;
-  padding: 0 8px;
+  justify-items: center;
+  padding: 0 12px;
 }
 
 .mobile-nav-item {
@@ -3019,7 +3021,7 @@ html, body {
 
   /* Show Mobile Bottom Navigation */
   .mobile-nav-bar {
-    display: flex;
+    display: grid !important;
   }
 
   /* Transform Persistent Player Bar into a Spotify-style Mini Player Floating above Nav Bar */
@@ -3466,6 +3468,121 @@ html, body {
   font-size: 0.78rem;
   color: var(--text-secondary);
 }
+
+/* ==========================================================================
+   YOUR LIBRARY VIEW (Mobile & Desktop Hub)
+   ========================================================================== */
+.library-view-container {
+  padding: 32px 32px 100px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.library-view-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.library-header-text .page-title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+.library-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 36px;
+}
+
+.library-hub-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background-color: var(--card-bg);
+  padding: 16px;
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.library-hub-card:hover {
+  background-color: var(--card-hover);
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.lib-hub-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.lib-hub-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.lib-hub-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lib-hub-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.lib-hub-meta {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.library-custom-playlists-wrap {
+  margin-top: 24px;
+}
+
+.library-section-heading {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.library-playlists-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 18px;
+}
+
+@media (max-width: 768px) {
+  .library-view-container {
+    padding: 20px 16px 120px;
+  }
+  .library-header-text .page-title {
+    font-size: 1.6rem;
+  }
+  .library-hub-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
 
 
 
