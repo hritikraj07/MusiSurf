@@ -119,72 +119,177 @@ async function searchSaavn(query, limit = 20) {
   }
 }
 
-// Search YouTube as universal full-length fallback
-async function searchYouTube(query, limit = 10) {
-  try {
-    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query + ' audio')}`;
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9'
-      }
-    });
-    if (!res.ok) return [];
-    const html = await res.text();
-    const match = html.match(/var ytInitialData = ({.*?});<\/script>/s) || html.match(/ytInitialData\s*=\s*({.+?});/);
-    if (!match) return [];
-    
-    const data = JSON.parse(match[1]);
-    const contents = data.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
-    const results = [];
+function cleanTrackTitleAndArtist(rawTitle, rawArtist) {
+  let title = decodeHtmlEntities(rawTitle || 'Unknown Title')
+    .replace(/\s*[\(\[](Official\s*(Music\s*)?Video|Music\s*Video|Official\s*Audio|Audio|Lyric\s*Video|Lyrics|Visualizer|HD|4K|HQ|Explicit|Video)[\)\]]/gi, '')
+    .trim();
+  let artist = decodeHtmlEntities(rawArtist || 'Universal Artist').trim();
 
-    for (const section of contents) {
-      const items = section?.itemSectionRenderer?.contents || [];
-      for (const item of items) {
-        if (item.videoRenderer) {
-          const v = item.videoRenderer;
-          const videoId = v.videoId;
-          if (!videoId) continue;
-
-          const title = v.title?.runs?.[0]?.text || 'Unknown Title';
-          const channel = v.ownerText?.runs?.[0]?.text || 'YouTube Music';
-          const durationStr = v.lengthText?.simpleText || '3:30';
-          const thumb = v.thumbnail?.thumbnails?.slice(-1)[0]?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-
-          // Parse duration to seconds
-          const parts = durationStr.split(':').map(Number);
-          let durationSec = 210;
-          if (parts.length === 2) durationSec = parts[0] * 60 + parts[1];
-          else if (parts.length === 3) durationSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
-
-          results.push({
-            id: 'yt_' + videoId,
-            ytId: videoId,
-            title: decodeHtmlEntities(title),
-            artist: decodeHtmlEntities(channel),
-            album: 'YouTube Universal Stream',
-            year: '',
-            image: thumb,
-            audioUrl: null, // Played via unified YouTube Player controller
-            duration: durationSec,
-            durationStr: durationStr,
-            source: 'youtube',
-            hasDirectAudio: false
-          });
-
-          if (results.length >= limit) break;
-        }
-      }
-      if (results.length >= limit) break;
+  // If title is "Artist - Song", separate them cleanly
+  if (title.includes(' - ')) {
+    const parts = title.split(' - ');
+    if (parts.length === 2 && parts[0].trim().length < 35 && parts[1].trim().length < 65) {
+      artist = parts[0].trim();
+      title = parts[1].trim();
     }
-    return results;
-  } catch (err) {
-    console.error('YouTube search error:', err.message);
-    return [];
   }
+
+  // Remove trailing "VEVO", " - Topic", " Official" from artist name
+  artist = artist.replace(/\s*(VEVO|- Topic|Official)$/i, '').trim();
+
+  return { title, artist };
 }
 
-// Unified Search Route
+// Universal Multi-Source YouTube Search Engine (Innertube JSON API + Cookie Scraper Fallback)
+async function searchYouTube(query, limit = 25) {
+  if (!query) return [];
+
+  // Strategy 1: YouTube Innertube API (Official internal pure JSON API - ultra fast, zero HTML parsing)
+  try {
+    const res = await fetch('https://www.youtube.com/youtubei/v1/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'X-YouTube-Client-Name': '1',
+        'X-YouTube-Client-Version': '2.20240301.00.00'
+      },
+      body: JSON.stringify({
+        context: {
+          client: {
+            clientName: 'WEB',
+            clientVersion: '2.20240301.00.00',
+            hl: 'en',
+            gl: 'US'
+          }
+        },
+        query: query
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const contents = data.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
+      const results = [];
+
+      for (const section of contents) {
+        const items = section?.itemSectionRenderer?.contents || [];
+        for (const item of items) {
+          if (item.videoRenderer) {
+            const v = item.videoRenderer;
+            const videoId = v.videoId;
+            if (!videoId) continue;
+
+            const rawTitle = v.title?.runs?.[0]?.text || 'Unknown Title';
+            const rawChannel = v.ownerText?.runs?.[0]?.text || 'Universal Audio';
+            const durationStr = v.lengthText?.simpleText || '3:30';
+            const thumb = v.thumbnail?.thumbnails?.slice(-1)[0]?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+
+            const parts = durationStr.split(':').map(Number);
+            let durationSec = 210;
+            if (parts.length === 2) durationSec = parts[0] * 60 + parts[1];
+            else if (parts.length === 3) durationSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+
+            const { title, artist } = cleanTrackTitleAndArtist(rawTitle, rawChannel);
+
+            results.push({
+              id: 'yt_' + videoId,
+              ytId: videoId,
+              title: title,
+              artist: artist,
+              album: 'Universal Audio Stream',
+              year: '',
+              image: thumb,
+              audioUrl: null, // Full-length stream managed by YouTube engine
+              duration: durationSec,
+              durationStr: durationStr,
+              source: 'youtube',
+              hasDirectAudio: false
+            });
+
+            if (results.length >= limit) break;
+          }
+        }
+        if (results.length >= limit) break;
+      }
+
+      if (results.length > 0) return results;
+    }
+  } catch (err) {
+    console.warn('Innertube search note:', err.message);
+  }
+
+  // Strategy 2: Web Scraper with Consent & Cookie Bypass
+  try {
+    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cookie': 'CONSENT=YES+cb.20210328-17-p0.en+FX+478; SOCS=CAESEwgDEgk0ODE3Nzk3MjQaAmVuIAEaBgiA_LyaBg;'
+      }
+    });
+
+    if (res.ok) {
+      const html = await res.text();
+      const match = html.match(/var ytInitialData = ({.*?});<\/script>/s) || html.match(/ytInitialData\s*=\s*({.+?});/);
+      if (match) {
+        const data = JSON.parse(match[1]);
+        const contents = data.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
+        const results = [];
+
+        for (const section of contents) {
+          const items = section?.itemSectionRenderer?.contents || [];
+          for (const item of items) {
+            if (item.videoRenderer) {
+              const v = item.videoRenderer;
+              const videoId = v.videoId;
+              if (!videoId) continue;
+
+              const rawTitle = v.title?.runs?.[0]?.text || 'Unknown Title';
+              const rawChannel = v.ownerText?.runs?.[0]?.text || 'Universal Audio';
+              const durationStr = v.lengthText?.simpleText || '3:30';
+              const thumb = v.thumbnail?.thumbnails?.slice(-1)[0]?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+
+              const parts = durationStr.split(':').map(Number);
+              let durationSec = 210;
+              if (parts.length === 2) durationSec = parts[0] * 60 + parts[1];
+              else if (parts.length === 3) durationSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+
+              const { title, artist } = cleanTrackTitleAndArtist(rawTitle, rawChannel);
+
+              results.push({
+                id: 'yt_' + videoId,
+                ytId: videoId,
+                title: title,
+                artist: artist,
+                album: 'Universal Audio Stream',
+                year: '',
+                image: thumb,
+                audioUrl: null,
+                duration: durationSec,
+                durationStr: durationStr,
+                source: 'youtube',
+                hasDirectAudio: false
+              });
+
+              if (results.length >= limit) break;
+            }
+          }
+          if (results.length >= limit) break;
+        }
+
+        if (results.length > 0) return results;
+      }
+    }
+  } catch (err) {
+    console.warn('YouTube scraper note:', err.message);
+  }
+
+  return [];
+}
+
+// Unified Search Route with Universal Coverage
 app.get('/api/search', async (req, res) => {
   const query = (req.query.q || '').trim();
   const source = req.query.source || 'all'; // 'all', 'saavn', 'youtube'
@@ -197,21 +302,42 @@ app.get('/api/search', async (req, res) => {
     let results = [];
 
     if (source === 'saavn') {
-      results = await searchSaavn(query, 25);
+      results = await searchSaavn(query, 30);
     } else if (source === 'youtube') {
-      results = await searchYouTube(query, 15);
+      results = await searchYouTube(query, 25);
     } else {
-      // Fast search: Query Saavn first (instant direct audio)
-      const saavnSongs = await searchSaavn(query, 25);
-      if (saavnSongs && saavnSongs.length >= 8) {
-        results = saavnSongs;
-      } else {
-        // Parallel fallback to YouTube with a 2.5s safety timeout
-        const ytPromise = searchYouTube(query, 10);
-        const timeoutPromise = new Promise(resolve => setTimeout(() => resolve([]), 2500));
-        const ytSongs = await Promise.race([ytPromise, timeoutPromise]);
-        results = [...(saavnSongs || []), ...(ytSongs || [])];
+      // Parallel Multi-Source Search for 100% Comprehensive Universal Coverage
+      const [saavnRes, ytRes] = await Promise.allSettled([
+        searchSaavn(query, 30),
+        searchYouTube(query, 25)
+      ]);
+
+      const saavnSongs = saavnRes.status === 'fulfilled' ? (saavnRes.value || []) : [];
+      const ytSongs = ytRes.status === 'fulfilled' ? (ytRes.value || []) : [];
+
+      // Combine results:
+      // Direct 320kbps Saavn tracks come first, complemented by YouTube for universal coverage
+      const seenKeys = new Set();
+      const combined = [];
+
+      for (const track of saavnSongs) {
+        if (!track || !track.title) continue;
+        const key = (track.title + ' ' + (track.artist || '')).toLowerCase().replace(/[^a-z0-9]/g, '');
+        seenKeys.add(key);
+        combined.push(track);
       }
+
+      for (const track of ytSongs) {
+        if (!track || !track.title) continue;
+        const key = (track.title + ' ' + (track.artist || '')).toLowerCase().replace(/[^a-z0-9]/g, '');
+        // Avoid duplicate identical tracks, keep distinct releases/remixes/live/unreleased
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          combined.push(track);
+        }
+      }
+
+      results = combined;
     }
 
     res.json({

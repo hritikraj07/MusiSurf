@@ -691,13 +691,20 @@
           console.warn('Offline playback error:', err);
         });
       } else if (track.source === 'youtube' || !track.hasDirectAudio) {
-        // YouTube Engine
+        // Universal YouTube Engine for 100% full-length song playback
         elements.audio.pause();
-        if (state.ytReady && state.ytPlayer && track.ytId) {
-          state.ytPlayer.loadVideoById(track.ytId);
-          state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
-          state.ytPlayer.playVideo();
-        }
+        let retries = 0;
+        const playYt = () => {
+          if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function' && track.ytId) {
+            state.ytPlayer.loadVideoById(track.ytId);
+            state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
+            state.ytPlayer.playVideo();
+          } else if (retries < 25) {
+            retries++;
+            setTimeout(playYt, 200);
+          }
+        };
+        playYt();
       } else {
         // High quality full-length direct audio streaming
         if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.stopVideo === 'function') {
@@ -2913,6 +2920,11 @@
     loadTrendingShelves();
     restoreLastPlayedState();
     updateProgress();
+
+    // Ensure YouTube player initializes if YT script already loaded
+    if (window.YT && window.YT.Player && !state.ytPlayer && typeof window.onYouTubeIframeAPIReady === 'function') {
+      window.onYouTubeIframeAPIReady();
+    }
 
     // Register PWA Service Worker for Mobile Caching and Installation
     if ('serviceWorker' in navigator) {
