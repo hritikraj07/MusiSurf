@@ -81,6 +81,7 @@
     libHubDownloadedMeta: document.getElementById('libHubDownloadedMeta'),
     libHubLocalMeta: document.getElementById('libHubLocalMeta'),
     libCustomPlaylistsGrid: document.getElementById('libCustomPlaylistsGrid'),
+    libHubSettingsBtn: document.getElementById('libHubSettingsBtn'),
 
     // Header & Offline Banner
     offlineBanner: document.getElementById('offlineBanner'),
@@ -117,6 +118,7 @@
     playAllPlaylistBtn: document.getElementById('playAllPlaylistBtn'),
     shufflePlaylistBtn: document.getElementById('shufflePlaylistBtn'),
     deletePlaylistBtn: document.getElementById('deletePlaylistBtn'),
+    playlistBackBtn: document.getElementById('playlistBackBtn'),
 
     // Lyrics View
     lyricsAlbumCover: document.getElementById('lyricsAlbumCover'),
@@ -185,6 +187,7 @@
     mobLyricsBtn: document.getElementById('mobLyricsBtn'),
     mobDownloadBtn: document.getElementById('mobDownloadBtn'),
     mobDownloadActionBtn: document.getElementById('mobDownloadActionBtn'),
+    mobAddToPlaylistBtn: document.getElementById('mobAddToPlaylistBtn'),
 
     // Modals
     createPlaylistModal: document.getElementById('createPlaylistModal'),
@@ -238,6 +241,42 @@
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   }
 
+  // Safe HTML Escaper to prevent XSS and prevent undefined reference errors
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
+  }
+
+  // Check if a song is downloaded in IndexedDB
+  function isTrackDownloaded(trackId) {
+    if (!trackId) return false;
+    return state.offlineTracks.some(t => t.id === trackId);
+  }
+
+  // Generate downloaded badge HTML indicator
+  function getDownloadedBadgeHtml(trackId) {
+    if (isTrackDownloaded(trackId)) {
+      return `<span class="downloaded-badge" title="Downloaded • Offline Ready"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+    }
+    return '';
+  }
+
+  // Live update all downloaded badges for a track across open views
+  function updateAllDownloadedBadges(trackId) {
+    const badgeHtml = `<span class="downloaded-badge" title="Downloaded • Offline Ready"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+    document.querySelectorAll(`[data-track-id="${trackId}"]`).forEach(el => {
+      const titleEl = el.querySelector('.song-title-text, .table-title-main');
+      if (titleEl && !titleEl.querySelector('.downloaded-badge')) {
+        titleEl.insertAdjacentHTML('beforeend', badgeHtml);
+      }
+      const dlBtn = el.querySelector('.download-song-trigger');
+      if (dlBtn) {
+        dlBtn.classList.add('downloaded');
+        dlBtn.title = 'Downloaded • Saved in Offline Songs';
+      }
+    });
+  }
+
   // Toast System
   function showToast(message, icon = '✓') {
     const toast = document.createElement('div');
@@ -281,6 +320,7 @@
     try {
       localStorage.setItem('musisurf_playlists', JSON.stringify(state.customPlaylists));
       renderSidebarPlaylists();
+      updateLibraryUI();
     } catch (e) {
       console.warn('Error saving custom playlists:', e);
     }
@@ -821,8 +861,8 @@
     }
   }
 
-  // Direct Audio Downloader: Desktop downloads to Downloads folder, Mobile saves to in-app Local Files
-  function downloadSong(track) {
+  // Direct Audio Downloader: Mobile saves to "Downloaded" playlist in Library, Desktop downloads to Downloads folder
+  async function downloadSong(track) {
     if (!track) {
       showToast('No song currently selected to download', 'ℹ');
       return;
@@ -843,36 +883,60 @@
       streamUrl = `/api/download?title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`;
     }
 
-    // ON MOBILE ONLY: Save song directly into Local Files (no download prompt or Downloads folder)
+    // ON MOBILE ONLY: Save song into Downloaded playlist in Library (IndexedDB offline storage)
     if (isMobile) {
-      showToast(`Saving "${track.title}" to Local Files...`, '📁');
+      if (isTrackDownloaded(track.id)) {
+        showToast(`"${track.title}" is already in Downloaded Songs`, '✓');
+        return;
+      }
 
-      fetch(streamUrl)
-        .then(res => {
-          if (!res.ok) throw new Error('Stream fetch failed');
-          return res.blob();
-        })
-        .then(async (blob) => {
-          const localTrack = {
-            id: 'local_' + (track.id || Date.now()),
-            title: track.title,
-            artist: track.artist,
-            album: track.album || 'Downloaded Track',
-            duration: track.duration || 210,
-            durationStr: track.durationStr || formatDuration(track.duration || 210),
-            image: track.image || DEFAULT_LOCAL_COVER,
-            isLocal: true,
-            fileBlob: blob,
-            addedAt: Date.now()
-          };
+      showToast(`Downloading "${track.title}" for offline play...`, '⏳');
 
-          await saveLocalTrackToDB(localTrack);
-          saveSongOfflineBlob(track);
-        })
-        .catch(err => {
-          console.warn('Mobile local files download error:', err);
-          showToast(`Saved to Local Files`, '📁');
-        });
+      try {
+        const res = await fetch(streamUrl);
+        if (!res.ok) throw new Error('Stream fetch failed');
+        const blob = await res.blob();
+
+        const db = await getOfflineDB();
+        const tx = db.transaction(OFFLINE_STORE_NAME, 'readwrite');
+        const store = tx.objectStore(OFFLINE_STORE_NAME);
+
+        const record = {
+          id: track.id,
+          title: track.title,
+          artist: track.artist,
+          album: track.album || 'Downloaded Track',
+          duration: track.duration || 210,
+          durationStr: track.durationStr || formatTime(track.duration || 210),
+          image: track.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80',
+          audioBlob: blob,
+          source: track.source,
+          isDownloaded: true,
+          downloadedAt: Date.now()
+        };
+
+        store.put(record);
+
+        tx.oncomplete = () => {
+          const existingIdx = state.offlineTracks.findIndex(t => t.id === track.id);
+          if (existingIdx >= 0) {
+            state.offlineTracks[existingIdx] = record;
+          } else {
+            state.offlineTracks.unshift(record);
+          }
+          updateDownloadedCountUI();
+          updateLibraryUI();
+          updateAllDownloadedBadges(track.id);
+          showToast(`Saved "${track.title}" to Downloaded Songs!`, '✓');
+
+          if (state.currentView === 'downloaded' || (state.currentView === 'playlist' && state.activePlaylistId === 'downloaded')) {
+            renderPlaylistView('downloaded');
+          }
+        };
+      } catch (err) {
+        console.warn('Mobile download error:', err);
+        showToast(`Download failed for "${track.title}". Check connection.`, '⚠');
+      }
 
       return;
     }
@@ -1607,12 +1671,14 @@
     row.dataset.trackId = track.id;
 
     const isLiked = state.likedSongs.some(s => s.id === track.id);
+    const isDownloaded = isTrackDownloaded(track.id);
+    const badgeHtml = getDownloadedBadgeHtml(track.id);
 
     row.innerHTML = `
-      <img src="${track.image}" alt="${track.title}" class="song-thumb">
+      <img src="${track.image}" alt="${escapeHtml(track.title)}" class="song-thumb">
       <div class="song-info-col">
-        <div class="song-title-text">${track.title}</div>
-        <div class="song-artist-text">${track.artist}</div>
+        <div class="song-title-text">${escapeHtml(track.title)}${badgeHtml}</div>
+        <div class="song-artist-text">${escapeHtml(track.artist)}</div>
       </div>
       <button class="song-action-btn ${isLiked ? 'liked' : ''}" title="${isLiked ? 'Liked' : 'Save to Liked Songs'}">
         <svg viewBox="0 0 24 24" fill="${isLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
@@ -1628,20 +1694,31 @@
           <line x1="16" y1="18" x2="22" y2="18"/>
         </svg>
       </button>
-      <button class="song-action-btn download-song-trigger" title="Download Full Track (320kbps)">
+      <button class="song-action-btn add-to-playlist-trigger" title="Add to Playlist">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="12" y1="5" x2="12" y2="19"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </button>
+      <button class="song-action-btn download-song-trigger ${isDownloaded ? 'downloaded' : ''}" title="${isDownloaded ? 'Downloaded • Saved in Offline Songs' : 'Download Song'}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
           <polyline points="7 10 12 15 17 10"/>
           <line x1="12" y1="15" x2="12" y2="3"/>
         </svg>
       </button>
-      <span class="song-duration-text">${track.durationStr}</span>
+      <span class="song-duration-text">${track.durationStr || '3:30'}</span>
     `;
 
     row.addEventListener('click', (e) => {
       if (e.target.closest('.add-to-queue-trigger')) {
         e.stopPropagation();
         addToQueue(track);
+        return;
+      }
+      if (e.target.closest('.add-to-playlist-trigger')) {
+        e.stopPropagation();
+        openAddToPlaylistModal(track);
         return;
       }
       if (e.target.closest('.download-song-trigger')) {
@@ -1666,19 +1743,21 @@
     tr.dataset.trackId = track.id;
 
     const isLiked = state.likedSongs.some(s => s.id === track.id);
+    const isDownloaded = isTrackDownloaded(track.id);
+    const badgeHtml = getDownloadedBadgeHtml(track.id);
 
     tr.innerHTML = `
       <td class="col-num">${index}</td>
       <td class="col-title">
         <div class="table-title-cell">
-          <img src="${track.image}" alt="${track.title}" class="table-cover" loading="lazy">
+          <img src="${track.image}" alt="${escapeHtml(track.title)}" class="table-cover" loading="lazy">
           <div>
-            <div class="table-title-main">${track.title}</div>
-            <div class="table-artist-sub">${track.artist}</div>
+            <div class="table-title-main">${escapeHtml(track.title)}${badgeHtml}</div>
+            <div class="table-artist-sub">${escapeHtml(track.artist)}</div>
           </div>
         </div>
       </td>
-      <td class="col-album">${track.album || 'Single'}</td>
+      <td class="col-album">${escapeHtml(track.album || 'Single')}</td>
       <td class="col-actions">
         <button class="song-action-btn ${isLiked ? 'liked' : ''}" title="${isLiked ? 'Liked' : 'Like'}">
           <svg viewBox="0 0 24 24" fill="${isLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
@@ -1695,12 +1774,12 @@
           </svg>
         </button>
         <button class="song-action-btn add-to-playlist-trigger" title="Add to Playlist">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <line x1="12" y1="5" x2="12" y2="19"/>
             <line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
         </button>
-        <button class="song-action-btn download-song-trigger" title="Download Song">
+        <button class="song-action-btn download-song-trigger ${isDownloaded ? 'downloaded' : ''}" title="${isDownloaded ? 'Downloaded • Saved in Offline Songs' : 'Download Song'}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
             <polyline points="7 10 12 15 17 10"/>
@@ -1708,7 +1787,7 @@
           </svg>
         </button>
       </td>
-      <td class="col-duration">${track.durationStr}</td>
+      <td class="col-duration">${track.durationStr || '3:30'}</td>
     `;
 
     tr.addEventListener('click', (e) => {
@@ -1962,13 +2041,23 @@
   }
 
   // ==========================================================================
-  // VIEW NAVIGATION CONTROLLER
+  // VIEW NAVIGATION CONTROLLER & HISTORY MANAGEMENT
   // ==========================================================================
-  function switchView(viewName) {
+  let navHistoryStack = ['home'];
+
+  function switchView(viewName, options = {}) {
+    const pushHistory = options.pushHistory !== false;
     if (state.currentView === viewName) return;
 
     state.previousView = state.currentView;
     state.currentView = viewName;
+
+    if (pushHistory) {
+      navHistoryStack.push(viewName);
+      try {
+        window.history.pushState({ view: viewName, depth: navHistoryStack.length }, '', window.location.pathname);
+      } catch (e) {}
+    }
 
     // Toggle active view element
     Object.keys(elements.views).forEach(key => {
@@ -2053,24 +2142,48 @@
 
   // Modal Helpers
   function openAddToPlaylistModal(track) {
+    if (!track) return;
     pendingTrackForPlaylist = track;
     elements.modalPlaylistPickerList.innerHTML = '';
 
+    // Always offer "+ Create New Playlist" at top
+    const newPlItem = document.createElement('div');
+    newPlItem.className = 'library-item';
+    newPlItem.style.borderBottom = '1px solid rgba(255, 255, 255, 0.1)';
+    newPlItem.style.marginBottom = '8px';
+    newPlItem.style.cursor = 'pointer';
+    newPlItem.innerHTML = `
+      <div class="playlist-cover-mini" style="background: var(--accent-primary); color: #000; display:flex; align-items:center; justify-content:center;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;">
+          <line x1="12" y1="5" x2="12" y2="19"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </div>
+      <div class="library-item-info">
+        <span class="library-item-title" style="color: var(--accent-primary); font-weight: 700;">+ New Playlist</span>
+        <span class="library-item-meta">Create collection with this song</span>
+      </div>
+    `;
+    newPlItem.addEventListener('click', () => {
+      elements.addToPlaylistModal.style.display = 'none';
+      elements.createPlaylistModal.style.display = 'flex';
+      try { window.history.pushState({ modal: 'createPlaylist' }, '', window.location.pathname); } catch (e) {}
+      setTimeout(() => elements.playlistNameInput?.focus(), 60);
+    });
+    elements.modalPlaylistPickerList.appendChild(newPlItem);
+
     if (state.customPlaylists.length === 0) {
-      elements.modalPlaylistPickerList.innerHTML = `
-        <div style="text-align: center; padding: 24px 0; color: var(--text-secondary);">
-          <p>No custom playlists created yet.</p>
-          <button class="btn-primary" style="margin-top: 12px;" id="createFirstPlaylistBtn">+ Create Playlist</button>
-        </div>
-      `;
-      document.getElementById('createFirstPlaylistBtn')?.addEventListener('click', () => {
-        elements.addToPlaylistModal.style.display = 'none';
-        elements.createPlaylistModal.style.display = 'flex';
-      });
+      const emptyNote = document.createElement('div');
+      emptyNote.style.textAlign = 'center';
+      emptyNote.style.padding = '16px 0';
+      emptyNote.style.color = 'var(--text-secondary)';
+      emptyNote.innerHTML = `<p>No other playlists yet. Tap "+ New Playlist" above to create your first!</p>`;
+      elements.modalPlaylistPickerList.appendChild(emptyNote);
     } else {
       state.customPlaylists.forEach(pl => {
         const item = document.createElement('div');
         item.className = 'library-item';
+        item.style.cursor = 'pointer';
         item.innerHTML = `
           <div class="playlist-cover-mini">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2080,7 +2193,7 @@
             </svg>
           </div>
           <div class="library-item-info">
-            <span class="library-item-title">${pl.name}</span>
+            <span class="library-item-title">${escapeHtml(pl.name)}</span>
             <span class="library-item-meta">${pl.tracks?.length || 0} songs</span>
           </div>
         `;
@@ -2089,17 +2202,19 @@
           if (!pl.tracks.some(t => t.id === track.id)) {
             pl.tracks.push(track);
             saveStoredPlaylists();
-            showToast(`Added to "${pl.name}"`);
+            showToast(`Added to "${pl.name}"`, '✓');
           } else {
-            showToast(`Already in "${pl.name}"`);
+            showToast(`Already in "${pl.name}"`, 'ℹ');
           }
           elements.addToPlaylistModal.style.display = 'none';
+          pendingTrackForPlaylist = null;
         });
         elements.modalPlaylistPickerList.appendChild(item);
       });
     }
 
     elements.addToPlaylistModal.style.display = 'flex';
+    try { window.history.pushState({ modal: 'addToPlaylist' }, '', window.location.pathname); } catch (e) {}
   }
 
   // ==========================================================================
@@ -2708,7 +2823,7 @@
         id: 'pl_' + Date.now(),
         name,
         description: desc,
-        tracks: []
+        tracks: pendingTrackForPlaylist ? [pendingTrackForPlaylist] : []
       };
 
       state.customPlaylists.push(newPl);
@@ -2716,7 +2831,12 @@
       elements.createPlaylistModal.style.display = 'none';
       elements.playlistNameInput.value = '';
       elements.playlistDescInput.value = '';
-      showToast(`Created playlist "${name}"`);
+      if (pendingTrackForPlaylist) {
+        showToast(`Created "${name}" & added "${pendingTrackForPlaylist.title}"!`, '✓');
+        pendingTrackForPlaylist = null;
+      } else {
+        showToast(`Created playlist "${name}"`, '✓');
+      }
       renderPlaylistView(newPl.id);
     });
 
@@ -2730,7 +2850,10 @@
     // Settings Modal
     const openSettingsModal = () => {
       loadSettings();
-      if (elements.settingsModal) elements.settingsModal.style.display = 'flex';
+      if (elements.settingsModal) {
+        elements.settingsModal.style.display = 'flex';
+        try { window.history.pushState({ modal: 'settings' }, '', window.location.pathname); } catch (e) {}
+      }
     };
     const closeSettingsModal = () => {
       if (elements.settingsModal) elements.settingsModal.style.display = 'none';
@@ -2739,6 +2862,28 @@
     if (elements.openSettingsBtn) elements.openSettingsBtn.addEventListener('click', openSettingsModal);
     if (elements.headerSettingsBtn) elements.headerSettingsBtn.addEventListener('click', openSettingsModal);
     if (elements.closeSettingsModalBtn) elements.closeSettingsModalBtn.addEventListener('click', closeSettingsModal);
+    if (elements.libHubSettingsBtn) elements.libHubSettingsBtn.addEventListener('click', openSettingsModal);
+
+    // Desktop History Navigation Controls
+    if (elements.historyBackBtn) {
+      elements.historyBackBtn.removeAttribute('disabled');
+      elements.historyBackBtn.addEventListener('click', () => window.history.back());
+    }
+    if (elements.historyForwardBtn) {
+      elements.historyForwardBtn.removeAttribute('disabled');
+      elements.historyForwardBtn.addEventListener('click', () => window.history.forward());
+    }
+
+    // Mobile Playlist Back Button
+    if (elements.playlistBackBtn) {
+      elements.playlistBackBtn.addEventListener('click', () => {
+        if (window.innerWidth <= 768) {
+          switchView('library');
+        } else {
+          switchView(state.previousView || 'home');
+        }
+      });
+    }
 
     if (elements.deadSilenceOnRadio) {
       elements.deadSilenceOnRadio.addEventListener('change', () => {
@@ -2891,11 +3036,74 @@
       switchView('home');
       updateMobNav('mobNavHome');
     });
-    if (elements.mobNavSearch) elements.mobNavSearch.addEventListener('click', () => {
+
+    // Mobile Search Button:
+    // - 1st tap: switches to search section without auto-focusing the keyboard
+    // - 2nd tap: focuses the search bar to bring up the keyboard
+    // - Long-press / hold: immediately opens search and focuses search bar
+    let searchHoldTimer = null;
+    let isSearchHoldTriggered = false;
+
+    function triggerSearchFocus() {
       switchView('search');
-      elements.globalSearchInput.focus();
       updateMobNav('mobNavSearch');
-    });
+      setTimeout(() => {
+        if (elements.globalSearchInput) elements.globalSearchInput.focus();
+      }, 70);
+    }
+
+    if (elements.mobNavSearch) {
+      // Touch long-press hold detection
+      elements.mobNavSearch.addEventListener('touchstart', () => {
+        isSearchHoldTriggered = false;
+        searchHoldTimer = setTimeout(() => {
+          isSearchHoldTriggered = true;
+          if (navigator.vibrate) navigator.vibrate(40);
+          triggerSearchFocus();
+        }, 360);
+      }, { passive: true });
+
+      elements.mobNavSearch.addEventListener('touchend', () => {
+        clearTimeout(searchHoldTimer);
+      });
+      elements.mobNavSearch.addEventListener('touchmove', () => {
+        clearTimeout(searchHoldTimer);
+      });
+
+      // Mouse long-press hold detection
+      elements.mobNavSearch.addEventListener('mousedown', () => {
+        isSearchHoldTriggered = false;
+        searchHoldTimer = setTimeout(() => {
+          isSearchHoldTriggered = true;
+          triggerSearchFocus();
+        }, 360);
+      });
+      elements.mobNavSearch.addEventListener('mouseup', () => {
+        clearTimeout(searchHoldTimer);
+      });
+      elements.mobNavSearch.addEventListener('mouseleave', () => {
+        clearTimeout(searchHoldTimer);
+      });
+
+      elements.mobNavSearch.addEventListener('click', (e) => {
+        if (isSearchHoldTriggered) {
+          isSearchHoldTriggered = false;
+          e.preventDefault();
+          return;
+        }
+        clearTimeout(searchHoldTimer);
+
+        if (state.currentView !== 'search') {
+          // 1st click: redirect to search section without keyboard popup
+          switchView('search');
+          updateMobNav('mobNavSearch');
+        } else {
+          // 2nd click: already in search section, focus search bar
+          triggerSearchFocus();
+        }
+      });
+    }
+
     if (elements.mobNavLibrary) elements.mobNavLibrary.addEventListener('click', () => {
       switchView('library');
       updateMobNav('mobNavLibrary');
@@ -2914,6 +3122,7 @@
     if (elements.libViewCreatePlaylistBtn) {
       elements.libViewCreatePlaylistBtn.addEventListener('click', () => {
         elements.createPlaylistModal.style.display = 'flex';
+        try { window.history.pushState({ modal: 'createPlaylist' }, '', window.location.pathname); } catch (e) {}
         elements.playlistNameInput.focus();
       });
     }
@@ -2926,6 +3135,7 @@
         }
         if (state.currentTrack) {
           elements.mobilePlayerModal.style.display = 'flex';
+          try { window.history.pushState({ modal: 'mobilePlayer' }, '', window.location.pathname); } catch (e) {}
         }
       }
     });
@@ -2946,6 +3156,14 @@
     if (elements.mobDownloadBtn) elements.mobDownloadBtn.addEventListener('click', () => downloadSong(state.currentTrack));
     if (elements.mobDownloadActionBtn) elements.mobDownloadActionBtn.addEventListener('click', () => downloadSong(state.currentTrack));
 
+    if (elements.mobAddToPlaylistBtn) {
+      elements.mobAddToPlaylistBtn.addEventListener('click', () => {
+        if (state.currentTrack) {
+          openAddToPlaylistModal(state.currentTrack);
+        }
+      });
+    }
+
     if (elements.mobLyricsBtn) {
       elements.mobLyricsBtn.addEventListener('click', () => {
         elements.mobilePlayerModal.style.display = 'none';
@@ -2960,6 +3178,47 @@
     if (elements.mobRepeatBtn) elements.mobRepeatBtn.addEventListener('click', () => elements.repeatBtn.click());
     if (elements.mobPlayerHeartBtn) elements.mobPlayerHeartBtn.addEventListener('click', () => {
       if (state.currentTrack) toggleLikeSong(state.currentTrack);
+    });
+
+    // Mobile System Back & Popstate History Navigation (Prevents app from closing on single back)
+    window.addEventListener('popstate', (e) => {
+      // 1. If any modal or drawer is open, close it first
+      if (elements.mobilePlayerModal && elements.mobilePlayerModal.style.display !== 'none') {
+        elements.mobilePlayerModal.style.display = 'none';
+        return;
+      }
+      if (elements.settingsModal && elements.settingsModal.style.display !== 'none') {
+        elements.settingsModal.style.display = 'none';
+        return;
+      }
+      if (elements.addToPlaylistModal && elements.addToPlaylistModal.style.display !== 'none') {
+        elements.addToPlaylistModal.style.display = 'none';
+        return;
+      }
+      if (elements.createPlaylistModal && elements.createPlaylistModal.style.display !== 'none') {
+        elements.createPlaylistModal.style.display = 'none';
+        return;
+      }
+      if (elements.queueDrawer && elements.queueDrawer.classList.contains('open')) {
+        elements.queueDrawer.classList.remove('open');
+        if (elements.queueBtn) elements.queueBtn.classList.remove('active');
+        return;
+      }
+
+      // 2. View step-back navigation
+      if (state.currentView === 'lyrics') {
+        switchView(state.previousView || 'home', { pushHistory: false });
+        return;
+      }
+      if (state.currentView === 'playlist' || state.currentView === 'localMusic') {
+        const target = (window.innerWidth <= 768) ? 'library' : (state.previousView || 'home');
+        switchView(target, { pushHistory: false });
+        return;
+      }
+      if (state.currentView !== 'home') {
+        switchView('home', { pushHistory: false });
+        return;
+      }
     });
 
     // Draggable Mobile Player Modal (Swipe down on top/handle to collapse)
@@ -3092,6 +3351,10 @@
   // INITIALIZE APP
   // ==========================================================================
   function init() {
+    try {
+      window.history.replaceState({ view: 'home', depth: 1 }, '', window.location.pathname);
+    } catch (e) {}
+
     loadStoredData();
     loadOfflineTracks();
     loadSettings();
