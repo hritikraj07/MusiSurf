@@ -24,18 +24,37 @@
   <link rel="apple-touch-icon" href="/icons/icon.svg">
   
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=3.5">
+  <link rel="stylesheet" href="/styles.css?v=3.6">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function(names) {
         for (var name of names) {
-          if (name !== 'musisurf-v3.5') caches.delete(name);
+          if (name !== 'musisurf-v3.6') caches.delete(name);
         }
       });
     }
   </script>
 </head>
 <body class="theme-dark">
+  <!-- App Splash Loading Screen (Smooth Mobile & First-Load Experience) -->
+  <div id="appSplashScreen" class="app-splash-screen">
+    <div class="splash-card">
+      <div class="splash-logo-wrap">
+        <div class="splash-ring splash-ring-1"></div>
+        <div class="splash-ring splash-ring-2"></div>
+        <div class="splash-logo-circle">
+          <svg viewBox="0 0 24 24" fill="#1DB954" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 3.5v10.55A4 4 0 1 0 14 17.5V7.5h4.5a1.5 1.5 0 0 0 1.5-1.5V4a.5.5 0 0 0-.5-.5H12z"/>
+          </svg>
+        </div>
+      </div>
+      <h1 class="splash-brand">Musi<span class="splash-highlight">Surf</span></h1>
+      <p class="splash-tagline">Feel every beat • Unlimited streaming</p>
+      <div class="splash-progress-track">
+        <div class="splash-progress-bar"></div>
+      </div>
+    </div>
+  </div>
   <div id="app" class="app-layout">
     
     <!-- Left Sidebar -->
@@ -229,7 +248,12 @@
 
             <!-- 6 Quick Play Tiles -->
             <div class="quick-picks-grid" id="quickPicksGrid">
-              <!-- Populated by JS -->
+              <div class="quick-pick-skeleton skeleton-shimmer"></div>
+              <div class="quick-pick-skeleton skeleton-shimmer"></div>
+              <div class="quick-pick-skeleton skeleton-shimmer"></div>
+              <div class="quick-pick-skeleton skeleton-shimmer"></div>
+              <div class="quick-pick-skeleton skeleton-shimmer"></div>
+              <div class="quick-pick-skeleton skeleton-shimmer"></div>
             </div>
           </div>
 
@@ -245,9 +269,27 @@
 
           <!-- Dynamic Trending Shelves -->
           <div class="shelves-container" id="shelvesContainer">
-            <div class="loading-shelves">
-              <div class="spinner-ring"></div>
-              <span>Loading songs...</span>
+            <div class="shelves-skeleton-container">
+              <div class="shelf-skeleton-block">
+                <div class="skeleton-line skeleton-title-bar skeleton-shimmer"></div>
+                <div class="skeleton-line skeleton-subtitle-bar skeleton-shimmer"></div>
+                <div class="shelf-skeleton-row">
+                  <div class="shelf-skeleton-card skeleton-shimmer"></div>
+                  <div class="shelf-skeleton-card skeleton-shimmer"></div>
+                  <div class="shelf-skeleton-card skeleton-shimmer"></div>
+                  <div class="shelf-skeleton-card skeleton-shimmer"></div>
+                </div>
+              </div>
+              <div class="shelf-skeleton-block">
+                <div class="skeleton-line skeleton-title-bar skeleton-shimmer"></div>
+                <div class="skeleton-line skeleton-subtitle-bar skeleton-shimmer"></div>
+                <div class="shelf-skeleton-row">
+                  <div class="shelf-skeleton-card skeleton-shimmer"></div>
+                  <div class="shelf-skeleton-card skeleton-shimmer"></div>
+                  <div class="shelf-skeleton-card skeleton-shimmer"></div>
+                  <div class="shelf-skeleton-card skeleton-shimmer"></div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -607,20 +649,6 @@
                 <div class="lib-hub-details">
                   <h3 class="lib-hub-name">Local Files</h3>
                   <span class="lib-hub-meta" id="libHubLocalMeta">0 songs • Device Storage</span>
-                </div>
-              </div>
-
-              <!-- Settings Card (Dedicated Mobile & Library Hub Access) -->
-              <div class="library-hub-card" id="libHubSettingsBtn">
-                <div class="lib-hub-icon settings-icon-box">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="3"/>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                  </svg>
-                </div>
-                <div class="lib-hub-details">
-                  <h3 class="lib-hub-name">Settings</h3>
-                  <span class="lib-hub-meta">Dead silence & playback</span>
                 </div>
               </div>
             </div>

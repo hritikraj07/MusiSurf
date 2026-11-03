@@ -95,6 +95,7 @@ function transformSaavnSong(item) {
   const durationSec = parseInt(more.duration || item.duration || 210, 10);
   const playCount = parseInt(item.play_count || more.play_count || 0, 10);
   const isVerified = Boolean(more.artistMap?.primary_artists?.length > 0);
+  const label = decodeHtmlEntities(more.label || more.copyright_text || '');
 
   return {
     id: 'saavn_' + item.id,
@@ -110,27 +111,51 @@ function transformSaavnSong(item) {
     durationStr: formatDuration(durationSec),
     playCount: playCount,
     isVerified: isVerified,
+    label: label,
     source: 'saavn',
     hasDirectAudio: true
   };
 }
 
-// Search JioSaavn
-async function searchSaavn(query, limit = 20) {
+// Search JioSaavn (Queries general & dedicated song engines in parallel for 100% catalog coverage)
+async function searchSaavn(query, limit = 25) {
   try {
-    const url = `https://www.jiosaavn.com/api.php?__call=search.getResults&q=${encodeURIComponent(query)}&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=${limit}&p=1`;
-    const res = await fetch(url, {
+    const urls = [
+      `https://www.jiosaavn.com/api.php?__call=search.getResults&q=${encodeURIComponent(query)}&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=${limit}&p=1`,
+      `https://www.jiosaavn.com/api.php?__call=search.getSongSearchResults&q=${encodeURIComponent(query)}&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=${limit}&p=1`
+    ];
+
+    const responses = await Promise.allSettled(urls.map(u => fetch(u, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       }
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    if (!data.results || !Array.isArray(data.results)) return [];
+    })));
 
-    return data.results
-      .map(transformSaavnSong)
-      .filter(item => item.audioUrl); // only return tracks with direct audio
+    const allItems = [];
+    for (const r of responses) {
+      if (r.status === 'fulfilled' && r.value.ok) {
+        try {
+          const data = await r.value.json();
+          const items = Array.isArray(data.results) ? data.results :
+                        (Array.isArray(data?.data?.results) ? data.data.results : []);
+          allItems.push(...items);
+        } catch (e) {}
+      }
+    }
+
+    const seenIds = new Set();
+    const uniqueSongs = [];
+    for (const item of allItems) {
+      if (item && item.id && !seenIds.has(item.id)) {
+        seenIds.add(item.id);
+        const transformed = transformSaavnSong(item);
+        if (transformed && transformed.audioUrl) {
+          uniqueSongs.push(transformed);
+        }
+      }
+    }
+
+    return uniqueSongs;
   } catch (err) {
     console.error('Saavn search error:', err.message);
     return [];
@@ -202,29 +227,58 @@ function parseYouTubeMusicTitle(rawTitle, channel) {
   return { title, artist, album };
 }
 
+// Curated regex for global & Indian top superstar artists
+const FAMOUS_SUPERSTARS_REGEX = /\b(atif aslam|sachin-jigar|sachin jigar|shreya ghoshal|arijit singh|pritam|a\.?\s*r\.?\s*rahman|rahman|kishore kumar|lata mangeshkar|alka yagnik|kumar sanu|udit narayan|sunidhi chauhan|sonu nigam|badshah|diljit dosanjh|sidhu moose wala|honey singh|yo yo honey singh|anirudh ravichander|anirudh|k\.?k\.?|neha kakkar|jubin nautiyal|mohit chauhan|vishal-shekhar|vishal dadlani|shekhar ravjiani|shankar-ehsaan-loy|amit trivedi|armaan malik|amal mallik|darshan raval|guru randhawa|b praak|jaani|himesh reshammiya|lucky ali|the weeknd|weeknd|taylor swift|ed sheeran|drake|eminem|justin bieber|billie eilish|bruno mars|dua lipa|post malone|rihanna|adele|coldplay|imagine dragons|kendrick lamar|travis scott|ariana grande|beyonce|bts|maroon 5|charlie puth|shawn mendes|selena gomez|katy perry|avicii|david guetta|calvin harris|alan walker|martin garrix|chainsmokers|queen|michael jackson|elvis presley|beatles|linkin park|metallica|green day|nirvana|ac\/dc|bon jovi|hans zimmer)\b/i;
+
+// Curated regex for major official record labels
+const MAJOR_LABELS_REGEX = /\b(tips|t-series|sony|zee|yrf|universal|warner|saregama|speed|times music|columbia|interscope|atlantic|def jam|republic|rca|epic|island|geffen)\b/i;
+
 function calculateRelevanceScore(track, query) {
   const normQ = query.toLowerCase().trim().replace(/[^a-z0-9 ]/g, '');
   const qWords = normQ.split(/\s+/).filter(Boolean);
-  const normTitle = (track.title || '').toLowerCase().trim().replace(/[^a-z0-9 ]/g, '');
+  const rawTitle = track.title || '';
+  const normTitle = rawTitle.toLowerCase().trim().replace(/[^a-z0-9 ]/g, '');
   const normArtist = (track.artist || '').toLowerCase().trim().replace(/[^a-z0-9 ]/g, '');
+
+  // Clean title for comparison (strip "(From ...)", "(Audio)", "(Video)", etc.)
+  const cleanTitle = rawTitle
+    .replace(/\s*[\(\[](From\s+.*|With\s+.*|Feat\.?\s+.*|Official\s*Audio|Official\s*Video|Full\s*Song|Original\s*Motion\s*Picture\s*Soundtrack|Soundtrack|Duet|Audio|Video|Lyrics|Remix|Lofi|Slowed|Reverb)[\)\]]/gi, '')
+    .replace(/\s*-\s*(From\s+.*|Original\s*Motion\s*Picture\s*Soundtrack|Soundtrack|Full\s*Song)/gi, '')
+    .trim();
+  const normCleanTitle = cleanTitle.toLowerCase().trim().replace(/[^a-z0-9 ]/g, '');
 
   let score = 0;
 
   // Title / Artist Matching Gate: track must match at least one query term
-  const matchedWords = qWords.filter(w => normTitle.includes(w) || normArtist.includes(w));
+  const matchedWords = qWords.filter(w => normCleanTitle.includes(w) || normTitle.includes(w) || normArtist.includes(w));
   if (matchedWords.length === 0) {
     return 0; // completely irrelevant track
   }
 
-  // Exact Title Matching (Normalized)
-  if (normTitle === normQ) {
-    score += 55000;
-  } else if (normTitle.startsWith(normQ)) {
-    score += 38000;
-  } else if (qWords.every(w => normTitle.includes(w))) {
-    score += 28000;
+  // Exact Title Matching (Normalized against both full and cleaned titles)
+  if (normCleanTitle === normQ || normTitle === normQ) {
+    score += 65000;
+  } else if (normCleanTitle.startsWith(normQ) || normTitle.startsWith(normQ)) {
+    score += 48000;
+  } else if (qWords.every(w => normCleanTitle.includes(w) || normTitle.includes(w))) {
+    score += 32000;
   } else {
-    score += (matchedWords.length / qWords.length) * 15000;
+    score += (matchedWords.length / qWords.length) * 16000;
+  }
+
+  // Penalize titles that don't start with the query and have unrelated words prefixed (like "Joganimaano Rang Lagyo")
+  if (!normCleanTitle.startsWith(normQ) && !normTitle.startsWith(normQ) && normCleanTitle !== normQ) {
+    score -= 15000;
+  }
+
+  // Superstar & Renowned Hitmakers Priority (+55,000 points ensures famous original artists come first)
+  if (FAMOUS_SUPERSTARS_REGEX.test(track.artist || '') || FAMOUS_SUPERSTARS_REGEX.test(track.album || '')) {
+    score += 55000;
+  }
+
+  // Major Record Label Boost (Tips, T-Series, Sony, Zee, Universal, etc. gets +25,000)
+  if (MAJOR_LABELS_REGEX.test(track.label || '') || MAJOR_LABELS_REGEX.test(track.album || '') || MAJOR_LABELS_REGEX.test(track.artist || '')) {
+    score += 25000;
   }
 
   // Popularity scaling based on real stream / view counts (Famous hits get massive priority)
@@ -245,17 +299,17 @@ function calculateRelevanceScore(track, query) {
 
   // Query mentions artist
   if (normArtist.includes(normQ) || qWords.some(w => normArtist.includes(w))) {
-    score += 15000;
+    score += 18000;
   }
 
   // Penalize covers, karaoke, ringtones, remake unless specifically queried
   const isCoverOrRemake = /cover|karaoke|instrumental|remake|tribute|ringtone|status/i.test(track.title);
   const wantsCover = /cover|karaoke|instrumental|remake|tribute|ringtone|status/i.test(query);
   if (isCoverOrRemake && !wantsCover) {
-    score -= 35000;
+    score -= 40000;
   }
 
-  // Bonus for direct 320kbps audio when scores are competitive
+  // Bonus for direct 320kbps studio audio when scores are competitive
   if (track.hasDirectAudio) {
     score += 3000;
   }

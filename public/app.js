@@ -275,6 +275,23 @@
         dlBtn.title = 'Downloaded • Saved in Offline Songs';
       }
     });
+
+    if (state.currentTrack && state.currentTrack.id === trackId) {
+      if (elements.playerDownloadBtn) elements.playerDownloadBtn.classList.add('downloaded');
+      if (elements.mobDownloadBtn) elements.mobDownloadBtn.classList.add('downloaded');
+      if (elements.mobDownloadActionBtn) elements.mobDownloadActionBtn.classList.add('downloaded');
+    }
+  }
+
+  // Dismiss splash loading screen smoothly
+  function dismissSplashScreen() {
+    const splash = document.getElementById('appSplashScreen');
+    if (splash && !splash.classList.contains('splash-hidden')) {
+      splash.classList.add('splash-hidden');
+      setTimeout(() => {
+        splash.style.display = 'none';
+      }, 500);
+    }
   }
 
   // Toast System
@@ -297,6 +314,16 @@
       const storedPlaylists = localStorage.getItem('musisurf_playlists');
       if (storedPlaylists) state.customPlaylists = JSON.parse(storedPlaylists);
 
+      const storedOffline = localStorage.getItem('musisurf_offline_tracks');
+      if (storedOffline) {
+        try {
+          const parsed = JSON.parse(storedOffline);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            state.offlineTracks = parsed;
+          }
+        } catch (e) {}
+      }
+
       const storedVol = localStorage.getItem('musisurf_volume');
       if (storedVol !== null) {
         const v = parseFloat(storedVol);
@@ -304,6 +331,29 @@
       }
     } catch (e) {
       console.warn('Error loading local storage data:', e);
+    }
+  }
+
+  function saveStoredOfflineTracks() {
+    try {
+      const metaToStore = state.offlineTracks.map(t => ({
+        id: t.id,
+        title: t.title,
+        artist: t.artist,
+        album: t.album,
+        duration: t.duration,
+        durationStr: t.durationStr,
+        image: t.image,
+        audioUrl: t.audioUrl || null,
+        streamUrl: t.streamUrl || null,
+        ytId: t.ytId || null,
+        source: t.source || 'saavn',
+        isDownloaded: true,
+        downloadedAt: t.downloadedAt || Date.now()
+      }));
+      localStorage.setItem('musisurf_offline_tracks', JSON.stringify(metaToStore));
+    } catch (e) {
+      console.warn('Error saving offline tracks metadata to localStorage:', e);
     }
   }
 
@@ -422,8 +472,20 @@
       const store = tx.objectStore(OFFLINE_STORE_NAME);
       const req = store.getAll();
       req.onsuccess = () => {
-        state.offlineTracks = req.result || [];
+        const idbTracks = req.result || [];
+        if (idbTracks.length > 0) {
+          idbTracks.forEach(idbTrack => {
+            const idx = state.offlineTracks.findIndex(t => t.id === idbTrack.id);
+            if (idx >= 0) {
+              state.offlineTracks[idx] = { ...state.offlineTracks[idx], ...idbTrack };
+            } else {
+              state.offlineTracks.push(idbTrack);
+            }
+          });
+          saveStoredOfflineTracks();
+        }
         updateDownloadedCountUI();
+        updateLibraryUI();
       };
     } catch (e) {
       console.warn('Error loading offline tracks:', e);
@@ -861,7 +923,7 @@
     }
   }
 
-  // Direct Audio Downloader: Mobile saves to "Downloaded" playlist in Library, Desktop downloads to Downloads folder
+  // Direct Audio Downloader: Instantly adds to "Downloaded" playlist in Library, and triggers file download on Desktop
   async function downloadSong(track) {
     if (!track) {
       showToast('No song currently selected to download', 'ℹ');
@@ -871,7 +933,6 @@
     const cleanTitle = (track.title || 'Track').replace(/[\\/:*?"<>|]/g, '').trim();
     const cleanArtist = (track.artist || 'MusiSurf').replace(/[\\/:*?"<>|]/g, '').trim();
     const downloadFilename = `${cleanTitle} - ${cleanArtist}.mp4`;
-
     const isMobile = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
     let streamUrl = '';
@@ -883,77 +944,75 @@
       streamUrl = `/api/download?title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`;
     }
 
-    // ON MOBILE ONLY: Save song into Downloaded playlist in Library (IndexedDB offline storage)
-    if (isMobile) {
-      if (isTrackDownloaded(track.id)) {
-        showToast(`"${track.title}" is already in Downloaded Songs`, '✓');
-        return;
-      }
+    // 1. Immediately create or update record in Downloaded Songs playlist
+    const offlineRecord = {
+      id: track.id,
+      title: track.title,
+      artist: track.artist,
+      album: track.album || 'Downloaded Track',
+      duration: track.duration || 210,
+      durationStr: track.durationStr || formatTime(track.duration || 210),
+      image: track.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80',
+      audioUrl: track.audioUrl || null,
+      streamUrl: track.streamUrl || null,
+      ytId: track.ytId || null,
+      source: track.source || 'saavn',
+      isDownloaded: true,
+      downloadedAt: Date.now()
+    };
 
-      showToast(`Downloading "${track.title}" for offline play...`, '⏳');
+    const existingIdx = state.offlineTracks.findIndex(t => t.id === track.id);
+    if (existingIdx >= 0) {
+      state.offlineTracks[existingIdx] = { ...state.offlineTracks[existingIdx], ...offlineRecord };
+    } else {
+      state.offlineTracks.unshift(offlineRecord);
+    }
 
+    // Immediately persist metadata to localStorage
+    saveStoredOfflineTracks();
+
+    // Immediately update counts, badges, and Library UI
+    updateDownloadedCountUI();
+    updateLibraryUI();
+    updateAllDownloadedBadges(track.id);
+
+    showToast(`Saved "${track.title}" to Downloaded Songs!`, '✓');
+
+    // If currently viewing Downloaded playlist, refresh view instantly
+    if (state.currentView === 'downloaded' || (state.currentView === 'playlist' && state.activePlaylistId === 'downloaded')) {
+      renderPlaylistView('downloaded');
+    }
+
+    // 2. On desktop, also trigger browser file download to computer's Downloads folder
+    if (!isMobile) {
+      const a = document.createElement('a');
+      a.href = streamUrl;
+      a.setAttribute('download', downloadFilename);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    // 3. In background: asynchronously fetch audio stream blob and persist to IndexedDB for 100% offline playback
+    (async () => {
       try {
-        const res = await fetch(streamUrl);
-        if (!res.ok) throw new Error('Stream fetch failed');
-        const blob = await res.blob();
-
-        const db = await getOfflineDB();
-        const tx = db.transaction(OFFLINE_STORE_NAME, 'readwrite');
-        const store = tx.objectStore(OFFLINE_STORE_NAME);
-
-        const record = {
-          id: track.id,
-          title: track.title,
-          artist: track.artist,
-          album: track.album || 'Downloaded Track',
-          duration: track.duration || 210,
-          durationStr: track.durationStr || formatTime(track.duration || 210),
-          image: track.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80',
-          audioBlob: blob,
-          source: track.source,
-          isDownloaded: true,
-          downloadedAt: Date.now()
-        };
-
-        store.put(record);
-
-        tx.oncomplete = () => {
-          const existingIdx = state.offlineTracks.findIndex(t => t.id === track.id);
-          if (existingIdx >= 0) {
-            state.offlineTracks[existingIdx] = record;
-          } else {
-            state.offlineTracks.unshift(record);
+        const fetchTarget = track.audioUrl ? track.audioUrl : streamUrl;
+        const res = await fetch(fetchTarget);
+        if (res.ok) {
+          const blob = await res.blob();
+          const db = await getOfflineDB();
+          const tx = db.transaction(OFFLINE_STORE_NAME, 'readwrite');
+          const store = tx.objectStore(OFFLINE_STORE_NAME);
+          store.put({ ...offlineRecord, audioBlob: blob });
+          const idx = state.offlineTracks.findIndex(t => t.id === track.id);
+          if (idx >= 0) {
+            state.offlineTracks[idx].audioBlob = blob;
           }
-          updateDownloadedCountUI();
-          updateLibraryUI();
-          updateAllDownloadedBadges(track.id);
-          showToast(`Saved "${track.title}" to Downloaded Songs!`, '✓');
-
-          if (state.currentView === 'downloaded' || (state.currentView === 'playlist' && state.activePlaylistId === 'downloaded')) {
-            renderPlaylistView('downloaded');
-          }
-        };
+        }
       } catch (err) {
-        console.warn('Mobile download error:', err);
-        showToast(`Download failed for "${track.title}". Check connection.`, '⚠');
+        console.warn('Background offline blob caching note:', err.message);
       }
-
-      return;
-    }
-
-    // ON WEBSITE / DESKTOP: Download file directly into computer's Downloads folder
-    showToast(`Downloading "${track.title}" to Downloads folder...`, '⬇');
-    const a = document.createElement('a');
-    a.href = streamUrl;
-    a.setAttribute('download', downloadFilename);
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-
-    // Save to IndexedDB if direct audio can be stored for offline listening
-    if (track.audioUrl) {
-      saveSongOfflineBlob(track);
-    }
+    })();
   }
 
   // Add Track to Queue (inserts at top of upcoming queue, and successive adds queue right after)
@@ -1476,6 +1535,8 @@
     } catch (err) {
       console.warn('Failed to load trending shelves:', err);
       elements.shelvesContainer.innerHTML = '<p style="padding: 40px; color: var(--text-secondary);">Unable to load trending catalog. Use Search to play any song!</p>';
+    } finally {
+      dismissSplashScreen();
     }
   }
 
@@ -3384,6 +3445,9 @@
         });
       });
     }
+
+    // Dismiss splash loading screen smoothly
+    setTimeout(dismissSplashScreen, 900);
 
     console.log('🌊 MusiSurf Client Initialized');
   }
