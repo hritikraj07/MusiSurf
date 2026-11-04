@@ -708,8 +708,15 @@
   // ==========================================================================
   // PLAYBACK CONTROLLER
   // ==========================================================================
-  function playTrack(track, queueList = null) {
+  function playTrack(track, queueList = null, addToHistory = true) {
     if (!track) return;
+
+    // Track playback history for previous song button navigation
+    if (addToHistory && state.currentTrack && state.currentTrack.id !== track.id) {
+      if (!state.history) state.history = [];
+      state.history.push(state.currentTrack);
+      if (state.history.length > 50) state.history.shift();
+    }
 
     // Set queue if provided
     if (queueList && Array.isArray(queueList)) {
@@ -720,9 +727,14 @@
         state.queue.unshift(track);
         state.queueIndex = 0;
       }
-    } else if (state.queueIndex === -1 || !state.queue.find(t => t.id === track.id)) {
-      state.queue.push(track);
-      state.queueIndex = state.queue.length - 1;
+    } else {
+      const existingQIdx = state.queue.findIndex(t => t.id === track.id);
+      if (existingQIdx !== -1) {
+        state.queueIndex = existingQIdx;
+      } else {
+        state.queue.push(track);
+        state.queueIndex = state.queue.length - 1;
+      }
     }
 
     state.currentTrack = track;
@@ -1076,22 +1088,40 @@
   }
 
   function prevTrack() {
-    if (state.queue.length === 0) return;
-
-    // If current song played more than 3 seconds, restart it
-    const currentTime = getCurrentPlaybackTime();
-    if (currentTime > 3) {
-      seekTo(0);
-      return;
+    // 1. If we have a track in the playback history stack, navigate back to previous song
+    if (state.history && state.history.length > 0) {
+      const prevSong = state.history.pop();
+      if (prevSong) {
+        const qIdx = state.queue.findIndex(t => t.id === prevSong.id);
+        if (qIdx !== -1) {
+          state.queueIndex = qIdx;
+        } else {
+          state.queue.unshift(prevSong);
+          state.queueIndex = 0;
+        }
+        playTrack(prevSong, null, false);
+        showToast(`Playing previous: "${prevSong.title}"`, '⏮');
+        return;
+      }
     }
 
-    let prevIdx = state.queueIndex - 1;
-    if (prevIdx < 0) {
-      prevIdx = state.queue.length - 1;
+    // 2. If no history stack, navigate backwards in current queue
+    if (state.queue && state.queue.length > 0) {
+      let prevIdx = state.queueIndex - 1;
+      if (prevIdx < 0) {
+        prevIdx = state.queue.length - 1;
+      }
+      state.queueIndex = prevIdx;
+      const prevSong = state.queue[prevIdx];
+      if (prevSong) {
+        playTrack(prevSong, null, false);
+        showToast(`Playing previous: "${prevSong.title}"`, '⏮');
+        return;
+      }
     }
 
-    state.queueIndex = prevIdx;
-    playTrack(state.queue[prevIdx]);
+    // 3. Fallback: restart track if no other song exists
+    seekTo(0);
   }
 
   function onTrackEnded() {
@@ -1328,11 +1358,15 @@
           lineEl.classList.add('active');
           lineEl.classList.remove('passed');
 
-          // Smoothly scroll active line to center
-          lineEl.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center'
-          });
+          // Smoothly scroll active line to center strictly inside lyricsScrollBody
+          if (elements.lyricsScrollBody) {
+            const containerHeight = elements.lyricsScrollBody.clientHeight;
+            const targetScroll = lineEl.offsetTop - (containerHeight / 2) + (lineEl.offsetHeight / 2);
+            elements.lyricsScrollBody.scrollTo({
+              top: Math.max(0, targetScroll),
+              behavior: 'smooth'
+            });
+          }
         } else if (idx < activeIdx) {
           lineEl.classList.remove('active');
           lineEl.classList.add('passed');
@@ -2151,8 +2185,11 @@
       elements.mobNavLibrary.classList.toggle('active', ['library', 'playlist', 'localMusic'].includes(viewName));
     }
 
-    // Scroll to top
-    if (elements.contentScroll) elements.contentScroll.scrollTop = 0;
+    // Scroll to top and toggle lyrics active state on content scroll
+    if (elements.contentScroll) {
+      elements.contentScroll.classList.toggle('has-lyrics-active', viewName === 'lyrics');
+      elements.contentScroll.scrollTop = 0;
+    }
   }
 
   // Library View Hub UI
@@ -2828,15 +2865,50 @@
       }
     });
 
-    // Queue Drawer Toggle
-    elements.queueBtn.addEventListener('click', () => {
-      elements.queueDrawer.classList.toggle('open');
-      elements.queueBtn.classList.toggle('active', elements.queueDrawer.classList.contains('open'));
+    // Queue Drawer Toggle & Outside Click Dismissal
+    const closeQueueDrawer = () => {
+      if (elements.queueDrawer && elements.queueDrawer.classList.contains('open')) {
+        elements.queueDrawer.classList.remove('open');
+        if (elements.queueBtn) elements.queueBtn.classList.remove('active');
+      }
+    };
+
+    if (elements.queueBtn) {
+      elements.queueBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        elements.queueDrawer.classList.toggle('open');
+        elements.queueBtn.classList.toggle('active', elements.queueDrawer.classList.contains('open'));
+      });
+    }
+
+    if (elements.closeQueueBtn) {
+      elements.closeQueueBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeQueueDrawer();
+      });
+    }
+
+    // Dismiss queue drawer when clicking or tapping anywhere outside
+    document.addEventListener('click', (e) => {
+      if (elements.queueDrawer && elements.queueDrawer.classList.contains('open')) {
+        const isClickInside = elements.queueDrawer.contains(e.target);
+        const isClickOnBtn = elements.queueBtn && elements.queueBtn.contains(e.target);
+        if (!isClickInside && !isClickOnBtn) {
+          closeQueueDrawer();
+        }
+      }
     });
-    elements.closeQueueBtn.addEventListener('click', () => {
-      elements.queueDrawer.classList.remove('open');
-      elements.queueBtn.classList.remove('active');
-    });
+
+    document.addEventListener('touchend', (e) => {
+      if (elements.queueDrawer && elements.queueDrawer.classList.contains('open')) {
+        const isClickInside = elements.queueDrawer.contains(e.target);
+        const isClickOnBtn = elements.queueBtn && elements.queueBtn.contains(e.target);
+        if (!isClickInside && !isClickOnBtn) {
+          closeQueueDrawer();
+        }
+      }
+    }, { passive: true });
+
     elements.clearQueueBtn.addEventListener('click', () => {
       state.queue = state.currentTrack ? [state.currentTrack] : [];
       state.queueIndex = 0;
