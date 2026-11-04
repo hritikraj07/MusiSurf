@@ -131,6 +131,7 @@
 
     // Queue Drawer
     queueDrawer: document.getElementById('queueDrawer'),
+    queueDrawerBackdrop: document.getElementById('queueDrawerBackdrop'),
     queueBtn: document.getElementById('queueBtn'),
     closeQueueBtn: document.getElementById('closeQueueBtn'),
     queueNowPlaying: document.getElementById('queueNowPlaying'),
@@ -1088,9 +1089,16 @@
   }
 
   function prevTrack() {
-    // 1. If we have a track in the playback history stack, navigate back to previous song
+    // 1. If we have a track in the playback history stack, navigate back to previous distinct song
     if (state.history && state.history.length > 0) {
-      const prevSong = state.history.pop();
+      let prevSong = null;
+      while (state.history.length > 0) {
+        const candidate = state.history.pop();
+        if (candidate && (!state.currentTrack || candidate.id !== state.currentTrack.id)) {
+          prevSong = candidate;
+          break;
+        }
+      }
       if (prevSong) {
         const qIdx = state.queue.findIndex(t => t.id === prevSong.id);
         if (qIdx !== -1) {
@@ -1105,8 +1113,8 @@
       }
     }
 
-    // 2. If no history stack, navigate backwards in current queue
-    if (state.queue && state.queue.length > 0) {
+    // 2. If no distinct history item, navigate backwards in current queue
+    if (state.queue && state.queue.length > 1) {
       let prevIdx = state.queueIndex - 1;
       if (prevIdx < 0) {
         prevIdx = state.queue.length - 1;
@@ -1604,6 +1612,7 @@
     const sectionEl = document.createElement('section');
     sectionEl.className = 'shelf-section';
     sectionEl.dataset.shelfId = section.id;
+    sectionEl._sectionData = section;
 
     sectionEl.innerHTML = `
       <div class="shelf-header">
@@ -1703,21 +1712,79 @@
 
     // Top Result
     const top = results[0];
+    const isTopLiked = state.likedSongs.some(s => s.id === top.id);
+    const isTopDownloaded = isTrackDownloaded(top.id);
+
     elements.topResultCard.innerHTML = `
-      <img src="${top.image}" alt="${top.title}" class="top-result-img">
-      <h4 class="top-result-title">${top.title}</h4>
+      <img src="${top.image}" alt="${escapeHtml(top.title)}" class="top-result-img">
+      <h4 class="top-result-title">${escapeHtml(top.title)}</h4>
       <div class="top-result-meta">
-        <span class="top-result-artist">${top.artist}</span>
+        <span class="top-result-artist">${escapeHtml(top.artist)}</span>
         <span class="top-result-pill">Song</span>
       </div>
-      <button class="top-result-play-btn" title="Play">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <polygon points="5 3 19 12 5 21 5 3"/>
-        </svg>
-      </button>
+      <div class="top-result-actions">
+        <button class="top-result-play-btn" title="Play Now">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+        </button>
+        <button class="top-result-action-btn top-like-btn ${isTopLiked ? 'liked' : ''}" title="${isTopLiked ? 'Liked' : 'Save to Liked Songs'}">
+          <svg viewBox="0 0 24 24" fill="${isTopLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+        </button>
+        <button class="top-result-action-btn top-queue-btn" title="Add to Queue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="8" y1="6" x2="21" y2="6"/>
+            <line x1="8" y1="12" x2="21" y2="12"/>
+            <line x1="8" y1="18" x2="16" y2="18"/>
+            <line x1="19" y1="15" x2="19" y2="21"/>
+            <line x1="16" y1="18" x2="22" y2="18"/>
+          </svg>
+        </button>
+        <button class="top-result-action-btn top-playlist-btn" title="Add to Playlist">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+        <button class="top-result-action-btn top-download-btn ${isTopDownloaded ? 'downloaded' : ''}" title="${isTopDownloaded ? 'Downloaded • Offline' : 'Download Song'}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </button>
+      </div>
     `;
 
-    elements.topResultCard.onclick = () => {
+    elements.topResultCard.onclick = (e) => {
+      if (e.target.closest('.top-like-btn')) {
+        e.stopPropagation();
+        toggleLikeSong(top);
+        const likeBtn = elements.topResultCard.querySelector('.top-like-btn');
+        if (likeBtn) {
+          const nowLiked = state.likedSongs.some(s => s.id === top.id);
+          likeBtn.classList.toggle('liked', nowLiked);
+          likeBtn.querySelector('svg')?.setAttribute('fill', nowLiked ? 'currentColor' : 'none');
+        }
+        return;
+      }
+      if (e.target.closest('.top-queue-btn')) {
+        e.stopPropagation();
+        addToQueue(top);
+        return;
+      }
+      if (e.target.closest('.top-playlist-btn')) {
+        e.stopPropagation();
+        openAddToPlaylistModal(top);
+        return;
+      }
+      if (e.target.closest('.top-download-btn')) {
+        e.stopPropagation();
+        downloadSong(top);
+        return;
+      }
       playTrack(top, results);
     };
 
@@ -1775,7 +1842,7 @@
         <div class="song-title-text">${escapeHtml(track.title)}${badgeHtml}</div>
         <div class="song-artist-text">${escapeHtml(track.artist)}</div>
       </div>
-      <button class="song-action-btn ${isLiked ? 'liked' : ''}" title="${isLiked ? 'Liked' : 'Save to Liked Songs'}">
+      <button class="song-action-btn like-song-trigger ${isLiked ? 'liked' : ''}" title="${isLiked ? 'Liked' : 'Save to Liked Songs'}">
         <svg viewBox="0 0 24 24" fill="${isLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
           <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
         </svg>
@@ -1821,9 +1888,19 @@
         downloadSong(track);
         return;
       }
-      if (e.target.closest('.song-action-btn')) {
+      if (e.target.closest('.like-song-trigger')) {
         e.stopPropagation();
         toggleLikeSong(track);
+        const btn = e.target.closest('.like-song-trigger');
+        if (btn) {
+          const nowLiked = state.likedSongs.some(s => s.id === track.id);
+          btn.classList.toggle('liked', nowLiked);
+          btn.querySelector('svg')?.setAttribute('fill', nowLiked ? 'currentColor' : 'none');
+        }
+        return;
+      }
+      if (e.target.closest('.song-action-btn')) {
+        e.stopPropagation();
         return;
       }
       playTrack(track, queueList);
@@ -1854,7 +1931,7 @@
       </td>
       <td class="col-album">${escapeHtml(track.album || 'Single')}</td>
       <td class="col-actions">
-        <button class="song-action-btn ${isLiked ? 'liked' : ''}" title="${isLiked ? 'Liked' : 'Like'}">
+        <button class="song-action-btn like-song-trigger ${isLiked ? 'liked' : ''}" title="${isLiked ? 'Liked' : 'Like'}">
           <svg viewBox="0 0 24 24" fill="${isLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
           </svg>
@@ -1901,9 +1978,19 @@
         openAddToPlaylistModal(track);
         return;
       }
-      if (e.target.closest('.song-action-btn')) {
+      if (e.target.closest('.like-song-trigger')) {
         e.stopPropagation();
         toggleLikeSong(track);
+        const btn = e.target.closest('.like-song-trigger');
+        if (btn) {
+          const nowLiked = state.likedSongs.some(s => s.id === track.id);
+          btn.classList.toggle('liked', nowLiked);
+          btn.querySelector('svg')?.setAttribute('fill', nowLiked ? 'currentColor' : 'none');
+        }
+        return;
+      }
+      if (e.target.closest('.song-action-btn')) {
+        e.stopPropagation();
         return;
       }
       playTrack(track, queueList);
@@ -2628,30 +2715,32 @@
       });
     });
 
-    // Home Filter Pills
+    // Home Filter Pills (100% Bollywood Moods & Dynamic Quick Picks Update)
     document.querySelectorAll('.filter-pill').forEach(pill => {
       pill.addEventListener('click', () => {
         document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
         pill.classList.add('active');
         const filter = pill.dataset.filter;
 
+        const visibleTracks = [];
         document.querySelectorAll('.shelf-section').forEach(shelf => {
-          if (filter === 'all') {
+          const match = (filter === 'all' || shelf.dataset.shelfId === filter);
+          if (match) {
             shelf.style.display = 'flex';
-          } else if (filter === 'charts' && shelf.dataset.shelfId === 'global-hits') {
-            shelf.style.display = 'flex';
-          } else if (filter === 'lofi' && shelf.dataset.shelfId === 'chill-lofi') {
-            shelf.style.display = 'flex';
-          } else if (filter === 'energy' && shelf.dataset.shelfId === 'electronic-energy') {
-            shelf.style.display = 'flex';
-          } else if (filter === 'soul' && shelf.dataset.shelfId === 'acoustic-soul') {
-            shelf.style.display = 'flex';
-          } else if (filter === 'desi' && shelf.dataset.shelfId === 'bollywood-pop') {
-            shelf.style.display = 'flex';
+            if (shelf._sectionData && Array.isArray(shelf._sectionData.tracks)) {
+              visibleTracks.push(...shelf._sectionData.tracks);
+            }
           } else {
             shelf.style.display = 'none';
           }
         });
+
+        // Dynamically update Quick Picks at the top of the Home page with songs matching the chosen category!
+        if (visibleTracks.length > 0) {
+          renderQuickPicks(deduplicateAndShuffleAlbums(visibleTracks, 6));
+        } else if (state.allAvailableTracks && state.allAvailableTracks.length > 0) {
+          renderQuickPicks(deduplicateAndShuffleAlbums(state.allAvailableTracks, 6));
+        }
       });
     });
 
@@ -2870,14 +2959,17 @@
       if (elements.queueDrawer && elements.queueDrawer.classList.contains('open')) {
         elements.queueDrawer.classList.remove('open');
         if (elements.queueBtn) elements.queueBtn.classList.remove('active');
+        if (elements.queueDrawerBackdrop) elements.queueDrawerBackdrop.classList.remove('active');
       }
     };
 
     if (elements.queueBtn) {
       elements.queueBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        elements.queueDrawer.classList.toggle('open');
-        elements.queueBtn.classList.toggle('active', elements.queueDrawer.classList.contains('open'));
+        const willOpen = !elements.queueDrawer.classList.contains('open');
+        elements.queueDrawer.classList.toggle('open', willOpen);
+        elements.queueBtn.classList.toggle('active', willOpen);
+        if (elements.queueDrawerBackdrop) elements.queueDrawerBackdrop.classList.toggle('active', willOpen);
       });
     }
 
@@ -2888,7 +2980,14 @@
       });
     }
 
-    // Dismiss queue drawer when clicking or tapping anywhere outside
+    if (elements.queueDrawerBackdrop) {
+      elements.queueDrawerBackdrop.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeQueueDrawer();
+      });
+    }
+
+    // Dismiss queue drawer when clicking or tapping anywhere outside (capture phase so no stopPropagation blocks it)
     document.addEventListener('click', (e) => {
       if (elements.queueDrawer && elements.queueDrawer.classList.contains('open')) {
         const isClickInside = elements.queueDrawer.contains(e.target);
@@ -2897,7 +2996,7 @@
           closeQueueDrawer();
         }
       }
-    });
+    }, true);
 
     document.addEventListener('touchend', (e) => {
       if (elements.queueDrawer && elements.queueDrawer.classList.contains('open')) {
@@ -2907,7 +3006,7 @@
           closeQueueDrawer();
         }
       }
-    }, { passive: true });
+    }, { passive: true, capture: true });
 
     elements.clearQueueBtn.addEventListener('click', () => {
       state.queue = state.currentTrack ? [state.currentTrack] : [];
@@ -3445,6 +3544,8 @@
         if (typeof openSettingsModal === 'function') openSettingsModal();
       } else if (e.key === 'Escape') {
         elements.queueDrawer.classList.remove('open');
+        if (elements.queueDrawerBackdrop) elements.queueDrawerBackdrop.classList.remove('active');
+        if (elements.queueBtn) elements.queueBtn.classList.remove('active');
         elements.createPlaylistModal.style.display = 'none';
         elements.addToPlaylistModal.style.display = 'none';
         if (elements.settingsModal) elements.settingsModal.style.display = 'none';

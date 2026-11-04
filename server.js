@@ -622,37 +622,49 @@ function deduplicateAndShuffle(tracks, max = 10) {
   return uniqueTracks;
 }
 
-// Curated Trending & Discover Categories with Diverse Multi-Artist Queries
+// Curated 100% Bollywood Trending & Home Categories with Poetic Expressions
 const TRENDING_CATEGORIES = [
   {
-    id: 'global-hits',
-    title: "Global Top Hits",
-    subtitle: "The most played anthems worldwide right now",
-    queries: ["Dua Lipa", "The Weeknd", "Taylor Swift", "Post Malone", "Ed Sheeran", "Billie Eilish", "Harry Styles", "Bruno Mars"]
+    id: 'bollywood-romantic',
+    title: "Ishq Sufiyana — Bollywood Romance",
+    subtitle: "Timeless melodies of pure love, monsoon sparks, and unspoken promises",
+    queries: ["Arijit Singh Romantic Hits", "Atif Aslam Love Songs", "Shreya Ghoshal Romantic", "Mohit Chauhan Love Songs", "Pritam Romantic Anthems"]
   },
   {
-    id: 'chill-lofi',
-    title: "Chill & Lo-Fi Waves",
-    subtitle: "Relax, study, code, and surf the mellow beats",
-    queries: ["Lofi Hip Hop", "Chillhop Beats", "Coffee Lofi", "Late Night Lofi", "Peaceful Piano", "Study Beats Instrumentals"]
+    id: 'bollywood-sad',
+    title: "Dard-e-Dil — Soulful Heartbreak Melodies",
+    subtitle: "Raw tears, midnight quiet, and aching lyrics for a wounded heart",
+    queries: ["Arijit Singh Sad Songs", "B Praak Emotional Hits", "Jubin Nautiyal Sad Melodies", "Mustafa Zahid Soulful", "Jagjit Singh Ghazals Bollywood"]
   },
   {
-    id: 'electronic-energy',
-    title: "Electronic & Gym Energy",
-    subtitle: "High octane basslines and peak workout motivation",
-    queries: ["Avicii", "Martin Garrix", "David Guetta", "Calvin Harris", "Alan Walker", "Tiësto", "Swedish House Mafia"]
+    id: 'bollywood-party',
+    title: "Dhamaka Beats — High-Octane Bollywood Party",
+    subtitle: "Infectious dhol drops, festive celebration vibes, and late-night club bangers",
+    queries: ["Badshah Bollywood Hits", "Honey Singh Party Anthems", "Mika Singh Dance Hits", "Sukhwinder Singh Hits", "Kala Chashma Party Beats"]
   },
   {
-    id: 'acoustic-soul',
-    title: "Acoustic & Midnight R&B",
-    subtitle: "Soulful vocals, late night drives, and warm vibes",
-    queries: ["Acoustic Hits", "Adele", "John Legend", "Sam Smith", "Lewis Capaldi", "Norah Jones", "Coldplay Acoustic"]
+    id: 'bollywood-retro',
+    title: "Purani Yaadein — Golden Retro Bollywood",
+    subtitle: "Vintage vinyl treasures from the golden legends that never fade",
+    queries: ["Kishore Kumar Romantic Hits", "Lata Mangeshkar Golden Hits", "Mohammed Rafi Classics", "R.D. Burman Magical Melodies", "Mukesh Timeless Hits"]
   },
   {
-    id: 'bollywood-pop',
-    title: "Desi & Bollywood Beats",
-    subtitle: "Trending charts, romantic melodies, and festive vibes",
-    queries: ["Arijit Singh", "Diljit Dosanjh", "Shreya Ghoshal", "Atif Aslam", "Badshah", "Pritam", "Sidhu Moose Wala", "A.R. Rahman"]
+    id: 'bollywood-90s',
+    title: "90s Magic — Nostalgic Cassette Tape Hits",
+    subtitle: "Sweet monsoon college romances and unhurried melodious cassette duets",
+    queries: ["Kumar Sanu 90s Hits", "Alka Yagnik Romantic Duets", "Udit Narayan Romantic 90s", "Sonu Nigam 2000s Classics", "KK Soulful Melodies"]
+  },
+  {
+    id: 'bollywood-sufi',
+    title: "Roohani Sukoon — Sufi & Spiritual Reverie",
+    subtitle: "Soul-elevating poetry, divine acoustic warmth, and serene peaceful contemplation",
+    queries: ["Rahat Fateh Ali Khan Sufi", "Kailash Kher Soulful", "Javed Ali Sufi Hits", "A.R. Rahman Sufi Melodies", "Nusrat Fateh Ali Khan Bollywood"]
+  },
+  {
+    id: 'bollywood-acoustic',
+    title: "Chai & Acoustic — Unplugged Bollywood Chill",
+    subtitle: "Gentle acoustic guitars, cozy sunset breeze, and soft intimate unplugged melodies",
+    queries: ["Bollywood Acoustic Unplugged", "Jasleen Royal Soft Melodies", "Prateek Kuhad Hindi", "Anuv Jain Melodies", "Sanam Acoustic Hits"]
   }
 ];
 

@@ -739,9 +739,10 @@ html, body {
 }
 
 .content-scroll.has-lyrics-active {
+  overflow: hidden !important;
   overflow-y: hidden !important;
   overflow-x: hidden !important;
-  padding-bottom: 16px !important;
+  padding-bottom: 0 !important;
 }
 
 .view-section {
@@ -752,6 +753,8 @@ html, body {
 #lyricsView.view-section.active {
   height: 100%;
   overflow: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
 }
 
 .view-section.active {
@@ -1278,29 +1281,28 @@ html, body {
   color: #fff;
 }
 
+.top-result-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
 .top-result-play-btn {
-  position: absolute;
-  right: 24px;
-  bottom: 24px;
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background-color: var(--accent-primary);
   color: #000;
   border: none;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  opacity: 0;
-  transform: translateY(8px);
-  transition: all var(--transition-fast);
-  cursor: pointer;
-}
-
-.top-result-card:hover .top-result-play-btn {
   opacity: 1;
-  transform: translateY(0);
+  transition: transform var(--transition-fast), background-color var(--transition-fast);
+  cursor: pointer;
 }
 
 .top-result-play-btn:hover {
@@ -1309,9 +1311,47 @@ html, body {
 }
 
 .top-result-play-btn svg {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   margin-left: 3px;
+}
+
+.top-result-action-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.top-result-action-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: scale(1.08);
+}
+
+.top-result-action-btn.liked {
+  color: var(--accent-primary);
+  background: rgba(29, 185, 84, 0.15);
+  border-color: var(--accent-primary);
+}
+
+.top-result-action-btn.downloaded {
+  color: var(--accent-primary);
+  background: rgba(29, 185, 84, 0.15);
+  border-color: var(--accent-primary);
+}
+
+.top-result-action-btn svg {
+  width: 17px;
+  height: 17px;
 }
 
 /* Songs preview list */
@@ -1385,22 +1425,33 @@ html, body {
   color: var(--text-secondary);
   cursor: pointer;
   padding: 6px;
-  opacity: 0;
+  opacity: 0.75;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
   transition: all var(--transition-fast);
 }
 
-.song-row:hover .song-action-btn {
+.song-row:hover .song-action-btn,
+.tracks-table tbody tr:hover .song-action-btn {
   opacity: 1;
 }
 
 .song-action-btn:hover {
   color: #fff;
   transform: scale(1.15);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .song-action-btn.liked {
-  opacity: 1;
-  color: var(--accent-primary);
+  opacity: 1 !important;
+  color: var(--accent-primary) !important;
+}
+
+.song-action-btn.downloaded {
+  opacity: 1 !important;
+  color: var(--accent-primary) !important;
 }
 
 .song-action-btn svg {
@@ -1742,12 +1793,15 @@ html, body {
    ========================================================================== */
 .lyrics-view-container {
   max-width: 900px;
+  width: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - var(--top-header-height) - var(--player-height) - 70px);
-  max-height: calc(100vh - var(--top-header-height) - var(--player-height) - 70px);
+  height: 100%;
+  max-height: calc(100vh - var(--top-header-height) - var(--player-height) - 10px);
   overflow: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
 }
 
 .lyrics-header {
@@ -1890,8 +1944,10 @@ html, body {
 
 @media (max-width: 768px) {
   .lyrics-view-container {
-    height: calc(100vh - var(--top-header-height) - 130px);
-    max-height: calc(100vh - var(--top-header-height) - 130px);
+    height: 100% !important;
+    max-height: calc(100vh - var(--top-header-height) - 130px) !important;
+    overflow: hidden !important;
+    overflow-x: hidden !important;
   }
 }
 
@@ -1989,6 +2045,23 @@ html, body {
 
 .queue-drawer.open {
   right: 0;
+}
+
+.queue-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 99;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.queue-backdrop.active {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .queue-header {
@@ -3302,18 +3375,40 @@ html, body {
     font-size: 0.8rem;
   }
 
+  /* 100% NO HORIZONTAL SCROLL ON MOBILE */
+  html, body, #app, .app-layout, .main-wrapper, .content-scroll, .view-section, .shelves-container {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Filter pills: wrap neatly without horizontal scroll */
+  .filter-pills-bar {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    overflow-x: hidden !important;
+    width: 100% !important;
+    padding-bottom: 4px !important;
+  }
+
+  /* Home shelves: 2-column clean grid without horizontal scroll */
   .shelf-cards-grid {
-    display: flex;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    gap: 14px;
-    padding-bottom: 10px;
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    overflow-x: hidden !important;
+    scroll-snap-type: none !important;
+    padding-bottom: 10px !important;
+    width: 100% !important;
   }
 
   .track-card {
-    flex: 0 0 150px;
-    scroll-snap-align: start;
-    padding: 10px;
+    flex: none !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    padding: 10px !important;
   }
 
   .card-title {
@@ -3329,23 +3424,24 @@ html, body {
     font-size: 1.05rem;
   }
 
-  .col-album, .col-source {
-    display: none;
-  }
-
   /* Mobile visible action buttons (no hover required) */
   .song-action-btn {
-    opacity: 0.9 !important;
+    opacity: 0.95 !important;
+    display: inline-flex !important;
   }
   .song-row .song-action-btn,
   .col-actions .song-action-btn {
-    opacity: 0.9 !important;
+    opacity: 0.95 !important;
+    display: inline-flex !important;
   }
 
   /* Compact song rows & tables for mobile */
   .song-row {
     padding: 6px 8px;
     gap: 8px;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
   }
   .song-thumb {
     width: 38px;
@@ -3358,13 +3454,40 @@ html, body {
     font-size: 0.74rem;
   }
 
-  .tracks-table th,
-  .tracks-table td {
-    padding: 6px 6px;
+  /* Full Tracks Table on Mobile: fixed width, hide non-essential columns */
+  .tracks-table {
+    table-layout: fixed !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
   }
+
+  .tracks-table th.col-album,
+  .tracks-table td.col-album,
+  .tracks-table th.col-duration,
+  .tracks-table td.col-duration,
+  .tracks-table th.col-source,
+  .tracks-table td.col-source {
+    display: none !important;
+  }
+
+  .tracks-table th.col-num,
+  .tracks-table td.col-num {
+    width: 26px !important;
+    padding: 4px 2px !important;
+    text-align: center !important;
+    font-size: 0.74rem !important;
+  }
+
+  .tracks-table th.col-title,
+  .tracks-table td.col-title {
+    width: auto !important;
+    padding: 4px 4px !important;
+  }
+
   .table-cover {
-    width: 38px;
-    height: 38px;
+    width: 36px;
+    height: 36px;
   }
   .table-title-main {
     font-size: 0.85rem;
@@ -3374,14 +3497,22 @@ html, body {
     font-size: 0.74rem;
     max-width: 140px;
   }
-  .col-actions {
-    width: auto;
-    min-width: 75px;
-    padding: 4px 2px;
+
+  .tracks-table th.col-actions,
+  .tracks-table td.col-actions {
+    width: 120px !important;
+    min-width: 120px !important;
+    padding: 4px 2px !important;
+    text-align: right !important;
   }
-  .col-duration {
-    font-size: 0.75rem;
-    width: 45px;
+
+  .col-actions .song-action-btn {
+    padding: 4px 2px !important;
+  }
+
+  .col-actions .song-action-btn svg {
+    width: 15px !important;
+    height: 15px !important;
   }
 
   /* Mobile Playlist Back Navigation Button */
