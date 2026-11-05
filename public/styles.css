@@ -1786,20 +1786,46 @@ html, body {
 
 .playlist-shuffle-btn {
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   color: var(--text-secondary);
   cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
   transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
 }
 
 .playlist-shuffle-btn:hover {
   color: #fff;
   transform: scale(1.1);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.playlist-shuffle-btn.active {
+  color: var(--accent-primary) !important;
+  background: rgba(29, 185, 84, 0.16) !important;
+  border-color: rgba(29, 185, 84, 0.35) !important;
+  box-shadow: 0 0 16px rgba(29, 185, 84, 0.25);
+}
+
+.playlist-shuffle-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: var(--accent-primary);
 }
 
 .playlist-shuffle-btn svg {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
 }
 
 .delete-playlist-btn {
@@ -1828,75 +1854,6 @@ html, body {
 .delete-playlist-btn svg {
   width: 17px;
   height: 17px;
-}
-
-/* Custom Playlist Delete Button on Cards in Library Grid */
-.playlist-card-delete-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: rgba(18, 18, 18, 0.78);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.32);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  opacity: 0.92;
-  transition: all var(--transition-fast);
-  z-index: 5;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-.playlist-card-delete-btn:hover {
-  opacity: 1;
-  background: #ef4444;
-  color: #ffffff;
-  border-color: #ef4444;
-  transform: scale(1.12);
-  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.45);
-}
-
-.playlist-card-delete-btn svg {
-  width: 16px;
-  height: 16px;
-}
-
-/* Sidebar Playlist Item Delete Button */
-.sidebar-playlist-del-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 6px;
-  border-radius: 50%;
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: all var(--transition-fast);
-}
-
-.playlist-list-item:hover .sidebar-playlist-del-btn {
-  opacity: 0.8;
-}
-
-.sidebar-playlist-del-btn:hover {
-  opacity: 1 !important;
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.15);
-  transform: scale(1.12);
-}
-
-.sidebar-playlist-del-btn svg {
-  width: 14px;
-  height: 14px;
 }
 
 .playlist-empty-state {
@@ -3357,26 +3314,77 @@ html, body {
     overflow: hidden;
   }
 
-  /* Live progress track on bottom edge of mobile mini player */
+  /* Live Movable progress track on bottom edge of mobile mini player */
   .mini-player-progress-track {
     display: block !important;
     position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
-    height: 3px;
-    background: rgba(255, 255, 255, 0.14);
-    overflow: hidden;
-    pointer-events: none;
+    height: 14px;
+    background: transparent;
+    cursor: pointer;
+    touch-action: none;
+    pointer-events: auto !important;
+    z-index: 15;
     border-radius: 0 0 12px 12px;
   }
 
+  .mini-player-progress-track::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 0 0 12px 12px;
+    transition: height 0.15s ease;
+  }
+
+  .mini-player-progress-track:hover::before,
+  .mini-player-progress-track:active::before,
+  .mini-player-progress-track.dragging::before {
+    height: 5px;
+  }
+
   .mini-player-progress-fill {
-    height: 100%;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
     width: 0%;
     background: linear-gradient(90deg, #1db954, #4ade80);
     box-shadow: 0 0 8px rgba(29, 185, 84, 0.7);
-    transition: width 0.15s linear;
+    border-radius: 0 0 0 12px;
+    transition: height 0.15s ease;
+    pointer-events: none;
+  }
+
+  .mini-player-progress-track:hover .mini-player-progress-fill,
+  .mini-player-progress-track:active .mini-player-progress-fill,
+  .mini-player-progress-track.dragging .mini-player-progress-fill {
+    height: 5px;
+  }
+
+  .mini-player-progress-fill::after {
+    content: '';
+    position: absolute;
+    right: -5px;
+    top: 50%;
+    transform: translateY(-50%) scale(0);
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.8), 0 0 4px #1db954;
+    transition: transform 0.15s ease;
+  }
+
+  .mini-player-progress-track:hover .mini-player-progress-fill::after,
+  .mini-player-progress-track:active .mini-player-progress-fill::after,
+  .mini-player-progress-track.dragging .mini-player-progress-fill::after {
+    transform: translateY(-50%) scale(1);
   }
 
   .player-left {
@@ -3436,14 +3444,16 @@ html, body {
     padding: 16px 14px 140px;
   }
 
-  /* Hide search bar and header on Home and Library views on mobile */
+  /* Hide search bar and header on Home, Library, and Playlist views on mobile */
   body[data-active-view="home"] .top-header,
-  body[data-active-view="library"] .top-header {
+  body[data-active-view="library"] .top-header,
+  body[data-active-view="playlist"] .top-header {
     display: none !important;
   }
 
   body[data-active-view="home"] .content-scroll,
-  body[data-active-view="library"] .content-scroll {
+  body[data-active-view="library"] .content-scroll,
+  body[data-active-view="playlist"] .content-scroll {
     padding-top: 18px !important;
   }
 
@@ -3706,6 +3716,44 @@ html, body {
   .playlist-back-nav-btn svg {
     width: 16px;
     height: 16px;
+  }
+
+  /* Mobile Playlist View Centered Aesthetic */
+  #playlistView.active {
+    display: block !important;
+  }
+  #playlistView .playlist-hero {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 16px !important;
+    padding: 10px 0 20px !important;
+    margin-bottom: 16px !important;
+  }
+  #playlistView .playlist-cover-art {
+    width: 170px !important;
+    height: 170px !important;
+    margin: 0 auto;
+    border-radius: 12px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
+  }
+  #playlistView .playlist-meta-details {
+    align-items: center !important;
+  }
+  #playlistView .playlist-hero-title {
+    font-size: 1.85rem !important;
+    margin: 6px 0 !important;
+    text-align: center;
+  }
+  #playlistView .playlist-hero-desc {
+    text-align: center;
+    max-width: 320px;
+    font-size: 0.82rem;
+  }
+  #playlistView .playlist-actions-bar {
+    justify-content: center !important;
+    gap: 16px !important;
+    margin-bottom: 20px !important;
   }
 }
 

@@ -1,4 +1,57 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="512" height="512">
-  <rect width="24" height="24" rx="5" fill="#121212"/>
-  <path fill="#1DB954" d="M12 3.5v10.55A4 4 0 1 0 14 17.5V7.5h4.5a1.5 1.5 0 0 0 1.5-1.5V4a.5.5 0 0 0-.5-.5H12z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
+  <defs>
+    <!-- Background luxury obsidian gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#121824"/>
+      <stop offset="50%" stop-color="#0a0e14"/>
+      <stop offset="100%" stop-color="#040608"/>
+    </linearGradient>
+    
+    <!-- Ultra-vibrant emerald-to-cyan surf glow -->
+    <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F5A0"/>
+      <stop offset="45%" stop-color="#00D9F5"/>
+      <stop offset="100%" stop-color="#0072FF"/>
+    </linearGradient>
+    
+    <!-- Emerald accent for harmonic note -->
+    <linearGradient id="accentGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#6EE7B7"/>
+    </linearGradient>
+
+    <!-- Subtle radial sheen -->
+    <radialGradient id="glowGleam" cx="30%" cy="25%" r="70%">
+      <stop offset="0%" stop-color="#00F5A0" stop-opacity="0.3"/>
+      <stop offset="50%" stop-color="#00D9F5" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    
+    <filter id="subtleShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#00F5A0" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Squircle Base with Metallic Border -->
+  <rect x="3" y="3" width="94" height="94" rx="26" fill="url(#bgGrad)" stroke="rgba(255,255,255,0.14)" stroke-width="1.5"/>
+  <rect x="3" y="3" width="94" height="94" rx="26" fill="url(#glowGleam)"/>
+
+  <!-- Dynamic Acoustic Wave & Musical Note (The MusiSurf Wave Crest) -->
+  <g filter="url(#subtleShadow)">
+    <!-- Harmonic Sound Wave 1 (Rising Crest) -->
+    <path d="M22 66 C 26 48, 36 34, 46 44 C 54 52, 62 64, 70 54 C 76 46, 78 36, 78 30" 
+          fill="none" stroke="url(#waveGrad)" stroke-width="6" stroke-linecap="round"/>
+    
+    <!-- Harmonic Sound Wave 2 (Deep Bass Wave) -->
+    <path d="M26 75 C 36 65, 48 59, 58 67 C 66 73, 72 70, 76 64" 
+          fill="none" stroke="url(#waveGrad)" stroke-width="4.5" stroke-linecap="round" stroke-opacity="0.75"/>
+
+    <!-- Harmonic Sound Wave 3 (High-frequency Surf Ripple) -->
+    <path d="M22 56 C 28 42, 38 28, 48 36 C 54 41, 60 48, 66 40" 
+          fill="none" stroke="url(#accentGrad)" stroke-width="3" stroke-linecap="round" stroke-opacity="0.65"/>
+
+    <!-- Stylized Modern MusiSurf Floating Note / Beacon Head -->
+    <circle cx="76" cy="30" r="7.5" fill="url(#accentGrad)"/>
+    <circle cx="76" cy="30" r="3" fill="#ffffff"/>
+  </g>
 </svg>

@@ -2163,8 +2163,10 @@
   }
 
   function renderPlaylistView(playlistId) {
-    switchView('playlist');
+    switchView('playlist', { force: true });
     state.activePlaylistId = playlistId;
+    if (elements.views.playlist) elements.views.playlist.classList.add('active');
+    if (elements.contentScroll) elements.contentScroll.scrollTop = 0;
 
     let title = 'Liked Songs';
     let desc = 'Your collection of favorite songs.';
@@ -2233,20 +2235,40 @@
       });
     }
 
-    // Play All Click
+    // Play All Click (plays playlist in sequential order)
     elements.playAllPlaylistBtn.onclick = () => {
       if (tracks.length > 0) playTrack(tracks[0], tracks);
     };
 
-    // Shuffle Click
+    // Shuffle Button (Single Button that changes between Random No-Repeats vs In-Order)
+    let isShuffledPlaylist = false;
+    elements.shufflePlaylistBtn.classList.remove('active');
+    elements.shufflePlaylistBtn.title = "Mode: In-Order • Click to Shuffle (No Repeats)";
+
     elements.shufflePlaylistBtn.onclick = () => {
-      if (tracks.length > 0) {
-        const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+      if (!tracks || tracks.length === 0) return;
+      isShuffledPlaylist = !isShuffledPlaylist;
+      elements.shufflePlaylistBtn.classList.toggle('active', isShuffledPlaylist);
+
+      if (isShuffledPlaylist) {
+        // True non-repeating random selection from playlist only
+        const shuffled = [...tracks];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        elements.shufflePlaylistBtn.title = "Mode: Random (No Repeats) • Click for In-Order";
         playTrack(shuffled[0], shuffled);
+        showToast("Shuffle Mode: Random (No repeats)", "🔀");
+      } else {
+        // Play strictly in order of playlist
+        elements.shufflePlaylistBtn.title = "Mode: In-Order • Click to Shuffle (No Repeats)";
+        playTrack(tracks[0], tracks);
+        showToast("Play Mode: In Order", "📋");
       }
     };
 
-    // Delete custom playlist
+    // Delete custom playlist (kept solely inside playlist view)
     elements.deletePlaylistBtn.onclick = () => {
       if (confirm(`Are you sure you want to delete playlist "${title}"?`)) {
         state.customPlaylists = state.customPlaylists.filter(p => p.id !== playlistId);
@@ -2277,27 +2299,7 @@
           <span class="library-item-title">${escapeHtml(pl.name)}</span>
           <span class="library-item-meta">Playlist • ${pl.tracks?.length || 0} songs</span>
         </div>
-        <button class="sidebar-playlist-del-btn" title="Delete Playlist" aria-label="Delete Playlist">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="3 6 5 6 21 6" />
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-          </svg>
-        </button>
       `;
-      div.querySelector('.sidebar-playlist-del-btn')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (confirm(`Delete playlist "${pl.name}"?`)) {
-          state.customPlaylists = state.customPlaylists.filter(p => p.id !== pl.id);
-          saveStoredPlaylists();
-          renderSidebarPlaylists();
-          updateLibraryUI();
-          if (state.currentPlaylistId === pl.id) {
-            const returnView = (window.innerWidth <= 768) ? 'library' : 'home';
-            switchView(returnView);
-          }
-          showToast(`Deleted playlist "${pl.name}"`, '🗑️');
-        }
-      });
       div.addEventListener('click', () => {
         renderPlaylistView(pl.id);
       });
@@ -2369,7 +2371,8 @@
 
   function switchView(viewName, options = {}) {
     const pushHistory = options.pushHistory !== false;
-    if (state.currentView === viewName) return;
+    const force = options.force === true;
+    if (state.currentView === viewName && !force) return;
 
     state.previousView = state.currentView;
     state.currentView = viewName;
@@ -2466,15 +2469,10 @@
         state.customPlaylists.forEach(pl => {
           const card = document.createElement('div');
           card.className = 'track-card custom-playlist-card';
+          card.style.cursor = 'pointer';
           card.innerHTML = `
             <div class="card-img-wrapper">
               ${createPlaylistCollageHtml(pl.tracks)}
-              <button class="playlist-card-delete-btn" title="Delete Playlist" aria-label="Delete Playlist">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="3 6 5 6 21 6" />
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                </svg>
-              </button>
               <button class="card-play-btn" title="Play Playlist">
                 <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
               </button>
@@ -2484,21 +2482,13 @@
               <span class="card-artist">${(pl.tracks || []).length} songs</span>
             </div>
           `;
-          card.querySelector('.playlist-card-delete-btn')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (confirm(`Delete playlist "${pl.name}"?`)) {
-              state.customPlaylists = state.customPlaylists.filter(p => p.id !== pl.id);
-              saveStoredPlaylists();
-              renderSidebarPlaylists();
-              updateLibraryUI();
-              showToast(`Deleted playlist "${pl.name}"`, '🗑️');
-            }
-          });
           card.querySelector('.card-play-btn')?.addEventListener('click', (e) => {
             e.stopPropagation();
             if (pl.tracks && pl.tracks.length > 0) playTrack(pl.tracks[0], pl.tracks);
           });
-          card.addEventListener('click', () => renderPlaylistView(pl.id));
+          card.addEventListener('click', () => {
+            renderPlaylistView(pl.id);
+          });
           elements.libCustomPlaylistsGrid.appendChild(card);
         });
       }
@@ -3083,9 +3073,12 @@
       }
     }
 
-    // Attach to both Desktop and Mobile Scrubber
+    // Attach to Desktop, Fullscreen Mobile, and Floating Mini-Player Scrubber
     setupDraggableScrubber(elements.progressBar, elements.progressFill, elements.currentTimeLabel, false);
     setupDraggableScrubber(elements.mobProgressBar, elements.mobProgressFill, elements.mobCurrentTime, true);
+    if (elements.miniPlayerTrack && elements.miniPlayerFill) {
+      setupDraggableScrubber(elements.miniPlayerTrack, elements.miniPlayerFill, null, true);
+    }
 
     // Movable Volume Slider (Interactive Drag for Mouse & Touch)
     let isDraggingVolume = false;
@@ -3573,7 +3566,7 @@
     // Mobile Mini-Player Bar Click -> Opens Fullscreen Mobile Player
     elements.playerBar.addEventListener('click', (e) => {
       if (window.innerWidth <= 768) {
-        if (e.target.closest('#playPauseBtn') || e.target.closest('#playerHeartBtn') || e.target.closest('#playerDownloadBtn')) {
+        if (e.target.closest('#miniPlayerTrack') || e.target.closest('#playPauseBtn') || e.target.closest('#playerHeartBtn') || e.target.closest('#playerDownloadBtn')) {
           return;
         }
         if (state.currentTrack) {
@@ -3708,6 +3701,44 @@
         }
       });
     }
+
+    // Mobile Swipe Gestures: Swipe Left for Next Song, Swipe Right for Previous Song
+    function setupSwipeTrackChange(targetEl) {
+      if (!targetEl) return;
+      let startX = 0;
+      let startY = 0;
+      let startTime = 0;
+
+      targetEl.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        startTime = Date.now();
+      }, { passive: true });
+
+      targetEl.addEventListener('touchend', (e) => {
+        if (e.changedTouches.length !== 1) return;
+        const diffX = e.changedTouches[0].clientX - startX;
+        const diffY = e.changedTouches[0].clientY - startY;
+        const elapsed = Date.now() - startTime;
+
+        // Must be predominantly horizontal and quick flick or swipe
+        if (elapsed < 650 && Math.abs(diffX) > 42 && Math.abs(diffX) > Math.abs(diffY) * 1.35) {
+          if (diffX < 0) {
+            // Swipe Left -> Next Track
+            nextTrack();
+            showToast('Next Song ⏭️');
+          } else {
+            // Swipe Right -> Previous Track
+            prevTrack();
+            showToast('Previous Song ⏮️');
+          }
+        }
+      }, { passive: true });
+    }
+
+    setupSwipeTrackChange(elements.playerBar);
+    setupSwipeTrackChange(elements.mobilePlayerModal);
 
     // Global Keyboard Shortcuts
     window.addEventListener('keydown', (e) => {
