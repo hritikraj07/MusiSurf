@@ -44,11 +44,27 @@
   --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
-/* Reset & Base */
+/* Reset & Base — Completely Eliminate Tap Highlight Blue Box & Focus Outlines Everywhere */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-focus-ring-color: transparent !important;
+}
+
+:focus:not(:focus-visible) {
+  outline: none !important;
+}
+
+button, a, input, select, textarea, [role="button"],
+.track-card, .song-row, .quick-pick-tile, .library-hub-card, .filter-pill, .control-btn, .nav-btn, .lib-pill, .lib-fab-btn {
+  -webkit-tap-highlight-color: transparent !important;
+  outline: none !important;
+}
+
+button:focus, a:focus, input:focus {
+  outline: none !important;
 }
 
 html, body {
@@ -1669,13 +1685,14 @@ html, body {
   width: 220px;
   height: 220px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #450af5 0%, #8e8ee5 50%, #c4efd9 100%);
+  background: linear-gradient(135deg, #1e2029 0%, #2a2d3d 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .playlist-cover-art svg {
@@ -3313,25 +3330,11 @@ html, body {
     display: none !important;
   }
 
-  .header-right {
-    display: flex !important;
-    align-items: center;
-    flex-shrink: 0;
-  }
-
-  .header-settings-btn {
-    display: flex !important;
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    align-items: center;
-    justify-content: center;
-    color: #e0e0e0;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: all 0.2s ease;
+  /* Remove top bar settings button on mobile (accessible only in Library view) */
+  .header-right,
+  .header-settings-btn,
+  #headerSettingsBtn {
+    display: none !important;
   }
 
   .header-settings-btn:active {
@@ -3846,74 +3849,159 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 28px;
-  flex-wrap: wrap;
-  gap: 16px;
+  margin-bottom: 16px;
 }
 
 .library-header-text .page-title {
-  font-size: 2rem;
+  font-size: 2.2rem;
   font-weight: 800;
   color: #fff;
-  margin-bottom: 6px;
+  letter-spacing: -0.5px;
 }
 
+.library-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lib-settings-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.lib-settings-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.08);
+}
+
+.lib-settings-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Library Filter Pills (Image 2 style) */
+.library-filter-pills {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 4px;
+}
+
+.library-filter-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.lib-pill {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 500px;
+  padding: 8px 18px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.lib-pill:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.lib-pill.active {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
+  font-weight: 700;
+}
+
+/* Library Hub Quick Cards (Image 2 style) */
 .library-hub-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-  margin-bottom: 36px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 30px;
 }
 
 .library-hub-card {
   display: flex;
   align-items: center;
-  gap: 16px;
-  background-color: var(--card-bg);
-  padding: 16px;
-  border-radius: var(--border-radius-md);
-  border: 1px solid var(--border-subtle);
+  gap: 14px;
+  background-color: #1a1c22;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 .library-hub-card:hover {
-  background-color: var(--card-hover);
+  background-color: #242730;
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
 .lib-hub-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 8px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
+.liked-icon-box {
+  background: linear-gradient(135deg, #450af5 0%, #c4efd9 100%);
+  color: #fff;
+}
+
+.downloaded-icon-box {
+  background: linear-gradient(135deg, #0575e6 0%, #00f260 100%);
+  color: #fff;
+}
+
+.local-icon-box {
+  background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%);
+  color: #000;
+}
+
 .lib-hub-icon svg {
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
 }
 
 .lib-hub-details {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
 }
 
 .lib-hub-name {
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 700;
-  color: var(--text-primary);
+  color: #fff;
   margin: 0;
 }
 
 .lib-hub-meta {
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
 }
 
@@ -3922,28 +4010,105 @@ html, body {
 }
 
 .library-section-heading {
-  font-size: 1.3rem;
-  font-weight: 700;
+  font-size: 1.4rem;
+  font-weight: 800;
   margin-bottom: 16px;
-  color: var(--text-primary);
+  color: #fff;
 }
 
 .library-playlists-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 16px;
+}
+
+/* Playlist Cover Collages (2x2 grid from songs) */
+.playlist-cover-collage {
+  width: 100%;
+  aspect-ratio: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #1e2029;
+}
+
+.playlist-cover-collage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.playlist-cover-single-img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+/* Floating Action Button for New Playlist (Image 2 style) */
+.lib-fab-btn {
+  position: fixed;
+  bottom: 140px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: var(--accent-primary);
+  color: #000;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  z-index: 85;
+  transition: transform var(--transition-fast), background-color var(--transition-fast);
+}
+
+.lib-fab-btn:hover {
+  transform: scale(1.08);
+  background-color: #1ed760;
+}
+
+.lib-fab-btn svg {
+  width: 26px;
+  height: 26px;
+}
+
+/* Delete from Download action button */
+.song-action-btn.delete-download-trigger {
+  color: #ff5252;
+}
+
+.song-action-btn.delete-download-trigger:hover {
+  color: #ff1744;
+  background: rgba(255, 23, 68, 0.15);
+  transform: scale(1.15);
+}
+
+@media (min-width: 769px) {
+  .lib-fab-btn {
+    bottom: 110px;
+    right: 36px;
+  }
 }
 
 @media (max-width: 768px) {
   .library-view-container {
-    padding: 20px 16px 120px;
+    padding: 16px 14px 130px;
   }
   .library-header-text .page-title {
-    font-size: 1.6rem;
+    font-size: 1.8rem;
   }
   .library-hub-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+  .library-playlists-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
   }
 }
 

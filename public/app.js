@@ -205,6 +205,10 @@
     settingsModal: document.getElementById('settingsModal'),
     openSettingsBtn: document.getElementById('openSettingsBtn'),
     headerSettingsBtn: document.getElementById('headerSettingsBtn'),
+    libSettingsBtn: document.getElementById('libSettingsBtn'),
+    libFilterPillsBar: document.getElementById('libFilterPillsBar'),
+    libHubGrid: document.getElementById('libHubGrid'),
+    libPlaylistsSection: document.getElementById('libPlaylistsSection'),
     closeSettingsModalBtn: document.getElementById('closeSettingsModalBtn'),
     deadSilenceOnRadio: document.getElementById('deadSilenceOnRadio'),
     deadSilenceOffRadio: document.getElementById('deadSilenceOffRadio'),
@@ -500,6 +504,57 @@
     }
   }
 
+  async function deleteOfflineTrackFromDB(trackId) {
+    if (!trackId) return;
+    try {
+      const db = await getOfflineDB();
+      const tx = db.transaction(OFFLINE_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(OFFLINE_STORE_NAME);
+      store.delete(trackId);
+      tx.oncomplete = () => {
+        const deletedTrack = state.offlineTracks.find(t => t.id === trackId);
+        state.offlineTracks = state.offlineTracks.filter(t => t.id !== trackId);
+        saveStoredOfflineTracks();
+        updateDownloadedCountUI();
+        updateLibraryUI();
+
+        // If currently viewing the downloaded playlist, re-render it seamlessly
+        if (state.currentView === 'playlist' && state.activePlaylistId === 'downloaded') {
+          renderPlaylistView('downloaded');
+        }
+
+        if (state.currentTrack?.id === trackId) {
+          elements.playerDownloadBtn?.classList.remove('downloaded');
+          elements.mobDownloadBtn?.classList.remove('downloaded');
+          elements.mobDownloadActionBtn?.classList.remove('downloaded');
+        }
+
+        // Update any download buttons and badges in DOM
+        document.querySelectorAll(`.download-song-trigger`).forEach(btn => {
+          if (btn.closest('tr')?.dataset.trackId === trackId || btn.closest('.song-row')?.dataset.trackId === trackId) {
+            btn.classList.remove('downloaded');
+            btn.title = 'Download Song';
+          }
+        });
+        document.querySelectorAll(`.top-download-btn`).forEach(btn => {
+          if (btn.closest('#topResultCard')?.querySelector('.top-result-title')?.textContent === deletedTrack?.title) {
+            btn.classList.remove('downloaded');
+            btn.title = 'Download Song';
+          }
+        });
+        document.querySelectorAll(`.downloaded-badge`).forEach(badge => {
+          if (badge.closest('tr')?.dataset.trackId === trackId || badge.closest('.song-row')?.dataset.trackId === trackId) {
+            badge.remove();
+          }
+        });
+
+        showToast(`Removed "${deletedTrack?.title || 'Song'}" from downloads`, '🗑️');
+      };
+    } catch (e) {
+      console.warn('Error deleting offline track:', e);
+    }
+  }
+
   // YouTube Iframe API Initialization
   window.onYouTubeIframeAPIReady = function () {
     state.ytPlayer = new YT.Player('ytPlayer', {
@@ -621,17 +676,16 @@
       // Fetch synchronized lyrics
       loadLyricsForTrack(track.title, track.artist);
 
-      // Handle resuming audio
+      // Prepare restored audio WITHOUT autoplay (leaves player paused until user clicks Play)
+      state.isPlaying = false;
+      updatePlayPauseButton();
+
       if (track.isLocal && track.id) {
         getLocalTrackBlobFromDB(track.id).then(blob => {
           if (blob) {
             elements.audio.src = URL.createObjectURL(blob);
             elements.audio.volume = state.isMuted ? 0 : state.volume;
             elements.audio.currentTime = resumeTime;
-            elements.audio.play().then(() => {
-              state.isPlaying = true;
-              updatePlayPauseButton();
-            }).catch(() => attachOneTimeResumeGesture());
           }
         }).catch(() => {});
       } else {
@@ -640,29 +694,26 @@
           elements.audio.src = URL.createObjectURL(offlineRecord.audioBlob);
           elements.audio.volume = state.isMuted ? 0 : state.volume;
           elements.audio.currentTime = resumeTime;
-          elements.audio.play().then(() => {
-            state.isPlaying = true;
-            updatePlayPauseButton();
-          }).catch(() => attachOneTimeResumeGesture());
         } else if (track.source === 'youtube' || !track.hasDirectAudio) {
-          const tryYt = () => {
+          const cueYt = () => {
             if (state.ytReady && state.ytPlayer && track.ytId) {
-              state.ytPlayer.loadVideoById(track.ytId, resumeTime);
+              if (typeof state.ytPlayer.cueVideoById === 'function') {
+                state.ytPlayer.cueVideoById({
+                  videoId: track.ytId,
+                  startSeconds: resumeTime
+                });
+              }
               state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
-              state.ytPlayer.playVideo();
-              state.isPlaying = true;
-              updatePlayPauseButton();
             } else {
-              setTimeout(tryYt, 300);
+              setTimeout(cueYt, 300);
             }
           };
-          setTimeout(tryYt, 500);
+          setTimeout(cueYt, 500);
         } else {
           const audioSrc = track.audioUrl || track.streamUrl;
           if (audioSrc) {
             elements.audio.src = audioSrc;
             elements.audio.volume = state.isMuted ? 0 : state.volume;
-
             const onCanPlay = () => {
               if (resumeTime > 0 && resumeTime < (elements.audio.duration || 9999)) {
                 elements.audio.currentTime = resumeTime;
@@ -670,17 +721,6 @@
               elements.audio.removeEventListener('canplay', onCanPlay);
             };
             elements.audio.addEventListener('canplay', onCanPlay);
-
-            const p = elements.audio.play();
-            if (p !== undefined) {
-              p.then(() => {
-                state.isPlaying = true;
-                updatePlayPauseButton();
-              }).catch(err => {
-                console.log('Reload playback waiting for user gesture:', err.message);
-                attachOneTimeResumeGesture();
-              });
-            }
           }
         }
       }
@@ -940,6 +980,13 @@
   async function downloadSong(track) {
     if (!track) {
       showToast('No song currently selected to download', 'ℹ');
+      return;
+    }
+
+    if (isTrackDownloaded(track.id)) {
+      if (confirm(`"${track.title}" is already in your Downloaded Songs. Remove it from downloads?`)) {
+        deleteOfflineTrackFromDB(track.id);
+      }
       return;
     }
 
@@ -1916,6 +1963,7 @@
 
     const isLiked = state.likedSongs.some(s => s.id === track.id);
     const isDownloaded = isTrackDownloaded(track.id);
+    const isDownloadedView = state.activePlaylistId === 'downloaded';
     const badgeHtml = getDownloadedBadgeHtml(track.id);
 
     tr.innerHTML = `
@@ -1951,6 +1999,16 @@
             <line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
         </button>
+        ${isDownloadedView ? `
+        <button class="song-action-btn delete-download-trigger" title="Delete from Downloads">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            <line x1="10" y1="11" x2="10" y2="17"/>
+            <line x1="14" y1="11" x2="14" y2="17"/>
+          </svg>
+        </button>
+        ` : `
         <button class="song-action-btn download-song-trigger ${isDownloaded ? 'downloaded' : ''}" title="${isDownloaded ? 'Downloaded • Saved in Offline Songs' : 'Download Song'}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -1958,11 +2016,19 @@
             <line x1="12" y1="15" x2="12" y2="3"/>
           </svg>
         </button>
+        `}
       </td>
       <td class="col-duration">${track.durationStr || '3:30'}</td>
     `;
 
     tr.addEventListener('click', (e) => {
+      if (e.target.closest('.delete-download-trigger')) {
+        e.stopPropagation();
+        if (confirm(`Remove "${track.title}" from downloaded songs?`)) {
+          deleteOfflineTrackFromDB(track.id);
+        }
+        return;
+      }
       if (e.target.closest('.add-to-queue-trigger')) {
         e.stopPropagation();
         addToQueue(track);
@@ -2047,6 +2113,51 @@
     }
   }
 
+  function createPlaylistCollageHtml(tracks, defaultIconSvg, fallbackGradient) {
+    if (!tracks || tracks.length === 0) {
+      return `
+        <div style="width: 100%; height: 100%; background: ${fallbackGradient || 'linear-gradient(135deg, #1e2029 0%, #2a2d3d 100%)'}; display: flex; align-items: center; justify-content: center; border-radius: 6px;">
+          ${defaultIconSvg || `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width: 44px; height: 44px; color: var(--accent-primary);">
+              <path d="M9 18V5l12-2v13"/>
+              <circle cx="6" cy="18" r="3"/>
+              <circle cx="18" cy="16" r="3"/>
+            </svg>
+          `}
+        </div>
+      `;
+    }
+
+    const images = [];
+    for (const t of tracks) {
+      if (t && t.image && !images.includes(t.image)) {
+        images.push(t.image);
+        if (images.length === 4) break;
+      }
+    }
+
+    if (images.length === 0) {
+      return `
+        <div style="width: 100%; height: 100%; background: ${fallbackGradient || 'linear-gradient(135deg, #1e2029 0%, #2a2d3d 100%)'}; display: flex; align-items: center; justify-content: center; border-radius: 6px;">
+          ${defaultIconSvg || ''}
+        </div>
+      `;
+    }
+
+    if (images.length < 4) {
+      return `<img src="${images[0]}" alt="Playlist Cover" class="playlist-cover-single-img">`;
+    }
+
+    return `
+      <div class="playlist-cover-collage">
+        <img src="${images[0]}" alt="" loading="lazy">
+        <img src="${images[1]}" alt="" loading="lazy">
+        <img src="${images[2]}" alt="" loading="lazy">
+        <img src="${images[3]}" alt="" loading="lazy">
+      </div>
+    `;
+  }
+
   function renderPlaylistView(playlistId) {
     switchView('playlist');
     state.activePlaylistId = playlistId;
@@ -2059,25 +2170,26 @@
     if (playlistId === 'liked') {
       tracks = state.likedSongs;
       elements.deletePlaylistBtn.style.display = 'none';
-      elements.playlistCoverArt.innerHTML = `
-        <svg viewBox="0 0 24 24" fill="currentColor">
+      elements.playlistCoverArt.innerHTML = createPlaylistCollageHtml(
+        state.likedSongs,
+        `<svg viewBox="0 0 24 24" fill="currentColor" style="width: 75px; height: 75px; color: #fff;">
           <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-        </svg>
-      `;
+        </svg>`,
+        'linear-gradient(135deg, #450af5 0%, #c4efd9 100%)'
+      );
     } else if (playlistId === 'downloaded') {
       title = 'Downloaded Songs';
       desc = 'Stored locally on your device. Listen anywhere 100% offline with zero internet!';
       tracks = state.offlineTracks;
       elements.deletePlaylistBtn.style.display = 'none';
-      elements.playlistCoverArt.innerHTML = `
-        <div style="width: 100%; height: 100%; background: linear-gradient(135deg, #0575E6 0%, #00F260 100%); display: flex; align-items: center; justify-content: center; border-radius: 8px;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 75px; height: 75px; color: #fff;">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-        </div>
-      `;
+      elements.playlistCoverArt.innerHTML = createPlaylistCollageHtml(
+        state.offlineTracks,
+        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 75px; height: 75px; color: #fff;">
+          <circle cx="12" cy="12" r="10" stroke-width="2"/>
+          <polyline points="8 12 11 15 16 9"/>
+        </svg>`,
+        'linear-gradient(135deg, #0575e6 0%, #00f260 100%)'
+      );
     } else {
       const pl = state.customPlaylists.find(p => p.id === playlistId);
       if (pl) {
@@ -2086,13 +2198,14 @@
         tracks = pl.tracks || [];
         isCustom = true;
         elements.deletePlaylistBtn.style.display = 'block';
-        elements.playlistCoverArt.innerHTML = `
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        elements.playlistCoverArt.innerHTML = createPlaylistCollageHtml(
+          tracks,
+          `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width: 75px; height: 75px; color: var(--accent-primary);">
             <path d="M9 18V5l12-2v13"/>
             <circle cx="6" cy="18" r="3"/>
             <circle cx="18" cy="16" r="3"/>
-          </svg>
-        `;
+          </svg>`
+        );
       }
     }
 
@@ -2280,45 +2393,99 @@
   }
 
   // Library View Hub UI
-  function updateLibraryUI() {
+  function updateLibraryUI(filter = 'all') {
     if (elements.libHubLikedMeta) {
-      elements.libHubLikedMeta.textContent = `${state.likedSongs.length} songs • Auto-saved`;
+      elements.libHubLikedMeta.textContent = `${state.likedSongs.length} songs`;
     }
     if (elements.libHubDownloadedMeta) {
-      elements.libHubDownloadedMeta.textContent = `${state.offlineTracks.length} songs • Offline Ready`;
+      elements.libHubDownloadedMeta.textContent = `${state.offlineTracks.length} songs`;
     }
     if (elements.libHubLocalMeta) {
-      elements.libHubLocalMeta.textContent = `${state.localTracks.length} songs • Device Storage`;
+      elements.libHubLocalMeta.textContent = `${state.localTracks.length} songs`;
     }
 
     if (elements.libCustomPlaylistsGrid) {
       elements.libCustomPlaylistsGrid.innerHTML = '';
-      if (!state.customPlaylists || state.customPlaylists.length === 0) {
-        elements.libCustomPlaylistsGrid.innerHTML = `
-          <div style="grid-column: 1 / -1; padding: 24px; text-align: center; color: var(--text-muted); background: var(--card-bg); border-radius: var(--border-radius-md); border: 1px dashed var(--border-subtle);">
-            <p>No custom playlists yet. Tap "+ New Playlist" to create your first collection!</p>
-          </div>
-        `;
-      } else {
+
+      const downloadSvg = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 44px; height: 44px; color: #fff;">
+          <circle cx="12" cy="12" r="10" stroke-width="2"/>
+          <polyline points="8 12 11 15 16 9"/>
+        </svg>
+      `;
+
+      const heartSvg = `
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width: 44px; height: 44px; color: #fff;">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
+      `;
+
+      // 1. Downloaded Songs playlist card
+      const dlCard = document.createElement('div');
+      dlCard.className = 'track-card';
+      dlCard.innerHTML = `
+        <div class="card-img-wrapper">
+          ${createPlaylistCollageHtml(state.offlineTracks, downloadSvg, 'linear-gradient(135deg, #0575e6 0%, #00f260 100%)')}
+          <button class="card-play-btn" title="Play Downloaded Songs">
+            <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </button>
+        </div>
+        <div class="card-info">
+          <span class="card-title">Downloaded Songs</span>
+          <span class="card-artist">${state.offlineTracks.length} songs • Offline Ready</span>
+        </div>
+      `;
+      dlCard.querySelector('.card-play-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (state.offlineTracks.length > 0) playTrack(state.offlineTracks[0], state.offlineTracks);
+      });
+      dlCard.addEventListener('click', () => renderPlaylistView('downloaded'));
+      elements.libCustomPlaylistsGrid.appendChild(dlCard);
+
+      // 2. Liked Songs playlist card
+      const likedCard = document.createElement('div');
+      likedCard.className = 'track-card';
+      likedCard.innerHTML = `
+        <div class="card-img-wrapper">
+          ${createPlaylistCollageHtml(state.likedSongs, heartSvg, 'linear-gradient(135deg, #450af5 0%, #c4efd9 100%)')}
+          <button class="card-play-btn" title="Play Liked Songs">
+            <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </button>
+        </div>
+        <div class="card-info">
+          <span class="card-title">Liked Songs</span>
+          <span class="card-artist">${state.likedSongs.length} songs • Auto-saved</span>
+        </div>
+      `;
+      likedCard.querySelector('.card-play-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (state.likedSongs.length > 0) playTrack(state.likedSongs[0], state.likedSongs);
+      });
+      likedCard.addEventListener('click', () => renderPlaylistView('liked'));
+      elements.libCustomPlaylistsGrid.appendChild(likedCard);
+
+      // 3. User custom playlists
+      if (state.customPlaylists && state.customPlaylists.length > 0) {
         state.customPlaylists.forEach(pl => {
           const card = document.createElement('div');
           card.className = 'track-card';
           card.innerHTML = `
-            <div class="card-cover-wrapper" style="background: linear-gradient(135deg, #1e2029 0%, #2a2d3d 100%); display:flex; align-items:center; justify-content:center;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width: 48px; height: 48px; color: var(--accent-primary);">
-                <path d="M9 18V5l12-2v13"/>
-                <circle cx="6" cy="18" r="3"/>
-                <circle cx="18" cy="16" r="3"/>
-              </svg>
+            <div class="card-img-wrapper">
+              ${createPlaylistCollageHtml(pl.tracks)}
+              <button class="card-play-btn" title="Play Playlist">
+                <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              </button>
             </div>
             <div class="card-info">
               <span class="card-title">${escapeHtml(pl.name)}</span>
               <span class="card-artist">${(pl.tracks || []).length} songs</span>
             </div>
           `;
-          card.addEventListener('click', () => {
-            renderPlaylistView(pl.id);
+          card.querySelector('.card-play-btn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (pl.tracks && pl.tracks.length > 0) playTrack(pl.tracks[0], pl.tracks);
           });
+          card.addEventListener('click', () => renderPlaylistView(pl.id));
           elements.libCustomPlaylistsGrid.appendChild(card);
         });
       }
@@ -3342,6 +3509,34 @@
     });
 
     // Library View Hub Card Event Listeners
+    if (elements.libSettingsBtn) {
+      elements.libSettingsBtn.addEventListener('click', openSettingsModal);
+    }
+    if (elements.libFilterPillsBar) {
+      elements.libFilterPillsBar.addEventListener('click', (e) => {
+        const pill = e.target.closest('.lib-pill');
+        if (!pill) return;
+        const filter = pill.dataset.libFilter;
+        elements.libFilterPillsBar.querySelectorAll('.lib-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+
+        if (filter === 'all') {
+          if (elements.libHubGrid) elements.libHubGrid.style.display = '';
+          if (elements.libPlaylistsSection) elements.libPlaylistsSection.style.display = 'block';
+          updateLibraryUI('all');
+        } else if (filter === 'playlists') {
+          if (elements.libHubGrid) elements.libHubGrid.style.display = 'none';
+          if (elements.libPlaylistsSection) elements.libPlaylistsSection.style.display = 'block';
+          updateLibraryUI('playlists');
+        } else if (filter === 'downloaded') {
+          renderPlaylistView('downloaded');
+        } else if (filter === 'liked') {
+          renderPlaylistView('liked');
+        } else if (filter === 'local') {
+          switchView('localMusic');
+        }
+      });
+    }
     if (elements.libHubLikedBtn) {
       elements.libHubLikedBtn.addEventListener('click', () => renderPlaylistView('liked'));
     }
