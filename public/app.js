@@ -161,6 +161,8 @@
     volumeBar: document.getElementById('volumeBar'),
     volumeFill: document.getElementById('volumeFill'),
     lyricsBtn: document.getElementById('lyricsBtn'),
+    miniPlayerTrack: document.getElementById('miniPlayerTrack'),
+    miniPlayerFill: document.getElementById('miniPlayerFill'),
 
     // PWA & Mobile Navigation (Strictly Home, Search, Library)
     pwaInstallBtn: document.getElementById('pwaInstallBtn'),
@@ -661,6 +663,7 @@
         const pct = Math.min(100, (resumeTime / dur) * 100);
         elements.progressFill.style.width = `${pct}%`;
         if (elements.mobProgressFill) elements.mobProgressFill.style.width = `${pct}%`;
+        if (elements.miniPlayerFill) elements.miniPlayerFill.style.width = `${pct}%`;
       }
 
       // Set MediaSession
@@ -1259,6 +1262,7 @@
         const pct = Math.min(100, (cur / dur) * 100);
         elements.progressFill.style.width = `${pct}%`;
         if (elements.mobProgressFill) elements.mobProgressFill.style.width = `${pct}%`;
+        if (elements.miniPlayerFill) elements.miniPlayerFill.style.width = `${pct}%`;
 
         // Update buffer bar for HTML5 audio
         if (elements.audio.buffered && elements.audio.buffered.length > 0) {
@@ -2346,6 +2350,7 @@
 
     state.previousView = state.currentView;
     state.currentView = viewName;
+    document.body.dataset.activeView = viewName;
 
     if (pushHistory) {
       navHistoryStack.push(viewName);
@@ -2401,71 +2406,40 @@
       elements.libHubDownloadedMeta.textContent = `${state.offlineTracks.length} songs`;
     }
     if (elements.libHubLocalMeta) {
-      elements.libHubLocalMeta.textContent = `${state.localTracks.length} songs`;
+      elements.libHubLocalMeta.textContent = `${state.localTracks.length} songs • Device Storage`;
     }
 
     if (elements.libCustomPlaylistsGrid) {
       elements.libCustomPlaylistsGrid.innerHTML = '';
 
-      const downloadSvg = `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 44px; height: 44px; color: #fff;">
-          <circle cx="12" cy="12" r="10" stroke-width="2"/>
-          <polyline points="8 12 11 15 16 9"/>
-        </svg>
-      `;
-
-      const heartSvg = `
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width: 44px; height: 44px; color: #fff;">
-          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-        </svg>
-      `;
-
-      // 1. Downloaded Songs playlist card
-      const dlCard = document.createElement('div');
-      dlCard.className = 'track-card';
-      dlCard.innerHTML = `
-        <div class="card-img-wrapper">
-          ${createPlaylistCollageHtml(state.offlineTracks, downloadSvg, 'linear-gradient(135deg, #0575e6 0%, #00f260 100%)')}
-          <button class="card-play-btn" title="Play Downloaded Songs">
-            <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      if (!state.customPlaylists || state.customPlaylists.length === 0) {
+        const emptyPromo = document.createElement('div');
+        emptyPromo.className = 'empty-playlist-promo';
+        emptyPromo.innerHTML = `
+          <div class="empty-promo-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M9 18V5l12-2v13"/>
+              <circle cx="6" cy="18" r="3"/>
+              <circle cx="18" cy="16" r="3"/>
+            </svg>
+          </div>
+          <h3 class="empty-promo-title">Create your first playlist</h3>
+          <p class="empty-promo-desc">Organize and keep your favorite tracks together in customized collections.</p>
+          <button class="btn-primary empty-promo-btn" id="emptyCreatePlaylistBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            <span>Create Playlist</span>
           </button>
-        </div>
-        <div class="card-info">
-          <span class="card-title">Downloaded Songs</span>
-          <span class="card-artist">${state.offlineTracks.length} songs • Offline Ready</span>
-        </div>
-      `;
-      dlCard.querySelector('.card-play-btn')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (state.offlineTracks.length > 0) playTrack(state.offlineTracks[0], state.offlineTracks);
-      });
-      dlCard.addEventListener('click', () => renderPlaylistView('downloaded'));
-      elements.libCustomPlaylistsGrid.appendChild(dlCard);
-
-      // 2. Liked Songs playlist card
-      const likedCard = document.createElement('div');
-      likedCard.className = 'track-card';
-      likedCard.innerHTML = `
-        <div class="card-img-wrapper">
-          ${createPlaylistCollageHtml(state.likedSongs, heartSvg, 'linear-gradient(135deg, #450af5 0%, #c4efd9 100%)')}
-          <button class="card-play-btn" title="Play Liked Songs">
-            <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          </button>
-        </div>
-        <div class="card-info">
-          <span class="card-title">Liked Songs</span>
-          <span class="card-artist">${state.likedSongs.length} songs • Auto-saved</span>
-        </div>
-      `;
-      likedCard.querySelector('.card-play-btn')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (state.likedSongs.length > 0) playTrack(state.likedSongs[0], state.likedSongs);
-      });
-      likedCard.addEventListener('click', () => renderPlaylistView('liked'));
-      elements.libCustomPlaylistsGrid.appendChild(likedCard);
-
-      // 3. User custom playlists
-      if (state.customPlaylists && state.customPlaylists.length > 0) {
+        `;
+        emptyPromo.querySelector('#emptyCreatePlaylistBtn')?.addEventListener('click', () => {
+          elements.createPlaylistModal.style.display = 'flex';
+          try { window.history.pushState({ modal: 'createPlaylist' }, '', window.location.pathname); } catch (e) {}
+          elements.playlistNameInput?.focus();
+        });
+        elements.libCustomPlaylistsGrid.appendChild(emptyPromo);
+      } else {
         state.customPlaylists.forEach(pl => {
           const card = document.createElement('div');
           card.className = 'track-card';
@@ -2688,7 +2662,7 @@
     }
   }
 
-  const DEFAULT_LOCAL_COVER = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%238A2387"/><stop offset="50%" stop-color="%23E94057"/><stop offset="100%" stop-color="%23F27121"/></linearGradient></defs><rect width="100" height="100" rx="8" fill="url(%23g)"/><path d="M40 70V30l28-6v40M40 50l28-6" stroke="%23fff" stroke-width="5" stroke-linecap="round" fill="none"/><circle cx="34" cy="70" r="8" fill="%23fff"/><circle cx="62" cy="64" r="8" fill="%23fff"/></svg>';
+  const DEFAULT_LOCAL_COVER = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23161822"/><stop offset="100%" stop-color="%230c0e14"/></linearGradient><linearGradient id="acc" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%231db954"/><stop offset="100%" stop-color="%2300f260"/></linearGradient></defs><rect width="300" height="300" rx="16" fill="url(%23bg)"/><rect x="1" y="1" width="298" height="298" rx="15" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2"/><circle cx="150" cy="150" r="64" fill="rgba(29,185,84,0.12)"/><path d="M130 190V110l55-12v82M130 148l55-12" stroke="url(%23acc)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="114" cy="190" r="16" fill="url(%23acc)"/><circle cx="169" cy="178" r="16" fill="url(%23acc)"/></svg>';
 
   function updateLocalMusicUI() {
     const count = state.localTracks.length;
@@ -2974,6 +2948,9 @@
         }
         if (elements.mobProgressFill && fillEl !== elements.mobProgressFill) {
           elements.mobProgressFill.style.width = `${dragPct * 100}%`;
+        }
+        if (elements.miniPlayerFill) {
+          elements.miniPlayerFill.style.width = `${dragPct * 100}%`;
         }
         if (elements.currentTimeLabel) elements.currentTimeLabel.textContent = displayTime;
         if (elements.mobCurrentTime) elements.mobCurrentTime.textContent = displayTime;
@@ -3780,6 +3757,7 @@
   // INITIALIZE APP
   // ==========================================================================
   function init() {
+    document.body.dataset.activeView = 'home';
     try {
       window.history.replaceState({ view: 'home', depth: 1 }, '', window.location.pathname);
     } catch (e) {}

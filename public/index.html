@@ -29,12 +29,12 @@
   <link rel="apple-touch-icon" href="/icons/icon.svg">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=3.9">
+  <link rel="stylesheet" href="/styles.css?v=4.0">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
         for (var name of names) {
-          if (name !== 'musisurf-v3.9') caches.delete(name);
+          if (name !== 'musisurf-v4.0') caches.delete(name);
         }
       });
     }
@@ -158,9 +158,10 @@
           <!-- Local Music (Device Storage) -->
           <div class="library-item local-music-item" id="navLocalMusicBtn" data-view="localMusic">
             <div class="local-icon-box">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                <polygon points="12 11 12 17 17 14" />
+                <path d="M12 13a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
+                <path d="M14 13V9h2" />
               </svg>
             </div>
             <div class="library-item-info">
@@ -245,6 +246,16 @@
 
         <!-- HOME VIEW -->
         <section class="view-section active" id="homeView">
+          <div class="mobile-home-header">
+            <div class="mobile-home-brand">
+              <svg viewBox="0 0 24 24" fill="#1DB954" style="width: 24px; height: 24px;">
+                <path d="M12 3.5v10.55A4 4 0 1 0 14 17.5V7.5h4.5a1.5 1.5 0 0 0 1.5-1.5V4a.5.5 0 0 0-.5-.5H12z"/>
+              </svg>
+              <span>MusiSurf</span>
+            </div>
+            <div class="mobile-home-tag">Pure Music • Ad-Free</div>
+          </div>
+
           <!-- Dynamic Time Greeting & Quick Picks -->
           <div class="hero-welcome">
             <div class="welcome-heading-row">
@@ -533,9 +544,10 @@
         <section class="view-section" id="localMusicView">
           <div class="playlist-hero local-files-hero">
             <div class="playlist-cover-art local-cover-art">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                <polygon points="12 11 12 17 17 14" />
+                <path d="M12 13a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
+                <path d="M14 13V9h3" />
               </svg>
             </div>
             <div class="playlist-info-meta">
@@ -679,15 +691,22 @@
               </div>
 
               <!-- Local Files Card -->
-              <div class="library-hub-card" id="libHubLocalBtn">
+              <div class="library-hub-card lib-hub-local" id="libHubLocalBtn">
                 <div class="lib-hub-icon local-icon-box">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="14" r="2" />
+                    <path d="M14 14V10h2" />
                   </svg>
                 </div>
                 <div class="lib-hub-details">
-                  <h3 class="lib-hub-name">Local</h3>
-                  <span class="lib-hub-meta" id="libHubLocalMeta">0 songs</span>
+                  <h3 class="lib-hub-name">Local Files</h3>
+                  <span class="lib-hub-meta" id="libHubLocalMeta">0 songs • Device Storage</span>
+                </div>
+                <div class="lib-hub-arrow">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
                 </div>
               </div>
             </div>
@@ -751,6 +770,11 @@
 
     <!-- Bottom Persistent Player Bar -->
     <footer class="player-bar" id="playerBar">
+      <!-- Mobile Mini-Player Live Progress Track -->
+      <div class="mini-player-progress-track" id="miniPlayerTrack">
+        <div class="mini-player-progress-fill" id="miniPlayerFill"></div>
+      </div>
+
       <!-- Left: Track Details -->
       <div class="player-left">
         <div class="player-cover-container" id="playerCoverWrapper">
@@ -966,17 +990,15 @@
         </button>
       </div>
 
-      <!-- Scrubber -->
+      <!-- Scrubber (Matching PC layout & reference image) -->
       <div class="mobile-player-scrubber-wrap">
-        <div class="progress-bar" id="mobProgressBar">
+        <span class="time-stamp mob-time-stamp" id="mobCurrentTime">0:00</span>
+        <div class="progress-bar" id="mobProgressBar" role="slider" aria-label="Seek track" tabindex="0">
           <div class="progress-fill" id="mobProgressFill">
             <div class="progress-handle"></div>
           </div>
         </div>
-        <div class="mobile-player-times">
-          <span id="mobCurrentTime">0:00</span>
-          <span id="mobTotalDuration">0:00</span>
-        </div>
+        <span class="time-stamp mob-time-stamp" id="mobTotalDuration">0:00</span>
       </div>
 
       <!-- Controls -->
@@ -1219,7 +1241,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.10"></script>
+  <script src="/app.js?v=2.11"></script>
 </body>
 
 </html>
