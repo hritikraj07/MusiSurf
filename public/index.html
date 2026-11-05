@@ -29,12 +29,12 @@
   <link rel="apple-touch-icon" href="/icons/icon.svg">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=4.0">
+  <link rel="stylesheet" href="/styles.css?v=4.1">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
         for (var name of names) {
-          if (name !== 'musisurf-v4.0') caches.delete(name);
+          if (name !== 'musisurf-v4.1') caches.delete(name);
         }
       });
     }
@@ -246,16 +246,6 @@
 
         <!-- HOME VIEW -->
         <section class="view-section active" id="homeView">
-          <div class="mobile-home-header">
-            <div class="mobile-home-brand">
-              <svg viewBox="0 0 24 24" fill="#1DB954" style="width: 24px; height: 24px;">
-                <path d="M12 3.5v10.55A4 4 0 1 0 14 17.5V7.5h4.5a1.5 1.5 0 0 0 1.5-1.5V4a.5.5 0 0 0-.5-.5H12z"/>
-              </svg>
-              <span>MusiSurf</span>
-            </div>
-            <div class="mobile-home-tag">Pure Music • Ad-Free</div>
-          </div>
-
           <!-- Dynamic Time Greeting & Quick Picks -->
           <div class="hero-welcome">
             <div class="welcome-heading-row">
@@ -471,11 +461,12 @@
                 <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
               </svg>
             </button>
-            <button class="icon-sub-btn" id="deletePlaylistBtn" title="Delete Playlist" style="display: none;">
+            <button class="playlist-action-sub-btn delete-playlist-btn" id="deletePlaylistBtn" title="Delete Playlist" style="display: none;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="3 6 5 6 21 6" />
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
               </svg>
+              <span>Delete Playlist</span>
             </button>
           </div>
 
@@ -1241,7 +1232,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.11"></script>
+  <script src="/app.js?v=2.12"></script>
 </body>
 
 </html>

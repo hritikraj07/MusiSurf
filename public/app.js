@@ -2201,7 +2201,7 @@
         desc = pl.description || 'Created by MusiSurf Listener';
         tracks = pl.tracks || [];
         isCustom = true;
-        elements.deletePlaylistBtn.style.display = 'block';
+        elements.deletePlaylistBtn.style.display = 'inline-flex';
         elements.playlistCoverArt.innerHTML = createPlaylistCollageHtml(
           tracks,
           `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width: 75px; height: 75px; color: var(--accent-primary);">
@@ -2248,11 +2248,14 @@
 
     // Delete custom playlist
     elements.deletePlaylistBtn.onclick = () => {
-      if (confirm(`Delete playlist "${title}"?`)) {
+      if (confirm(`Are you sure you want to delete playlist "${title}"?`)) {
         state.customPlaylists = state.customPlaylists.filter(p => p.id !== playlistId);
         saveStoredPlaylists();
-        switchView('home');
-        showToast(`Playlist deleted`);
+        renderSidebarPlaylists();
+        updateLibraryUI();
+        const returnView = (window.innerWidth <= 768) ? 'library' : 'home';
+        switchView(returnView);
+        showToast(`Deleted playlist "${title}"`, '🗑️');
       }
     };
   }
@@ -2271,10 +2274,30 @@
           </svg>
         </div>
         <div class="library-item-info">
-          <span class="library-item-title">${pl.name}</span>
+          <span class="library-item-title">${escapeHtml(pl.name)}</span>
           <span class="library-item-meta">Playlist • ${pl.tracks?.length || 0} songs</span>
         </div>
+        <button class="sidebar-playlist-del-btn" title="Delete Playlist" aria-label="Delete Playlist">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+        </button>
       `;
+      div.querySelector('.sidebar-playlist-del-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (confirm(`Delete playlist "${pl.name}"?`)) {
+          state.customPlaylists = state.customPlaylists.filter(p => p.id !== pl.id);
+          saveStoredPlaylists();
+          renderSidebarPlaylists();
+          updateLibraryUI();
+          if (state.currentPlaylistId === pl.id) {
+            const returnView = (window.innerWidth <= 768) ? 'library' : 'home';
+            switchView(returnView);
+          }
+          showToast(`Deleted playlist "${pl.name}"`, '🗑️');
+        }
+      });
       div.addEventListener('click', () => {
         renderPlaylistView(pl.id);
       });
@@ -2442,10 +2465,16 @@
       } else {
         state.customPlaylists.forEach(pl => {
           const card = document.createElement('div');
-          card.className = 'track-card';
+          card.className = 'track-card custom-playlist-card';
           card.innerHTML = `
             <div class="card-img-wrapper">
               ${createPlaylistCollageHtml(pl.tracks)}
+              <button class="playlist-card-delete-btn" title="Delete Playlist" aria-label="Delete Playlist">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
               <button class="card-play-btn" title="Play Playlist">
                 <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
               </button>
@@ -2455,6 +2484,16 @@
               <span class="card-artist">${(pl.tracks || []).length} songs</span>
             </div>
           `;
+          card.querySelector('.playlist-card-delete-btn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (confirm(`Delete playlist "${pl.name}"?`)) {
+              state.customPlaylists = state.customPlaylists.filter(p => p.id !== pl.id);
+              saveStoredPlaylists();
+              renderSidebarPlaylists();
+              updateLibraryUI();
+              showToast(`Deleted playlist "${pl.name}"`, '🗑️');
+            }
+          });
           card.querySelector('.card-play-btn')?.addEventListener('click', (e) => {
             e.stopPropagation();
             if (pl.tracks && pl.tracks.length > 0) playTrack(pl.tracks[0], pl.tracks);
