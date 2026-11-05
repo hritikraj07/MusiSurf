@@ -224,6 +224,7 @@
     libFilterPillsBar: document.getElementById('libFilterPillsBar'),
     libHubGrid: document.getElementById('libHubGrid'),
     libPlaylistsSection: document.getElementById('libPlaylistsSection'),
+    libHeaderAddPlaylistBtn: document.getElementById('libHeaderAddPlaylistBtn'),
     closeSettingsModalBtn: document.getElementById('closeSettingsModalBtn'),
     deadSilenceOnRadio: document.getElementById('deadSilenceOnRadio'),
     deadSilenceOffRadio: document.getElementById('deadSilenceOffRadio'),
@@ -775,7 +776,7 @@
   // ==========================================================================
   // PLAYBACK CONTROLLER
   // ==========================================================================
-  function playTrack(track, queueList = null, addToHistory = true) {
+  async function playTrack(track, queueList = null, addToHistory = true) {
     if (!track) return;
 
     // Track playback history for previous song button navigation
@@ -858,7 +859,27 @@
         console.warn('Local storage audio play error:', err);
       });
     } else {
-      const offlineRecord = track.audioBlob ? track : state.offlineTracks.find(t => t.id === track.id);
+      let offlineRecord = track.audioBlob ? track : state.offlineTracks.find(t => t.id === track.id);
+      if (offlineRecord && !offlineRecord.audioBlob) {
+        try {
+          const db = await getOfflineDB();
+          const tx = db.transaction(OFFLINE_STORE_NAME, 'readonly');
+          const store = tx.objectStore(OFFLINE_STORE_NAME);
+          const req = store.get(track.id);
+          const storedItem = await new Promise((res) => {
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => res(null);
+          });
+          if (storedItem && storedItem.audioBlob) {
+            offlineRecord = { ...offlineRecord, audioBlob: storedItem.audioBlob };
+            const idx = state.offlineTracks.findIndex(t => t.id === track.id);
+            if (idx >= 0) state.offlineTracks[idx].audioBlob = storedItem.audioBlob;
+          }
+        } catch (e) {
+          console.warn('Error reading offline blob from IDB:', e);
+        }
+      }
+
       if (offlineRecord && offlineRecord.audioBlob) {
         // Offline Stored Audio Playback
         if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.stopVideo === 'function') {
@@ -874,6 +895,7 @@
         });
       } else if (track.source === 'youtube' || !track.hasDirectAudio) {
         // Universal YouTube Engine for 100% full-length song playback
+        track.source = 'youtube';
         elements.audio.pause();
         let retries = 0;
         const playYt = () => {
@@ -903,7 +925,7 @@
         const streamUrl = track.streamUrl || (track.audioUrl ? `/api/stream?url=${encodeURIComponent(track.audioUrl)}` : null);
         const audioSrc = track.audioUrl || streamUrl;
         if (!audioSrc) {
-          showToast('Audio stream unavailable for this track', '⚠');
+          showToast('Audio stream unavailable for this track', '⚠️');
           return;
         }
 
@@ -1011,6 +1033,20 @@
       }
       elements.playAllPlaylistBtn.title = isCurrentPlaylistPlaying ? 'Pause Playlist' : 'Play All';
     }
+
+    // Sync Top Result Card Play/Pause Button
+    const topPlayBtn = document.getElementById('topResultPlayBtn') || elements.topResultCard?.querySelector('.top-result-play-btn');
+    if (topPlayBtn && elements.topResultCard?.dataset.trackId) {
+      const isThisTopTrack = state.currentTrack && state.currentTrack.id === elements.topResultCard.dataset.trackId;
+      const isPlayingThis = isThisTopTrack && state.isPlaying;
+      const playIcon = topPlayBtn.querySelector('.play-icon');
+      const pauseIcon = topPlayBtn.querySelector('.pause-icon');
+      if (playIcon && pauseIcon) {
+        playIcon.style.display = isPlayingThis ? 'none' : 'block';
+        pauseIcon.style.display = isPlayingThis ? 'block' : 'none';
+      }
+      topPlayBtn.title = isPlayingThis ? 'Pause' : 'Play';
+    }
   }
 
   // Direct Audio Downloader: Instantly adds to "Downloaded" playlist in Library, and triggers file download on Desktop
@@ -1093,7 +1129,7 @@
     // 3. In background: asynchronously fetch audio stream blob and persist to IndexedDB for 100% offline playback
     (async () => {
       try {
-        const fetchTarget = track.audioUrl ? track.audioUrl : streamUrl;
+        const fetchTarget = track.audioUrl ? `/api/stream?url=${encodeURIComponent(track.audioUrl)}` : streamUrl;
         const res = await fetch(fetchTarget);
         if (res.ok) {
           const blob = await res.blob();
@@ -1243,22 +1279,30 @@
     nextTrack();
   }
 
+  function isYouTubeActive() {
+    return !!(
+      (state.currentTrack && (state.currentTrack.source === 'youtube' || !state.currentTrack.hasDirectAudio)) ||
+      (state.ytPlayer && typeof state.ytPlayer.getPlayerState === 'function' && state.ytPlayer.getPlayerState() === 1)
+    );
+  }
+
   function getCurrentPlaybackTime() {
-    if (state.currentTrack && state.currentTrack.source === 'youtube') {
+    if (isYouTubeActive()) {
       return state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function' ? state.ytPlayer.getCurrentTime() : 0;
     }
     return elements.audio.currentTime || 0;
   }
 
   function getTotalDuration() {
-    if (state.currentTrack && state.currentTrack.source === 'youtube') {
-      return state.ytPlayer && typeof state.ytPlayer.getDuration === 'function' ? state.ytPlayer.getDuration() : (state.currentTrack.duration || 0);
+    if (isYouTubeActive()) {
+      const dur = state.ytPlayer && typeof state.ytPlayer.getDuration === 'function' ? state.ytPlayer.getDuration() : 0;
+      return dur > 0 ? dur : (state.currentTrack?.duration || 0);
     }
     return elements.audio.duration || state.currentTrack?.duration || 0;
   }
 
   function seekTo(seconds) {
-    if (state.currentTrack && state.currentTrack.source === 'youtube') {
+    if (isYouTubeActive()) {
       if (state.ytPlayer && typeof state.ytPlayer.seekTo === 'function') {
         state.ytPlayer.seekTo(seconds, true);
       }
@@ -1301,6 +1345,8 @@
 
   // Real-time Progress Bar Loop with Intelligent Dead Silence Trimmer
   function updateProgress() {
+    requestAnimationFrame(updateProgress);
+
     if (state.isPlaying && state.currentTrack) {
       if (state.isDraggingProgress) return; // Don't override while user is actively dragging scrubber
 
@@ -1347,8 +1393,6 @@
         savePlaybackState();
       }
     }
-
-    requestAnimationFrame(updateProgress);
   }
 
   // ==========================================================================
@@ -1817,18 +1861,29 @@
     const top = results[0];
     const isTopLiked = state.likedSongs.some(s => s.id === top.id);
     const isTopDownloaded = isTrackDownloaded(top.id);
+    const isPlayingThisTop = state.isPlaying && state.currentTrack && state.currentTrack.id === top.id;
 
+    elements.topResultCard.dataset.trackId = top.id;
+    elements.topResultCard.className = `top-result-card ${isPlayingThisTop ? 'playing' : ''}`;
     elements.topResultCard.innerHTML = `
-      <img src="${top.image}" alt="${escapeHtml(top.title)}" class="top-result-img">
-      <h4 class="top-result-title">${escapeHtml(top.title)}</h4>
-      <div class="top-result-meta">
-        <span class="top-result-artist">${escapeHtml(top.artist)}</span>
-        <span class="top-result-pill">Song</span>
+      <div class="top-result-header-row">
+        <img src="${top.image}" alt="${escapeHtml(top.title)}" class="top-result-img">
+        <div class="top-result-info">
+          <h4 class="top-result-title">${escapeHtml(top.title)}</h4>
+          <div class="top-result-meta">
+            <span class="top-result-artist">${escapeHtml(top.artist)}</span>
+            <span class="top-result-pill">Song</span>
+          </div>
+        </div>
       </div>
       <div class="top-result-actions">
-        <button class="top-result-play-btn" title="Play Now">
-          <svg viewBox="0 0 24 24" fill="currentColor">
+        <button class="top-result-play-btn" id="topResultPlayBtn" title="${isPlayingThisTop ? 'Pause' : 'Play Now'}">
+          <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor" style="display: ${isPlayingThisTop ? 'none' : 'block'};">
             <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display: ${isPlayingThisTop ? 'block' : 'none'};">
+            <rect x="6" y="4" width="4" height="16"/>
+            <rect x="14" y="4" width="4" height="16"/>
           </svg>
         </button>
         <button class="top-result-action-btn top-like-btn ${isTopLiked ? 'liked' : ''}" title="${isTopLiked ? 'Liked' : 'Save to Liked Songs'}">
@@ -1888,7 +1943,20 @@
         downloadSong(top);
         return;
       }
-      playTrack(top, results);
+      if (e.target.closest('.top-result-play-btn')) {
+        e.stopPropagation();
+        if (state.currentTrack && state.currentTrack.id === top.id) {
+          togglePlayPause();
+        } else {
+          playTrack(top, results);
+        }
+        return;
+      }
+      if (state.currentTrack && state.currentTrack.id === top.id) {
+        togglePlayPause();
+      } else {
+        playTrack(top, results);
+      }
     };
 
     // First 4 tracks in preview list
@@ -3449,6 +3517,21 @@
       updatePlayPauseButton();
       savePlaybackState();
     });
+    elements.audio.addEventListener('timeupdate', () => {
+      if (state.isPlaying && !state.isDraggingProgress && state.currentTrack) {
+        const cur = elements.audio.currentTime || 0;
+        const dur = elements.audio.duration || state.currentTrack.duration || 0;
+        elements.currentTimeLabel.textContent = formatTime(cur);
+        if (elements.mobCurrentTime) elements.mobCurrentTime.textContent = formatTime(cur);
+        if (dur > 0) {
+          const pct = Math.min(100, (cur / dur) * 100);
+          elements.progressFill.style.width = `${pct}%`;
+          if (elements.mobProgressFill) elements.mobProgressFill.style.width = `${pct}%`;
+          if (elements.miniPlayerFill) elements.miniPlayerFill.style.width = `${pct}%`;
+        }
+        syncLyricsWithTime(cur);
+      }
+    });
     elements.audio.addEventListener('ended', onTrackEnded);
     elements.audio.addEventListener('error', (err) => {
       console.warn('Audio stream error event:', err);
@@ -3622,12 +3705,16 @@
     if (elements.libHubLocalBtn) {
       elements.libHubLocalBtn.addEventListener('click', () => switchView('localMusic'));
     }
+    const openCreatePlaylistModal = () => {
+      elements.createPlaylistModal.style.display = 'flex';
+      try { window.history.pushState({ modal: 'createPlaylist' }, '', window.location.pathname); } catch (e) {}
+      elements.playlistNameInput.focus();
+    };
     if (elements.libViewCreatePlaylistBtn) {
-      elements.libViewCreatePlaylistBtn.addEventListener('click', () => {
-        elements.createPlaylistModal.style.display = 'flex';
-        try { window.history.pushState({ modal: 'createPlaylist' }, '', window.location.pathname); } catch (e) {}
-        elements.playlistNameInput.focus();
-      });
+      elements.libViewCreatePlaylistBtn.addEventListener('click', openCreatePlaylistModal);
+    }
+    if (elements.libHeaderAddPlaylistBtn) {
+      elements.libHeaderAddPlaylistBtn.addEventListener('click', openCreatePlaylistModal);
     }
 
     // Mobile Mini-Player Bar Click -> Opens Fullscreen Mobile Player

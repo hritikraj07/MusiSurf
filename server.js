@@ -839,6 +839,8 @@ app.get('/api/lyrics', async (req, res) => {
 
 // Direct Song Downloader for Mobile and Desktop (Downloads files into user's Downloads folder)
 app.get('/api/download', async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   const audioUrl = req.query.url;
   const ytId = req.query.ytId;
   const rawTitle = req.query.title || 'song';

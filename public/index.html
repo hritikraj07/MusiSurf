@@ -29,12 +29,12 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=4.3">
+  <link rel="stylesheet" href="/styles.css?v=4.5">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
         for (var name of names) {
-          if (name !== 'musisurf-v4.3') caches.delete(name);
+          if (name !== 'musisurf-v4.5') caches.delete(name);
         }
       });
     }
@@ -250,16 +250,6 @@
               <span class="search-shortcut-badge">/</span>
             </div>
           </div>
-        </div>
-
-        <div class="header-right">
-          <button class="header-settings-btn" id="headerSettingsBtn" title="Settings & Shortcuts [?]">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3" />
-              <path
-                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </button>
         </div>
       </header>
 
@@ -746,19 +736,18 @@
             <div class="library-custom-playlists-wrap" id="libPlaylistsSection">
               <div class="library-section-header">
                 <h2 class="library-section-heading">Playlists</h2>
+                <button class="lib-header-add-btn" id="libHeaderAddPlaylistBtn" title="Create Playlist">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  <span>New</span>
+                </button>
               </div>
               <div class="library-playlists-grid" id="libCustomPlaylistsGrid">
                 <!-- Dynamically rendered custom playlist cards -->
               </div>
             </div>
-
-            <!-- Floating Action Button for New Playlist (Image 2 style) -->
-            <button class="lib-fab-btn" id="libViewCreatePlaylistBtn" title="Create New Playlist">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-            </button>
           </div>
         </section>
 
@@ -1291,7 +1280,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.14"></script>
+  <script src="/app.js?v=2.16"></script>
 </body>
 
 </html>
