@@ -25,6 +25,8 @@
     offlineTracks: [],
     customPlaylists: [],
     activePlaylistId: null,
+    activePlaylistTracks: null,
+    isPlaylistShuffle: false,
     lyrics: [],
     hasSyncedLyrics: false,
     activeLyricIndex: -1,
@@ -191,6 +193,17 @@
     mobDownloadBtn: document.getElementById('mobDownloadBtn'),
     mobDownloadActionBtn: document.getElementById('mobDownloadActionBtn'),
     mobAddToPlaylistBtn: document.getElementById('mobAddToPlaylistBtn'),
+    mobPlayerOptionsBtn: document.getElementById('mobPlayerOptionsBtn'),
+
+    // Mobile Player 3-Bar Options Bottom Sheet
+    mobTrackOptionsModal: document.getElementById('mobTrackOptionsModal'),
+    closeMobOptionsBtn: document.getElementById('closeMobOptionsBtn'),
+    mobOptCover: document.getElementById('mobOptCover'),
+    mobOptTitle: document.getElementById('mobOptTitle'),
+    mobOptArtist: document.getElementById('mobOptArtist'),
+    mobOptAddToPlaylistBtn: document.getElementById('mobOptAddToPlaylistBtn'),
+    mobOptLyricsBtn: document.getElementById('mobOptLyricsBtn'),
+    mobOptDownloadBtn: document.getElementById('mobOptDownloadBtn'),
 
     // Modals
     createPlaylistModal: document.getElementById('createPlaylistModal'),
@@ -287,6 +300,11 @@
       if (elements.playerDownloadBtn) elements.playerDownloadBtn.classList.add('downloaded');
       if (elements.mobDownloadBtn) elements.mobDownloadBtn.classList.add('downloaded');
       if (elements.mobDownloadActionBtn) elements.mobDownloadActionBtn.classList.add('downloaded');
+      if (elements.mobOptDownloadBtn) {
+        elements.mobOptDownloadBtn.classList.add('downloaded');
+        const span = elements.mobOptDownloadBtn.querySelector('span');
+        if (span) span.textContent = 'Remove from Downloads';
+      }
     }
   }
 
@@ -529,6 +547,11 @@
           elements.playerDownloadBtn?.classList.remove('downloaded');
           elements.mobDownloadBtn?.classList.remove('downloaded');
           elements.mobDownloadActionBtn?.classList.remove('downloaded');
+          if (elements.mobOptDownloadBtn) {
+            elements.mobOptDownloadBtn.classList.remove('downloaded');
+            const span = elements.mobOptDownloadBtn.querySelector('span');
+            if (span) span.textContent = 'Download Song';
+          }
         }
 
         // Update any download buttons and badges in DOM
@@ -977,6 +1000,17 @@
         mobPause.style.display = state.isPlaying ? 'block' : 'none';
       }
     }
+
+    if (elements.playAllPlaylistBtn) {
+      const plPlay = elements.playAllPlaylistBtn.querySelector('.play-icon');
+      const plPause = elements.playAllPlaylistBtn.querySelector('.pause-icon');
+      const isCurrentPlaylistPlaying = state.isPlaying && state.currentTrack && state.activePlaylistTracks && state.activePlaylistTracks.some(t => t.id === state.currentTrack.id);
+      if (plPlay && plPause) {
+        plPlay.style.display = isCurrentPlaylistPlaying ? 'none' : 'block';
+        plPause.style.display = isCurrentPlaylistPlaying ? 'block' : 'none';
+      }
+      elements.playAllPlaylistBtn.title = isCurrentPlaylistPlaying ? 'Pause Playlist' : 'Play All';
+    }
   }
 
   // Direct Audio Downloader: Instantly adds to "Downloaded" playlist in Library, and triggers file download on Desktop
@@ -1117,6 +1151,24 @@
     if (nextIdx >= state.queue.length) {
       if (state.repeatMode === 'all') {
         nextIdx = 0;
+      } else if (state.activePlaylistTracks && state.activePlaylistTracks.length > 0) {
+        // If playing from playlist, stay strictly within playlist tracks without pulling outside songs
+        if (state.isPlaylistShuffle) {
+          const pool = [...state.activePlaylistTracks];
+          for (let i = pool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [pool[i], pool[j]] = [pool[j], pool[i]];
+          }
+          if (pool.length > 1 && pool[0].id === state.currentTrack?.id) {
+            [pool[0], pool[1]] = [pool[1], pool[0]];
+          }
+          state.queue = pool;
+          state.queueIndex = 0;
+          playTrack(state.queue[0]);
+          return;
+        } else {
+          nextIdx = 0;
+        }
       } else {
         // AUTOPLAY: Don't stop! Keep music flowing by picking unplayed songs from home/trending
         const unplayed = (state.allAvailableTracks || []).filter(t => !state.queue.some(q => q.id === t.id));
@@ -2235,30 +2287,51 @@
       });
     }
 
-    // Play All Click (plays playlist in sequential order)
+    // Play All Click (plays playlist in sequential order, or toggles pause if already playing)
     elements.playAllPlaylistBtn.onclick = () => {
-      if (tracks.length > 0) playTrack(tracks[0], tracks);
+      if (!tracks || tracks.length === 0) return;
+      const isCurrentTrackInThisPlaylist = state.currentTrack && tracks.some(t => t.id === state.currentTrack.id);
+      if (isCurrentTrackInThisPlaylist) {
+        togglePlayPause();
+      } else {
+        state.activePlaylistTracks = [...tracks];
+        state.activePlaylistId = playlistId;
+        state.isPlaylistShuffle = false;
+        state.isShuffled = false;
+        if (elements.shufflePlaylistBtn) elements.shufflePlaylistBtn.classList.remove('active');
+        playTrack(tracks[0], tracks);
+      }
     };
 
     // Shuffle Button (Single Button that changes between Random No-Repeats vs In-Order)
-    let isShuffledPlaylist = false;
-    elements.shufflePlaylistBtn.classList.remove('active');
-    elements.shufflePlaylistBtn.title = "Mode: In-Order • Click to Shuffle (No Repeats)";
+    elements.shufflePlaylistBtn.classList.toggle('active', !!(state.isPlaylistShuffle && state.activePlaylistId === playlistId));
+    elements.shufflePlaylistBtn.title = (state.isPlaylistShuffle && state.activePlaylistId === playlistId)
+      ? "Mode: Random (No Repeats) • Click for In-Order"
+      : "Mode: In-Order • Click to Shuffle (No Repeats)";
 
     elements.shufflePlaylistBtn.onclick = () => {
       if (!tracks || tracks.length === 0) return;
-      isShuffledPlaylist = !isShuffledPlaylist;
-      elements.shufflePlaylistBtn.classList.toggle('active', isShuffledPlaylist);
+      state.isPlaylistShuffle = !state.isPlaylistShuffle;
+      elements.shufflePlaylistBtn.classList.toggle('active', state.isPlaylistShuffle);
+      state.isShuffled = state.isPlaylistShuffle;
+      if (elements.shuffleBtn) elements.shuffleBtn.classList.toggle('active', state.isShuffled);
+      if (elements.mobShuffleBtn) elements.mobShuffleBtn.classList.toggle('active', state.isShuffled);
 
-      if (isShuffledPlaylist) {
+      state.activePlaylistTracks = [...tracks];
+      state.activePlaylistId = playlistId;
+
+      if (state.isPlaylistShuffle) {
         // True non-repeating random selection from playlist only
-        const shuffled = [...tracks];
-        for (let i = shuffled.length - 1; i > 0; i--) {
+        const pool = [...tracks];
+        for (let i = pool.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
-          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+        if (state.currentTrack && pool.length > 1 && pool[0].id === state.currentTrack.id) {
+          [pool[0], pool[1]] = [pool[1], pool[0]];
         }
         elements.shufflePlaylistBtn.title = "Mode: Random (No Repeats) • Click for In-Order";
-        playTrack(shuffled[0], shuffled);
+        playTrack(pool[0], pool);
         showToast("Shuffle Mode: Random (No repeats)", "🔀");
       } else {
         // Play strictly in order of playlist
@@ -2267,6 +2340,8 @@
         showToast("Play Mode: In Order", "📋");
       }
     };
+
+    updatePlayPauseButton();
 
     // Delete custom playlist (kept solely inside playlist view)
     elements.deletePlaylistBtn.onclick = () => {
@@ -2289,11 +2364,7 @@
       div.className = 'playlist-list-item';
       div.innerHTML = `
         <div class="playlist-cover-mini">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="8" y1="6" x2="21" y2="6"/>
-            <line x1="8" y1="12" x2="21" y2="12"/>
-            <line x1="8" y1="18" x2="21" y2="18"/>
-          </svg>
+          ${createPlaylistCollageHtml(pl.tracks)}
         </div>
         <div class="library-item-info">
           <span class="library-item-title">${escapeHtml(pl.name)}</span>
@@ -2541,11 +2612,7 @@
         item.style.cursor = 'pointer';
         item.innerHTML = `
           <div class="playlist-cover-mini">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="8" y1="6" x2="21" y2="6"/>
-              <line x1="8" y1="12" x2="21" y2="12"/>
-              <line x1="8" y1="18" x2="21" y2="18"/>
-            </svg>
+            ${createPlaylistCollageHtml(pl.tracks)}
           </div>
           <div class="library-item-info">
             <span class="library-item-title">${escapeHtml(pl.name)}</span>
@@ -3589,21 +3656,58 @@
       });
     }
 
-    if (elements.mobDownloadBtn) elements.mobDownloadBtn.addEventListener('click', () => downloadSong(state.currentTrack));
-    if (elements.mobDownloadActionBtn) elements.mobDownloadActionBtn.addEventListener('click', () => downloadSong(state.currentTrack));
-
-    if (elements.mobAddToPlaylistBtn) {
-      elements.mobAddToPlaylistBtn.addEventListener('click', () => {
-        if (state.currentTrack) {
-          openAddToPlaylistModal(state.currentTrack);
+    // Mobile Player 3-Bar Options Button & Bottom Sheet
+    if (elements.mobPlayerOptionsBtn) {
+      elements.mobPlayerOptionsBtn.addEventListener('click', () => {
+        if (elements.mobTrackOptionsModal && state.currentTrack) {
+          if (elements.mobOptCover) elements.mobOptCover.src = state.currentTrack.image || '';
+          if (elements.mobOptTitle) elements.mobOptTitle.textContent = state.currentTrack.title || 'Unknown Track';
+          if (elements.mobOptArtist) elements.mobOptArtist.textContent = state.currentTrack.artist || 'Unknown Artist';
+          if (elements.mobOptDownloadBtn) {
+            const isDownloaded = isTrackDownloaded(state.currentTrack.id);
+            elements.mobOptDownloadBtn.classList.toggle('downloaded', isDownloaded);
+            const span = elements.mobOptDownloadBtn.querySelector('span');
+            if (span) span.textContent = isDownloaded ? 'Remove from Downloads' : 'Download Song';
+          }
+          elements.mobTrackOptionsModal.style.display = 'flex';
+          try { window.history.pushState({ modal: 'mobTrackOptions' }, '', window.location.pathname); } catch (e) {}
         }
       });
     }
 
-    if (elements.mobLyricsBtn) {
-      elements.mobLyricsBtn.addEventListener('click', () => {
-        elements.mobilePlayerModal.style.display = 'none';
+    if (elements.closeMobOptionsBtn) {
+      elements.closeMobOptionsBtn.addEventListener('click', () => {
+        if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
+      });
+    }
+
+    if (elements.mobOptAddToPlaylistBtn) {
+      elements.mobOptAddToPlaylistBtn.addEventListener('click', () => {
+        if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
+        if (state.currentTrack) openAddToPlaylistModal(state.currentTrack);
+      });
+    }
+
+    if (elements.mobOptLyricsBtn) {
+      elements.mobOptLyricsBtn.addEventListener('click', () => {
+        if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
+        if (elements.mobilePlayerModal) elements.mobilePlayerModal.style.display = 'none';
         switchView('lyrics');
+      });
+    }
+
+    if (elements.mobOptDownloadBtn) {
+      elements.mobOptDownloadBtn.addEventListener('click', () => {
+        if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
+        if (state.currentTrack) downloadSong(state.currentTrack);
+      });
+    }
+
+    if (elements.mobTrackOptionsModal) {
+      elements.mobTrackOptionsModal.addEventListener('click', (e) => {
+        if (e.target === elements.mobTrackOptionsModal) {
+          elements.mobTrackOptionsModal.style.display = 'none';
+        }
       });
     }
 
@@ -3619,6 +3723,10 @@
     // Mobile System Back & Popstate History Navigation (Prevents app from closing on single back)
     window.addEventListener('popstate', (e) => {
       // 1. If any modal or drawer is open, close it first
+      if (elements.mobTrackOptionsModal && elements.mobTrackOptionsModal.style.display !== 'none') {
+        elements.mobTrackOptionsModal.style.display = 'none';
+        return;
+      }
       if (elements.mobilePlayerModal && elements.mobilePlayerModal.style.display !== 'none') {
         elements.mobilePlayerModal.style.display = 'none';
         return;
@@ -3737,8 +3845,8 @@
       }, { passive: true });
     }
 
+    // Swiping to change song is enabled strictly on the floating player bar ("here only")
     setupSwipeTrackChange(elements.playerBar);
-    setupSwipeTrackChange(elements.mobilePlayerModal);
 
     // Global Keyboard Shortcuts
     window.addEventListener('keydown', (e) => {

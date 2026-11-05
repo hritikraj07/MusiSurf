@@ -9,8 +9,9 @@
     content="Stream millions of full songs on MusiSurf. Ultra-fast music streaming, real-time synchronized lyrics, and personalized playlists.">
 
   <!-- Favicon: Rich MusiSurf Obsidian & Emerald Logo -->
-  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg?v=4.2">
-  <link rel="apple-touch-icon" href="/icons/icon.svg?v=4.2">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg?v=4.3">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png?v=4.3">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png?v=4.3">
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -28,12 +29,12 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=4.2">
+  <link rel="stylesheet" href="/styles.css?v=4.3">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
         for (var name of names) {
-          if (name !== 'musisurf-v4.2') caches.delete(name);
+          if (name !== 'musisurf-v4.3') caches.delete(name);
         }
       });
     }
@@ -487,8 +488,12 @@
           <!-- Playlist Action Buttons -->
           <div class="playlist-actions-bar">
             <button class="playlist-play-giant-btn" id="playAllPlaylistBtn" title="Play All">
-              <svg viewBox="0 0 24 24" fill="currentColor">
+              <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor">
                 <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+                <rect x="6" y="4" width="4" height="16" />
+                <rect x="14" y="4" width="4" height="16" />
               </svg>
             </button>
             <button class="playlist-shuffle-btn" id="shufflePlaylistBtn" title="Shuffle Play">
@@ -904,12 +909,10 @@
         <!-- Live Lyrics Trigger -->
         <button class="player-icon-btn" id="lyricsBtn" title="Synchronized Lyrics (L)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
-            <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
-            <line x1="12" y1="18" x2="12" y2="22"/>
-            <line x1="8" y1="22" x2="16" y2="22"/>
-            <path d="M21 7c.8 1.4.8 3.6 0 5" stroke-width="1.8"/>
-            <path d="M3 7c-.8 1.4-.8 3.6 0 5" stroke-width="1.8"/>
+            <rect x="9" y="2" width="6" height="11" rx="3"/>
+            <path d="M5 10a7 7 0 0 0 14 0"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
           </svg>
         </button>
 
@@ -980,22 +983,18 @@
 
     <!-- Fullscreen Mobile Now Playing Screen -->
     <div class="mobile-now-playing-modal" id="mobilePlayerModal" style="display: none;">
-      <div class="mobile-player-drag-handle" id="mobPlayerDragHandle"></div>
       <div class="mobile-player-header">
         <button class="mobile-player-collapse-btn" id="closeMobilePlayerBtn" title="Collapse Player">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </button>
-        <div class="mobile-player-header-title">
-          <span class="sub">STREAMING FROM INTERNET</span>
-          <span class="main">MusiSurf Ad-Free</span>
-        </div>
-        <button class="mobile-player-action-btn" id="mobDownloadBtn" title="Download Song (MP4)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
+        <div class="mobile-player-header-spacer"></div>
+        <button class="mobile-player-options-btn" id="mobPlayerOptionsBtn" title="Song Options">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+            <line x1="4" y1="6" x2="20" y2="6" />
+            <line x1="4" y1="12" x2="20" y2="12" />
+            <line x1="4" y1="18" x2="20" y2="18" />
           </svg>
         </button>
       </div>
@@ -1065,35 +1064,58 @@
           </svg>
         </button>
       </div>
+    </div>
 
-      <!-- Bottom action pills -->
-      <div class="mobile-player-bottom-bar">
-        <button class="mob-pill-btn" id="mobAddToPlaylistBtn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          <span>Playlist</span>
-        </button>
-        <button class="mob-pill-btn" id="mobLyricsBtn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
-            <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
-            <line x1="12" y1="18" x2="12" y2="22"/>
-            <line x1="8" y1="22" x2="16" y2="22"/>
-            <path d="M21 7c.8 1.4.8 3.6 0 5" stroke-width="1.8"/>
-            <path d="M3 7c-.8 1.4-.8 3.6 0 5" stroke-width="1.8"/>
-          </svg>
-          <span>Lyrics</span>
-        </button>
-        <button class="mob-pill-btn download-highlight" id="mobDownloadActionBtn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          <span>Download Song</span>
-        </button>
+    <!-- Mobile Player 3-Bar Options Bottom Sheet Modal -->
+    <div class="modal-backdrop" id="mobTrackOptionsModal" style="display: none;">
+      <div class="modal-card mob-options-sheet">
+        <div class="mob-options-header">
+          <div class="mob-options-track-info">
+            <img src="" id="mobOptCover" class="mob-opt-cover" alt="Track Cover">
+            <div class="mob-opt-text">
+              <h4 id="mobOptTitle" class="mob-opt-title">Track Title</h4>
+              <p id="mobOptArtist" class="mob-opt-artist">Artist</p>
+            </div>
+          </div>
+          <button class="modal-close-btn" id="closeMobOptionsBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div class="mob-options-list">
+          <button class="mob-option-item" id="mobOptAddToPlaylistBtn">
+            <div class="mob-option-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </div>
+            <span>Add to Playlist</span>
+          </button>
+          <button class="mob-option-item" id="mobOptLyricsBtn">
+            <div class="mob-option-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="2" width="6" height="11" rx="3"/>
+                <path d="M5 10a7 7 0 0 0 14 0"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+            </div>
+            <span>Synchronized Lyrics</span>
+          </button>
+          <button class="mob-option-item" id="mobOptDownloadBtn">
+            <div class="mob-option-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </div>
+            <span>Download Song</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -1269,7 +1291,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.13"></script>
+  <script src="/app.js?v=2.14"></script>
 </body>
 
 </html>
