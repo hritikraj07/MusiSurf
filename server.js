@@ -801,13 +801,16 @@ app.get('/api/lyrics', async (req, res) => {
 
     if (response.ok) {
       const data = await response.json();
-      return res.json({
-        success: true,
-        trackName: data.trackName,
-        artistName: data.artistName,
-        syncedLyrics: data.syncedLyrics,
-        plainLyrics: data.plainLyrics
-      });
+      if (data && data.syncedLyrics) {
+        return res.json({
+          success: true,
+          trackName: data.trackName,
+          artistName: data.artistName,
+          syncedLyrics: data.syncedLyrics,
+          plainLyrics: data.plainLyrics
+        });
+      }
+      // If syncedLyrics is empty, fall through to search to find a synced version!
     }
 
     // Fallback: search query on lrclib

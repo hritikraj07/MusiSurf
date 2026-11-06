@@ -29,12 +29,12 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=4.7">
+  <link rel="stylesheet" href="/styles.css?v=4.8">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
         for (var name of names) {
-          if (name !== 'musisurf-v4.7') caches.delete(name);
+          if (name !== 'musisurf-v4.8') caches.delete(name);
         }
       });
     }
@@ -683,7 +683,7 @@
               <button class="lib-pill" data-lib-filter="local">Local</button>
             </div>
 
-            <!-- Library Hub Quick Cards (Image 2 style: rounded chip cards) -->
+            <!-- Library Hub Quick Cards (Row 1: Liked + Local Files; Row 2: Downloaded Songs) -->
             <div class="library-hub-grid" id="libHubGrid">
               <!-- Liked Songs Card -->
               <div class="library-hub-card" id="libHubLikedBtn">
@@ -699,21 +699,7 @@
                 </div>
               </div>
 
-              <!-- Downloaded / Offline Card -->
-              <div class="library-hub-card" id="libHubDownloadedBtn">
-                <div class="lib-hub-icon downloaded-icon-box">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <circle cx="12" cy="12" r="10" stroke-width="2" />
-                    <polyline points="8 12 11 15 16 9" />
-                  </svg>
-                </div>
-                <div class="lib-hub-details">
-                  <h3 class="lib-hub-name">Downloaded</h3>
-                  <span class="lib-hub-meta" id="libHubDownloadedMeta">0 songs</span>
-                </div>
-              </div>
-
-              <!-- Local Files Card -->
+              <!-- Local Files Card (Short name, sits nicely beside Liked in Row 1) -->
               <div class="library-hub-card lib-hub-local" id="libHubLocalBtn">
                 <div class="lib-hub-icon local-icon-box">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -724,7 +710,21 @@
                 </div>
                 <div class="lib-hub-details">
                   <h3 class="lib-hub-name">Local Files</h3>
-                  <span class="lib-hub-meta" id="libHubLocalMeta">0 songs • Device Storage</span>
+                  <span class="lib-hub-meta" id="libHubLocalMeta">0 songs</span>
+                </div>
+              </div>
+
+              <!-- Downloaded / Offline Card (Moved down to Row 2: full width so name never cuts down) -->
+              <div class="library-hub-card lib-hub-downloaded" id="libHubDownloadedBtn">
+                <div class="lib-hub-icon downloaded-icon-box">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <circle cx="12" cy="12" r="10" stroke-width="2" />
+                    <polyline points="8 12 11 15 16 9" />
+                  </svg>
+                </div>
+                <div class="lib-hub-details">
+                  <h3 class="lib-hub-name">Downloaded Songs</h3>
+                  <span class="lib-hub-meta" id="libHubDownloadedMeta">0 songs • Saved Offline</span>
                 </div>
                 <div class="lib-hub-arrow">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;">
@@ -980,12 +980,15 @@
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </button>
-        <div class="mobile-player-header-spacer"></div>
+        <div class="mobile-player-header-title">
+          <span class="mob-header-sub">PLAYING FROM PLAYLIST</span>
+          <span class="mob-header-main" id="mobHeaderPlaylistName">MusiSurf</span>
+        </div>
         <button class="mobile-player-options-btn" id="mobPlayerOptionsBtn" title="Song Options">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
-            <line x1="4" y1="6" x2="20" y2="6" />
-            <line x1="4" y1="12" x2="20" y2="12" />
-            <line x1="4" y1="18" x2="20" y2="18" />
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5" r="2.2"/>
+            <circle cx="12" cy="12" r="2.2"/>
+            <circle cx="12" cy="19" r="2.2"/>
           </svg>
         </button>
       </div>
@@ -1020,18 +1023,18 @@
 
       <!-- Controls -->
       <div class="mobile-player-controls-row">
-        <button class="control-btn" id="mobShuffleBtn">
+        <button class="control-btn" id="mobShuffleBtn" title="Toggle Shuffle">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
           </svg>
         </button>
-        <button class="control-btn" id="mobPrevBtn">
+        <button class="control-btn" id="mobPrevBtn" title="Previous Track">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <polygon points="19 20 9 12 19 4 19 20" />
             <line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2.5" />
           </svg>
         </button>
-        <button class="play-pause-btn mob-play-btn" id="mobPlayPauseBtn">
+        <button class="play-pause-btn mob-play-btn" id="mobPlayPauseBtn" title="Play / Pause">
           <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor">
             <polygon points="5 3 19 12 5 21 5 3" />
           </svg>
@@ -1040,40 +1043,44 @@
             <rect x="14" y="4" width="4" height="16" />
           </svg>
         </button>
-        <button class="control-btn" id="mobNextBtn">
+        <button class="control-btn" id="mobNextBtn" title="Next Track">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <polygon points="5 4 15 12 5 20 5 4" />
             <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2.5" />
           </svg>
         </button>
-        <button class="control-btn" id="mobRepeatBtn">
+        <button class="control-btn" id="mobRepeatBtn" title="Toggle Repeat">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="17 1 21 5 17 9" />
             <path d="M3 11V9a4 4 0 0 1 4-4h14" />
             <polyline points="7 23 3 19 7 15" />
             <path d="M21 13v2a4 4 0 0 1-4 4H3" />
           </svg>
+          <span class="repeat-one-indicator" style="display: none;">1</span>
         </button>
-      </div>
-
-      <!-- Outside Utility Action Bar: Lyrics & Sleep Timer directly accessible on player window -->
-      <div class="mobile-player-bottom-bar">
-        <button class="mob-player-util-btn" id="mobPlayerTimerBtn" title="Sleep Timer">
+        <button class="control-btn timer-icon-btn" id="mobPlayerTimerBtn" title="Sleep Timer">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"/>
             <polyline points="12 6 12 12 16 14"/>
           </svg>
-          <span id="mobTimerBadge" class="timer-badge-text">Sleep Timer</span>
+          <span class="timer-active-dot" id="mobTimerDot" style="display: none;"></span>
         </button>
+      </div>
 
-        <button class="mob-player-util-btn mob-player-lyrics-pill" id="mobPlayerLyricsBtn" title="View Lyrics">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 18V5l12-2v13"/>
-            <circle cx="6" cy="18" r="3"/>
-            <circle cx="18" cy="16" r="3"/>
-          </svg>
-          <span>Lyrics</span>
-        </button>
+      <!-- Spotify-Grade Compact Lyrics Card Preview at Bottom -->
+      <div class="mobile-player-lyrics-card" id="mobPlayerLyricsBtn" role="button" tabindex="0" title="Open Lyrics">
+        <div class="mob-lyrics-card-top">
+          <div class="mob-lyrics-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 15px; height: 15px;">
+              <path d="M9 18V5l12-2v13"/>
+              <circle cx="6" cy="18" r="3"/>
+              <circle cx="18" cy="16" r="3"/>
+            </svg>
+            <span>Lyrics</span>
+          </div>
+          <span class="mob-lyrics-expand-action">MORE</span>
+        </div>
+        <p class="mob-lyrics-snippet-line" id="mobLyricsSnippet">Tap to view synchronized lyrics</p>
       </div>
     </div>
 
@@ -1376,7 +1383,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.18"></script>
+  <script src="/app.js?v=2.19"></script>
 </body>
 
 </html>

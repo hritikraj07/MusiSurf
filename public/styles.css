@@ -792,7 +792,15 @@ body[data-active-view="lyrics"] .content-scroll,
   overflow: hidden !important;
   overflow-y: hidden !important;
   overflow-x: hidden !important;
-  padding-bottom: 0 !important;
+  padding: 0 !important;
+  scrollbar-width: none !important;
+}
+
+body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
+.content-scroll.has-lyrics-active::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .view-section {
@@ -1288,7 +1296,16 @@ body[data-active-view="lyrics"] .content-scroll,
 
 @media (max-width: 950px) {
   .results-top-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 100% !important;
+    gap: 20px !important;
+    width: 100% !important;
+  }
+  .top-result-card-container,
+  .top-result-card,
+  .top-songs-list-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
 }
 
@@ -3660,22 +3677,34 @@ body[data-active-view="lyrics"] .content-scroll,
   }
 
   .player-heart-btn, #playerDownloadBtn {
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     padding: 0;
+    margin: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: var(--text-secondary);
   }
 
-  /* Hide center scrubber in mini player */
+  .player-heart-btn svg, #playerDownloadBtn svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+    margin: auto;
+  }
+
+  /* Center controls in mini player */
   .player-center {
     width: auto;
     flex-shrink: 0;
     display: flex;
     align-items: center;
+    margin-left: 6px;
   }
 
   .player-controls .control-btn,
@@ -3685,12 +3714,18 @@ body[data-active-view="lyrics"] .content-scroll,
 
   .player-controls {
     gap: 0;
+    display: flex;
+    align-items: center;
   }
 
   .play-pause-btn {
     width: 38px;
     height: 38px;
+    margin: 0;
     flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .play-pause-btn svg {
@@ -3808,13 +3843,36 @@ body[data-active-view="lyrics"] .content-scroll,
     gap: 8px;
   }
 
+  .quick-pick-tile {
+    height: 52px;
+    padding-right: 6px;
+  }
+
   .quick-pick-img {
-    width: 48px;
-    height: 48px;
+    width: 52px;
+    height: 52px;
+  }
+
+  .quick-pick-info {
+    padding: 0 8px;
+    flex: 1;
+    min-width: 0;
   }
 
   .quick-pick-title {
     font-size: 0.8rem;
+    line-height: 1.25;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-break: break-word;
+  }
+
+  .quick-pick-tile .quick-pick-play-btn {
+    display: none !important;
   }
 
   /* 100% NO HORIZONTAL SCROLL ON MOBILE */
@@ -4609,7 +4667,7 @@ body[data-active-view="lyrics"] .content-scroll,
 
 @media (max-width: 768px) {
   .library-view-container {
-    padding: 16px 14px calc(180px + env(safe-area-inset-bottom, 20px)) !important;
+    padding: 16px 14px 24px !important;
   }
   .library-header-text .page-title {
     font-size: 1.8rem;
@@ -4645,6 +4703,10 @@ body[data-active-view="lyrics"] .content-scroll,
     text-overflow: ellipsis !important;
   }
   .library-hub-card.lib-hub-local {
+    grid-column: auto !important;
+    padding: 10px 12px !important;
+  }
+  .library-hub-card.lib-hub-downloaded {
     grid-column: 1 / -1 !important;
     padding: 10px 14px !important;
   }
@@ -4976,63 +5038,173 @@ body[data-active-view="lyrics"] .content-scroll,
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+/* Dynamic Spotify-Style Atmospheric Playlist Gradient */
+#playlistView {
+  position: relative;
+  isolation: isolate;
+}
+
+#playlistView::before {
+  content: '';
+  position: absolute;
+  top: -24px;
+  left: -32px;
+  right: -32px;
+  height: 480px;
+  background: var(--playlist-dynamic-gradient, linear-gradient(180deg, rgba(30, 35, 45, 0.8) 0%, rgba(18, 20, 26, 0.45) 55%, rgba(11, 13, 17, 0) 100%));
+  pointer-events: none;
+  z-index: -1;
+  transition: background 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 12px 12px 0 0;
+}
+
+@media (max-width: 768px) {
+  #playlistView::before {
+    top: -16px;
+    left: -14px;
+    right: -14px;
+    height: 440px;
+    border-radius: 0;
+  }
+}
+
 /* ==========================================================================
-   MOBILE FULLSCREEN PLAYER BOTTOM ACTION BAR (Lyrics & Sleep Timer)
+   MOBILE FULLSCREEN PLAYER (Spotify Lookalike Header, Controls & Lyrics Card)
    ========================================================================== */
-.mobile-player-bottom-bar {
+.mobile-player-header-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  flex: 1;
+  min-width: 0;
+  padding: 0 10px;
+}
+
+.mob-header-sub {
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+.mob-header-main {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 190px;
+  line-height: 1.25;
+}
+
+.timer-icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timer-icon-btn.timer-active {
+  color: #00f2fe !important;
+}
+
+.timer-active-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #00f2fe;
+  box-shadow: 0 0 6px #00f2fe;
+}
+
+/* Spotify-Grade Compact Lyrics Card Preview at Bottom */
+.mobile-player-lyrics-card {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: auto;
+  flex-shrink: 0;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.mobile-player-lyrics-card:active {
+  background: rgba(255, 255, 255, 0.14);
+  transform: scale(0.98);
+}
+
+.mob-lyrics-card-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
-  padding: 12px 6px 4px;
-  margin-top: auto;
-  gap: 12px;
 }
 
-.mob-player-util-btn {
-  display: inline-flex;
+.mob-lyrics-badge {
+  display: flex;
   align-items: center;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 500px;
-  padding: 8px 16px;
-  color: #e0e0e0;
-  font-size: 0.85rem;
+  gap: 6px;
+  color: #ffffff;
+  font-size: 0.82rem;
   font-weight: 700;
-  cursor: pointer;
-  transition: all var(--transition-fast);
 }
 
-.mob-player-util-btn:hover,
-.mob-player-util-btn:active {
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
-  transform: scale(1.03);
+.mob-lyrics-expand-action {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
 }
 
-.mob-player-util-btn svg {
-  width: 18px;
-  height: 18px;
+.mob-lyrics-snippet-line {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
 }
 
-.mob-player-lyrics-pill {
-  background: rgba(29, 185, 84, 0.16);
-  border-color: rgba(29, 185, 84, 0.4);
-  color: #fff;
+/* Non-Clickable Album Artwork */
+.player-cover-container,
+#playerCoverWrapper,
+.mobile-player-art-wrap,
+#mobPlayerCover {
+  cursor: default !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
-.mob-player-lyrics-pill:hover,
-.mob-player-lyrics-pill:active {
-  background: var(--accent-primary);
-  color: #000;
-  border-color: var(--accent-primary);
+#coverExpandBtn {
+  display: none !important;
 }
 
-.mob-player-util-btn.timer-active {
-  background: rgba(0, 242, 254, 0.16) !important;
-  border-color: #00f2fe !important;
-  color: #00f2fe !important;
+/* Nav Tap Animations */
+.mobile-nav-item {
+  transition: transform 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275), color 0.2s ease !important;
+}
+
+.mobile-nav-item:active {
+  transform: scale(0.9) !important;
+}
+
+.mobile-nav-item.active svg {
+  transform: scale(1.08);
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 /* ==========================================================================
