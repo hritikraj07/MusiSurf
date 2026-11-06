@@ -858,46 +858,61 @@ body[data-active-view="lyrics"] .content-scroll,
   display: flex;
   align-items: center;
   background-color: rgba(255, 255, 255, 0.07);
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
   position: relative;
-  transition: background-color var(--transition-fast), transform var(--transition-fast);
+  transition: background-color var(--transition-fast), transform var(--transition-fast), border-color var(--transition-fast);
+  height: 56px;
+  border: 1px solid transparent;
 }
 
 .quick-pick-tile:hover {
-  background-color: rgba(255, 255, 255, 0.16);
-  transform: translateY(-2px);
+  background-color: rgba(255, 255, 255, 0.14);
+  transform: translateY(-1px);
+}
+
+.quick-pick-tile.playing {
+  background-color: rgba(29, 185, 84, 0.16) !important;
+  border-color: rgba(29, 185, 84, 0.4) !important;
+}
+
+.quick-pick-tile.playing .quick-pick-title {
+  color: var(--accent-primary) !important;
 }
 
 .quick-pick-img {
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   object-fit: cover;
   flex-shrink: 0;
 }
 
 .quick-pick-info {
   flex: 1;
-  padding: 0 16px;
+  padding: 0 12px;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .quick-pick-title {
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   font-weight: 700;
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   display: block;
+  line-height: 1.25;
 }
 
 .quick-pick-play-btn {
   position: absolute;
-  right: 14px;
-  width: 42px;
-  height: 42px;
+  right: 12px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   background-color: var(--accent-primary);
   color: #000;
@@ -913,19 +928,22 @@ body[data-active-view="lyrics"] .content-scroll,
 }
 
 .quick-pick-play-btn svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   margin-left: 2px;
 }
 
-.quick-pick-tile:hover .quick-pick-play-btn {
-  opacity: 1;
-  transform: translateY(0);
+@media (hover: hover) and (min-width: 769px) {
+  .quick-pick-tile:hover .quick-pick-play-btn {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.quick-pick-play-btn:hover {
-  transform: scale(1.08) !important;
-  background-color: #1ed760;
+@media (max-width: 768px), (hover: none) {
+  .quick-pick-play-btn {
+    display: none !important;
+  }
 }
 
 /* Filter Pills */
@@ -1431,9 +1449,14 @@ body[data-active-view="lyrics"] .content-scroll,
 }
 
 .top-result-action-btn.liked {
-  color: var(--accent-primary);
-  background: rgba(29, 185, 84, 0.15);
-  border-color: var(--accent-primary);
+  color: #ff3b5c !important;
+  background: transparent !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.top-result-action-btn.liked svg {
+  fill: #ff3b5c !important;
+  stroke: #ff3b5c !important;
 }
 
 .top-result-action-btn.downloaded {
@@ -1540,7 +1563,22 @@ body[data-active-view="lyrics"] .content-scroll,
 
 .song-action-btn.liked {
   opacity: 1 !important;
-  color: var(--accent-primary) !important;
+  color: #ff3b5c !important;
+  background: transparent !important;
+}
+
+.song-action-btn.liked svg {
+  fill: #ff3b5c !important;
+  stroke: #ff3b5c !important;
+}
+
+.song-action-btn.song-more-trigger {
+  opacity: 0.8;
+}
+
+.song-action-btn.song-more-trigger svg {
+  width: 18px;
+  height: 18px;
 }
 
 .song-action-btn.downloaded {
@@ -2450,7 +2488,13 @@ body[data-active-view="lyrics"] .content-scroll,
 }
 
 .player-heart-btn.liked {
-  color: var(--accent-primary);
+  color: #ff3b5c !important;
+  background: transparent !important;
+}
+
+.player-heart-btn.liked svg {
+  fill: #ff3b5c !important;
+  stroke: #ff3b5c !important;
 }
 
 .player-heart-btn svg {
@@ -3570,31 +3614,68 @@ body[data-active-view="lyrics"] .content-scroll,
   }
 
   .player-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     width: auto;
     flex: 1;
     min-width: 0;
   }
 
   .player-cover-container {
-    width: 44px;
-    height: 44px;
+    width: 42px;
+    height: 42px;
+    border-radius: 6px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .player-track-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
   }
 
   .player-title {
-    font-size: 0.85rem;
+    font-size: 0.86rem;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    line-height: 1.25;
   }
 
   .player-artist {
     font-size: 0.72rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    line-height: 1.2;
   }
 
   .player-heart-btn, #playerDownloadBtn {
-    padding: 4px;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: transparent;
   }
 
   /* Hide center scrubber in mini player */
   .player-center {
     width: auto;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
   }
 
   .player-controls .control-btn,
@@ -3609,6 +3690,7 @@ body[data-active-view="lyrics"] .content-scroll,
   .play-pause-btn {
     width: 38px;
     height: 38px;
+    flex-shrink: 0;
   }
 
   .play-pause-btn svg {
@@ -3626,16 +3708,18 @@ body[data-active-view="lyrics"] .content-scroll,
     padding: 16px 14px calc(185px + env(safe-area-inset-bottom, 20px)) !important;
   }
 
-  /* Hide search bar and header on Home, Library, and Playlist views on mobile */
+  /* Hide search bar and header on Home, Library, Playlist, and Lyrics views on mobile */
   body[data-active-view="home"] .top-header,
   body[data-active-view="library"] .top-header,
-  body[data-active-view="playlist"] .top-header {
+  body[data-active-view="playlist"] .top-header,
+  body[data-active-view="lyrics"] .top-header {
     display: none !important;
   }
 
   body[data-active-view="home"] .content-scroll,
   body[data-active-view="library"] .content-scroll,
-  body[data-active-view="playlist"] .content-scroll {
+  body[data-active-view="playlist"] .content-scroll,
+  body[data-active-view="lyrics"] .content-scroll {
     padding-top: 18px !important;
     padding-bottom: calc(185px + env(safe-area-inset-bottom, 20px)) !important;
   }
@@ -3848,29 +3932,29 @@ body[data-active-view="lyrics"] .content-scroll,
     height: 36px;
   }
   .table-title-main {
-    font-size: 0.85rem;
-    max-width: 140px;
+    font-size: 0.88rem;
+    max-width: 180px;
   }
   .table-artist-sub {
-    font-size: 0.74rem;
-    max-width: 140px;
+    font-size: 0.76rem;
+    max-width: 180px;
   }
 
   .tracks-table th.col-actions,
   .tracks-table td.col-actions {
-    width: 120px !important;
-    min-width: 120px !important;
+    width: 68px !important;
+    min-width: 68px !important;
     padding: 4px 2px !important;
     text-align: right !important;
   }
 
   .col-actions .song-action-btn {
-    padding: 4px 2px !important;
+    padding: 6px 4px !important;
   }
 
   .col-actions .song-action-btn svg {
-    width: 15px !important;
-    height: 15px !important;
+    width: 17px !important;
+    height: 17px !important;
   }
 
   /* Mobile Playlist Back Navigation Button */
@@ -4890,6 +4974,429 @@ body[data-active-view="lyrics"] .content-scroll,
   height: 220px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* ==========================================================================
+   MOBILE FULLSCREEN PLAYER BOTTOM ACTION BAR (Lyrics & Sleep Timer)
+   ========================================================================== */
+.mobile-player-bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 6px 4px;
+  margin-top: auto;
+  gap: 12px;
+}
+
+.mob-player-util-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 500px;
+  padding: 8px 16px;
+  color: #e0e0e0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.mob-player-util-btn:hover,
+.mob-player-util-btn:active {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  transform: scale(1.03);
+}
+
+.mob-player-util-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.mob-player-lyrics-pill {
+  background: rgba(29, 185, 84, 0.16);
+  border-color: rgba(29, 185, 84, 0.4);
+  color: #fff;
+}
+
+.mob-player-lyrics-pill:hover,
+.mob-player-lyrics-pill:active {
+  background: var(--accent-primary);
+  color: #000;
+  border-color: var(--accent-primary);
+}
+
+.mob-player-util-btn.timer-active {
+  background: rgba(0, 242, 254, 0.16) !important;
+  border-color: #00f2fe !important;
+  color: #00f2fe !important;
+}
+
+/* ==========================================================================
+   SLEEP TIMER MODAL (10 Multiples of 5 + Custom Duration)
+   ========================================================================== */
+.sleep-timer-card {
+  max-width: 420px;
+  width: 92%;
+  padding: 24px;
+  border-radius: 16px;
+  background: #161922;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85);
+  z-index: 2800 !important;
+}
+
+#sleepTimerModal {
+  z-index: 2800 !important;
+}
+
+.timer-modal-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--accent-primary);
+}
+
+.sleep-timer-desc {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  margin-top: 6px;
+  margin-bottom: 20px;
+  line-height: 1.4;
+}
+
+.sleep-timer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.timer-option-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: center;
+}
+
+.timer-option-btn:hover,
+.timer-option-btn:active {
+  background: rgba(29, 185, 84, 0.18);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  transform: scale(1.02);
+}
+
+.timer-option-btn.active {
+  background: var(--accent-primary) !important;
+  color: #000 !important;
+  border-color: var(--accent-primary) !important;
+}
+
+.sleep-timer-custom-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.custom-timer-input-group {
+  display: flex;
+  gap: 10px;
+}
+
+.custom-timer-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #fff;
+  font-size: 0.9rem;
+  font-family: inherit;
+  outline: none;
+}
+
+.custom-timer-input:focus {
+  border-color: var(--accent-primary);
+}
+
+.custom-timer-set-btn {
+  background: var(--accent-primary);
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  padding: 0 20px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.custom-timer-set-btn:hover {
+  transform: scale(1.04);
+}
+
+.timer-turn-off-btn {
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #ef4444;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.timer-turn-off-btn:hover {
+  background: #ef4444;
+  color: #fff;
+}
+
+/* Hide Search Box Wrapper on Desktop Lyrics View */
+body[data-active-view="lyrics"] .search-box-wrapper {
+  display: none !important;
+}
+
+/* Completely Hide Top Header Globally in Lyrics View (Desktop & Mobile) */
+body[data-active-view="lyrics"] .top-header {
+  display: none !important;
+}
+
+body[data-active-view="lyrics"] .main-wrapper,
+body[data-active-view="lyrics"] .content-scroll {
+  overflow: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
+  padding: 0 !important;
+}
+
+#lyricsView {
+  height: 100% !important;
+  max-height: calc(100vh - var(--player-height)) !important;
+  overflow: hidden !important;
+  overflow-x: hidden !important;
+}
+
+.lyrics-view-container {
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  height: 100% !important;
+  max-height: calc(100vh - var(--player-height) - 16px) !important;
+  overflow: hidden !important;
+  overflow-x: hidden !important;
+  padding: 24px 20px 0;
+  box-sizing: border-box;
+}
+
+.lyrics-scroll-body {
+  flex: 1;
+  position: relative;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 30px 10px 180px;
+  scroll-behavior: smooth;
+  scrollbar-width: none !important; /* Firefox: completely hide scrollbar thumb & track */
+  -ms-overflow-style: none !important; /* IE/Edge */
+}
+
+.lyrics-scroll-body::-webkit-scrollbar {
+  display: none !important; /* Chrome/Safari/Brave: completely hide scrollbar */
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.lyrics-lines-container {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  overflow-x: hidden !important;
+  width: 100%;
+}
+
+.lyric-line {
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+/* Redesigned Spotify-Grade Top Result Card */
+.top-result-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
+  padding: 18px;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  cursor: pointer;
+  position: relative;
+  transition: all var(--transition-fast);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.top-result-card:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.05) 100%);
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-2px);
+}
+
+.top-result-header-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.top-result-img {
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  flex-shrink: 0;
+}
+
+.top-result-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.top-result-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: #fff;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+.top-result-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.top-result-artist {
+  color: #e2e8f0;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.top-result-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.top-result-play-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: var(--accent-primary);
+  color: #000;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(29, 185, 84, 0.45);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform var(--transition-fast), background-color var(--transition-fast);
+}
+
+.top-result-play-btn:hover {
+  transform: scale(1.06);
+  background-color: #1ed760;
+}
+
+.top-result-action-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.top-result-action-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(1.12);
+}
+
+.top-result-action-btn.top-like-btn.liked {
+  color: #ff3b5c !important;
+  background: transparent !important;
+}
+
+.top-result-action-btn.top-like-btn.liked svg {
+  fill: #ff3b5c !important;
+  stroke: #ff3b5c !important;
+}
+
+/* Universal Song Rows (Clean 2-Action Design) */
+.song-row-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.col-actions {
+  white-space: nowrap;
+}
+
+.col-actions .song-action-btn {
+  padding: 6px;
+  border-radius: 50%;
+  background: transparent !important;
+}
+
+.col-actions .song-action-btn.liked svg {
+  fill: #ff3b5c !important;
+  stroke: #ff3b5c !important;
+}
+
+.col-actions .song-action-btn.song-more-trigger svg {
+  width: 18px;
+  height: 18px;
 }
 
 

@@ -41,7 +41,14 @@
     isTrimmingStartSilence: false,
     trailingSilenceFrames: 0,
     isDraggingProgress: false,
-    allAvailableTracks: []
+    allAvailableTracks: [],
+    sleepTimer: {
+      timeoutId: null,
+      intervalId: null,
+      targetTime: null,
+      durationMinutes: 0
+    },
+    contextTrack: null
   };
 
   // DOM Elements
@@ -189,10 +196,9 @@
     mobNextBtn: document.getElementById('mobNextBtn'),
     mobShuffleBtn: document.getElementById('mobShuffleBtn'),
     mobRepeatBtn: document.getElementById('mobRepeatBtn'),
-    mobLyricsBtn: document.getElementById('mobLyricsBtn'),
-    mobDownloadBtn: document.getElementById('mobDownloadBtn'),
-    mobDownloadActionBtn: document.getElementById('mobDownloadActionBtn'),
-    mobAddToPlaylistBtn: document.getElementById('mobAddToPlaylistBtn'),
+    mobPlayerLyricsBtn: document.getElementById('mobPlayerLyricsBtn'),
+    mobPlayerTimerBtn: document.getElementById('mobPlayerTimerBtn'),
+    mobTimerBadge: document.getElementById('mobTimerBadge'),
     mobPlayerOptionsBtn: document.getElementById('mobPlayerOptionsBtn'),
 
     // Mobile Player 3-Bar Options Bottom Sheet
@@ -202,8 +208,20 @@
     mobOptTitle: document.getElementById('mobOptTitle'),
     mobOptArtist: document.getElementById('mobOptArtist'),
     mobOptAddToPlaylistBtn: document.getElementById('mobOptAddToPlaylistBtn'),
+    mobOptQueueBtn: document.getElementById('mobOptQueueBtn'),
     mobOptLyricsBtn: document.getElementById('mobOptLyricsBtn'),
+    mobOptSleepTimerBtn: document.getElementById('mobOptSleepTimerBtn'),
     mobOptDownloadBtn: document.getElementById('mobOptDownloadBtn'),
+    mobOptDownloadText: document.getElementById('mobOptDownloadText'),
+    mobOptRemovePlaylistBtn: document.getElementById('mobOptRemovePlaylistBtn'),
+
+    // Sleep Timer Modal
+    sleepTimerModal: document.getElementById('sleepTimerModal'),
+    closeSleepTimerBtn: document.getElementById('closeSleepTimerBtn'),
+    sleepTimerActiveStatus: document.getElementById('sleepTimerActiveStatus'),
+    customTimerMinutesInput: document.getElementById('customTimerMinutesInput'),
+    setCustomTimerBtn: document.getElementById('setCustomTimerBtn'),
+    turnOffTimerBtn: document.getElementById('turnOffTimerBtn'),
 
     // Modals
     createPlaylistModal: document.getElementById('createPlaylistModal'),
@@ -1860,7 +1878,6 @@
     // Top Result
     const top = results[0];
     const isTopLiked = state.likedSongs.some(s => s.id === top.id);
-    const isTopDownloaded = isTrackDownloaded(top.id);
     const isPlayingThisTop = state.isPlaying && state.currentTrack && state.currentTrack.id === top.id;
 
     elements.topResultCard.dataset.trackId = top.id;
@@ -1887,30 +1904,15 @@
           </svg>
         </button>
         <button class="top-result-action-btn top-like-btn ${isTopLiked ? 'liked' : ''}" title="${isTopLiked ? 'Liked' : 'Save to Liked Songs'}">
-          <svg viewBox="0 0 24 24" fill="${isTopLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+          <svg viewBox="0 0 24 24" fill="${isTopLiked ? '#ff3b5c' : 'none'}" stroke="currentColor" stroke-width="2">
             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
           </svg>
         </button>
-        <button class="top-result-action-btn top-queue-btn" title="Add to Queue">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="8" y1="6" x2="21" y2="6"/>
-            <line x1="8" y1="12" x2="21" y2="12"/>
-            <line x1="8" y1="18" x2="16" y2="18"/>
-            <line x1="19" y1="15" x2="19" y2="21"/>
-            <line x1="16" y1="18" x2="22" y2="18"/>
-          </svg>
-        </button>
-        <button class="top-result-action-btn top-playlist-btn" title="Add to Playlist">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-        </button>
-        <button class="top-result-action-btn top-download-btn ${isTopDownloaded ? 'downloaded' : ''}" title="${isTopDownloaded ? 'Downloaded • Offline' : 'Download Song'}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
+        <button class="top-result-action-btn top-more-btn" title="More Options">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;">
+            <circle cx="12" cy="5" r="2"/>
+            <circle cx="12" cy="12" r="2"/>
+            <circle cx="12" cy="19" r="2"/>
           </svg>
         </button>
       </div>
@@ -1920,27 +1922,11 @@
       if (e.target.closest('.top-like-btn')) {
         e.stopPropagation();
         toggleLikeSong(top);
-        const likeBtn = elements.topResultCard.querySelector('.top-like-btn');
-        if (likeBtn) {
-          const nowLiked = state.likedSongs.some(s => s.id === top.id);
-          likeBtn.classList.toggle('liked', nowLiked);
-          likeBtn.querySelector('svg')?.setAttribute('fill', nowLiked ? 'currentColor' : 'none');
-        }
         return;
       }
-      if (e.target.closest('.top-queue-btn')) {
+      if (e.target.closest('.top-more-btn')) {
         e.stopPropagation();
-        addToQueue(top);
-        return;
-      }
-      if (e.target.closest('.top-playlist-btn')) {
-        e.stopPropagation();
-        openAddToPlaylistModal(top);
-        return;
-      }
-      if (e.target.closest('.top-download-btn')) {
-        e.stopPropagation();
-        downloadSong(top);
+        openTrackOptionsMenu(top);
         return;
       }
       if (e.target.closest('.top-result-play-btn')) {
@@ -1998,13 +1984,70 @@
     elements.fullSongsTable.appendChild(table);
   }
 
+  // Universal Track Options Modal Sheet (Spotify-grade ⋮ menu)
+  function openTrackOptionsMenu(track) {
+    if (!track) return;
+    state.contextTrack = track;
+
+    if (elements.mobOptCover) {
+      elements.mobOptCover.src = track.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80';
+    }
+    if (elements.mobOptTitle) elements.mobOptTitle.textContent = track.title || 'Unknown Track';
+    if (elements.mobOptArtist) elements.mobOptArtist.textContent = track.artist || 'Unknown Artist';
+
+    // Download option: check if downloaded or in downloaded playlist view
+    if (elements.mobOptDownloadBtn) {
+      const isDownloaded = isTrackDownloaded(track.id);
+      const isDownloadedView = state.currentView === 'playlist' && state.activePlaylistId === 'downloaded';
+      const showDelete = isDownloaded || isDownloadedView;
+
+      elements.mobOptDownloadBtn.classList.toggle('downloaded', !showDelete && isDownloaded);
+      elements.mobOptDownloadBtn.classList.toggle('delete-action', showDelete);
+
+      const downloadIcon = elements.mobOptDownloadBtn.querySelector('.mob-option-icon');
+      if (downloadIcon) {
+        downloadIcon.innerHTML = showDelete ? `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #ef4444;">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            <line x1="10" y1="11" x2="10" y2="17"/>
+            <line x1="14" y1="11" x2="14" y2="17"/>
+          </svg>
+        ` : `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+        `;
+      }
+
+      if (elements.mobOptDownloadText) {
+        elements.mobOptDownloadText.textContent = showDelete ? 'Delete from Downloads' : 'Download Song';
+        elements.mobOptDownloadText.style.color = showDelete ? '#ef4444' : '';
+      }
+    }
+
+    // Contextual "Remove from this Playlist" button (only visible when inside a user-created playlist)
+    if (elements.mobOptRemovePlaylistBtn) {
+      const isCustomUserPlaylist = state.currentView === 'playlist' && 
+                                   state.activePlaylistId && 
+                                   !['liked', 'downloaded', 'local'].includes(state.activePlaylistId);
+      elements.mobOptRemovePlaylistBtn.style.display = isCustomUserPlaylist ? 'flex' : 'none';
+    }
+
+    if (elements.mobTrackOptionsModal) {
+      elements.mobTrackOptionsModal.style.display = 'flex';
+      try { window.history.pushState({ modal: 'mobTrackOptions' }, '', window.location.pathname); } catch (e) {}
+    }
+  }
+
   function createSongRow(track, queueList) {
     const row = document.createElement('div');
     row.className = `song-row ${state.currentTrack?.id === track.id ? 'playing' : ''}`;
     row.dataset.trackId = track.id;
 
     const isLiked = state.likedSongs.some(s => s.id === track.id);
-    const isDownloaded = isTrackDownloaded(track.id);
     const badgeHtml = getDownloadedBadgeHtml(track.id);
 
     row.innerHTML = `
@@ -2013,61 +2056,31 @@
         <div class="song-title-text">${escapeHtml(track.title)}${badgeHtml}</div>
         <div class="song-artist-text">${escapeHtml(track.artist)}</div>
       </div>
-      <button class="song-action-btn like-song-trigger ${isLiked ? 'liked' : ''}" title="${isLiked ? 'Liked' : 'Save to Liked Songs'}">
-        <svg viewBox="0 0 24 24" fill="${isLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
-          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-        </svg>
-      </button>
-      <button class="song-action-btn add-to-queue-trigger" title="Add to Queue">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="8" y1="6" x2="21" y2="6"/>
-          <line x1="8" y1="12" x2="21" y2="12"/>
-          <line x1="8" y1="18" x2="16" y2="18"/>
-          <line x1="19" y1="15" x2="19" y2="21"/>
-          <line x1="16" y1="18" x2="22" y2="18"/>
-        </svg>
-      </button>
-      <button class="song-action-btn add-to-playlist-trigger" title="Add to Playlist">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <line x1="12" y1="5" x2="12" y2="19"/>
-          <line x1="5" y1="12" x2="19" y2="12"/>
-        </svg>
-      </button>
-      <button class="song-action-btn download-song-trigger ${isDownloaded ? 'downloaded' : ''}" title="${isDownloaded ? 'Downloaded • Saved in Offline Songs' : 'Download Song'}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-      </button>
-      <span class="song-duration-text">${track.durationStr || '3:30'}</span>
+      <div class="song-row-right-actions">
+        <button class="song-action-btn like-song-trigger ${isLiked ? 'liked' : ''}" title="${isLiked ? 'Liked' : 'Like'}">
+          <svg viewBox="0 0 24 24" fill="${isLiked ? '#ff3b5c' : 'none'}" stroke="currentColor" stroke-width="2">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+        </button>
+        <button class="song-action-btn song-more-trigger" title="More Options">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5" r="2"/>
+            <circle cx="12" cy="12" r="2"/>
+            <circle cx="12" cy="19" r="2"/>
+          </svg>
+        </button>
+      </div>
     `;
 
     row.addEventListener('click', (e) => {
-      if (e.target.closest('.add-to-queue-trigger')) {
-        e.stopPropagation();
-        addToQueue(track);
-        return;
-      }
-      if (e.target.closest('.add-to-playlist-trigger')) {
-        e.stopPropagation();
-        openAddToPlaylistModal(track);
-        return;
-      }
-      if (e.target.closest('.download-song-trigger')) {
-        e.stopPropagation();
-        downloadSong(track);
-        return;
-      }
       if (e.target.closest('.like-song-trigger')) {
         e.stopPropagation();
         toggleLikeSong(track);
-        const btn = e.target.closest('.like-song-trigger');
-        if (btn) {
-          const nowLiked = state.likedSongs.some(s => s.id === track.id);
-          btn.classList.toggle('liked', nowLiked);
-          btn.querySelector('svg')?.setAttribute('fill', nowLiked ? 'currentColor' : 'none');
-        }
+        return;
+      }
+      if (e.target.closest('.song-more-trigger')) {
+        e.stopPropagation();
+        openTrackOptionsMenu(track);
         return;
       }
       if (e.target.closest('.song-action-btn')) {
@@ -2086,8 +2099,6 @@
     tr.dataset.trackId = track.id;
 
     const isLiked = state.likedSongs.some(s => s.id === track.id);
-    const isDownloaded = isTrackDownloaded(track.id);
-    const isDownloadedView = state.activePlaylistId === 'downloaded';
     const badgeHtml = getDownloadedBadgeHtml(track.id);
 
     tr.innerHTML = `
@@ -2104,79 +2115,30 @@
       <td class="col-album">${escapeHtml(track.album || 'Single')}</td>
       <td class="col-actions">
         <button class="song-action-btn like-song-trigger ${isLiked ? 'liked' : ''}" title="${isLiked ? 'Liked' : 'Like'}">
-          <svg viewBox="0 0 24 24" fill="${isLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+          <svg viewBox="0 0 24 24" fill="${isLiked ? '#ff3b5c' : 'none'}" stroke="currentColor" stroke-width="2">
             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
           </svg>
         </button>
-        <button class="song-action-btn add-to-queue-trigger" title="Add to Queue">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="8" y1="6" x2="21" y2="6"/>
-            <line x1="8" y1="12" x2="21" y2="12"/>
-            <line x1="8" y1="18" x2="16" y2="18"/>
-            <line x1="19" y1="15" x2="19" y2="21"/>
-            <line x1="16" y1="18" x2="22" y2="18"/>
+        <button class="song-action-btn song-more-trigger" title="More Options">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5" r="2"/>
+            <circle cx="12" cy="12" r="2"/>
+            <circle cx="12" cy="19" r="2"/>
           </svg>
         </button>
-        <button class="song-action-btn add-to-playlist-trigger" title="Add to Playlist">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-        </button>
-        ${isDownloadedView ? `
-        <button class="song-action-btn delete-download-trigger" title="Delete from Downloads">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-            <line x1="10" y1="11" x2="10" y2="17"/>
-            <line x1="14" y1="11" x2="14" y2="17"/>
-          </svg>
-        </button>
-        ` : `
-        <button class="song-action-btn download-song-trigger ${isDownloaded ? 'downloaded' : ''}" title="${isDownloaded ? 'Downloaded • Saved in Offline Songs' : 'Download Song'}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-        </button>
-        `}
       </td>
       <td class="col-duration">${track.durationStr || '3:30'}</td>
     `;
 
     tr.addEventListener('click', (e) => {
-      if (e.target.closest('.delete-download-trigger')) {
-        e.stopPropagation();
-        if (confirm(`Remove "${track.title}" from downloaded songs?`)) {
-          deleteOfflineTrackFromDB(track.id);
-        }
-        return;
-      }
-      if (e.target.closest('.add-to-queue-trigger')) {
-        e.stopPropagation();
-        addToQueue(track);
-        return;
-      }
-      if (e.target.closest('.download-song-trigger')) {
-        e.stopPropagation();
-        downloadSong(track);
-        return;
-      }
-      if (e.target.closest('.add-to-playlist-trigger')) {
-        e.stopPropagation();
-        openAddToPlaylistModal(track);
-        return;
-      }
       if (e.target.closest('.like-song-trigger')) {
         e.stopPropagation();
         toggleLikeSong(track);
-        const btn = e.target.closest('.like-song-trigger');
-        if (btn) {
-          const nowLiked = state.likedSongs.some(s => s.id === track.id);
-          btn.classList.toggle('liked', nowLiked);
-          btn.querySelector('svg')?.setAttribute('fill', nowLiked ? 'currentColor' : 'none');
-        }
+        return;
+      }
+      if (e.target.closest('.song-more-trigger')) {
+        e.stopPropagation();
+        openTrackOptionsMenu(track);
         return;
       }
       if (e.target.closest('.song-action-btn')) {
@@ -2219,21 +2181,35 @@
       renderPlaylistView('liked');
     }
 
-    // Update buttons in table
-    document.querySelectorAll(`[data-track-id="${track.id}"] .song-action-btn`).forEach(btn => {
-      const isLiked = state.likedSongs.some(s => s.id === track.id);
+    // Update ONLY like buttons throughout the DOM
+    const isLiked = state.likedSongs.some(s => s.id === track.id);
+    document.querySelectorAll(`[data-track-id="${track.id}"] .like-song-trigger, [data-track-id="${track.id}"] .top-like-btn`).forEach(btn => {
       btn.classList.toggle('liked', isLiked);
       const svg = btn.querySelector('svg');
-      if (svg) svg.setAttribute('fill', isLiked ? 'currentColor' : 'none');
+      if (svg) {
+        svg.setAttribute('fill', isLiked ? '#ff3b5c' : 'none');
+        svg.style.color = isLiked ? '#ff3b5c' : '';
+      }
     });
   }
 
   function updateHeartIcon(currentTrackId) {
     const isLiked = state.likedSongs.some(s => s.id === currentTrackId);
-    elements.playerHeartBtn.classList.toggle('liked', isLiked);
-    const svg = elements.playerHeartBtn.querySelector('svg');
-    if (svg) {
-      svg.setAttribute('fill', isLiked ? 'currentColor' : 'none');
+    if (elements.playerHeartBtn) {
+      elements.playerHeartBtn.classList.toggle('liked', isLiked);
+      const svg = elements.playerHeartBtn.querySelector('svg');
+      if (svg) {
+        svg.setAttribute('fill', isLiked ? '#ff3b5c' : 'none');
+        svg.style.color = isLiked ? '#ff3b5c' : '';
+      }
+    }
+    if (elements.mobPlayerHeartBtn) {
+      elements.mobPlayerHeartBtn.classList.toggle('liked', isLiked);
+      const mobSvg = elements.mobPlayerHeartBtn.querySelector('svg');
+      if (mobSvg) {
+        mobSvg.setAttribute('fill', isLiked ? '#ff3b5c' : 'none');
+        mobSvg.style.color = isLiked ? '#ff3b5c' : '';
+      }
     }
   }
 
@@ -2354,6 +2330,10 @@
         elements.playlistTracksBody.appendChild(tr);
       });
     }
+
+    // Sync playlist tracking
+    state.activePlaylistTracks = [...tracks];
+    state.activePlaylistId = playlistId;
 
     // Play All Click (plays playlist in sequential order, or toggles pause if already playing)
     elements.playAllPlaylistBtn.onclick = () => {
@@ -2546,6 +2526,25 @@
     }
     if (viewName === 'library') {
       updateLibraryUI();
+    }
+    if (viewName === 'lyrics') {
+      if (state.currentTrack) {
+        if (elements.lyricsTrackTitle) elements.lyricsTrackTitle.textContent = state.currentTrack.title || 'Song Title';
+        if (elements.lyricsTrackArtist) elements.lyricsTrackArtist.textContent = state.currentTrack.artist || 'Artist';
+        if (elements.lyricsAlbumCover) {
+          elements.lyricsAlbumCover.src = state.currentTrack.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80';
+          elements.lyricsAlbumCover.style.display = 'block';
+        }
+        if (!state.lyrics || state.lyrics.length === 0) {
+          loadLyricsForTrack(state.currentTrack.title, state.currentTrack.artist);
+        }
+      } else {
+        if (elements.lyricsTrackTitle) elements.lyricsTrackTitle.textContent = 'No Song Playing';
+        if (elements.lyricsTrackArtist) elements.lyricsTrackArtist.textContent = 'Play a track to view lyrics';
+        if (elements.lyricsAlbumCover) {
+          elements.lyricsAlbumCover.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80';
+        }
+      }
     }
 
     // Sync mobile bottom navigation bar (Home, Search, Library)
@@ -3335,7 +3334,7 @@
       }
     };
     if (elements.lyricsBtn) elements.lyricsBtn.addEventListener('click', toggleLyricsView);
-    if (elements.closeLyricsBtn) elements.closeLyricsBtn.addEventListener('click', () => switchView('home'));
+    if (elements.closeLyricsBtn) elements.closeLyricsBtn.addEventListener('click', () => switchView(state.previousView && state.previousView !== 'lyrics' ? state.previousView : 'home'));
 
     // Expand Album Art click
     elements.playerCoverWrapper.addEventListener('click', () => {
@@ -3743,25 +3742,121 @@
       });
     }
 
-    // Mobile Player 3-Bar Options Button & Bottom Sheet
+    // ==========================================================================
+    // SLEEP TIMER CONTROLLER (Multiples of 5: 5..50 mins + Custom + Auto Pause)
+    // ==========================================================================
+    function openSleepTimerModal() {
+      updateSleepTimerUI();
+      if (elements.sleepTimerModal) {
+        elements.sleepTimerModal.style.display = 'flex';
+        try { window.history.pushState({ modal: 'sleepTimer' }, '', window.location.pathname); } catch (e) {}
+      }
+    }
+
+    function closeSleepTimerModal() {
+      if (elements.sleepTimerModal) {
+        elements.sleepTimerModal.style.display = 'none';
+      }
+    }
+
+    function updateSleepTimerUI() {
+      const isActive = !!(state.sleepTimer && state.sleepTimer.targetTime && state.sleepTimer.targetTime > Date.now());
+      
+      document.querySelectorAll('.timer-option-btn').forEach(btn => {
+        const mins = parseInt(btn.dataset.minutes, 10);
+        btn.classList.toggle('active', isActive && state.sleepTimer.durationMinutes === mins);
+      });
+
+      if (elements.turnOffTimerBtn) {
+        elements.turnOffTimerBtn.style.display = isActive ? 'block' : 'none';
+      }
+
+      if (isActive) {
+        const remainingSec = Math.max(0, Math.round((state.sleepTimer.targetTime - Date.now()) / 1000));
+        const remainingMin = Math.ceil(remainingSec / 60);
+        if (elements.sleepTimerActiveStatus) {
+          elements.sleepTimerActiveStatus.textContent = `Timer active: ~${remainingMin} minute${remainingMin === 1 ? '' : 's'} remaining (${formatTime(remainingSec)}).`;
+          elements.sleepTimerActiveStatus.style.color = 'var(--accent-primary)';
+        }
+        if (elements.mobTimerBadge) {
+          elements.mobTimerBadge.textContent = `${remainingMin}m`;
+          elements.mobTimerBadge.parentElement?.classList.add('active');
+        }
+      } else {
+        if (elements.sleepTimerActiveStatus) {
+          elements.sleepTimerActiveStatus.textContent = 'Pause music automatically after a set duration.';
+          elements.sleepTimerActiveStatus.style.color = '';
+        }
+        if (elements.mobTimerBadge) {
+          elements.mobTimerBadge.textContent = 'Sleep Timer';
+          elements.mobTimerBadge.parentElement?.classList.remove('active');
+        }
+      }
+    }
+
+    function startSleepTimer(minutes) {
+      if (!minutes || isNaN(minutes) || minutes <= 0) return;
+      cancelSleepTimer(false);
+
+      const ms = minutes * 60 * 1000;
+      state.sleepTimer.durationMinutes = minutes;
+      state.sleepTimer.targetTime = Date.now() + ms;
+
+      state.sleepTimer.timeoutId = setTimeout(() => {
+        if (state.isPlaying) {
+          togglePlayPause();
+        }
+        cancelSleepTimer(false);
+        showToast('Sleep timer ended. Playback paused.', '🌙');
+      }, ms);
+
+      state.sleepTimer.intervalId = setInterval(() => {
+        if (!state.sleepTimer.targetTime || state.sleepTimer.targetTime <= Date.now()) {
+          cancelSleepTimer(false);
+        } else {
+          updateSleepTimerUI();
+        }
+      }, 1000);
+
+      updateSleepTimerUI();
+      closeSleepTimerModal();
+      showToast(`Sleep timer set for ${minutes} minute${minutes === 1 ? '' : 's'}.`, '⏱️');
+    }
+
+    function cancelSleepTimer(showFeedback = true) {
+      if (state.sleepTimer.timeoutId) clearTimeout(state.sleepTimer.timeoutId);
+      if (state.sleepTimer.intervalId) clearInterval(state.sleepTimer.intervalId);
+      state.sleepTimer.timeoutId = null;
+      state.sleepTimer.intervalId = null;
+      state.sleepTimer.targetTime = null;
+      state.sleepTimer.durationMinutes = 0;
+
+      updateSleepTimerUI();
+      if (showFeedback) {
+        closeSleepTimerModal();
+        showToast('Sleep timer turned off.', '⚪');
+      }
+    }
+
+    // Fullscreen Mobile Player Outside Utility Buttons
     if (elements.mobPlayerOptionsBtn) {
       elements.mobPlayerOptionsBtn.addEventListener('click', () => {
-        if (elements.mobTrackOptionsModal && state.currentTrack) {
-          if (elements.mobOptCover) elements.mobOptCover.src = state.currentTrack.image || '';
-          if (elements.mobOptTitle) elements.mobOptTitle.textContent = state.currentTrack.title || 'Unknown Track';
-          if (elements.mobOptArtist) elements.mobOptArtist.textContent = state.currentTrack.artist || 'Unknown Artist';
-          if (elements.mobOptDownloadBtn) {
-            const isDownloaded = isTrackDownloaded(state.currentTrack.id);
-            elements.mobOptDownloadBtn.classList.toggle('downloaded', isDownloaded);
-            const span = elements.mobOptDownloadBtn.querySelector('span');
-            if (span) span.textContent = isDownloaded ? 'Remove from Downloads' : 'Download Song';
-          }
-          elements.mobTrackOptionsModal.style.display = 'flex';
-          try { window.history.pushState({ modal: 'mobTrackOptions' }, '', window.location.pathname); } catch (e) {}
-        }
+        if (state.currentTrack) openTrackOptionsMenu(state.currentTrack);
       });
     }
 
+    if (elements.mobPlayerLyricsBtn) {
+      elements.mobPlayerLyricsBtn.addEventListener('click', () => {
+        if (elements.mobilePlayerModal) elements.mobilePlayerModal.style.display = 'none';
+        switchView('lyrics');
+      });
+    }
+
+    if (elements.mobPlayerTimerBtn) {
+      elements.mobPlayerTimerBtn.addEventListener('click', openSleepTimerModal);
+    }
+
+    // Mobile Player 3-Bar Options Button & Bottom Sheet
     if (elements.closeMobOptionsBtn) {
       elements.closeMobOptionsBtn.addEventListener('click', () => {
         if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
@@ -3771,7 +3866,16 @@
     if (elements.mobOptAddToPlaylistBtn) {
       elements.mobOptAddToPlaylistBtn.addEventListener('click', () => {
         if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
-        if (state.currentTrack) openAddToPlaylistModal(state.currentTrack);
+        const target = state.contextTrack || state.currentTrack;
+        if (target) openAddToPlaylistModal(target);
+      });
+    }
+
+    if (elements.mobOptQueueBtn) {
+      elements.mobOptQueueBtn.addEventListener('click', () => {
+        if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
+        const target = state.contextTrack || state.currentTrack;
+        if (target) addToQueue(target);
       });
     }
 
@@ -3779,14 +3883,53 @@
       elements.mobOptLyricsBtn.addEventListener('click', () => {
         if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
         if (elements.mobilePlayerModal) elements.mobilePlayerModal.style.display = 'none';
-        switchView('lyrics');
+        const target = state.contextTrack || state.currentTrack;
+        if (target) {
+          if (!state.currentTrack || state.currentTrack.id !== target.id) {
+            playTrack(target, [target]);
+          }
+          switchView('lyrics');
+        }
+      });
+    }
+
+    if (elements.mobOptSleepTimerBtn) {
+      elements.mobOptSleepTimerBtn.addEventListener('click', () => {
+        if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
+        openSleepTimerModal();
       });
     }
 
     if (elements.mobOptDownloadBtn) {
       elements.mobOptDownloadBtn.addEventListener('click', () => {
         if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
-        if (state.currentTrack) downloadSong(state.currentTrack);
+        const target = state.contextTrack || state.currentTrack;
+        if (!target) return;
+        const isDownloaded = isTrackDownloaded(target.id);
+        const isDownloadedView = state.currentView === 'playlist' && state.activePlaylistId === 'downloaded';
+        if (isDownloaded || isDownloadedView) {
+          if (confirm(`Remove "${target.title}" from downloaded songs?`)) {
+            deleteOfflineTrackFromDB(target.id);
+          }
+        } else {
+          downloadSong(target);
+        }
+      });
+    }
+
+    if (elements.mobOptRemovePlaylistBtn) {
+      elements.mobOptRemovePlaylistBtn.addEventListener('click', () => {
+        if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
+        const target = state.contextTrack || state.currentTrack;
+        if (target && state.activePlaylistId) {
+          const pl = state.customPlaylists.find(p => p.id === state.activePlaylistId);
+          if (pl) {
+            pl.tracks = (pl.tracks || []).filter(t => t.id !== target.id);
+            saveStoredPlaylists();
+            renderPlaylistView(pl.id);
+            showToast(`Removed "${target.title}" from ${pl.name}`, '🗑️');
+          }
+        }
       });
     }
 
@@ -3796,6 +3939,43 @@
           elements.mobTrackOptionsModal.style.display = 'none';
         }
       });
+    }
+
+    // Sleep Timer Modal Event Listeners
+    if (elements.closeSleepTimerBtn) {
+      elements.closeSleepTimerBtn.addEventListener('click', closeSleepTimerModal);
+    }
+
+    if (elements.sleepTimerModal) {
+      elements.sleepTimerModal.addEventListener('click', (e) => {
+        if (e.target === elements.sleepTimerModal) closeSleepTimerModal();
+      });
+    }
+
+    document.querySelectorAll('.timer-option-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mins = parseInt(btn.dataset.minutes, 10);
+        if (mins > 0) startSleepTimer(mins);
+      });
+    });
+
+    if (elements.setCustomTimerBtn && elements.customTimerMinutesInput) {
+      elements.setCustomTimerBtn.addEventListener('click', () => {
+        const mins = parseInt(elements.customTimerMinutesInput.value, 10);
+        if (mins && mins > 0) {
+          startSleepTimer(mins);
+          elements.customTimerMinutesInput.value = '';
+        } else {
+          showToast('Please enter a valid duration in minutes.', '⚠️');
+        }
+      });
+      elements.customTimerMinutesInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') elements.setCustomTimerBtn.click();
+      });
+    }
+
+    if (elements.turnOffTimerBtn) {
+      elements.turnOffTimerBtn.addEventListener('click', () => cancelSleepTimer(true));
     }
 
     if (elements.mobPlayPauseBtn) elements.mobPlayPauseBtn.addEventListener('click', togglePlayPause);
@@ -3810,6 +3990,10 @@
     // Mobile System Back & Popstate History Navigation (Prevents app from closing on single back)
     window.addEventListener('popstate', (e) => {
       // 1. If any modal or drawer is open, close it first
+      if (elements.sleepTimerModal && elements.sleepTimerModal.style.display !== 'none') {
+        elements.sleepTimerModal.style.display = 'none';
+        return;
+      }
       if (elements.mobTrackOptionsModal && elements.mobTrackOptionsModal.style.display !== 'none') {
         elements.mobTrackOptionsModal.style.display = 'none';
         return;
