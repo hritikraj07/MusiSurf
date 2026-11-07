@@ -29,12 +29,12 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=5.2">
+  <link rel="stylesheet" href="/styles.css?v=5.3">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
         for (var name of names) {
-          if (name !== 'musisurf-v5.2') caches.delete(name);
+          if (name !== 'musisurf-v5.3') caches.delete(name);
         }
       });
     }
@@ -206,9 +206,10 @@
           <div class="library-item local-music-item" id="navLocalMusicBtn" data-view="localMusic">
             <div class="local-icon-box">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                <path d="M12 13a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
-                <path d="M14 13V9h2" />
+                <circle cx="12" cy="12" r="10"/>
+                <circle cx="12" cy="12" r="3"/>
+                <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                <path d="M12 2a10 10 0 0 1 10 10"/>
               </svg>
             </div>
             <div class="library-item-info">
@@ -503,6 +504,18 @@
                 <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
               </svg>
             </button>
+            <div class="playlist-sort-dropdown-wrap lib-sort-dropdown-wrap">
+              <svg class="lib-sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18M6 12h12m-9 6h6"/>
+              </svg>
+              <select id="playlistTracksSortSelect" class="lib-sort-select" aria-label="Sort playlist tracks">
+                <option value="custom">Custom Order</option>
+                <option value="title">Title (A-Z)</option>
+                <option value="artist">Artist (A-Z)</option>
+                <option value="recents">Recently Added</option>
+                <option value="duration">Duration</option>
+              </select>
+            </div>
             <button class="playlist-action-sub-btn delete-playlist-btn" id="deletePlaylistBtn" title="Delete Playlist" style="display: none;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="3 6 5 6 21 6" />
@@ -520,13 +533,13 @@
                   <th class="col-num">#</th>
                   <th class="col-title">Title</th>
                   <th class="col-album">Album</th>
-                  <th class="col-actions"></th>
                   <th class="col-duration">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <circle cx="12" cy="12" r="10" />
                       <polyline points="12 6 12 12 16 14" />
                     </svg>
                   </th>
+                  <th class="col-actions"></th>
                 </tr>
               </thead>
               <tbody id="playlistTracksBody">
@@ -578,9 +591,10 @@
           <div class="playlist-hero local-files-hero">
             <div class="playlist-cover-art local-cover-art">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                <path d="M12 13a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
-                <path d="M14 13V9h3" />
+                <circle cx="12" cy="12" r="10"/>
+                <circle cx="12" cy="12" r="3.5"/>
+                <circle cx="12" cy="12" r="1.2" fill="currentColor"/>
+                <path d="M12 2a10 10 0 0 1 10 10"/>
               </svg>
             </div>
             <div class="playlist-info-meta">
@@ -640,13 +654,13 @@
                   <th class="col-num">#</th>
                   <th class="col-title">Title</th>
                   <th class="col-album">File Name</th>
-                  <th class="col-actions"></th>
                   <th class="col-duration">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <circle cx="12" cy="12" r="10" />
                       <polyline points="12 6 12 12 16 14" />
                     </svg>
                   </th>
+                  <th class="col-actions"></th>
                 </tr>
               </thead>
               <tbody id="localTracksTbody"></tbody>
@@ -713,9 +727,10 @@
               <div class="library-hub-card lib-hub-local" id="libHubLocalBtn">
                 <div class="lib-hub-icon local-icon-box">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                    <circle cx="12" cy="14" r="2" />
-                    <path d="M14 14V10h2" />
+                    <circle cx="12" cy="12" r="10"/>
+                    <circle cx="12" cy="12" r="3"/>
+                    <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                    <path d="M12 2a10 10 0 0 1 10 10"/>
                   </svg>
                 </div>
                 <div class="lib-hub-details">
@@ -1132,6 +1147,14 @@
           </button>
         </div>
         <div class="mob-options-list">
+          <button class="mob-option-item" id="mobOptLikeBtn">
+            <div class="mob-option-icon" id="mobOptLikeIcon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              </svg>
+            </div>
+            <span id="mobOptLikeText">Save to Liked Songs</span>
+          </button>
           <button class="mob-option-item" id="mobOptAddToPlaylistBtn">
             <div class="mob-option-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -1393,7 +1416,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.23"></script>
+  <script src="/app.js?v=2.24"></script>
 </body>
 
 </html>

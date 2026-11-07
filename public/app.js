@@ -30,6 +30,7 @@
     lyrics: [],
     hasSyncedLyrics: false,
     activeLyricIndex: -1,
+    openedLyricsFromMobilePlayer: false,
     vizMode: 'bars', // 'bars', 'wave', 'circle'
     ytPlayer: null,
     ytReady: false,
@@ -128,6 +129,7 @@
     playlistEmptyState: document.getElementById('playlistEmptyState'),
     playAllPlaylistBtn: document.getElementById('playAllPlaylistBtn'),
     shufflePlaylistBtn: document.getElementById('shufflePlaylistBtn'),
+    playlistTracksSortSelect: document.getElementById('playlistTracksSortSelect'),
     deletePlaylistBtn: document.getElementById('deletePlaylistBtn'),
     playlistBackBtn: document.getElementById('playlistBackBtn'),
 
@@ -345,6 +347,19 @@
     return '';
   }
 
+  // Update desktop player bar & mobile fullscreen player titles with in-playlist tick mark
+  function updatePlayerTitlesWithTick(track) {
+    if (!track) return;
+    const inPlaylist = isTrackInAnyPlaylist(track.id);
+    const tickHtml = inPlaylist ? getPlaylistTickBadgeHtml(track.id) : '';
+    if (elements.playerTitle) {
+      elements.playerTitle.innerHTML = `${escapeHtml(track.title)}${tickHtml}`;
+    }
+    if (elements.mobPlayerTitle) {
+      elements.mobPlayerTitle.innerHTML = `${escapeHtml(track.title)}${tickHtml}`;
+    }
+  }
+
   // Real-time update for all in-playlist tick marks across the DOM
   function updateAllPlaylistTickBadges(targetTrackId = null) {
     const selector = targetTrackId ? `[data-track-id="${targetTrackId}"]` : '[data-track-id]';
@@ -361,6 +376,9 @@
         existingBadge.remove();
       }
     });
+    if (state.currentTrack) {
+      updatePlayerTitlesWithTick(state.currentTrack);
+    }
   }
 
   // Dismiss splash loading screen smoothly
@@ -752,13 +770,12 @@
       }
 
       // Update Player UI Metadata
-      elements.playerTitle.textContent = track.title;
+      updatePlayerTitlesWithTick(track);
       elements.playerArtist.textContent = track.artist;
       elements.playerCoverImg.src = track.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80';
       const dur = saved.duration || track.duration || 0;
       elements.totalDurationLabel.textContent = track.durationStr || formatTime(dur);
 
-      if (elements.mobPlayerTitle) elements.mobPlayerTitle.textContent = track.title;
       if (elements.mobPlayerArtist) elements.mobPlayerArtist.textContent = track.artist;
       if (elements.mobPlayerCover) elements.mobPlayerCover.src = track.image;
       if (elements.mobTotalDuration) elements.mobTotalDuration.textContent = track.durationStr || formatTime(dur);
@@ -902,13 +919,12 @@
     }
 
     // Update Player UI Metadata
-    elements.playerTitle.textContent = track.title;
+    updatePlayerTitlesWithTick(track);
     elements.playerArtist.textContent = track.artist;
     elements.playerCoverImg.src = track.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80';
     elements.totalDurationLabel.textContent = track.durationStr || formatTime(track.duration || 0);
 
     // Sync Mobile Fullscreen Player UI
-    if (elements.mobPlayerTitle) elements.mobPlayerTitle.textContent = track.title;
     if (elements.mobPlayerArtist) elements.mobPlayerArtist.textContent = track.artist;
     if (elements.mobPlayerCover) elements.mobPlayerCover.src = track.image;
     if (elements.mobTotalDuration) elements.mobTotalDuration.textContent = track.durationStr || formatTime(track.duration || 0);
@@ -2136,6 +2152,25 @@
     if (elements.mobOptTitle) elements.mobOptTitle.textContent = track.title || 'Unknown Track';
     if (elements.mobOptArtist) elements.mobOptArtist.textContent = track.artist || 'Unknown Artist';
 
+    // Like option inside 3-dots modal
+    const mobOptLikeBtn = document.getElementById('mobOptLikeBtn');
+    if (mobOptLikeBtn) {
+      const isLiked = state.likedSongs.some(s => s.id === track.id);
+      const mobOptLikeIcon = document.getElementById('mobOptLikeIcon');
+      const mobOptLikeText = document.getElementById('mobOptLikeText');
+      if (mobOptLikeIcon) {
+        mobOptLikeIcon.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="${isLiked ? '#ff3b5c' : 'none'}" stroke="${isLiked ? '#ff3b5c' : 'currentColor'}" stroke-width="2">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+        `;
+      }
+      if (mobOptLikeText) {
+        mobOptLikeText.textContent = isLiked ? 'Remove from Liked Songs' : 'Save to Liked Songs';
+        mobOptLikeText.style.color = isLiked ? '#ff3b5c' : '';
+      }
+    }
+
     // Download option: check if downloaded or in downloaded playlist view
     if (elements.mobOptDownloadBtn) {
       const isDownloaded = isTrackDownloaded(track.id);
@@ -2190,7 +2225,6 @@
     row.className = `song-row ${state.currentTrack?.id === track.id ? 'playing' : ''}`;
     row.dataset.trackId = track.id;
 
-    const isLiked = state.likedSongs.some(s => s.id === track.id);
     const badgeHtml = getDownloadedBadgeHtml(track.id);
 
     row.innerHTML = `
@@ -2200,11 +2234,6 @@
         <div class="song-artist-text">${escapeHtml(track.artist)}</div>
       </div>
       <div class="song-row-right-actions">
-        <button class="song-action-btn like-song-trigger ${isLiked ? 'liked' : ''}" title="${isLiked ? 'Liked' : 'Like'}">
-          <svg viewBox="0 0 24 24" fill="${isLiked ? '#ff3b5c' : 'none'}" stroke="currentColor" stroke-width="2">
-            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-          </svg>
-        </button>
         <button class="song-action-btn song-more-trigger" title="More Options">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <circle cx="12" cy="5" r="2"/>
@@ -2216,11 +2245,6 @@
     `;
 
     row.addEventListener('click', (e) => {
-      if (e.target.closest('.like-song-trigger')) {
-        e.stopPropagation();
-        toggleLikeSong(track);
-        return;
-      }
       if (e.target.closest('.song-more-trigger')) {
         e.stopPropagation();
         openTrackOptionsMenu(track);
@@ -2244,7 +2268,6 @@
     tr.className = state.currentTrack?.id === track.id ? 'playing' : '';
     tr.dataset.trackId = track.id;
 
-    const isLiked = state.likedSongs.some(s => s.id === track.id);
     const badgeHtml = getDownloadedBadgeHtml(track.id);
 
     tr.innerHTML = `
@@ -2259,12 +2282,8 @@
         </div>
       </td>
       <td class="col-album">${escapeHtml(track.album || 'Single')}</td>
+      <td class="col-duration">${track.durationStr || '3:30'}</td>
       <td class="col-actions">
-        <button class="song-action-btn like-song-trigger ${isLiked ? 'liked' : ''}" title="${isLiked ? 'Liked' : 'Like'}">
-          <svg viewBox="0 0 24 24" fill="${isLiked ? '#ff3b5c' : 'none'}" stroke="currentColor" stroke-width="2">
-            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-          </svg>
-        </button>
         <button class="song-action-btn song-more-trigger" title="More Options">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <circle cx="12" cy="5" r="2"/>
@@ -2273,15 +2292,9 @@
           </svg>
         </button>
       </td>
-      <td class="col-duration">${track.durationStr || '3:30'}</td>
     `;
 
     tr.addEventListener('click', (e) => {
-      if (e.target.closest('.like-song-trigger')) {
-        e.stopPropagation();
-        toggleLikeSong(track);
-        return;
-      }
       if (e.target.closest('.song-more-trigger')) {
         e.stopPropagation();
         openTrackOptionsMenu(track);
@@ -2621,20 +2634,44 @@
     // Automatically apply Spotify-style dynamic atmospheric background from artwork
     applyPlaylistDynamicBackground(playlistId, tracks, title);
 
+    // Sort handling for playlist tracks
+    const sortSelect = document.getElementById('playlistTracksSortSelect');
+    const sortMode = sortSelect ? sortSelect.value : 'custom';
+    
+    let sortedTracks = [...tracks];
+    if (sortMode === 'title') {
+      sortedTracks.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    } else if (sortMode === 'artist') {
+      sortedTracks.sort((a, b) => (a.artist || '').localeCompare(b.artist || ''));
+    } else if (sortMode === 'recents') {
+      sortedTracks.reverse();
+    } else if (sortMode === 'duration') {
+      sortedTracks.sort((a, b) => (a.duration || 210) - (b.duration || 210));
+    }
+
+    if (sortSelect && !sortSelect._hasListener) {
+      sortSelect._hasListener = true;
+      sortSelect.addEventListener('change', () => {
+        if (state.activePlaylistId) {
+          renderPlaylistView(state.activePlaylistId);
+        }
+      });
+    }
+
     // Render table
     elements.playlistTracksBody.innerHTML = '';
-    if (tracks.length === 0) {
+    if (sortedTracks.length === 0) {
       elements.playlistEmptyState.style.display = 'block';
     } else {
       elements.playlistEmptyState.style.display = 'none';
-      tracks.forEach((track, idx) => {
-        const tr = createTableRow(track, idx + 1, tracks);
+      sortedTracks.forEach((track, idx) => {
+        const tr = createTableRow(track, idx + 1, sortedTracks);
         elements.playlistTracksBody.appendChild(tr);
       });
     }
 
     // Sync playlist tracking
-    state.activePlaylistTracks = [...tracks];
+    state.activePlaylistTracks = [...sortedTracks];
     state.activePlaylistId = playlistId;
 
     // Play All Click (plays playlist in sequential order, or toggles pause if already playing)
@@ -2739,10 +2776,12 @@
     // Now playing
     if (state.currentTrack) {
       elements.queueNowPlaying.innerHTML = `
-        <img src="${state.currentTrack.image}" alt="${state.currentTrack.title}" class="queue-img">
-        <div class="queue-card-info">
-          <div class="queue-card-title">${state.currentTrack.title}</div>
-          <div class="queue-card-artist">${state.currentTrack.artist}</div>
+        <div class="queue-card current">
+          <img src="${state.currentTrack.image}" alt="${escapeHtml(state.currentTrack.title)}" class="queue-img">
+          <div class="queue-card-info">
+            <div class="queue-card-title">${escapeHtml(state.currentTrack.title)}${getPlaylistTickBadgeHtml(state.currentTrack.id)}</div>
+            <div class="queue-card-artist">${escapeHtml(state.currentTrack.artist)}</div>
+          </div>
         </div>
       `;
     } else {
@@ -2760,12 +2799,12 @@
         const card = document.createElement('div');
         card.className = 'queue-card';
         card.innerHTML = `
-          <img src="${t.image}" alt="${t.title}" class="queue-img">
+          <img src="${t.image}" alt="${escapeHtml(t.title)}" class="queue-img">
           <div class="queue-card-info">
-            <div class="queue-card-title">${t.title}</div>
-            <div class="queue-card-artist">${t.artist}</div>
+            <div class="queue-card-title">${escapeHtml(t.title)}${getPlaylistTickBadgeHtml(t.id)}</div>
+            <div class="queue-card-artist">${escapeHtml(t.artist)}</div>
           </div>
-          <button class="icon-sub-btn remove-queue-btn" title="Remove" style="padding: 4px;">
+          <button class="remove-queue-btn" title="Remove from queue" aria-label="Remove">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
               <line x1="18" y1="6" x2="6" y2="18"/>
               <line x1="6" y1="6" x2="18" y2="18"/>
@@ -3753,16 +3792,27 @@
       showToast('Queue cleared');
     });
 
-    // Lyrics View Toggle
+    // Lyrics View Toggle & Close Handling (Restores Mobile Player Modal if opened from it)
+    const handleCloseLyrics = () => {
+      const returnToModal = state.openedLyricsFromMobilePlayer;
+      state.openedLyricsFromMobilePlayer = false;
+      const targetView = state.previousView && state.previousView !== 'lyrics' ? state.previousView : 'home';
+      switchView(targetView);
+      if (returnToModal && elements.mobilePlayerModal) {
+        elements.mobilePlayerModal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+      }
+    };
+
     const toggleLyricsView = () => {
       if (state.currentView === 'lyrics') {
-        switchView(state.previousView || 'home');
+        handleCloseLyrics();
       } else {
         switchView('lyrics');
       }
     };
     if (elements.lyricsBtn) elements.lyricsBtn.addEventListener('click', toggleLyricsView);
-    if (elements.closeLyricsBtn) elements.closeLyricsBtn.addEventListener('click', () => switchView(state.previousView && state.previousView !== 'lyrics' ? state.previousView : 'home'));
+    if (elements.closeLyricsBtn) elements.closeLyricsBtn.addEventListener('click', handleCloseLyrics);
 
     // Song image is explicitly not clickable per user specification
     if (elements.playerCoverWrapper) {
@@ -4277,6 +4327,7 @@
 
     if (elements.mobPlayerLyricsBtn) {
       elements.mobPlayerLyricsBtn.addEventListener('click', () => {
+        state.openedLyricsFromMobilePlayer = true;
         if (elements.mobilePlayerModal) elements.mobilePlayerModal.style.display = 'none';
         switchView('lyrics');
       });
@@ -4310,6 +4361,19 @@
     if (elements.closeMobOptionsBtn) {
       elements.closeMobOptionsBtn.addEventListener('click', () => {
         if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
+      });
+    }
+
+    const mobOptLikeBtn = document.getElementById('mobOptLikeBtn');
+    if (mobOptLikeBtn) {
+      mobOptLikeBtn.addEventListener('click', () => {
+        if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
+        const target = state.contextTrack || state.currentTrack;
+        if (target) {
+          toggleLikeSong(target);
+          updatePlayerTitlesWithTick(state.currentTrack);
+          updateAllPlaylistTickBadges();
+        }
       });
     }
 
