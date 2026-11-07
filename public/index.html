@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=5.5">
+  <link rel="stylesheet" href="/styles.css?v=5.6">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -490,47 +490,51 @@
 
           <!-- Playlist Action Buttons -->
           <div class="playlist-actions-bar">
-            <button class="playlist-play-giant-btn" id="playAllPlaylistBtn" title="Play All">
-              <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="5 3 19 12 5 21 5 3" />
-              </svg>
-              <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
-                <rect x="6" y="4" width="4" height="16" />
-                <rect x="14" y="4" width="4" height="16" />
-              </svg>
-            </button>
-            <button class="playlist-shuffle-btn" id="shufflePlaylistBtn" title="Shuffle Play">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
-              </svg>
-            </button>
-            <div class="playlist-sort-dropdown-wrap lib-sort-dropdown-wrap">
-              <svg class="lib-sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 6h18M6 12h12m-9 6h6"/>
-              </svg>
-              <select id="playlistTracksSortSelect" class="lib-sort-select" aria-label="Sort playlist tracks">
-                <option value="custom">Custom Order</option>
-                <option value="title">Title (A-Z)</option>
-                <option value="artist">Artist (A-Z)</option>
-                <option value="recents">Recently Added</option>
-                <option value="duration">Duration</option>
-              </select>
+            <div class="playlist-actions-primary">
+              <button class="playlist-play-giant-btn" id="playAllPlaylistBtn" title="Play All">
+                <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+                <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+                  <rect x="6" y="4" width="4" height="16" />
+                  <rect x="14" y="4" width="4" height="16" />
+                </svg>
+              </button>
+              <button class="playlist-shuffle-btn" id="shufflePlaylistBtn" title="Shuffle Play">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
+                </svg>
+              </button>
+              <button class="playlist-action-sub-btn delete-playlist-btn" id="deletePlaylistBtn" title="Delete Playlist" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+                <span>Delete Playlist</span>
+              </button>
+              <!-- Mobile 3-Horizontal-Bars Menu Button (Mobile Only) -->
+              <button class="playlist-action-sub-btn mobile-playlist-more-btn" id="mobilePlaylistMoreBtn" title="Playlist options" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                  <line x1="4" y1="7" x2="20" y2="7"/>
+                  <line x1="4" y1="12" x2="20" y2="12"/>
+                  <line x1="4" y1="17" x2="20" y2="17"/>
+                </svg>
+              </button>
             </div>
-            <button class="playlist-action-sub-btn delete-playlist-btn" id="deletePlaylistBtn" title="Delete Playlist" style="display: none;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              </svg>
-              <span>Delete Playlist</span>
-            </button>
-            <!-- Mobile 3-Horizontal-Bars Menu Button (Mobile Only) -->
-            <button class="playlist-action-sub-btn mobile-playlist-more-btn" id="mobilePlaylistMoreBtn" title="Playlist options" style="display: none;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-                <line x1="4" y1="7" x2="20" y2="7"/>
-                <line x1="4" y1="12" x2="20" y2="12"/>
-                <line x1="4" y1="17" x2="20" y2="17"/>
-              </svg>
-            </button>
+            <div class="playlist-sort-row">
+              <div class="playlist-sort-dropdown-wrap lib-sort-dropdown-wrap">
+                <svg class="lib-sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 6h18M6 12h12m-9 6h6"/>
+                </svg>
+                <select id="playlistTracksSortSelect" class="lib-sort-select" aria-label="Sort playlist tracks">
+                  <option value="custom">Custom Order</option>
+                  <option value="title">Title (A-Z)</option>
+                  <option value="artist">Artist (A-Z)</option>
+                  <option value="recents">Recently Added</option>
+                  <option value="duration">Duration</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           <!-- Dynamic Downloading Progress Bar Indicator inside Playlist -->
@@ -832,7 +836,7 @@
       <div class="queue-body">
         <div class="queue-section">
           <span class="queue-section-heading">Now Playing</span>
-          <div class="queue-card current" id="queueNowPlaying">
+          <div class="queue-now-playing-wrap" id="queueNowPlaying">
             <!-- Populated by JS -->
           </div>
         </div>
@@ -884,14 +888,6 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path
               d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-          </svg>
-        </button>
-
-        <button class="player-icon-btn download-song-btn" id="playerDownloadBtn" title="Download Song">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
         </button>
       </div>
@@ -1480,7 +1476,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.27"></script>
+  <script src="/app.js?v=2.28"></script>
 </body>
 
 </html>

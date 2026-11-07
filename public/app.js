@@ -1238,6 +1238,12 @@
       }
       topPlayBtn.title = isPlayingThis ? 'Pause' : 'Play';
     }
+
+    // Sync equalizer in Queue Now Playing card
+    const queueEq = document.querySelector('#queueNowPlaying .queue-playing-eq');
+    if (queueEq) {
+      queueEq.classList.toggle('playing', !!state.isPlaying);
+    }
   }
 
   // Direct Audio Downloader: Instantly adds to "Downloaded" playlist in Library, and triggers file download on Desktop
@@ -2513,10 +2519,10 @@
   function getDeterministicArtworkColor(key) {
     const lowerKey = String(key || '').toLowerCase();
     if (lowerKey === 'downloaded' || lowerKey.includes('download')) {
-      return [5, 117, 230]; // Sapphire Cyan instead of ugly red (hue 359)
+      return [16, 85, 155]; // Deep elegant sapphire instead of bright neon
     }
     if (lowerKey === 'liked' || lowerKey.includes('liked')) {
-      return [69, 10, 245];
+      return [52, 28, 98]; // Deep royal purple/plum instead of blinding electric neon
     }
     let hash = 0;
     const str = String(key || 'musisurf');
@@ -2525,8 +2531,8 @@
       hash |= 0;
     }
     const h = Math.abs(hash) % 360;
-    const s = 48 + (Math.abs(hash >> 3) % 28);
-    const l = 32 + (Math.abs(hash >> 6) % 18);
+    const s = 35 + (Math.abs(hash >> 3) % 20); // 35% - 55% muted saturation
+    const l = 20 + (Math.abs(hash >> 6) % 12); // 20% - 32% elegant dark lightness
     return hslToRgb(h, s, l);
   }
 
@@ -2638,11 +2644,20 @@
     }
 
     const [r, g, b] = await extractDominantColor(coverUrl, playlistId || fallbackKey);
-    const darkR = Math.floor(r * 0.35);
-    const darkG = Math.floor(g * 0.35);
-    const darkB = Math.floor(b * 0.35);
 
-    const gradient = `linear-gradient(180deg, rgba(${r}, ${g}, ${b}, 0.85) 0%, rgba(${darkR}, ${darkG}, ${darkB}, 0.48) 42%, rgba(13, 14, 17, 0.95) 78%, #08090b 100%)`;
+    // Clamp luminance to preserve deep, moody, luxurious tones and avoid bright neon glare
+    const maxVal = Math.max(r, g, b, 1);
+    const scale = maxVal > 135 ? 135 / maxVal : 1;
+    const clampR = Math.round(r * scale);
+    const clampG = Math.round(g * scale);
+    const clampB = Math.round(b * scale);
+
+    const darkR = Math.floor(clampR * 0.35);
+    const darkG = Math.floor(clampG * 0.35);
+    const darkB = Math.floor(clampB * 0.35);
+
+    // Seamless single atmospheric gradient transitioning to pure obsidian #08090b by 460px with zero cutoff
+    const gradient = `linear-gradient(180deg, rgba(${clampR}, ${clampG}, ${clampB}, 0.65) 0%, rgba(${darkR}, ${darkG}, ${darkB}, 0.35) 200px, rgba(13, 14, 18, 0.85) 340px, #08090b 460px, #08090b 100%)`;
     if (targetEl) targetEl.style.setProperty('--playlist-dynamic-gradient', gradient);
     if (mainWrapper) mainWrapper.style.setProperty('--playlist-dynamic-gradient', gradient);
     document.body.style.setProperty('--playlist-dynamic-gradient', gradient);
@@ -2668,7 +2683,7 @@
         `<svg viewBox="0 0 24 24" fill="currentColor" style="width: 75px; height: 75px; color: #fff;">
           <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
         </svg>`,
-        'linear-gradient(135deg, #450af5 0%, #c4efd9 100%)'
+        'linear-gradient(135deg, #341c62 0%, #683bb5 100%)'
       );
     } else if (playlistId === 'downloaded') {
       title = 'Downloaded Songs';
@@ -2682,7 +2697,7 @@
           <circle cx="12" cy="12" r="10" stroke-width="2"/>
           <polyline points="8 12 11 15 16 9"/>
         </svg>`,
-        'linear-gradient(135deg, #0575e6 0%, #00f260 100%)'
+        'linear-gradient(135deg, #10559b 0%, #0d3866 100%)'
       );
     } else {
       const pl = state.customPlaylists.find(p => p.id === playlistId);
@@ -2873,16 +2888,25 @@
     // Now playing
     if (state.currentTrack) {
       elements.queueNowPlaying.innerHTML = `
-        <div class="queue-card current">
-          <img src="${state.currentTrack.image}" alt="${escapeHtml(state.currentTrack.title)}" class="queue-img">
-          <div class="queue-card-info">
-            <div class="queue-card-title">${escapeHtml(state.currentTrack.title)}${getPlaylistTickBadgeHtml(state.currentTrack.id)}${getDownloadedBadgeHtml(state.currentTrack.id)}</div>
-            <div class="queue-card-artist">${escapeHtml(state.currentTrack.artist)}</div>
+        <div class="queue-now-playing-card">
+          <div class="queue-now-playing-cover">
+            <img src="${state.currentTrack.image}" alt="${escapeHtml(state.currentTrack.title)}" class="queue-now-playing-img">
+            <div class="queue-playing-eq ${state.isPlaying ? 'playing' : ''}">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="queue-now-playing-info">
+            <div class="queue-now-playing-badge">
+              <span class="queue-pulse-dot"></span>
+              NOW PLAYING
+            </div>
+            <div class="queue-now-playing-title">${escapeHtml(state.currentTrack.title)}${getPlaylistTickBadgeHtml(state.currentTrack.id)}${getDownloadedBadgeHtml(state.currentTrack.id)}</div>
+            <div class="queue-now-playing-artist">${escapeHtml(state.currentTrack.artist)}</div>
           </div>
         </div>
       `;
     } else {
-      elements.queueNowPlaying.innerHTML = '<span style="color: var(--text-muted); font-size: 0.85rem;">Nothing currently playing</span>';
+      elements.queueNowPlaying.innerHTML = '<span style="color: var(--text-muted); font-size: 0.85rem; padding: 12px 4px; display: block;">Nothing currently playing</span>';
     }
 
     // Next up list
