@@ -9,9 +9,9 @@
     content="Stream millions of full songs on MusiSurf. Ultra-fast music streaming, real-time synchronized lyrics, and personalized playlists.">
 
   <!-- Favicon: Rich MusiSurf Obsidian & Emerald Logo -->
-  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg?v=5.0">
-  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png?v=5.0">
-  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png?v=5.0">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg?v=5.2">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png?v=5.2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png?v=5.2">
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -29,12 +29,12 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=5.1">
+  <link rel="stylesheet" href="/styles.css?v=5.2">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
         for (var name of names) {
-          if (name !== 'musisurf-v5.1') caches.delete(name);
+          if (name !== 'musisurf-v5.2') caches.delete(name);
         }
       });
     }
@@ -100,7 +100,6 @@
                   <stop offset="100%" stop-color="#00D2FF"/>
                 </linearGradient>
               </defs>
-              <circle cx="50" cy="50" r="47" fill="#0d1411" stroke="url(#brandLogoGrad)" stroke-width="2.5"/>
               <!-- Headphone Band -->
               <path d="M 19 55 A 31 31 0 0 1 81 55" fill="none" stroke="url(#brandLogoGrad)" stroke-width="6.5" stroke-linecap="round"/>
               <!-- Left Earcup -->
@@ -120,7 +119,6 @@
               <circle cx="50" cy="72.5" r="3.2" fill="#0d1411"/>
               <rect x="48.8" y="72.5" width="2.4" height="7.5" fill="#0d1411"/>
             </svg>
-            <span class="brand-pulse"></span>
           </div>
           <span class="brand-name">Musi<span class="brand-highlight">Surf</span></span>
         </a>
@@ -155,7 +153,7 @@
       <!-- Library Section -->
       <div class="sidebar-library">
         <div class="library-header">
-          <div class="library-title-group">
+          <div class="library-title-group" id="navLibraryBtn" role="button" tabindex="0" title="Your Library">
             <svg class="library-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
               stroke-linecap="round" stroke-linejoin="round">
               <path d="m16 6 4 14" />
@@ -388,8 +386,9 @@
                 <div class="category-card" style="--card-color: #8d67ab;" data-query="Acoustic Romance">
                   <span class="category-name">Acoustic & Warm</span>
                   <img
-                    src="https://images.unsplash.com/photo-1445985543469-433ecba627a0?w=300&auto=format&fit=crop&q=80"
-                    alt="Acoustic" class="category-img">
+                    src="https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=300&auto=format&fit=crop&q=80"
+                    alt="Acoustic" class="category-img"
+                    onerror="this.src='https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80'">
                 </div>
                 <div class="category-card" style="--card-color: #b06239;" data-query="Bollywood Top 50">
                   <span class="category-name">Bollywood Hits</span>
@@ -748,14 +747,29 @@
             <!-- Custom Playlists Section -->
             <div class="library-custom-playlists-wrap" id="libPlaylistsSection">
               <div class="library-section-header">
-                <h2 class="library-section-heading">Playlists</h2>
-                <button class="lib-header-add-btn" id="libHeaderAddPlaylistBtn" title="Create Playlist">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                  <span>New</span>
-                </button>
+                <div class="lib-header-left">
+                  <h2 class="library-section-heading">Playlists</h2>
+                </div>
+                <div class="lib-header-right">
+                  <div class="lib-sort-dropdown-wrap">
+                    <svg class="lib-sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M3 6h18M6 12h12m-9 6h6"/>
+                    </svg>
+                    <select id="libPlaylistSortSelect" class="lib-sort-select" aria-label="Sort playlists">
+                      <option value="recents">Recents</option>
+                      <option value="added">Recently Added</option>
+                      <option value="alphabetical">Alphabetical</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                  </div>
+                  <button class="lib-header-add-btn" id="libHeaderAddPlaylistBtn" title="Create Playlist">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    <span>New</span>
+                  </button>
+                </div>
               </div>
               <div class="library-playlists-grid" id="libCustomPlaylistsGrid">
                 <!-- Dynamically rendered custom playlist cards -->
@@ -1063,29 +1077,30 @@
           </svg>
           <span class="repeat-one-indicator" style="display: none;">1</span>
         </button>
-        <button class="control-btn timer-icon-btn" id="mobPlayerTimerBtn" title="Sleep Timer">
+      </div>
+
+      <!-- Spotify-Grade Bottom Feature Bar (Share -> Timer -> Lyrics -> Options) -->
+      <div class="mobile-player-bottom-bar">
+        <button class="mob-bottom-icon-btn" id="mobPlayerShareBtn" title="Share Song" aria-label="Share Song">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+            <polyline points="16 6 12 2 8 6"/>
+            <line x1="12" y1="2" x2="12" y2="15"/>
+          </svg>
+        </button>
+        <button class="mob-bottom-icon-btn timer-icon-btn" id="mobPlayerTimerBtn" title="Sleep Timer" aria-label="Sleep Timer">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"/>
             <polyline points="12 6 12 12 16 14"/>
           </svg>
           <span class="timer-active-dot" id="mobTimerDot" style="display: none;"></span>
         </button>
-      </div>
-
-      <!-- Spotify-Grade Bottom Feature Bar -->
-      <div class="mobile-player-bottom-bar">
         <button class="mob-bottom-icon-btn" id="mobPlayerLyricsBtn" title="Lyrics" aria-label="Open Lyrics">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 18V5l12-2v13"/>
-            <circle cx="6" cy="18" r="3"/>
-            <circle cx="18" cy="16" r="3"/>
-          </svg>
-        </button>
-        <button class="mob-bottom-icon-btn" id="mobPlayerShareBtn" title="Share Song" aria-label="Share Song">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
-            <polyline points="16 6 12 2 8 6"/>
-            <line x1="12" y1="2" x2="12" y2="15"/>
+            <rect x="9" y="2" width="6" height="11" rx="3"/>
+            <path d="M5 10a7 7 0 0 0 14 0"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
           </svg>
         </button>
         <button class="mob-bottom-icon-btn" id="mobPlayerOptionsBtn" title="More Options" aria-label="More Options">
@@ -1378,7 +1393,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.22"></script>
+  <script src="/app.js?v=2.23"></script>
 </body>
 
 </html>

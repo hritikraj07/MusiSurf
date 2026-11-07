@@ -50,7 +50,6 @@
   margin: 0;
   padding: 0;
   -webkit-tap-highlight-color: transparent !important;
-  -webkit-focus-ring-color: transparent !important;
 }
 
 :focus:not(:focus-visible) {
@@ -162,22 +161,6 @@ html, body {
   transform: scale(1.08) rotate(-4deg);
 }
 
-.brand-pulse {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  border: 2px solid var(--accent-primary);
-  opacity: 0;
-  animation: pulseLogo 3s infinite;
-}
-
-@keyframes pulseLogo {
-  0% { transform: scale(0.9); opacity: 0.8; }
-  70% { transform: scale(1.4); opacity: 0; }
-  100% { transform: scale(1.4); opacity: 0; }
-}
-
 .brand-name {
   font-size: 1.45rem;
   font-weight: 800;
@@ -187,6 +170,7 @@ html, body {
 .brand-highlight {
   background: var(--accent-gradient);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -312,6 +296,16 @@ html, body {
   color: var(--text-secondary);
   font-weight: 700;
   font-size: 0.95rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+
+.library-title-group:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .library-icon {
@@ -1367,6 +1361,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   line-height: 1.25;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3438,6 +3433,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   justify-content: center;
   transition: all var(--transition-fast);
   flex-shrink: 0;
+  position: relative;
 }
 
 .mob-bottom-icon-btn:hover {
@@ -3940,6 +3936,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     white-space: normal;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -4449,8 +4446,14 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 /* ==========================================================================
    YOUR LIBRARY VIEW (Mobile & Desktop Hub)
    ========================================================================== */
+#libraryView {
+  overflow: visible !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
 .library-view-container {
-  padding: 32px 32px 100px;
+  padding: 8px 0 24px;
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -4703,6 +4706,89 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.lib-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lib-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lib-sort-dropdown-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 500px;
+  padding: 0 10px 0 12px;
+  transition: all var(--transition-fast);
+}
+
+.lib-sort-dropdown-wrap:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.lib-sort-icon {
+  width: 15px;
+  height: 15px;
+  color: var(--text-secondary);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.lib-sort-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 6px 14px 6px 6px;
+  cursor: pointer;
+  outline: none;
+}
+
+.lib-sort-select option {
+  background: #181b22;
+  color: #ffffff;
+}
+
+.custom-playlist-reorder-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.reorder-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.reorder-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
 }
 
 .lib-header-add-btn {
@@ -4959,28 +5045,30 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   animation: splashRipple 2.4s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
 }
 
+.splash-ring {
+  display: none !important;
+}
+
 .splash-ring-2 {
-  animation-delay: 0.8s;
+  display: none !important;
 }
 
 .splash-logo-circle {
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, rgba(29, 185, 84, 0.3) 0%, rgba(18, 18, 18, 0.95) 100%);
-  border: 2px solid rgba(29, 185, 84, 0.6);
+  width: 68px;
+  height: 68px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 35px rgba(29, 185, 84, 0.4);
-  animation: splashPulse 2s ease-in-out infinite alternate;
+  background: transparent;
+  border: none;
+  box-shadow: none;
   z-index: 2;
 }
 
 .splash-logo-circle svg {
-  width: 38px;
-  height: 38px;
-  filter: drop-shadow(0 2px 10px rgba(29, 185, 84, 0.7));
+  width: 56px;
+  height: 56px;
+  filter: drop-shadow(0 4px 18px rgba(0, 242, 150, 0.5));
 }
 
 .splash-brand {
@@ -4996,6 +5084,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   color: #1DB954;
   background: linear-gradient(135deg, #1ed760 0%, #1db954 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -5496,6 +5585,7 @@ body[data-active-view="lyrics"] .content-scroll {
   line-height: 1.3;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
