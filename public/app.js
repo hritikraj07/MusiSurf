@@ -326,6 +326,41 @@
     }
   }
 
+  // Check if track is saved in any playlist (Liked songs, Downloads, or Custom playlists)
+  function isTrackInAnyPlaylist(trackId) {
+    if (!trackId) return false;
+    if (state.likedSongs && state.likedSongs.some(t => t.id === trackId)) return true;
+    if (state.offlineTracks && state.offlineTracks.some(t => t.id === trackId)) return true;
+    if (state.customPlaylists && state.customPlaylists.some(pl => (pl.tracks || []).some(t => t.id === trackId))) return true;
+    return false;
+  }
+
+  // Spotify-style green circular checkmark badge for songs already in playlists / library
+  function getPlaylistTickBadgeHtml(trackId) {
+    if (isTrackInAnyPlaylist(trackId)) {
+      return `<span class="in-playlist-tick-badge" title="Saved in your playlist / library" aria-label="In playlist"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm3.707 6.293-4.5 4.5a1 1 0 0 1-1.414 0l-2-2a1 1 0 1 1 1.414-1.414L6.5 8.586l3.793-3.793a1 1 0 0 1 1.414 1.414z"/></svg></span>`;
+    }
+    return '';
+  }
+
+  // Real-time update for all in-playlist tick marks across the DOM
+  function updateAllPlaylistTickBadges(targetTrackId = null) {
+    const selector = targetTrackId ? `[data-track-id="${targetTrackId}"]` : '[data-track-id]';
+    document.querySelectorAll(selector).forEach(el => {
+      const trackId = el.dataset.trackId;
+      if (!trackId) return;
+      const titleEl = el.querySelector('.song-title-text, .table-title-main, .song-title, .top-result-title, .quick-pick-title');
+      if (!titleEl) return;
+      const existingBadge = titleEl.querySelector('.in-playlist-tick-badge');
+      const shouldHaveBadge = isTrackInAnyPlaylist(trackId);
+      if (shouldHaveBadge && !existingBadge) {
+        titleEl.insertAdjacentHTML('beforeend', getPlaylistTickBadgeHtml(trackId));
+      } else if (!shouldHaveBadge && existingBadge) {
+        existingBadge.remove();
+      }
+    });
+  }
+
   // Dismiss splash loading screen smoothly
   function dismissSplashScreen() {
     const splash = document.getElementById('appSplashScreen');
@@ -585,10 +620,36 @@
           }
         });
 
+        updateAllPlaylistTickBadges(trackId);
         showToast(`Removed "${deletedTrack?.title || 'Song'}" from downloads`, '🗑️');
       };
     } catch (e) {
       console.warn('Error deleting offline track:', e);
+    }
+  }
+
+  // Background Audio Keep-Alive
+  // Browsers throttle background iframes when tab loses focus unless an audio pipeline is active.
+  const SILENT_AUDIO_URI = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+  function startBackgroundKeepAlive() {
+    if (elements.audio && elements.audio.paused && (!state.currentTrack || state.currentTrack.source === 'youtube' || !state.currentTrack.hasDirectAudio)) {
+      try {
+        if (!elements.audio.src || !elements.audio.src.startsWith('data:audio')) {
+          elements.audio.src = SILENT_AUDIO_URI;
+          elements.audio.loop = true;
+          elements.audio.volume = 0.001;
+        }
+        elements.audio.play().catch(() => {});
+      } catch (e) {}
+    }
+  }
+
+  function stopBackgroundKeepAlive() {
+    if (elements.audio && elements.audio.src && elements.audio.src.startsWith('data:audio')) {
+      try {
+        elements.audio.pause();
+        elements.audio.removeAttribute('src');
+      } catch (e) {}
     }
   }
 
@@ -603,7 +664,9 @@
         disablekb: 1,
         fs: 0,
         modestbranding: 1,
-        rel: 0
+        rel: 0,
+        playsinline: 1,
+        origin: window.location.origin
       },
       events: {
         onReady: () => {
@@ -614,9 +677,20 @@
           if (event.data === YT.PlayerState.PLAYING) {
             state.isPlaying = true;
             updatePlayPauseButton();
+            startBackgroundKeepAlive();
           } else if (event.data === YT.PlayerState.PAUSED) {
+            if (document.hidden && state.isPlaying) {
+              // Browser attempted to pause YouTube iframe due to tab switch; auto-resume
+              setTimeout(() => {
+                if (state.isPlaying && state.ytPlayer && typeof state.ytPlayer.playVideo === 'function') {
+                  try { state.ytPlayer.playVideo(); } catch (e) {}
+                }
+              }, 100);
+              return;
+            }
             state.isPlaying = false;
             updatePlayPauseButton();
+            stopBackgroundKeepAlive();
           } else if (event.data === YT.PlayerState.ENDED) {
             onTrackEnded();
           }
@@ -1144,6 +1218,7 @@
     updateDownloadedCountUI();
     updateLibraryUI();
     updateAllDownloadedBadges(track.id);
+    updateAllPlaylistTickBadges(track.id);
 
     showToast(`Saved "${track.title}" to Downloaded Songs!`, '✓');
 
@@ -1214,8 +1289,7 @@
     }
 
     if (state.repeatMode === 'one' && state.currentTrack) {
-      seekTo(0);
-      playTrack(state.currentTrack);
+      playTrack(state.currentTrack, state.queue, false);
       return;
     }
 
@@ -1309,13 +1383,11 @@
   function onTrackEnded() {
     if (state.repeatMode === 'one' && state.currentTrack) {
       if (state.currentTrack._introTrimmed) state.currentTrack._introTrimmed = false;
-      seekTo(0);
-      if (isYouTubeActive()) {
-        if (state.ytPlayer && typeof state.ytPlayer.playVideo === 'function') state.ytPlayer.playVideo();
-      } else {
-        elements.audio.currentTime = 0;
-        elements.audio.play().catch(() => {});
-      }
+      playTrack(state.currentTrack, state.queue, false);
+      return;
+    }
+    if (state.repeatMode === 'all' && state.queue.length <= 1 && state.currentTrack) {
+      playTrack(state.currentTrack, state.queue, false);
       return;
     }
     nextTrack();
@@ -1794,7 +1866,7 @@
       tile.innerHTML = `
         <img src="${track.image}" alt="${track.title}" class="quick-pick-img">
         <div class="quick-pick-info">
-          <span class="quick-pick-title">${track.title}</span>
+          <span class="quick-pick-title">${escapeHtml(track.title)}${getPlaylistTickBadgeHtml(track.id)}</span>
         </div>
         <button class="quick-pick-play-btn" title="Play Full Song">
           <svg viewBox="0 0 24 24" fill="currentColor">
@@ -1924,7 +1996,7 @@
       <div class="top-result-header-row">
         <img src="${top.image}" alt="${escapeHtml(top.title)}" class="top-result-img">
         <div class="top-result-info">
-          <h4 class="top-result-title">${escapeHtml(top.title)}</h4>
+          <h4 class="top-result-title">${escapeHtml(top.title)}${getPlaylistTickBadgeHtml(top.id)}</h4>
           <div class="top-result-meta">
             <span class="top-result-artist">${escapeHtml(top.artist)}</span>
             <span class="top-result-pill">Song</span>
@@ -2093,7 +2165,7 @@
     row.innerHTML = `
       <img src="${track.image}" alt="${escapeHtml(track.title)}" class="song-thumb">
       <div class="song-info-col">
-        <div class="song-title-text">${escapeHtml(track.title)}${badgeHtml}</div>
+        <div class="song-title-text">${escapeHtml(track.title)}${getPlaylistTickBadgeHtml(track.id)}${badgeHtml}</div>
         <div class="song-artist-text">${escapeHtml(track.artist)}</div>
       </div>
       <div class="song-row-right-actions">
@@ -2147,7 +2219,7 @@
         <div class="table-title-cell">
           <img src="${track.image}" alt="${escapeHtml(track.title)}" class="table-cover" loading="lazy">
           <div>
-            <div class="table-title-main">${escapeHtml(track.title)}${badgeHtml}</div>
+            <div class="table-title-main">${escapeHtml(track.title)}${getPlaylistTickBadgeHtml(track.id)}${badgeHtml}</div>
             <div class="table-artist-sub">${escapeHtml(track.artist)}</div>
           </div>
         </div>
@@ -2231,6 +2303,9 @@
         svg.style.color = isLiked ? '#ff3b5c' : '';
       }
     });
+
+    // Update in-playlist / library tick mark
+    updateAllPlaylistTickBadges(track.id);
   }
 
   function updateHeartIcon(currentTrackId) {
@@ -2882,6 +2957,7 @@
           if (!pl.tracks.some(t => t.id === track.id)) {
             pl.tracks.push(track);
             saveStoredPlaylists();
+            updateAllPlaylistTickBadges(track.id);
             showToast(`Added to "${pl.name}"`, '✓');
           } else {
             showToast(`Already in "${pl.name}"`, 'ℹ');
@@ -3259,6 +3335,7 @@
       [elements.repeatBtn, elements.mobRepeatBtn].forEach(btn => {
         if (!btn) return;
         btn.classList.toggle('active', isRepeatOn);
+        btn.title = isRepeatOne ? 'Repeat: Current Track' : (isRepeatOn ? 'Repeat: Entire Queue' : 'Enable Repeat');
         const indicator = btn.querySelector('.repeat-one-indicator');
         if (indicator) {
           indicator.style.display = isRepeatOne ? 'flex' : 'none';
@@ -3268,9 +3345,9 @@
 
     function toggleRepeatMode() {
       if (state.repeatMode === 'off') {
-        state.repeatMode = 'all';
-      } else if (state.repeatMode === 'all') {
         state.repeatMode = 'one';
+      } else if (state.repeatMode === 'one') {
+        state.repeatMode = 'all';
       } else {
         state.repeatMode = 'off';
       }
@@ -4130,6 +4207,7 @@
           if (pl) {
             pl.tracks = (pl.tracks || []).filter(t => t.id !== target.id);
             saveStoredPlaylists();
+            updateAllPlaylistTickBadges(target.id);
             renderPlaylistView(pl.id);
             showToast(`Removed "${target.title}" from ${pl.name}`, '🗑️');
           }
@@ -4404,6 +4482,20 @@
     if (!navigator.onLine && elements.offlineBanner) {
       elements.offlineBanner.style.display = 'flex';
     }
+
+    // Uninterrupted Background Tab Playback Handler
+    document.addEventListener('visibilitychange', () => {
+      if (state.isPlaying) {
+        if (isYouTubeActive() && state.ytPlayer && typeof state.ytPlayer.playVideo === 'function') {
+          const pState = typeof state.ytPlayer.getPlayerState === 'function' ? state.ytPlayer.getPlayerState() : -1;
+          if (pState === YT.PlayerState.PAUSED || pState === 2 || pState === -1) {
+            try { state.ytPlayer.playVideo(); } catch (e) {}
+          }
+        } else if (elements.audio && elements.audio.paused && state.currentTrack?.hasDirectAudio) {
+          elements.audio.play().catch(() => {});
+        }
+      }
+    });
   }
 
   // ==========================================================================

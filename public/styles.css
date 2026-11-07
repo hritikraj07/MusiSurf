@@ -1767,17 +1767,39 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   height: 15px;
 }
 
-.col-duration {
-  width: 65px;
-  text-align: right;
+.tracks-table th.col-duration,
+.tracks-table td.col-duration {
+  width: 72px;
+  text-align: right !important;
+  padding-right: 18px !important;
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
   font-size: 0.82rem;
 }
 
-.col-duration svg {
+.tracks-table th.col-duration svg {
   width: 16px;
   height: 16px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* In-Playlist / Saved Track Tick Badge (Spotify Style) */
+.in-playlist-tick-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  vertical-align: middle;
+  color: var(--accent-primary, #00f260);
+  flex-shrink: 0;
+  transition: transform var(--transition-fast), opacity var(--transition-fast);
+}
+
+.in-playlist-tick-badge svg {
+  width: 15px;
+  height: 15px;
+  filter: drop-shadow(0 0 3px rgba(0, 242, 96, 0.45));
 }
 
 /* Empty Search State */
@@ -2853,15 +2875,16 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   box-shadow: 0 0 6px var(--accent-primary);
 }
 
-/* Hidden YouTube Player */
+/* Controlled YouTube Player with Background Tab Persistence */
 .yt-hidden-player {
-  position: absolute;
-  bottom: -1000px;
-  left: -1000px;
-  width: 10px;
-  height: 10px;
-  opacity: 0.01;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 200px;
+  height: 200px;
+  opacity: 0.001;
   pointer-events: none;
+  z-index: -9999;
 }
 
 /* ==========================================================================

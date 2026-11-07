@@ -9,9 +9,9 @@
     content="Stream millions of full songs on MusiSurf. Ultra-fast music streaming, real-time synchronized lyrics, and personalized playlists.">
 
   <!-- Favicon: Rich MusiSurf Obsidian & Emerald Logo -->
-  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg?v=4.3">
-  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png?v=4.3">
-  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png?v=4.3">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg?v=5.0">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png?v=5.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png?v=5.0">
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -29,12 +29,12 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=5.0">
+  <link rel="stylesheet" href="/styles.css?v=5.1">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
         for (var name of names) {
-          if (name !== 'musisurf-v5.0') caches.delete(name);
+          if (name !== 'musisurf-v5.1') caches.delete(name);
         }
       });
     }
@@ -51,24 +51,30 @@
         <div class="splash-logo-circle">
           <svg viewBox="0 0 100 100" class="splash-logo-svg" xmlns="http://www.w3.org/2000/svg">
             <defs>
-              <linearGradient id="logoWave" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#00F5A0"/>
-                <stop offset="50%" stop-color="#00D9F5"/>
-                <stop offset="100%" stop-color="#0072FF"/>
-              </linearGradient>
-              <linearGradient id="logoNote" x1="0%" y1="100%" x2="100%" y2="0%">
-                <stop offset="0%" stop-color="#10B981"/>
-                <stop offset="100%" stop-color="#6EE7B7"/>
+              <linearGradient id="splashLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#00F296"/>
+                <stop offset="50%" stop-color="#10B981"/>
+                <stop offset="100%" stop-color="#00D2FF"/>
               </linearGradient>
             </defs>
-            <path d="M18 68 C 24 48, 36 34, 46 44 C 54 52, 62 64, 70 54 C 76 46, 78 36, 78 30" 
-                  fill="none" stroke="url(#logoWave)" stroke-width="7" stroke-linecap="round"/>
-            <path d="M22 76 C 34 65, 46 60, 58 68 C 66 73, 72 70, 76 64" 
-                  fill="none" stroke="url(#logoWave)" stroke-width="5" stroke-linecap="round" stroke-opacity="0.8"/>
-            <path d="M20 58 C 26 44, 36 30, 48 38 C 54 42, 60 48, 66 40" 
-                  fill="none" stroke="url(#logoNote)" stroke-width="3.5" stroke-linecap="round" stroke-opacity="0.7"/>
-            <circle cx="78" cy="30" r="8" fill="url(#logoNote)"/>
-            <circle cx="78" cy="30" r="3" fill="#ffffff"/>
+            <!-- Headphone Band -->
+            <path d="M 19 55 A 31 31 0 0 1 81 55" fill="none" stroke="url(#splashLogoGrad)" stroke-width="6.5" stroke-linecap="round"/>
+            <!-- Left Earcup -->
+            <rect x="11" y="45" width="10" height="22" rx="5" fill="url(#splashLogoGrad)"/>
+            <rect x="18" y="49" width="5" height="14" rx="2" fill="url(#splashLogoGrad)"/>
+            <!-- Right Earcup -->
+            <rect x="79" y="45" width="10" height="22" rx="5" fill="url(#splashLogoGrad)"/>
+            <rect x="77" y="49" width="5" height="14" rx="2" fill="url(#splashLogoGrad)"/>
+            <!-- Pill Condenser Microphone -->
+            <rect x="38" y="38" width="24" height="42" rx="12" fill="url(#splashLogoGrad)"/>
+            <!-- 4 Horizontal Grille Slots -->
+            <rect x="38" y="46" width="13" height="2.5" rx="1.25" fill="#090e0c"/>
+            <rect x="38" y="51.5" width="13" height="2.5" rx="1.25" fill="#090e0c"/>
+            <rect x="38" y="57" width="13" height="2.5" rx="1.25" fill="#090e0c"/>
+            <rect x="38" y="62.5" width="13" height="2.5" rx="1.25" fill="#090e0c"/>
+            <!-- Bottom Knob and Stem Cutout -->
+            <circle cx="50" cy="72.5" r="3.2" fill="#090e0c"/>
+            <rect x="48.8" y="72.5" width="2.4" height="7.5" fill="#090e0c"/>
           </svg>
         </div>
       </div>
@@ -88,26 +94,31 @@
           <div class="brand-logo-container">
             <svg class="brand-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
               <defs>
-                <linearGradient id="brandWave" x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient id="brandLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stop-color="#00F296"/>
                   <stop offset="50%" stop-color="#10B981"/>
                   <stop offset="100%" stop-color="#00D2FF"/>
                 </linearGradient>
-                <linearGradient id="brandBeam" x1="0%" y1="100%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="#10B981"/>
-                  <stop offset="50%" stop-color="#00F296"/>
-                  <stop offset="100%" stop-color="#ffffff"/>
-                </linearGradient>
               </defs>
-              <circle cx="50" cy="50" r="47" fill="#0d1411" stroke="url(#brandWave)" stroke-width="2.5"/>
-              <path d="M 22 62 C 30 40, 44 32, 54 44 C 62 54, 72 58, 80 34" 
-                    fill="none" stroke="url(#brandWave)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M 24 74 C 36 58, 48 52, 58 64 C 66 73, 74 68, 80 50" 
-                    fill="none" stroke="url(#brandWave)" stroke-width="4.8" stroke-linecap="round" stroke-opacity="0.85"/>
-              <path d="M 28 48 C 36 34, 46 25, 56 33 C 64 39, 70 42, 76 26" 
-                    fill="none" stroke="url(#brandBeam)" stroke-width="3.2" stroke-linecap="round" stroke-opacity="0.9"/>
-              <circle cx="78" cy="27" r="6.5" fill="url(#brandWave)"/>
-              <circle cx="78" cy="27" r="2.6" fill="#ffffff"/>
+              <circle cx="50" cy="50" r="47" fill="#0d1411" stroke="url(#brandLogoGrad)" stroke-width="2.5"/>
+              <!-- Headphone Band -->
+              <path d="M 19 55 A 31 31 0 0 1 81 55" fill="none" stroke="url(#brandLogoGrad)" stroke-width="6.5" stroke-linecap="round"/>
+              <!-- Left Earcup -->
+              <rect x="11" y="45" width="10" height="22" rx="5" fill="url(#brandLogoGrad)"/>
+              <rect x="18" y="49" width="5" height="14" rx="2" fill="url(#brandLogoGrad)"/>
+              <!-- Right Earcup -->
+              <rect x="79" y="45" width="10" height="22" rx="5" fill="url(#brandLogoGrad)"/>
+              <rect x="77" y="49" width="5" height="14" rx="2" fill="url(#brandLogoGrad)"/>
+              <!-- Pill Condenser Microphone -->
+              <rect x="38" y="38" width="24" height="42" rx="12" fill="url(#brandLogoGrad)"/>
+              <!-- 4 Horizontal Grille Slots -->
+              <rect x="38" y="46" width="13" height="2.5" rx="1.25" fill="#0d1411"/>
+              <rect x="38" y="51.5" width="13" height="2.5" rx="1.25" fill="#0d1411"/>
+              <rect x="38" y="57" width="13" height="2.5" rx="1.25" fill="#0d1411"/>
+              <rect x="38" y="62.5" width="13" height="2.5" rx="1.25" fill="#0d1411"/>
+              <!-- Bottom Knob and Stem Cutout -->
+              <circle cx="50" cy="72.5" r="3.2" fill="#0d1411"/>
+              <rect x="48.8" y="72.5" width="2.4" height="7.5" fill="#0d1411"/>
             </svg>
             <span class="brand-pulse"></span>
           </div>
@@ -1367,7 +1378,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.21"></script>
+  <script src="/app.js?v=2.22"></script>
 </body>
 
 </html>

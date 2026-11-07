@@ -1,51 +1,53 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
   <defs>
     <!-- Premium Radiant Emerald to Neon Cyan Gradient -->
-    <linearGradient id="surfGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="musiLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#00F296"/>
       <stop offset="50%" stop-color="#10B981"/>
       <stop offset="100%" stop-color="#00D2FF"/>
     </linearGradient>
 
     <!-- Deep Obsidian Backdrop with Inner Luminescence -->
-    <radialGradient id="surfBg" cx="40%" cy="30%" r="80%">
+    <radialGradient id="musiLogoBg" cx="50%" cy="40%" r="75%">
       <stop offset="0%" stop-color="#121e1a"/>
-      <stop offset="60%" stop-color="#090e0c"/>
-      <stop offset="100%" stop-color="#030504"/>
+      <stop offset="70%" stop-color="#090e0c"/>
+      <stop offset="100%" stop-color="#040605"/>
     </radialGradient>
 
-    <!-- Glowing Accent Gradient for Sound Beams -->
-    <linearGradient id="beamGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#10B981"/>
-      <stop offset="50%" stop-color="#00F296"/>
-      <stop offset="100%" stop-color="#ffffff"/>
-    </linearGradient>
-
-    <filter id="waveGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00F296" flood-opacity="0.5"/>
+    <filter id="musiGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#00F296" flood-opacity="0.45"/>
     </filter>
   </defs>
 
-  <!-- Circular Outer Badge (Inspired by Spotify, JioSaavn & YouTube Music) -->
-  <circle cx="50" cy="50" r="47" fill="url(#surfBg)" stroke="url(#surfGradient)" stroke-width="2.5"/>
+  <!-- Circular Outer Badge -->
+  <circle cx="50" cy="50" r="47" fill="url(#musiLogoBg)" stroke="url(#musiLogoGrad)" stroke-width="2.5"/>
   <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
 
-  <!-- Iconic MusiSurf Audio Crest (Acoustic Surf Wave + Musical Frequency Harmonics) -->
-  <g filter="url(#waveGlow)">
-    <!-- Primary Acoustic Crest (Powerful Ocean Sound Surge) -->
-    <path d="M 22 62 C 30 40, 44 32, 54 44 C 62 54, 72 58, 80 34" 
-          fill="none" stroke="url(#surfGradient)" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
-    
-    <!-- Secondary Harmonic Wave (Bass Frequency Undertow) -->
-    <path d="M 24 74 C 36 58, 48 52, 58 64 C 66 73, 74 68, 80 50" 
-          fill="none" stroke="url(#surfGradient)" stroke-width="5" stroke-linecap="round" stroke-opacity="0.85"/>
+  <!-- Logo Icon: Headphone + Pill Microphone -->
+  <g filter="url(#musiGlow)">
+    <!-- Headphone Band -->
+    <path d="M 19 55 A 31 31 0 0 1 81 55" fill="none" stroke="url(#musiLogoGrad)" stroke-width="6.5" stroke-linecap="round"/>
 
-    <!-- High-Tide Treble Arc (Surfing Note Lead) -->
-    <path d="M 28 48 C 36 34, 46 25, 56 33 C 64 39, 70 42, 76 26" 
-          fill="none" stroke="url(#beamGrad)" stroke-width="3.5" stroke-linecap="round" stroke-opacity="0.9"/>
+    <!-- Left Earcup -->
+    <rect x="11" y="45" width="10" height="22" rx="5" fill="url(#musiLogoGrad)"/>
+    <rect x="18" y="49" width="5" height="14" rx="2" fill="url(#musiLogoGrad)"/>
 
-    <!-- Sound Beacon Note Head (Musical Resonance Point) -->
-    <circle cx="78" cy="27" r="7" fill="url(#surfGradient)"/>
-    <circle cx="78" cy="27" r="2.8" fill="#ffffff"/>
+    <!-- Right Earcup -->
+    <rect x="79" y="45" width="10" height="22" rx="5" fill="url(#musiLogoGrad)"/>
+    <rect x="77" y="49" width="5" height="14" rx="2" fill="url(#musiLogoGrad)"/>
+
+    <!-- Pill-Shaped Condenser Microphone -->
+    <!-- Microphone Body -->
+    <rect x="38" y="38" width="24" height="42" rx="12" fill="url(#musiLogoGrad)"/>
+
+    <!-- 4 Horizontal Grille Slots -->
+    <rect x="38" y="46" width="13" height="2.5" rx="1.25" fill="#090e0c"/>
+    <rect x="38" y="51.5" width="13" height="2.5" rx="1.25" fill="#090e0c"/>
+    <rect x="38" y="57" width="13" height="2.5" rx="1.25" fill="#090e0c"/>
+    <rect x="38" y="62.5" width="13" height="2.5" rx="1.25" fill="#090e0c"/>
+
+    <!-- Bottom Circular Knob and Stem Cutout -->
+    <circle cx="50" cy="72.5" r="3.2" fill="#090e0c"/>
+    <rect x="48.8" y="72.5" width="2.4" height="7.5" fill="#090e0c"/>
   </g>
 </svg>
