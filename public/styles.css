@@ -3172,12 +3172,12 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 .mobile-now-playing-modal {
   position: fixed;
   inset: 0;
-  background: linear-gradient(180deg, #1e2029 0%, #0c0d11 40%, #060709 100%);
+  background: var(--mob-player-bg, linear-gradient(180deg, #1e2029 0%, #0c0d11 40%, #060709 100%));
   z-index: 1000;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 14px 20px calc(env(safe-area-inset-bottom, 16px) + 16px);
+  padding: calc(env(safe-area-inset-top, 10px) + 8px) 20px calc(env(safe-area-inset-bottom, 16px) + 12px);
   overflow: hidden !important;
   overflow-y: hidden !important;
   overflow-x: hidden !important;
@@ -3186,6 +3186,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   overscroll-behavior: none !important;
   touch-action: pan-y;
   animation: slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: background 0.5s ease;
 }
 
 @keyframes slideUpModal {
@@ -3205,8 +3206,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   flex: 1;
 }
 
-.mobile-player-collapse-btn,
-.mobile-player-options-btn {
+.mobile-player-collapse-btn {
   background: rgba(255, 255, 255, 0.08);
   border: none;
   color: #fff;
@@ -3221,35 +3221,45 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   flex-shrink: 0;
 }
 
-.mobile-player-collapse-btn:active,
-.mobile-player-options-btn:active {
+.mobile-player-collapse-btn:active {
   background: rgba(255, 255, 255, 0.2);
   transform: scale(0.92);
 }
 
-.mobile-player-collapse-btn svg,
-.mobile-player-options-btn svg {
+.mobile-player-collapse-btn svg {
   width: 22px;
   height: 22px;
 }
 
+.mobile-player-header-placeholder {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
 .mobile-player-art-wrap {
-  width: min(70vw, 290px);
-  height: min(70vw, 290px);
-  max-width: 42vh;
-  max-height: 42vh;
+  width: 100%;
+  max-width: 380px;
   aspect-ratio: 1;
-  margin: 0 auto 12px;
-  border-radius: 14px;
+  max-height: 46vh;
+  margin: 0 auto;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
-  flex-shrink: 1;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
 }
 
 .mobile-player-art {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 8px;
+  pointer-events: none;
+  user-select: none;
 }
 
 .mobile-player-details {
@@ -3360,14 +3370,14 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
-  padding: 0 10px;
+  margin-bottom: 4px;
+  padding: 0 8px;
   flex-shrink: 0;
 }
 
 .mob-play-btn {
-  width: 62px;
-  height: 62px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   background-color: #fff;
   color: #000;
@@ -3379,6 +3389,48 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 .mob-play-btn svg {
   width: 26px;
   height: 26px;
+}
+
+/* Spotify-Grade Bottom Feature Bar */
+.mobile-player-bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 6px 4px;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.mob-bottom-icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.mob-bottom-icon-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mob-bottom-icon-btn:active {
+  transform: scale(0.92);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.mob-bottom-icon-btn svg {
+  width: 22px;
+  height: 22px;
 }
 
 /* Mobile Player 3-Bar Options Bottom Sheet */
@@ -5044,6 +5096,17 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   isolation: isolate;
 }
 
+body[data-active-view="playlist"] .main-wrapper {
+  background: var(--playlist-dynamic-gradient, #08090b) !important;
+  background-repeat: no-repeat !important;
+  background-size: 100% 640px !important;
+  background-color: #08090b !important;
+}
+
+body[data-active-view="playlist"] .content-scroll {
+  background: transparent !important;
+}
+
 #playlistView::before {
   content: '';
   position: absolute;
@@ -5060,11 +5123,13 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 
 @media (max-width: 768px) {
   #playlistView::before {
-    top: -16px;
-    left: -14px;
-    right: -14px;
-    height: 440px;
-    border-radius: 0;
+    display: none !important;
+  }
+  body[data-active-view="playlist"] .main-wrapper {
+    background: var(--playlist-dynamic-gradient, #08090b) !important;
+    background-repeat: no-repeat !important;
+    background-size: 100% 560px !important;
+    background-color: #08090b !important;
   }
 }
 
@@ -5124,60 +5189,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   box-shadow: 0 0 6px #00f2fe;
 }
 
-/* Spotify-Grade Compact Lyrics Card Preview at Bottom */
-.mobile-player-lyrics-card {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  padding: 12px 14px;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: auto;
-  flex-shrink: 0;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
 
-.mobile-player-lyrics-card:active {
-  background: rgba(255, 255, 255, 0.14);
-  transform: scale(0.98);
-}
-
-.mob-lyrics-card-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.mob-lyrics-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #ffffff;
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-.mob-lyrics-expand-action {
-  font-size: 0.7rem;
-  font-weight: 800;
-  letter-spacing: 1px;
-  color: var(--text-secondary);
-}
-
-.mob-lyrics-snippet-line {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.9);
-  line-height: 1.35;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin: 0;
-}
 
 /* Non-Clickable Album Artwork */
 .player-cover-container,

@@ -197,6 +197,7 @@
     mobShuffleBtn: document.getElementById('mobShuffleBtn'),
     mobRepeatBtn: document.getElementById('mobRepeatBtn'),
     mobPlayerLyricsBtn: document.getElementById('mobPlayerLyricsBtn'),
+    mobPlayerShareBtn: document.getElementById('mobPlayerShareBtn'),
     mobPlayerTimerBtn: document.getElementById('mobPlayerTimerBtn'),
     mobTimerBadge: document.getElementById('mobTimerBadge'),
     mobPlayerOptionsBtn: document.getElementById('mobPlayerOptionsBtn'),
@@ -209,8 +210,6 @@
     mobOptArtist: document.getElementById('mobOptArtist'),
     mobOptAddToPlaylistBtn: document.getElementById('mobOptAddToPlaylistBtn'),
     mobOptQueueBtn: document.getElementById('mobOptQueueBtn'),
-    mobOptLyricsBtn: document.getElementById('mobOptLyricsBtn'),
-    mobOptSleepTimerBtn: document.getElementById('mobOptSleepTimerBtn'),
     mobOptDownloadBtn: document.getElementById('mobOptDownloadBtn'),
     mobOptDownloadText: document.getElementById('mobOptDownloadText'),
     mobOptRemovePlaylistBtn: document.getElementById('mobOptRemovePlaylistBtn'),
@@ -849,8 +848,19 @@
         headerName.textContent = 'MusiSurf';
       }
     }
-    const snippetEl = document.getElementById('mobLyricsSnippet');
-    if (snippetEl) snippetEl.textContent = 'Tap to view synchronized lyrics';
+
+    // Dynamic Atmospheric Background for Mobile Player Modal
+    if (elements.mobilePlayerModal && track.image) {
+      extractDominantColor(track.image, track.id).then(([r, g, b]) => {
+        const darkR = Math.floor(r * 0.28);
+        const darkG = Math.floor(g * 0.28);
+        const darkB = Math.floor(b * 0.28);
+        elements.mobilePlayerModal.style.setProperty(
+          '--mob-player-bg',
+          `linear-gradient(180deg, rgba(${r}, ${g}, ${b}, 0.65) 0%, rgba(${darkR}, ${darkG}, ${darkB}, 0.42) 45%, #08090b 100%)`
+        );
+      }).catch(() => {});
+    }
 
     // Update Like Heart
     updateHeartIcon(track.id);
@@ -2064,14 +2074,7 @@
       elements.mobOptRemovePlaylistBtn.style.display = isCustomUserPlaylist ? 'flex' : 'none';
     }
 
-    // Only show Lyrics and Sleep Timer options for the currently playing song
-    const isPlayingThisTrack = !!(state.currentTrack && state.currentTrack.id === track.id);
-    if (elements.mobOptLyricsBtn) {
-      elements.mobOptLyricsBtn.style.display = isPlayingThisTrack ? 'flex' : 'none';
-    }
-    if (elements.mobOptSleepTimerBtn) {
-      elements.mobOptSleepTimerBtn.style.display = isPlayingThisTrack ? 'flex' : 'none';
-    }
+
 
     if (elements.mobTrackOptionsModal) {
       elements.mobTrackOptionsModal.style.display = 'flex';
@@ -2417,7 +2420,8 @@
 
   async function applyPlaylistDynamicBackground(playlistId, tracks, fallbackKey = 'playlist') {
     const targetEl = document.getElementById('playlistView');
-    if (!targetEl) return;
+    const mainWrapper = document.getElementById('mainWrapper');
+    if (!targetEl && !mainWrapper) return;
 
     let coverUrl = null;
     if (playlistId === 'liked' && state.likedSongs.length > 0) {
@@ -2429,12 +2433,14 @@
     }
 
     const [r, g, b] = await extractDominantColor(coverUrl, playlistId || fallbackKey);
-    const darkR = Math.floor(r * 0.38);
-    const darkG = Math.floor(g * 0.38);
-    const darkB = Math.floor(b * 0.38);
+    const darkR = Math.floor(r * 0.35);
+    const darkG = Math.floor(g * 0.35);
+    const darkB = Math.floor(b * 0.35);
 
-    const gradient = `linear-gradient(180deg, rgba(${r}, ${g}, ${b}, 0.72) 0%, rgba(${darkR}, ${darkG}, ${darkB}, 0.45) 55%, rgba(11, 13, 17, 0) 100%)`;
-    targetEl.style.setProperty('--playlist-dynamic-gradient', gradient);
+    const gradient = `linear-gradient(180deg, rgba(${r}, ${g}, ${b}, 0.85) 0%, rgba(${darkR}, ${darkG}, ${darkB}, 0.48) 42%, rgba(13, 14, 17, 0.95) 78%, #08090b 100%)`;
+    if (targetEl) targetEl.style.setProperty('--playlist-dynamic-gradient', gradient);
+    if (mainWrapper) mainWrapper.style.setProperty('--playlist-dynamic-gradient', gradient);
+    document.body.style.setProperty('--playlist-dynamic-gradient', gradient);
   }
 
   function renderPlaylistView(playlistId) {
@@ -4051,6 +4057,26 @@
       });
     }
 
+    if (elements.mobPlayerShareBtn) {
+      elements.mobPlayerShareBtn.addEventListener('click', async () => {
+        const track = state.currentTrack;
+        if (!track) return;
+        if (navigator.share) {
+          try {
+            await navigator.share({
+              title: track.title,
+              text: `Listen to "${track.title}" by ${track.artist} on MusiSurf!`,
+              url: window.location.href
+            });
+          } catch (e) {}
+        } else {
+          try {
+            await navigator.clipboard.writeText(`${track.title} - ${track.artist} | MusiSurf: ${window.location.href}`);
+          } catch (e) {}
+        }
+      });
+    }
+
     if (elements.mobPlayerTimerBtn) {
       elements.mobPlayerTimerBtn.addEventListener('click', openSleepTimerModal);
     }
@@ -4075,27 +4101,6 @@
         if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
         const target = state.contextTrack || state.currentTrack;
         if (target) addToQueue(target);
-      });
-    }
-
-    if (elements.mobOptLyricsBtn) {
-      elements.mobOptLyricsBtn.addEventListener('click', () => {
-        if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
-        if (elements.mobilePlayerModal) elements.mobilePlayerModal.style.display = 'none';
-        const target = state.contextTrack || state.currentTrack;
-        if (target) {
-          if (!state.currentTrack || state.currentTrack.id !== target.id) {
-            playTrack(target, [target]);
-          }
-          switchView('lyrics');
-        }
-      });
-    }
-
-    if (elements.mobOptSleepTimerBtn) {
-      elements.mobOptSleepTimerBtn.addEventListener('click', () => {
-        if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
-        openSleepTimerModal();
       });
     }
 
