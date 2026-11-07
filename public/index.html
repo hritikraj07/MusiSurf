@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=5.9">
+  <link rel="stylesheet" href="/styles.css?v=6.0">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -492,19 +492,17 @@
                   <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
                 </svg>
               </button>
-              <button class="playlist-action-sub-btn rename-playlist-btn" id="renamePlaylistBtn" title="Rename Playlist" style="display: none;">
+              <button class="playlist-action-icon-btn rename-playlist-btn" id="renamePlaylistBtn" title="Rename Playlist" style="display: none;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
                 </svg>
-                <span>Rename</span>
               </button>
-              <button class="playlist-action-sub-btn export-playlist-btn" id="exportPlaylistBtn" title="Export Playlist">
+              <button class="playlist-action-icon-btn export-playlist-btn" id="exportPlaylistBtn" title="Export Playlist">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
-                <span>Export</span>
               </button>
               <button class="playlist-action-sub-btn delete-playlist-btn" id="deletePlaylistBtn" title="Delete Playlist" style="display: none;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -588,6 +586,7 @@
                   <th class="col-num">#</th>
                   <th class="col-title">Title</th>
                   <th class="col-album">Album</th>
+                  <th class="col-status"></th>
                   <th class="col-duration">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <circle cx="12" cy="12" r="10" />
@@ -706,6 +705,7 @@
                   <th class="col-num">#</th>
                   <th class="col-title">Title</th>
                   <th class="col-album">File Name</th>
+                  <th class="col-status"></th>
                   <th class="col-duration">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <circle cx="12" cy="12" r="10" />
@@ -1232,19 +1232,6 @@
             </div>
             <span>Add to Playlist</span>
           </button>
-          <button class="mob-option-item" id="mobOptViewQueueBtn">
-            <div class="mob-option-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="8" y1="6" x2="21" y2="6"/>
-                <line x1="8" y1="12" x2="21" y2="12"/>
-                <line x1="8" y1="18" x2="21" y2="18"/>
-                <line x1="3" y1="6" x2="3.01" y2="6"/>
-                <line x1="3" y1="12" x2="3.01" y2="12"/>
-                <line x1="3" y1="18" x2="3.01" y2="18"/>
-              </svg>
-            </div>
-            <span>View Play Queue</span>
-          </button>
           <button class="mob-option-item" id="mobOptQueueBtn">
             <div class="mob-option-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1551,7 +1538,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.31"></script>
+  <script src="/app.js?v=2.32"></script>
 </body>
 
 </html>

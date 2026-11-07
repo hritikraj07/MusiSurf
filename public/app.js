@@ -226,7 +226,6 @@
     mobOptTitle: document.getElementById('mobOptTitle'),
     mobOptArtist: document.getElementById('mobOptArtist'),
     mobOptAddToPlaylistBtn: document.getElementById('mobOptAddToPlaylistBtn'),
-    mobOptViewQueueBtn: document.getElementById('mobOptViewQueueBtn'),
     mobOptQueueBtn: document.getElementById('mobOptQueueBtn'),
     mobOptDownloadBtn: document.getElementById('mobOptDownloadBtn'),
     mobOptDownloadText: document.getElementById('mobOptDownloadText'),
@@ -386,19 +385,27 @@
 
       const shouldHaveBadge = isTrackInAnyPlaylist(trackId);
 
-      // Target title container in tables, song rows, search results, and quick picks
+      // Clean up stray tick if inside title
       const titleContainer = el.querySelector(
         '.table-title-main, .song-title-text, .quick-pick-title, .top-result-title, .queue-card-title, .queue-now-playing-title'
       );
       if (titleContainer) {
-        const existingBadge = titleContainer.querySelector('.in-playlist-tick-badge');
+        const strayBadge = titleContainer.querySelector('.in-playlist-tick-badge');
+        if (strayBadge) strayBadge.remove();
+      }
+
+      // 1. Table row status column (before duration column)
+      const statusCell = el.querySelector('.col-status');
+      if (statusCell) {
+        statusCell.innerHTML = shouldHaveBadge ? getPlaylistTickBadgeHtml(trackId) : '';
+      }
+
+      // 2. Song row right actions (before 3 dots)
+      const rightActions = el.querySelector('.song-row-right-actions');
+      if (rightActions) {
+        const existingBadge = rightActions.querySelector('.in-playlist-tick-badge');
         if (shouldHaveBadge && !existingBadge) {
-          const dlBadge = titleContainer.querySelector('.downloaded-badge');
-          if (dlBadge) {
-            dlBadge.insertAdjacentHTML('beforebegin', getPlaylistTickBadgeHtml(trackId));
-          } else {
-            titleContainer.insertAdjacentHTML('beforeend', getPlaylistTickBadgeHtml(trackId));
-          }
+          rightActions.insertAdjacentHTML('afterbegin', getPlaylistTickBadgeHtml(trackId));
         } else if (!shouldHaveBadge && existingBadge) {
           existingBadge.remove();
         }
@@ -2295,10 +2302,11 @@
     row.innerHTML = `
       <img src="${track.image}" alt="${escapeHtml(track.title)}" class="song-thumb">
       <div class="song-info-col">
-        <div class="song-title-text">${escapeHtml(track.title)}${tickHtml}${badgeHtml}</div>
+        <div class="song-title-text">${escapeHtml(track.title)}${badgeHtml}</div>
         <div class="song-artist-text">${escapeHtml(track.artist)}</div>
       </div>
       <div class="song-row-right-actions">
+        ${tickHtml}
         <button class="song-action-btn song-more-trigger" title="More Options">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <circle cx="12" cy="5" r="2"/>
@@ -2342,12 +2350,13 @@
         <div class="table-title-cell">
           <img src="${track.image}" alt="${escapeHtml(track.title)}" class="table-cover" loading="lazy">
           <div>
-            <div class="table-title-main">${escapeHtml(track.title)}${tickHtml}${badgeHtml}</div>
+            <div class="table-title-main">${escapeHtml(track.title)}${badgeHtml}</div>
             <div class="table-artist-sub">${escapeHtml(track.artist)}</div>
           </div>
         </div>
       </td>
       <td class="col-album">${escapeHtml(track.album || 'Single')}</td>
+      <td class="col-status">${tickHtml}</td>
       <td class="col-duration">${track.durationStr || '3:30'}</td>
       <td class="col-actions">
         <button class="song-action-btn song-more-trigger" title="More Options">
@@ -3041,6 +3050,14 @@
     }
   }
 
+  function closeQueueDrawer() {
+    if (elements.queueDrawer && elements.queueDrawer.classList.contains('open')) {
+      elements.queueDrawer.classList.remove('open');
+      if (elements.queueBtn) elements.queueBtn.classList.remove('active');
+      if (elements.queueDrawerBackdrop) elements.queueDrawerBackdrop.classList.remove('active');
+    }
+  }
+
   // ==========================================================================
   // VIEW NAVIGATION CONTROLLER & HISTORY MANAGEMENT
   // ==========================================================================
@@ -3554,12 +3571,13 @@
             <div class="table-title-cell">
               <img src="${track.image || DEFAULT_LOCAL_COVER}" alt="${track.title}" class="table-cover">
               <div>
-                <div class="table-title-main">${escapeHtml(track.title)}${getPlaylistTickBadgeHtml(track.id)}${getDownloadedBadgeHtml(track.id)}</div>
+                <div class="table-title-main">${escapeHtml(track.title)}${getDownloadedBadgeHtml(track.id)}</div>
                 <div class="table-artist-sub">${escapeHtml(track.artist || 'Local File')}</div>
               </div>
             </div>
           </td>
           <td class="col-album">${escapeHtml(track.fileName || track.album || 'Device Storage')}</td>
+          <td class="col-status">${getPlaylistTickBadgeHtml(track.id)}</td>
           <td class="col-duration">${track.durationStr || '--:--'}</td>
           <td class="col-actions">
             <button class="song-action-btn add-to-queue-trigger" title="Add to Queue">
@@ -3712,13 +3730,13 @@
 
   // Navigate to Top of Home page from anywhere in website/app
   function navigateToHomeTop() {
+    closeQueueDrawer();
     if (elements.mobilePlayerModal) elements.mobilePlayerModal.style.display = 'none';
     if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
     if (elements.mobilePlaylistOptionsModal) elements.mobilePlaylistOptionsModal.style.display = 'none';
     if (elements.createPlaylistModal) elements.createPlaylistModal.style.display = 'none';
     if (elements.addToPlaylistModal) elements.addToPlaylistModal.style.display = 'none';
     if (elements.sleepTimerModal) elements.sleepTimerModal.style.display = 'none';
-    closeQueueDrawer();
     document.body.style.overflow = '';
 
     try {
@@ -3728,6 +3746,7 @@
       }));
     } catch (e) {}
 
+    state.activePlaylistId = null;
     switchView('home', { force: true });
     [elements.mobNavHome, elements.mobNavSearch, elements.mobNavLibrary].forEach(btn => {
       if (btn) btn.classList.toggle('active', btn.id === 'mobNavHome');
@@ -4083,15 +4102,6 @@
         elements.volumeBar.classList.remove('dragging');
       }
     });
-
-    // Queue Drawer Toggle & Outside Click Dismissal
-    const closeQueueDrawer = () => {
-      if (elements.queueDrawer && elements.queueDrawer.classList.contains('open')) {
-        elements.queueDrawer.classList.remove('open');
-        if (elements.queueBtn) elements.queueBtn.classList.remove('active');
-        if (elements.queueDrawerBackdrop) elements.queueDrawerBackdrop.classList.remove('active');
-      }
-    };
 
     if (elements.queueBtn) {
       elements.queueBtn.addEventListener('click', (e) => {
@@ -4747,17 +4757,6 @@
         if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
         const target = state.contextTrack || state.currentTrack;
         if (target) openAddToPlaylistModal(target);
-      });
-    }
-
-    if (elements.mobOptViewQueueBtn) {
-      elements.mobOptViewQueueBtn.addEventListener('click', () => {
-        if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
-        if (elements.queueDrawer) {
-          renderQueue();
-          elements.queueDrawer.classList.add('open');
-          try { window.history.pushState({ drawer: 'queue' }, '', window.location.pathname); } catch (e) {}
-        }
       });
     }
 

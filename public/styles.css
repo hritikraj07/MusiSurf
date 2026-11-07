@@ -1834,7 +1834,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   }
 }
 
-/* In-Playlist / Saved Track Tick Badge (Spotify Style - Always clearly visible with 6px gap) */
+/* In-Playlist / Saved Track Tick Badge (Spotify Style - Previous Location & Visible on Hover) */
 .in-playlist-tick-badge {
   display: inline-flex;
   align-items: center;
@@ -1842,20 +1842,57 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   vertical-align: middle;
   color: var(--accent-primary, #00f260);
   flex-shrink: 0;
-  margin-left: 6px;
-  opacity: 1 !important;
-  transition: transform var(--transition-fast);
+  transition: opacity 0.2s ease, transform var(--transition-fast);
 }
 
 .in-playlist-tick-badge svg {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   filter: drop-shadow(0 0 3px rgba(0, 242, 96, 0.45));
 }
 
 .tracks-table th.col-status,
 .tracks-table td.col-status {
-  display: none !important;
+  width: 36px;
+  min-width: 36px;
+  text-align: center !important;
+  vertical-align: middle !important;
+  padding: 0 4px !important;
+}
+
+.song-row-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Desktop: Visible on hover only */
+@media (min-width: 769px) {
+  .tracks-table tbody tr .col-status .in-playlist-tick-badge,
+  .song-row .song-row-right-actions .in-playlist-tick-badge {
+    opacity: 0;
+  }
+
+  .tracks-table tbody tr:hover .col-status .in-playlist-tick-badge,
+  .song-row:hover .song-row-right-actions .in-playlist-tick-badge {
+    opacity: 1;
+  }
+}
+
+/* Mobile: Displayed neatly next to 3 dots */
+@media (max-width: 768px) {
+  .tracks-table th.col-status,
+  .tracks-table td.col-status {
+    width: 28px !important;
+    min-width: 28px !important;
+    padding: 0 2px !important;
+  }
+  .song-row-right-actions .in-playlist-tick-badge,
+  .tracks-table tbody tr .col-status .in-playlist-tick-badge {
+    opacity: 1 !important;
+  }
 }
 
 /* Empty Search State */
@@ -2066,6 +2103,34 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 .playlist-shuffle-btn svg {
   width: 24px;
   height: 24px;
+}
+
+.playlist-action-icon-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.playlist-action-icon-btn:hover {
+  color: #fff;
+  transform: scale(1.1);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.playlist-action-icon-btn svg {
+  width: 22px;
+  height: 22px;
 }
 
 .delete-playlist-btn {
@@ -3433,33 +3498,6 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 .modal-playlist-checkbox.checked svg {
   opacity: 1;
   transform: scale(1);
-}
-
-/* Rename Playlist Button */
-.rename-playlist-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: 500px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #fff;
-  font-size: 0.88rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.rename-playlist-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.25);
-  transform: scale(1.02);
-}
-
-.rename-playlist-btn svg {
-  width: 16px;
-  height: 16px;
 }
 
 /* Ensure mobile tap on playlist album goes inside playlist */
