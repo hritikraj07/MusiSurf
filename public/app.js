@@ -131,6 +131,14 @@
     shufflePlaylistBtn: document.getElementById('shufflePlaylistBtn'),
     playlistTracksSortSelect: document.getElementById('playlistTracksSortSelect'),
     deletePlaylistBtn: document.getElementById('deletePlaylistBtn'),
+    mobilePlaylistMoreBtn: document.getElementById('mobilePlaylistMoreBtn'),
+    mobilePlaylistOptionsModal: document.getElementById('mobilePlaylistOptionsModal'),
+    closeMobPlaylistOptionsBtn: document.getElementById('closeMobPlaylistOptionsBtn'),
+    mobOptDeletePlaylistBtn: document.getElementById('mobOptDeletePlaylistBtn'),
+    playlistDownloadStatusCard: document.getElementById('playlistDownloadStatusCard'),
+    dlStatusTitle: document.getElementById('dlStatusTitle'),
+    dlStatusSub: document.getElementById('dlStatusSub'),
+    dlStatusProgressFill: document.getElementById('dlStatusProgressFill'),
     playlistBackBtn: document.getElementById('playlistBackBtn'),
 
     // Lyrics View
@@ -295,38 +303,39 @@
     return state.offlineTracks.some(t => t.id === trackId);
   }
 
-  // Generate downloaded badge HTML indicator
+  // Generate downloaded badge HTML indicator (Spotify-grade offline check)
   function getDownloadedBadgeHtml(trackId) {
     if (isTrackDownloaded(trackId)) {
-      return `<span class="downloaded-badge" title="Downloaded • Offline Ready"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+      return `<span class="downloaded-badge" title="Downloaded • 100% Offline Ready" aria-label="Downloaded"><svg viewBox="0 0 16 16"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm3.2 7.2-2.5 2.5a1 1 0 0 1-1.4 0L4.8 8.2a.7.7 0 0 1 1-1l1.5 1.5V4.7a.7.7 0 0 1 1.4 0v4l1.5-1.5a.7.7 0 0 1 1 1z"/></svg></span>`;
     }
     return '';
   }
 
   // Live update all downloaded badges for a track across open views
   function updateAllDownloadedBadges(trackId) {
-    const badgeHtml = `<span class="downloaded-badge" title="Downloaded • Offline Ready"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+    const badgeHtml = getDownloadedBadgeHtml(trackId);
     document.querySelectorAll(`[data-track-id="${trackId}"]`).forEach(el => {
-      const titleEl = el.querySelector('.song-title-text, .table-title-main');
-      if (titleEl && !titleEl.querySelector('.downloaded-badge')) {
-        titleEl.insertAdjacentHTML('beforeend', badgeHtml);
+      const titleEl = el.querySelector('.song-title-text, .table-title-main, .song-title, .top-result-title, .quick-pick-title, .queue-card-title');
+      if (titleEl) {
+        const existingDl = titleEl.querySelector('.downloaded-badge');
+        const shouldHave = isTrackDownloaded(trackId);
+        if (shouldHave && !existingDl) {
+          titleEl.insertAdjacentHTML('beforeend', badgeHtml);
+        } else if (!shouldHave && existingDl) {
+          existingDl.remove();
+        }
       }
-      const dlBtn = el.querySelector('.download-song-trigger');
+      const dlBtn = el.querySelector('.download-song-trigger, .top-download-btn');
       if (dlBtn) {
-        dlBtn.classList.add('downloaded');
-        dlBtn.title = 'Downloaded • Saved in Offline Songs';
+        dlBtn.classList.toggle('downloaded', isTrackDownloaded(trackId));
+        dlBtn.title = isTrackDownloaded(trackId) ? 'Downloaded • Saved in Offline Songs' : 'Download Song';
       }
     });
 
-    if (state.currentTrack && state.currentTrack.id === trackId) {
-      if (elements.playerDownloadBtn) elements.playerDownloadBtn.classList.add('downloaded');
-      if (elements.mobDownloadBtn) elements.mobDownloadBtn.classList.add('downloaded');
-      if (elements.mobDownloadActionBtn) elements.mobDownloadActionBtn.classList.add('downloaded');
-      if (elements.mobOptDownloadBtn) {
-        elements.mobOptDownloadBtn.classList.add('downloaded');
-        const span = elements.mobOptDownloadBtn.querySelector('span');
-        if (span) span.textContent = 'Remove from Downloads';
-      }
+    if (state.currentTrack) {
+      updatePlayerTitlesWithTick(state.currentTrack);
+      if (elements.playerDownloadBtn) elements.playerDownloadBtn.classList.toggle('downloaded', isTrackDownloaded(state.currentTrack.id));
+      if (elements.mobPlayerDownloadBtn) elements.mobPlayerDownloadBtn.classList.toggle('downloaded', isTrackDownloaded(state.currentTrack.id));
     }
   }
 
@@ -347,16 +356,17 @@
     return '';
   }
 
-  // Update desktop player bar & mobile fullscreen player titles with in-playlist tick mark
+  // Update desktop player bar & mobile fullscreen player titles with in-playlist tick mark and downloaded badge
   function updatePlayerTitlesWithTick(track) {
     if (!track) return;
     const inPlaylist = isTrackInAnyPlaylist(track.id);
     const tickHtml = inPlaylist ? getPlaylistTickBadgeHtml(track.id) : '';
+    const dlHtml = getDownloadedBadgeHtml(track.id);
     if (elements.playerTitle) {
-      elements.playerTitle.innerHTML = `${escapeHtml(track.title)}${tickHtml}`;
+      elements.playerTitle.innerHTML = `${escapeHtml(track.title)}${tickHtml}${dlHtml}`;
     }
     if (elements.mobPlayerTitle) {
-      elements.mobPlayerTitle.innerHTML = `${escapeHtml(track.title)}${tickHtml}`;
+      elements.mobPlayerTitle.innerHTML = `${escapeHtml(track.title)}${tickHtml}${dlHtml}`;
     }
   }
 
@@ -956,14 +966,14 @@
     }
 
     if (headerTitleWrap) {
-      if (isPlaylistPlayback) {
-        headerTitleWrap.style.visibility = 'visible';
+      if (isPlaylistPlayback && playlistTitle) {
         if (headerSub) headerSub.textContent = 'PLAYING FROM PLAYLIST';
         if (headerName) headerName.textContent = playlistTitle;
       } else {
-        // Hide playlist banner when playing outside any playlist
-        headerTitleWrap.style.visibility = 'hidden';
+        if (headerSub) headerSub.textContent = 'NOW PLAYING';
+        if (headerName) headerName.textContent = track.artist || 'MusiSurf';
       }
+      headerTitleWrap.style.visibility = 'visible';
     }
 
     // Dynamic Atmospheric Background for Mobile Player Modal
@@ -1263,11 +1273,23 @@
     updateAllDownloadedBadges(track.id);
     updateAllPlaylistTickBadges(track.id);
 
-    showToast(`Saved "${track.title}" to Downloaded Songs!`, '✓');
+    // Show downloading status card in playlist view
+    if (elements.playlistDownloadStatusCard) {
+      elements.playlistDownloadStatusCard.classList.remove('completed');
+      elements.playlistDownloadStatusCard.style.display = 'flex';
+      if (elements.dlStatusTitle) elements.dlStatusTitle.textContent = `Downloading "${track.title}"...`;
+      if (elements.dlStatusSub) elements.dlStatusSub.textContent = 'Saving to Downloaded Songs for 100% offline playback';
+      if (elements.dlStatusProgressFill) elements.dlStatusProgressFill.style.width = '35%';
+    }
+
+    showToast(`Downloading "${track.title}" to Downloaded Songs...`, '⏳');
 
     // If currently viewing Downloaded playlist, refresh view instantly
     if (state.currentView === 'downloaded' || (state.currentView === 'playlist' && state.activePlaylistId === 'downloaded')) {
       renderPlaylistView('downloaded');
+      if (elements.playlistDownloadStatusCard) {
+        elements.playlistDownloadStatusCard.style.display = 'flex';
+      }
     }
 
     // 2. On desktop, also trigger browser file download to computer's Downloads folder
@@ -1283,6 +1305,7 @@
     // 3. In background: asynchronously fetch audio stream blob and persist to IndexedDB for 100% offline playback
     (async () => {
       try {
+        if (elements.dlStatusProgressFill) elements.dlStatusProgressFill.style.width = '65%';
         const fetchTarget = track.audioUrl ? `/api/stream?url=${encodeURIComponent(track.audioUrl)}` : streamUrl;
         const res = await fetch(fetchTarget);
         if (res.ok) {
@@ -1296,8 +1319,25 @@
             state.offlineTracks[idx].audioBlob = blob;
           }
         }
+        if (elements.dlStatusProgressFill) elements.dlStatusProgressFill.style.width = '100%';
+        if (elements.playlistDownloadStatusCard) {
+          elements.playlistDownloadStatusCard.classList.add('completed');
+          if (elements.dlStatusTitle) elements.dlStatusTitle.textContent = `✓ Downloaded "${track.title}"!`;
+          if (elements.dlStatusSub) elements.dlStatusSub.textContent = 'Saved to Downloaded Songs • 100% Offline Ready';
+          setTimeout(() => {
+            if (elements.playlistDownloadStatusCard) {
+              elements.playlistDownloadStatusCard.style.display = 'none';
+              elements.playlistDownloadStatusCard.classList.remove('completed');
+              if (elements.dlStatusProgressFill) elements.dlStatusProgressFill.style.width = '0%';
+            }
+          }, 3500);
+        }
+        showToast(`✓ "${track.title}" is ready for offline listening!`, '✓');
       } catch (err) {
         console.warn('Background offline blob caching note:', err.message);
+        if (elements.playlistDownloadStatusCard) {
+          elements.playlistDownloadStatusCard.style.display = 'none';
+        }
       }
     })();
   }
@@ -1909,7 +1949,7 @@
       tile.innerHTML = `
         <img src="${track.image}" alt="${track.title}" class="quick-pick-img">
         <div class="quick-pick-info">
-          <span class="quick-pick-title">${escapeHtml(track.title)}${getPlaylistTickBadgeHtml(track.id)}</span>
+          <span class="quick-pick-title">${escapeHtml(track.title)}${getPlaylistTickBadgeHtml(track.id)}${getDownloadedBadgeHtml(track.id)}</span>
         </div>
         <button class="quick-pick-play-btn" title="Play Full Song">
           <svg viewBox="0 0 24 24" fill="currentColor">
@@ -2041,7 +2081,7 @@
       <div class="top-result-header-row">
         <img src="${top.image}" alt="${escapeHtml(top.title)}" class="top-result-img">
         <div class="top-result-info">
-          <h4 class="top-result-title">${escapeHtml(top.title)}${getPlaylistTickBadgeHtml(top.id)}</h4>
+          <h4 class="top-result-title">${escapeHtml(top.title)}${getPlaylistTickBadgeHtml(top.id)}${getDownloadedBadgeHtml(top.id)}</h4>
           <div class="top-result-meta">
             <span class="top-result-artist">${escapeHtml(top.artist)}</span>
             <span class="top-result-pill">Song</span>
@@ -2438,6 +2478,13 @@
   }
 
   function getDeterministicArtworkColor(key) {
+    const lowerKey = String(key || '').toLowerCase();
+    if (lowerKey === 'downloaded' || lowerKey.includes('download')) {
+      return [5, 117, 230]; // Sapphire Cyan instead of ugly red (hue 359)
+    }
+    if (lowerKey === 'liked' || lowerKey.includes('liked')) {
+      return [69, 10, 245];
+    }
     let hash = 0;
     const str = String(key || 'musisurf');
     for (let i = 0; i < str.length; i++) {
@@ -2582,6 +2629,7 @@
     if (playlistId === 'liked') {
       tracks = state.likedSongs;
       elements.deletePlaylistBtn.style.display = 'none';
+      if (elements.mobilePlaylistMoreBtn) elements.mobilePlaylistMoreBtn.style.display = 'none';
       elements.playlistCoverArt.innerHTML = createPlaylistCollageHtml(
         state.likedSongs,
         `<svg viewBox="0 0 24 24" fill="currentColor" style="width: 75px; height: 75px; color: #fff;">
@@ -2594,6 +2642,7 @@
       desc = 'Stored locally on your device. Listen anywhere 100% offline with zero internet!';
       tracks = state.offlineTracks;
       elements.deletePlaylistBtn.style.display = 'none';
+      if (elements.mobilePlaylistMoreBtn) elements.mobilePlaylistMoreBtn.style.display = 'none';
       elements.playlistCoverArt.innerHTML = createPlaylistCollageHtml(
         state.offlineTracks,
         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 75px; height: 75px; color: #fff;">
@@ -2612,6 +2661,7 @@
         pl.lastPlayedAt = Date.now();
         saveStoredPlaylists();
         elements.deletePlaylistBtn.style.display = 'inline-flex';
+        if (elements.mobilePlaylistMoreBtn) elements.mobilePlaylistMoreBtn.style.display = 'inline-flex';
         elements.playlistCoverArt.innerHTML = createPlaylistCollageHtml(
           tracks,
           `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width: 75px; height: 75px; color: var(--accent-primary);">
@@ -2746,6 +2796,20 @@
         showToast(`Deleted playlist "${title}"`, '🗑️');
       }
     };
+
+    // Mobile 3-horizontal-bars button to open playlist options bottom sheet
+    if (elements.mobilePlaylistMoreBtn) {
+      elements.mobilePlaylistMoreBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (elements.mobilePlaylistOptionsModal) {
+          const titleEl = document.getElementById('mobPlaylistOptionsTitle');
+          const subEl = document.getElementById('mobPlaylistOptionsSub');
+          if (titleEl) titleEl.textContent = title;
+          if (subEl) subEl.textContent = `${tracks.length} songs • Custom Playlist`;
+          elements.mobilePlaylistOptionsModal.style.display = 'flex';
+        }
+      };
+    }
   }
 
   function renderSidebarPlaylists() {
@@ -2779,7 +2843,7 @@
         <div class="queue-card current">
           <img src="${state.currentTrack.image}" alt="${escapeHtml(state.currentTrack.title)}" class="queue-img">
           <div class="queue-card-info">
-            <div class="queue-card-title">${escapeHtml(state.currentTrack.title)}${getPlaylistTickBadgeHtml(state.currentTrack.id)}</div>
+            <div class="queue-card-title">${escapeHtml(state.currentTrack.title)}${getPlaylistTickBadgeHtml(state.currentTrack.id)}${getDownloadedBadgeHtml(state.currentTrack.id)}</div>
             <div class="queue-card-artist">${escapeHtml(state.currentTrack.artist)}</div>
           </div>
         </div>
@@ -2801,7 +2865,7 @@
         card.innerHTML = `
           <img src="${t.image}" alt="${escapeHtml(t.title)}" class="queue-img">
           <div class="queue-card-info">
-            <div class="queue-card-title">${escapeHtml(t.title)}${getPlaylistTickBadgeHtml(t.id)}</div>
+            <div class="queue-card-title">${escapeHtml(t.title)}${getPlaylistTickBadgeHtml(t.id)}${getDownloadedBadgeHtml(t.id)}</div>
             <div class="queue-card-artist">${escapeHtml(t.artist)}</div>
           </div>
           <button class="remove-queue-btn" title="Remove from queue" aria-label="Remove">
@@ -4427,10 +4491,42 @@
       });
     }
 
+    if (elements.closeMobOptionsBtn && elements.mobTrackOptionsModal) {
+      elements.closeMobOptionsBtn.addEventListener('click', () => {
+        elements.mobTrackOptionsModal.style.display = 'none';
+      });
+    }
+
     if (elements.mobTrackOptionsModal) {
       elements.mobTrackOptionsModal.addEventListener('click', (e) => {
         if (e.target === elements.mobTrackOptionsModal) {
           elements.mobTrackOptionsModal.style.display = 'none';
+        }
+      });
+    }
+
+    // Mobile Playlist Options Bottom Sheet
+    if (elements.closeMobPlaylistOptionsBtn && elements.mobilePlaylistOptionsModal) {
+      elements.closeMobPlaylistOptionsBtn.addEventListener('click', () => {
+        elements.mobilePlaylistOptionsModal.style.display = 'none';
+      });
+    }
+
+    if (elements.mobilePlaylistOptionsModal) {
+      elements.mobilePlaylistOptionsModal.addEventListener('click', (e) => {
+        if (e.target === elements.mobilePlaylistOptionsModal) {
+          elements.mobilePlaylistOptionsModal.style.display = 'none';
+        }
+      });
+    }
+
+    if (elements.mobOptDeletePlaylistBtn) {
+      elements.mobOptDeletePlaylistBtn.addEventListener('click', () => {
+        if (elements.mobilePlaylistOptionsModal) {
+          elements.mobilePlaylistOptionsModal.style.display = 'none';
+        }
+        if (elements.deletePlaylistBtn) {
+          elements.deletePlaylistBtn.click();
         }
       });
     }
@@ -4489,6 +4585,10 @@
       }
       if (elements.mobTrackOptionsModal && elements.mobTrackOptionsModal.style.display !== 'none') {
         elements.mobTrackOptionsModal.style.display = 'none';
+        return;
+      }
+      if (elements.mobilePlaylistOptionsModal && elements.mobilePlaylistOptionsModal.style.display !== 'none') {
+        elements.mobilePlaylistOptionsModal.style.display = 'none';
         return;
       }
       if (elements.mobilePlayerModal && elements.mobilePlayerModal.style.display !== 'none') {

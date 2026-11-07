@@ -19,8 +19,11 @@
     </filter>
   </defs>
 
-  <!-- Logo Icon: Headphone + Pill Microphone -->
-  <g filter="url(#musiGlow)">
+  <!-- Solid Background for Adaptive Maskable Icon -->
+  <rect width="100" height="100" fill="url(#musiLogoBg)"/>
+
+  <!-- Logo Icon: Headphone + Pill Microphone Scaled to Safe Zone (66% scale, centered) -->
+  <g transform="translate(50, 50) scale(0.66) translate(-50, -52)" filter="url(#musiGlow)">
     <!-- Headphone Band -->
     <path d="M 19 55 A 31 31 0 0 1 81 55" fill="none" stroke="url(#musiLogoGrad)" stroke-width="6.5" stroke-linecap="round"/>
 

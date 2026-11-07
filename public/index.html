@@ -9,9 +9,9 @@
     content="Stream millions of full songs on MusiSurf. Ultra-fast music streaming, real-time synchronized lyrics, and personalized playlists.">
 
   <!-- Favicon: Rich MusiSurf Obsidian & Emerald Logo -->
-  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg?v=5.2">
-  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png?v=5.2">
-  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png?v=5.2">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg?v=5.4">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png?v=5.4">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png?v=5.4">
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -29,12 +29,12 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=5.3">
+  <link rel="stylesheet" href="/styles.css?v=5.4">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
         for (var name of names) {
-          if (name !== 'musisurf-v5.3') caches.delete(name);
+          if (name !== 'musisurf-v5.4') caches.delete(name);
         }
       });
     }
@@ -523,6 +523,28 @@
               </svg>
               <span>Delete Playlist</span>
             </button>
+            <!-- Mobile 3-Horizontal-Bars Menu Button (Mobile Only) -->
+            <button class="playlist-action-sub-btn mobile-playlist-more-btn" id="mobilePlaylistMoreBtn" title="Playlist options" style="display: none;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                <line x1="4" y1="7" x2="20" y2="7"/>
+                <line x1="4" y1="12" x2="20" y2="12"/>
+                <line x1="4" y1="17" x2="20" y2="17"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Dynamic Downloading Progress Bar Indicator inside Playlist -->
+          <div id="playlistDownloadStatusCard" class="playlist-download-status-card" style="display: none;">
+            <div class="dl-status-left">
+              <div class="dl-status-spinner" id="dlStatusSpinner"></div>
+              <div class="dl-status-info">
+                <span class="dl-status-title" id="dlStatusTitle">Downloading Song...</span>
+                <span class="dl-status-sub" id="dlStatusSub">Saving to Downloaded Songs for 100% offline playback</span>
+              </div>
+            </div>
+            <div class="dl-status-progress-track">
+              <div class="dl-status-progress-fill" id="dlStatusProgressFill"></div>
+            </div>
           </div>
 
           <!-- Playlist Songs Table -->
@@ -598,12 +620,10 @@
               </svg>
             </div>
             <div class="playlist-info-meta">
-              <span class="playlist-tag">Device Storage</span>
               <h1 class="playlist-title">Local Files</h1>
-              <p class="playlist-desc">Your personal music files from this device. These tracks remain strictly on your
-                local computer or phone and are never visible online or to the public catalog.</p>
+              <p class="playlist-desc">Personal audio files stored directly on this device.</p>
               <div class="playlist-details">
-                <span class="playlist-owner">Local Device</span>
+                <span class="playlist-owner">Device Storage</span>
                 <span class="meta-dot">•</span>
                 <span class="playlist-track-count" id="localTrackCount">0 songs</span>
                 <span class="meta-dot">•</span>
@@ -642,8 +662,7 @@
               <polyline points="17 8 12 3 7 8" />
               <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
-            <p>Drag and drop audio files here (MP3, M4A, WAV), or click <strong>Add Local Music</strong></p>
-            <span class="local-dropzone-sub">Plays instantly and stored 100% locally in your device storage</span>
+            <p>Drag & drop audio files here, or click <strong>Add Local Music</strong></p>
           </div>
 
           <!-- Local Tracks Table -->
@@ -1021,7 +1040,7 @@
           </svg>
         </button>
         <div class="mobile-player-header-title">
-          <span class="mob-header-sub">PLAYING FROM PLAYLIST</span>
+          <span class="mob-header-sub">NOW PLAYING</span>
           <span class="mob-header-main" id="mobHeaderPlaylistName">MusiSurf</span>
         </div>
         <div class="mobile-player-header-placeholder"></div>
@@ -1194,6 +1213,39 @@
               </svg>
             </div>
             <span>Remove from this Playlist</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Playlist 3-Bar Options Bottom Sheet Modal (Mobile Only) -->
+    <div class="modal-backdrop" id="mobilePlaylistOptionsModal" style="display: none;">
+      <div class="modal-card mob-options-sheet">
+        <div class="mob-options-header">
+          <div class="mob-options-track-info">
+            <div class="mob-opt-text">
+              <h4 id="mobPlaylistOptionsTitle" class="mob-opt-title">Playlist Options</h4>
+              <p id="mobPlaylistOptionsSub" class="mob-opt-artist">Manage your playlist</p>
+            </div>
+          </div>
+          <button class="modal-close-btn" id="closeMobPlaylistOptionsBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div class="mob-options-list">
+          <button class="mob-option-item" id="mobOptDeletePlaylistBtn" style="color: #ef4444;">
+            <div class="mob-option-icon" style="color: #ef4444;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                <line x1="10" y1="11" x2="10" y2="17" />
+                <line x1="14" y1="11" x2="14" y2="17" />
+              </svg>
+            </div>
+            <span>Delete Playlist</span>
           </button>
         </div>
       </div>
@@ -1416,7 +1468,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.24"></script>
+  <script src="/app.js?v=2.26"></script>
 </body>
 
 </html>
