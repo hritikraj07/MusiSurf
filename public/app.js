@@ -131,10 +131,12 @@
     shufflePlaylistBtn: document.getElementById('shufflePlaylistBtn'),
     playlistTracksSortSelect: document.getElementById('playlistTracksSortSelect'),
     deletePlaylistBtn: document.getElementById('deletePlaylistBtn'),
+    exportPlaylistBtn: document.getElementById('exportPlaylistBtn'),
     mobilePlaylistMoreBtn: document.getElementById('mobilePlaylistMoreBtn'),
     mobilePlaylistOptionsModal: document.getElementById('mobilePlaylistOptionsModal'),
     closeMobPlaylistOptionsBtn: document.getElementById('closeMobPlaylistOptionsBtn'),
     mobOptDeletePlaylistBtn: document.getElementById('mobOptDeletePlaylistBtn'),
+    mobOptExportPlaylistBtn: document.getElementById('mobOptExportPlaylistBtn'),
     playlistDownloadStatusCard: document.getElementById('playlistDownloadStatusCard'),
     dlStatusTitle: document.getElementById('dlStatusTitle'),
     dlStatusSub: document.getElementById('dlStatusSub'),
@@ -222,6 +224,7 @@
     mobOptTitle: document.getElementById('mobOptTitle'),
     mobOptArtist: document.getElementById('mobOptArtist'),
     mobOptAddToPlaylistBtn: document.getElementById('mobOptAddToPlaylistBtn'),
+    mobOptViewQueueBtn: document.getElementById('mobOptViewQueueBtn'),
     mobOptQueueBtn: document.getElementById('mobOptQueueBtn'),
     mobOptDownloadBtn: document.getElementById('mobOptDownloadBtn'),
     mobOptDownloadText: document.getElementById('mobOptDownloadText'),
@@ -380,29 +383,19 @@
 
       const shouldHaveBadge = isTrackInAnyPlaylist(trackId);
 
-      // 1. Table row status column (Red circle position before duration)
-      const statusCell = el.querySelector('.col-status');
-      if (statusCell) {
-        statusCell.innerHTML = shouldHaveBadge ? getPlaylistTickBadgeHtml(trackId) : '';
-      }
-
-      // 2. Song row right actions (Red circle position before 3 dots)
-      const rightActions = el.querySelector('.song-row-right-actions');
-      if (rightActions) {
-        const existingBadge = rightActions.querySelector('.in-playlist-tick-badge');
+      // Target title container in tables, song rows, search results, and quick picks
+      const titleContainer = el.querySelector(
+        '.table-title-main, .song-title-text, .quick-pick-title, .top-result-title, .queue-card-title, .queue-now-playing-title'
+      );
+      if (titleContainer) {
+        const existingBadge = titleContainer.querySelector('.in-playlist-tick-badge');
         if (shouldHaveBadge && !existingBadge) {
-          rightActions.insertAdjacentHTML('afterbegin', getPlaylistTickBadgeHtml(trackId));
-        } else if (!shouldHaveBadge && existingBadge) {
-          existingBadge.remove();
-        }
-      }
-
-      // 3. Search top result & Quick picks
-      const metaEl = el.querySelector('.top-result-meta, .quick-pick-info');
-      if (metaEl) {
-        const existingBadge = metaEl.querySelector('.in-playlist-tick-badge');
-        if (shouldHaveBadge && !existingBadge) {
-          metaEl.insertAdjacentHTML('beforeend', getPlaylistTickBadgeHtml(trackId));
+          const dlBadge = titleContainer.querySelector('.downloaded-badge');
+          if (dlBadge) {
+            dlBadge.insertAdjacentHTML('beforebegin', getPlaylistTickBadgeHtml(trackId));
+          } else {
+            titleContainer.insertAdjacentHTML('beforeend', getPlaylistTickBadgeHtml(trackId));
+          }
         } else if (!shouldHaveBadge && existingBadge) {
           existingBadge.remove();
         }
@@ -991,11 +984,12 @@
       if (isPlaylistPlayback && playlistTitle) {
         if (headerSub) headerSub.textContent = 'PLAYING FROM PLAYLIST';
         if (headerName) headerName.textContent = playlistTitle;
+        headerTitleWrap.style.visibility = 'visible';
       } else {
-        if (headerSub) headerSub.textContent = 'NOW PLAYING';
-        if (headerName) headerName.textContent = track.artist || 'MusiSurf';
+        if (headerSub) headerSub.textContent = '';
+        if (headerName) headerName.textContent = '';
+        headerTitleWrap.style.visibility = 'hidden';
       }
-      headerTitleWrap.style.visibility = 'visible';
     }
 
     // Dynamic Atmospheric Background for Mobile Player Modal (100% Solid Opaque, No Translucency)
@@ -1412,9 +1406,7 @@
 
     let nextIdx = state.queueIndex + 1;
     if (nextIdx >= state.queue.length) {
-      if (state.repeatMode === 'all') {
-        nextIdx = 0;
-      } else if (state.activePlaylistTracks && state.activePlaylistTracks.length > 0) {
+      if (state.activePlaylistTracks && state.activePlaylistTracks.length > 0) {
         // If playing from playlist, stay strictly within playlist tracks without pulling outside songs
         if (state.isPlaylistShuffle) {
           const pool = [...state.activePlaylistTracks];
@@ -1500,10 +1492,6 @@
   function onTrackEnded() {
     if (state.repeatMode === 'one' && state.currentTrack) {
       if (state.currentTrack._introTrimmed) state.currentTrack._introTrimmed = false;
-      playTrack(state.currentTrack, state.queue, false);
-      return;
-    }
-    if (state.repeatMode === 'all' && state.queue.length <= 1 && state.currentTrack) {
       playTrack(state.currentTrack, state.queue, false);
       return;
     }
@@ -1983,7 +1971,7 @@
       tile.innerHTML = `
         <img src="${track.image}" alt="${track.title}" class="quick-pick-img">
         <div class="quick-pick-info">
-          <span class="quick-pick-title">${escapeHtml(track.title)}${getDownloadedBadgeHtml(track.id)}</span>
+          <span class="quick-pick-title">${escapeHtml(track.title)}${getPlaylistTickBadgeHtml(track.id)}${getDownloadedBadgeHtml(track.id)}</span>
         </div>
         <button class="quick-pick-play-btn" title="Play Full Song">
           <svg viewBox="0 0 24 24" fill="currentColor">
@@ -2115,10 +2103,9 @@
       <div class="top-result-header-row">
         <img src="${top.image}" alt="${escapeHtml(top.title)}" class="top-result-img">
         <div class="top-result-info">
-          <h4 class="top-result-title">${escapeHtml(top.title)}${getDownloadedBadgeHtml(top.id)}</h4>
+          <h4 class="top-result-title">${escapeHtml(top.title)}${getPlaylistTickBadgeHtml(top.id)}${getDownloadedBadgeHtml(top.id)}</h4>
           <div class="top-result-meta">
             <span class="top-result-artist">${escapeHtml(top.artist)}</span>
-            ${getPlaylistTickBadgeHtml(top.id)}
             <span class="top-result-pill">Song</span>
           </div>
         </div>
@@ -2306,11 +2293,10 @@
     row.innerHTML = `
       <img src="${track.image}" alt="${escapeHtml(track.title)}" class="song-thumb">
       <div class="song-info-col">
-        <div class="song-title-text">${escapeHtml(track.title)}${badgeHtml}</div>
+        <div class="song-title-text">${escapeHtml(track.title)}${tickHtml}${badgeHtml}</div>
         <div class="song-artist-text">${escapeHtml(track.artist)}</div>
       </div>
       <div class="song-row-right-actions">
-        ${tickHtml}
         <button class="song-action-btn song-more-trigger" title="More Options">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <circle cx="12" cy="5" r="2"/>
@@ -2354,13 +2340,12 @@
         <div class="table-title-cell">
           <img src="${track.image}" alt="${escapeHtml(track.title)}" class="table-cover" loading="lazy">
           <div>
-            <div class="table-title-main">${escapeHtml(track.title)}${badgeHtml}</div>
+            <div class="table-title-main">${escapeHtml(track.title)}${tickHtml}${badgeHtml}</div>
             <div class="table-artist-sub">${escapeHtml(track.artist)}</div>
           </div>
         </div>
       </td>
       <td class="col-album">${escapeHtml(track.album || 'Single')}</td>
-      <td class="col-status">${tickHtml}</td>
       <td class="col-duration">${track.durationStr || '3:30'}</td>
       <td class="col-actions">
         <button class="song-action-btn song-more-trigger" title="More Options">
@@ -2735,6 +2720,7 @@
     // Sort handling for playlist tracks
     const sortSelect = document.getElementById('playlistTracksSortSelect');
     const sortMode = sortSelect ? sortSelect.value : 'custom';
+    syncCustomDropdown('playlistTracksSortDropdown', sortMode);
     
     let sortedTracks = [...tracks];
     if (sortMode === 'title') {
@@ -2832,6 +2818,11 @@
 
     updatePlayPauseButton();
 
+    // Export playlist action
+    if (elements.exportPlaylistBtn) {
+      elements.exportPlaylistBtn.onclick = () => exportCurrentPlaylist();
+    }
+
     // Delete custom playlist (kept solely inside playlist view)
     elements.deletePlaylistBtn.onclick = () => {
       if (confirm(`Are you sure you want to delete playlist "${title}"?`)) {
@@ -2858,6 +2849,70 @@
         }
       };
     }
+  }
+
+  // Export Playlist as JSON
+  function exportCurrentPlaylist() {
+    let title = 'Playlist';
+    let desc = '';
+    let tracks = [];
+    if (state.activePlaylistId === 'liked') {
+      title = 'Liked Songs';
+      desc = 'Your collection of favorite songs';
+      tracks = state.likedSongs || [];
+    } else if (state.activePlaylistId === 'downloaded') {
+      title = 'Downloaded Songs';
+      desc = 'Stored locally on your device';
+      tracks = state.offlineTracks || [];
+    } else {
+      const pl = state.customPlaylists.find(p => p.id === state.activePlaylistId);
+      if (pl) {
+        title = pl.name;
+        desc = pl.description || 'Custom playlist';
+        tracks = pl.tracks || [];
+      }
+    }
+
+    if (!tracks || tracks.length === 0) {
+      showToast('Playlist is empty, nothing to export', 'ℹ️');
+      return;
+    }
+
+    const exportPayload = {
+      app: 'MusiSurf',
+      version: '1.0',
+      playlistName: title,
+      description: desc,
+      exportedAt: new Date().toISOString(),
+      trackCount: tracks.length,
+      tracks: tracks.map((t, idx) => ({
+        index: idx + 1,
+        title: t.title,
+        artist: t.artist,
+        album: t.album || '',
+        duration: t.duration || 0,
+        durationStr: t.durationStr || '',
+        image: t.image || '',
+        source: t.source || 'jiosaavn',
+        id: t.id
+      }))
+    };
+
+    const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const safeName = title.toLowerCase().replace(/[^a-z0-9_-]/gi, '_');
+    a.download = `${safeName}_playlist.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    if (elements.mobilePlaylistOptionsModal) {
+      elements.mobilePlaylistOptionsModal.style.display = 'none';
+    }
+    showToast(`Exported "${title}" (${tracks.length} songs)`, '📥');
   }
 
   function renderSidebarPlaylists() {
@@ -3077,6 +3132,7 @@
         const sortMode = localStorage.getItem('musisurf_playlist_sort') || 'recents';
         if (elements.libPlaylistSortSelect) {
           elements.libPlaylistSortSelect.value = sortMode;
+          syncCustomDropdown('libPlaylistSortDropdown', sortMode);
         }
 
         let sortedPlaylists = [...state.customPlaylists];
@@ -3428,13 +3484,12 @@
             <div class="table-title-cell">
               <img src="${track.image || DEFAULT_LOCAL_COVER}" alt="${track.title}" class="table-cover">
               <div>
-                <div class="table-title-main">${escapeHtml(track.title)}${getDownloadedBadgeHtml(track.id)}</div>
+                <div class="table-title-main">${escapeHtml(track.title)}${getPlaylistTickBadgeHtml(track.id)}${getDownloadedBadgeHtml(track.id)}</div>
                 <div class="table-artist-sub">${escapeHtml(track.artist || 'Local File')}</div>
               </div>
             </div>
           </td>
           <td class="col-album">${escapeHtml(track.fileName || track.album || 'Device Storage')}</td>
-          <td class="col-status">${getPlaylistTickBadgeHtml(track.id)}</td>
           <td class="col-duration">${track.durationStr || '--:--'}</td>
           <td class="col-actions">
             <button class="song-action-btn add-to-queue-trigger" title="Add to Queue">
@@ -3516,14 +3571,107 @@
   }
 
   // ==========================================================================
+  // CUSTOM SORT DROPDOWN CONTROLLER
+  // ==========================================================================
+  function setupCustomDropdown(dropdownId, selectId, onChange) {
+    const dropdown = document.getElementById(dropdownId);
+    const select = document.getElementById(selectId);
+    if (!dropdown || !select) return;
+
+    const trigger = dropdown.querySelector('.custom-sort-trigger');
+    const label = dropdown.querySelector('.custom-sort-label');
+    const items = dropdown.querySelectorAll('.custom-sort-item');
+
+    const updateUI = (val) => {
+      items.forEach(item => {
+        const isMatch = item.dataset.value === val;
+        item.classList.toggle('selected', isMatch);
+        if (isMatch && label) {
+          label.textContent = item.querySelector('span')?.textContent || item.textContent.trim();
+        }
+      });
+    };
+
+    updateUI(select.value);
+
+    if (trigger && !trigger._hasDropdownListener) {
+      trigger._hasDropdownListener = true;
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = dropdown.classList.contains('open');
+        document.querySelectorAll('.custom-sort-dropdown.open').forEach(d => {
+          if (d !== dropdown) d.classList.remove('open');
+        });
+        dropdown.classList.toggle('open', !isOpen);
+      });
+    }
+
+    items.forEach(item => {
+      if (!item._hasItemListener) {
+        item._hasItemListener = true;
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const val = item.dataset.value;
+          select.value = val;
+          updateUI(val);
+          dropdown.classList.remove('open');
+          select.dispatchEvent(new Event('change'));
+          if (typeof onChange === 'function') onChange(val);
+        });
+      }
+    });
+  }
+
+  function syncCustomDropdown(dropdownId, val) {
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) return;
+    const label = dropdown.querySelector('.custom-sort-label');
+    const items = dropdown.querySelectorAll('.custom-sort-item');
+    items.forEach(item => {
+      const isMatch = item.dataset.value === val;
+      item.classList.toggle('selected', isMatch);
+      if (isMatch && label) {
+        label.textContent = item.querySelector('span')?.textContent || item.textContent.trim();
+      }
+    });
+  }
+
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.custom-sort-dropdown.open').forEach(d => d.classList.remove('open'));
+  });
+
+  // Navigate to Top of Home page from anywhere in website/app
+  function navigateToHomeTop() {
+    if (elements.mobilePlayerModal) elements.mobilePlayerModal.style.display = 'none';
+    if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
+    if (elements.mobilePlaylistOptionsModal) elements.mobilePlaylistOptionsModal.style.display = 'none';
+    if (elements.createPlaylistModal) elements.createPlaylistModal.style.display = 'none';
+    if (elements.addToPlaylistModal) elements.addToPlaylistModal.style.display = 'none';
+    if (elements.sleepTimerModal) elements.sleepTimerModal.style.display = 'none';
+    closeQueueDrawer();
+    document.body.style.overflow = '';
+
+    switchView('home', { force: true });
+    [elements.mobNavHome, elements.mobNavSearch, elements.mobNavLibrary].forEach(btn => {
+      if (btn) btn.classList.toggle('active', btn.id === 'mobNavHome');
+    });
+
+    if (elements.contentScroll) {
+      elements.contentScroll.scrollTop = 0;
+      elements.contentScroll.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ==========================================================================
   // EVENT LISTENERS & SETUP
   // ==========================================================================
   function setupEventListeners() {
-    // Navigation
-    elements.navHome.addEventListener('click', () => switchView('home'));
+    // Navigation (Home button redirects to top of Home from anywhere)
+    elements.navHome.addEventListener('click', navigateToHomeTop);
     elements.navBrand.addEventListener('click', (e) => {
       e.preventDefault();
-      switchView('home');
+      navigateToHomeTop();
     });
     elements.navSearch.addEventListener('click', () => {
       switchView('search');
@@ -3540,6 +3688,18 @@
         updateLibraryUI();
       });
     }
+
+    // Initialize custom Spotify-grade sort dropdowns
+    setupCustomDropdown('libPlaylistSortDropdown', 'libPlaylistSortSelect', (val) => {
+      localStorage.setItem('musisurf_playlist_sort', val);
+      updateLibraryUI();
+    });
+    setupCustomDropdown('playlistTracksSortDropdown', 'playlistTracksSortSelect', (val) => {
+      if (state.activePlaylistId) {
+        renderPlaylistView(state.activePlaylistId);
+      }
+    });
+
     if (elements.navExplore) {
       elements.navExplore.addEventListener('click', () => {
         switchView('search');
@@ -3632,9 +3792,8 @@
       if (state.currentTrack) toggleLikeSong(state.currentTrack);
     });
 
-    // Repeat Mode Synchronization (Desktop & Mobile, with audio.loop for seamless repeat)
+    // Repeat Mode: strictly repeats the currently playing track only (per user specification)
     function updateRepeatUI() {
-      const isRepeatOn = state.repeatMode !== 'off';
       const isRepeatOne = state.repeatMode === 'one';
 
       if (elements.audio) {
@@ -3643,8 +3802,8 @@
 
       [elements.repeatBtn, elements.mobRepeatBtn].forEach(btn => {
         if (!btn) return;
-        btn.classList.toggle('active', isRepeatOn);
-        btn.title = isRepeatOne ? 'Repeat: Current Track' : (isRepeatOn ? 'Repeat: Entire Queue' : 'Enable Repeat');
+        btn.classList.toggle('active', isRepeatOne);
+        btn.title = isRepeatOne ? 'Repeat Track: On' : 'Repeat Track: Off';
         const indicator = btn.querySelector('.repeat-one-indicator');
         if (indicator) {
           indicator.style.display = isRepeatOne ? 'flex' : 'none';
@@ -3653,13 +3812,8 @@
     }
 
     function toggleRepeatMode() {
-      if (state.repeatMode === 'off') {
-        state.repeatMode = 'one';
-      } else if (state.repeatMode === 'one') {
-        state.repeatMode = 'all';
-      } else {
-        state.repeatMode = 'off';
-      }
+      state.repeatMode = state.repeatMode === 'one' ? 'off' : 'one';
+      showToast(state.repeatMode === 'one' ? 'Repeat Track: On' : 'Repeat Track: Off', state.repeatMode === 'one' ? '🔂' : '🔁');
       updateRepeatUI();
     }
 
@@ -4190,8 +4344,7 @@
     };
 
     if (elements.mobNavHome) elements.mobNavHome.addEventListener('click', () => {
-      switchView('home');
-      updateMobNav('mobNavHome');
+      navigateToHomeTop();
     });
 
     // Mobile Search Button:
@@ -4521,6 +4674,17 @@
       });
     }
 
+    if (elements.mobOptViewQueueBtn) {
+      elements.mobOptViewQueueBtn.addEventListener('click', () => {
+        if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
+        if (elements.queueDrawer) {
+          renderQueue();
+          elements.queueDrawer.classList.add('open');
+          try { window.history.pushState({ drawer: 'queue' }, '', window.location.pathname); } catch (e) {}
+        }
+      });
+    }
+
     if (elements.mobOptQueueBtn) {
       elements.mobOptQueueBtn.addEventListener('click', () => {
         if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
@@ -4589,6 +4753,12 @@
         if (e.target === elements.mobilePlaylistOptionsModal) {
           elements.mobilePlaylistOptionsModal.style.display = 'none';
         }
+      });
+    }
+
+    if (elements.mobOptExportPlaylistBtn) {
+      elements.mobOptExportPlaylistBtn.addEventListener('click', () => {
+        exportCurrentPlaylist();
       });
     }
 

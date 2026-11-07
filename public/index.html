@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=5.6">
+  <link rel="stylesheet" href="/styles.css?v=5.8">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -231,19 +231,6 @@
       <!-- Top Navigation & Search Header -->
       <header class="top-header" id="topHeader">
         <div class="header-left">
-          <div class="history-controls">
-            <button class="history-btn" id="historyBackBtn" title="Go back" disabled>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
-            <button class="history-btn" id="historyForwardBtn" title="Go forward" disabled>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
-          </div>
-
           <!-- Global Interactive Search Box -->
           <div class="search-box-wrapper" id="searchBoxWrapper">
             <div class="search-box">
@@ -505,6 +492,14 @@
                   <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
                 </svg>
               </button>
+              <button class="playlist-action-sub-btn export-playlist-btn" id="exportPlaylistBtn" title="Export Playlist">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <span>Export</span>
+              </button>
               <button class="playlist-action-sub-btn delete-playlist-btn" id="deletePlaylistBtn" title="Delete Playlist" style="display: none;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="3 6 5 6 21 6" />
@@ -522,11 +517,39 @@
               </button>
             </div>
             <div class="playlist-sort-row">
-              <div class="playlist-sort-dropdown-wrap lib-sort-dropdown-wrap">
-                <svg class="lib-sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 6h18M6 12h12m-9 6h6"/>
-                </svg>
-                <select id="playlistTracksSortSelect" class="lib-sort-select" aria-label="Sort playlist tracks">
+              <div class="custom-sort-dropdown" id="playlistTracksSortDropdown">
+                <button class="custom-sort-trigger" id="playlistTracksSortTrigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+                  <svg class="lib-sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 6h18M6 12h12m-9 6h6"/>
+                  </svg>
+                  <span class="custom-sort-label" id="playlistTracksSortLabel">Custom Order</span>
+                  <svg class="custom-sort-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+                <div class="custom-sort-menu" id="playlistTracksSortMenu" role="listbox">
+                  <div class="custom-sort-item selected" data-value="custom" role="option">
+                    <span>Custom Order</span>
+                    <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </div>
+                  <div class="custom-sort-item" data-value="title" role="option">
+                    <span>Title (A-Z)</span>
+                    <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </div>
+                  <div class="custom-sort-item" data-value="artist" role="option">
+                    <span>Artist (A-Z)</span>
+                    <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </div>
+                  <div class="custom-sort-item" data-value="recents" role="option">
+                    <span>Recently Added</span>
+                    <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </div>
+                  <div class="custom-sort-item" data-value="duration" role="option">
+                    <span>Duration</span>
+                    <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </div>
+                </div>
+                <select id="playlistTracksSortSelect" class="lib-sort-select" aria-label="Sort playlist tracks" style="display: none;" aria-hidden="true">
                   <option value="custom">Custom Order</option>
                   <option value="title">Title (A-Z)</option>
                   <option value="artist">Artist (A-Z)</option>
@@ -559,7 +582,6 @@
                   <th class="col-num">#</th>
                   <th class="col-title">Title</th>
                   <th class="col-album">Album</th>
-                  <th class="col-status"></th>
                   <th class="col-duration">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <circle cx="12" cy="12" r="10" />
@@ -678,7 +700,6 @@
                   <th class="col-num">#</th>
                   <th class="col-title">Title</th>
                   <th class="col-album">File Name</th>
-                  <th class="col-status"></th>
                   <th class="col-duration">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <circle cx="12" cy="12" r="10" />
@@ -791,11 +812,35 @@
                   <h2 class="library-section-heading">Playlists</h2>
                 </div>
                 <div class="lib-header-right">
-                  <div class="lib-sort-dropdown-wrap">
-                    <svg class="lib-sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M3 6h18M6 12h12m-9 6h6"/>
-                    </svg>
-                    <select id="libPlaylistSortSelect" class="lib-sort-select" aria-label="Sort playlists">
+                  <div class="custom-sort-dropdown" id="libPlaylistSortDropdown">
+                    <button class="custom-sort-trigger" id="libPlaylistSortTrigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+                      <svg class="lib-sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 6h18M6 12h12m-9 6h6"/>
+                      </svg>
+                      <span class="custom-sort-label" id="libPlaylistSortLabel">Recents</span>
+                      <svg class="custom-sort-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                      </svg>
+                    </button>
+                    <div class="custom-sort-menu" id="libPlaylistSortMenu" role="listbox">
+                      <div class="custom-sort-item selected" data-value="recents" role="option">
+                        <span>Recents</span>
+                        <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </div>
+                      <div class="custom-sort-item" data-value="added" role="option">
+                        <span>Recently Added</span>
+                        <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </div>
+                      <div class="custom-sort-item" data-value="alphabetical" role="option">
+                        <span>Alphabetical</span>
+                        <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </div>
+                      <div class="custom-sort-item" data-value="custom" role="option">
+                        <span>Custom</span>
+                        <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </div>
+                    </div>
+                    <select id="libPlaylistSortSelect" class="lib-sort-select" aria-label="Sort playlists" style="display: none;" aria-hidden="true">
                       <option value="recents">Recents</option>
                       <option value="added">Recently Added</option>
                       <option value="alphabetical">Alphabetical</option>
@@ -1037,9 +1082,9 @@
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </button>
-        <div class="mobile-player-header-title">
-          <span class="mob-header-sub">NOW PLAYING</span>
-          <span class="mob-header-main" id="mobHeaderPlaylistName">MusiSurf</span>
+        <div class="mobile-player-header-title" style="visibility: hidden;">
+          <span class="mob-header-sub"></span>
+          <span class="mob-header-main" id="mobHeaderPlaylistName"></span>
         </div>
         <div class="mobile-player-header-placeholder"></div>
       </div>
@@ -1135,16 +1180,6 @@
             <line x1="12" y1="17" x2="12" y2="21"/>
           </svg>
         </button>
-        <button class="mob-bottom-icon-btn" id="mobPlayerQueueBtn" title="Queue" aria-label="View Queue">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="8" y1="6" x2="21" y2="6"/>
-            <line x1="8" y1="12" x2="21" y2="12"/>
-            <line x1="8" y1="18" x2="21" y2="18"/>
-            <line x1="3" y1="6" x2="3.01" y2="6"/>
-            <line x1="3" y1="12" x2="3.01" y2="12"/>
-            <line x1="3" y1="18" x2="3.01" y2="18"/>
-          </svg>
-        </button>
         <button class="mob-bottom-icon-btn" id="mobPlayerOptionsBtn" title="More Options" aria-label="More Options">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
             <line x1="4" y1="7" x2="20" y2="7"/>
@@ -1190,6 +1225,19 @@
               </svg>
             </div>
             <span>Add to Playlist</span>
+          </button>
+          <button class="mob-option-item" id="mobOptViewQueueBtn">
+            <div class="mob-option-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="8" y1="6" x2="21" y2="6"/>
+                <line x1="8" y1="12" x2="21" y2="12"/>
+                <line x1="8" y1="18" x2="21" y2="18"/>
+                <line x1="3" y1="6" x2="3.01" y2="6"/>
+                <line x1="3" y1="12" x2="3.01" y2="12"/>
+                <line x1="3" y1="18" x2="3.01" y2="18"/>
+              </svg>
+            </div>
+            <span>View Play Queue</span>
           </button>
           <button class="mob-option-item" id="mobOptQueueBtn">
             <div class="mob-option-icon">
@@ -1244,6 +1292,16 @@
           </button>
         </div>
         <div class="mob-options-list">
+          <button class="mob-option-item" id="mobOptExportPlaylistBtn">
+            <div class="mob-option-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </div>
+            <span>Export Playlist</span>
+          </button>
           <button class="mob-option-item" id="mobOptDeletePlaylistBtn" style="color: #ef4444;">
             <div class="mob-option-icon" style="color: #ef4444;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1476,7 +1534,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.28"></script>
+  <script src="/app.js?v=2.30"></script>
 </body>
 
 </html>
