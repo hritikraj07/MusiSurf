@@ -3399,6 +3399,77 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   margin-top: 2px !important;
 }
 
+/* Checkbox inside Add to Playlist Modal (Spotify Style Multi-Select) */
+.modal-playlist-checkbox {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  transition: all var(--transition-fast);
+  background: transparent;
+}
+
+.modal-playlist-checkbox.checked {
+  background-color: var(--accent-primary, #00f260);
+  border-color: var(--accent-primary, #00f260);
+}
+
+.modal-playlist-checkbox svg {
+  width: 14px;
+  height: 14px;
+  color: #000;
+  stroke: #000;
+  stroke-width: 3;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: all var(--transition-fast);
+}
+
+.modal-playlist-checkbox.checked svg {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Rename Playlist Button */
+.rename-playlist-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 500px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.rename-playlist-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: scale(1.02);
+}
+
+.rename-playlist-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Ensure mobile tap on playlist album goes inside playlist */
+@media (max-width: 768px), (hover: none) {
+  .custom-playlist-card .card-play-btn {
+    display: none !important;
+    pointer-events: none !important;
+  }
+}
+
 /* Shortcuts Modal */
 .shortcuts-card {
   max-width: 520px;

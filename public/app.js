@@ -129,12 +129,14 @@
     playlistEmptyState: document.getElementById('playlistEmptyState'),
     playAllPlaylistBtn: document.getElementById('playAllPlaylistBtn'),
     shufflePlaylistBtn: document.getElementById('shufflePlaylistBtn'),
+    renamePlaylistBtn: document.getElementById('renamePlaylistBtn'),
     playlistTracksSortSelect: document.getElementById('playlistTracksSortSelect'),
     deletePlaylistBtn: document.getElementById('deletePlaylistBtn'),
     exportPlaylistBtn: document.getElementById('exportPlaylistBtn'),
     mobilePlaylistMoreBtn: document.getElementById('mobilePlaylistMoreBtn'),
     mobilePlaylistOptionsModal: document.getElementById('mobilePlaylistOptionsModal'),
     closeMobPlaylistOptionsBtn: document.getElementById('closeMobPlaylistOptionsBtn'),
+    mobOptRenamePlaylistBtn: document.getElementById('mobOptRenamePlaylistBtn'),
     mobOptDeletePlaylistBtn: document.getElementById('mobOptDeletePlaylistBtn'),
     mobOptExportPlaylistBtn: document.getElementById('mobOptExportPlaylistBtn'),
     playlistDownloadStatusCard: document.getElementById('playlistDownloadStatusCard'),
@@ -249,6 +251,7 @@
     addToPlaylistModal: document.getElementById('addToPlaylistModal'),
     modalPlaylistPickerList: document.getElementById('modalPlaylistPickerList'),
     closeAddToPlaylistBtn: document.getElementById('closeAddToPlaylistBtn'),
+    doneAddToPlaylistBtn: document.getElementById('doneAddToPlaylistBtn'),
 
     settingsModal: document.getElementById('settingsModal'),
     openSettingsBtn: document.getElementById('openSettingsBtn'),
@@ -1078,27 +1081,12 @@
         elements.audio.play().catch(err => {
           console.warn('Offline playback error:', err);
         });
-      } else if (track.source === 'youtube' || !track.hasDirectAudio) {
-        // Universal YouTube Engine for 100% full-length song playback
-        track.source = 'youtube';
-        elements.audio.pause();
-        let retries = 0;
-        const playYt = () => {
-          if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function' && track.ytId) {
-            state.ytPlayer.loadVideoById(track.ytId);
-            state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
-            state.ytPlayer.playVideo();
-          } else if (retries < 25) {
-            retries++;
-            setTimeout(playYt, 200);
-          }
-        };
-        playYt();
-      } else {
+      } else if (track.audioUrl || track.streamUrl) {
         // High quality full-length direct audio streaming
         if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.stopVideo === 'function') {
-          state.ytPlayer.stopVideo();
+          try { state.ytPlayer.stopVideo(); } catch (e) {}
         }
+        track.source = 'saavn';
 
         // Ensure volume is audible and unmuted
         if (state.isMuted || state.volume <= 0.05) {
@@ -1107,13 +1095,8 @@
           elements.audio.volume = state.volume;
         }
 
-        const streamUrl = track.streamUrl || (track.audioUrl ? `/api/stream?url=${encodeURIComponent(track.audioUrl)}` : null);
+        const streamUrl = track.streamUrl || `/api/stream?url=${encodeURIComponent(track.audioUrl)}`;
         const audioSrc = track.audioUrl || streamUrl;
-        if (!audioSrc) {
-          showToast('Audio stream unavailable for this track', '⚠️');
-          return;
-        }
-
         elements.audio.src = audioSrc;
         elements.audio.load();
         const playPromise = elements.audio.play();
@@ -1127,6 +1110,24 @@
             }
           });
         }
+      } else if (track.source === 'youtube' && track.ytId) {
+        // Universal YouTube Engine only when explicitly YouTube source with valid ytId
+        try { elements.audio.pause(); elements.audio.currentTime = 0; } catch (e) {}
+        let retries = 0;
+        const playYt = () => {
+          if (!state.isPlaying || state.currentTrack?.id !== track.id) return;
+          if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
+            state.ytPlayer.loadVideoById(track.ytId);
+            state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
+            state.ytPlayer.playVideo();
+          } else if (retries < 15) {
+            retries++;
+            setTimeout(playYt, 200);
+          }
+        };
+        playYt();
+      } else {
+        showToast('Audio stream unavailable for this track', '⚠️');
       }
     }
 
@@ -1154,32 +1155,33 @@
       return;
     }
 
-    if (state.currentTrack.source === 'youtube') {
-      if (!state.ytReady || !state.ytPlayer) return;
-      const ytState = state.ytPlayer.getPlayerState();
-      if (ytState === YT.PlayerState.PLAYING) {
-        state.ytPlayer.pauseVideo();
-        state.isPlaying = false;
-      } else {
-        state.ytPlayer.playVideo();
-        state.isPlaying = true;
+    if (state.isPlaying) {
+      // Pause both audio engines immediately
+      state.isPlaying = false;
+      try { elements.audio.pause(); } catch (e) {}
+      if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
+        try { state.ytPlayer.pauseVideo(); } catch (e) {}
       }
     } else {
-      if (elements.audio.paused) {
-        const resumePromise = elements.audio.play();
-        if (resumePromise !== undefined) {
-          resumePromise.catch(err => {
-            if (state.currentTrack?.audioUrl && !elements.audio.src.includes('/api/stream')) {
-              elements.audio.src = `/api/stream?url=${encodeURIComponent(state.currentTrack.audioUrl)}`;
-              elements.audio.volume = state.isMuted ? 0 : state.volume;
-              elements.audio.play().catch(e => console.warn('Proxy resume error:', e));
-            }
-          });
+      // Resume playback
+      state.isPlaying = true;
+      if (state.currentTrack.source === 'youtube') {
+        if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.playVideo === 'function') {
+          try { state.ytPlayer.playVideo(); } catch (e) {}
         }
-        state.isPlaying = true;
       } else {
-        elements.audio.pause();
-        state.isPlaying = false;
+        if (elements.audio.paused) {
+          const resumePromise = elements.audio.play();
+          if (resumePromise !== undefined) {
+            resumePromise.catch(err => {
+              if (state.currentTrack?.streamUrl) {
+                elements.audio.src = state.currentTrack.streamUrl;
+                elements.audio.volume = state.isMuted ? 0 : state.volume;
+                elements.audio.play().catch(e => console.warn('Proxy resume error:', e));
+              }
+            });
+          }
+        }
       }
     }
 
@@ -1932,7 +1934,7 @@
 
   async function loadTrendingShelves() {
     try {
-      const res = await fetch('/api/trending');
+      const res = await fetch(`/api/trending?t=${Date.now()}&refresh=1`);
       const data = await res.json();
 
       if (!data.success || !data.sections) {
@@ -2651,6 +2653,14 @@
   function renderPlaylistView(playlistId) {
     switchView('playlist', { force: true });
     state.activePlaylistId = playlistId;
+
+    try {
+      localStorage.setItem('musisurf_current_view', JSON.stringify({
+        view: 'playlist',
+        playlistId: playlistId
+      }));
+    } catch (e) {}
+
     if (elements.views.playlist) elements.views.playlist.classList.add('active');
     if (elements.contentScroll) elements.contentScroll.scrollTop = 0;
 
@@ -2662,6 +2672,7 @@
     if (playlistId === 'liked') {
       tracks = state.likedSongs;
       elements.deletePlaylistBtn.style.display = 'none';
+      if (elements.renamePlaylistBtn) elements.renamePlaylistBtn.style.display = 'none';
       if (elements.mobilePlaylistMoreBtn) elements.mobilePlaylistMoreBtn.style.display = 'none';
       elements.playlistCoverArt.innerHTML = createPlaylistCollageHtml(
         state.likedSongs,
@@ -2675,6 +2686,7 @@
       desc = 'Stored locally on your device. Listen anywhere 100% offline with zero internet!';
       tracks = state.offlineTracks;
       elements.deletePlaylistBtn.style.display = 'none';
+      if (elements.renamePlaylistBtn) elements.renamePlaylistBtn.style.display = 'none';
       if (elements.mobilePlaylistMoreBtn) elements.mobilePlaylistMoreBtn.style.display = 'none';
       elements.playlistCoverArt.innerHTML = createPlaylistCollageHtml(
         state.offlineTracks,
@@ -2694,6 +2706,7 @@
         pl.lastPlayedAt = Date.now();
         saveStoredPlaylists();
         elements.deletePlaylistBtn.style.display = 'inline-flex';
+        if (elements.renamePlaylistBtn) elements.renamePlaylistBtn.style.display = 'inline-flex';
         if (elements.mobilePlaylistMoreBtn) elements.mobilePlaylistMoreBtn.style.display = 'inline-flex';
         elements.playlistCoverArt.innerHTML = createPlaylistCollageHtml(
           tracks,
@@ -2818,6 +2831,11 @@
 
     updatePlayPauseButton();
 
+    // Rename playlist action
+    if (elements.renamePlaylistBtn) {
+      elements.renamePlaylistBtn.onclick = () => promptRenameCurrentPlaylist();
+    }
+
     // Export playlist action
     if (elements.exportPlaylistBtn) {
       elements.exportPlaylistBtn.onclick = () => exportCurrentPlaylist();
@@ -2849,6 +2867,25 @@
         }
       };
     }
+  }
+
+  // Rename Custom Playlist Action
+  function promptRenameCurrentPlaylist() {
+    const playlistId = state.activePlaylistId;
+    if (!playlistId || playlistId === 'liked' || playlistId === 'downloaded' || playlistId === 'local') return;
+    const pl = state.customPlaylists.find(p => p.id === playlistId);
+    if (!pl) return;
+    const currentName = pl.name || 'My Playlist';
+    const newName = prompt('Enter new playlist name:', currentName);
+    if (!newName || !newName.trim() || newName.trim() === currentName) return;
+    pl.name = newName.trim();
+    saveStoredPlaylists();
+    renderSidebarPlaylists();
+    updateLibraryUI();
+    if (elements.playlistTitle) elements.playlistTitle.textContent = pl.name;
+    const titleEl = document.getElementById('mobPlaylistOptionsTitle');
+    if (titleEl) titleEl.textContent = pl.name;
+    showToast(`Playlist renamed to "${pl.name}"`, '✏️');
   }
 
   // Export Playlist as JSON
@@ -3017,6 +3054,14 @@
     state.previousView = state.currentView;
     state.currentView = viewName;
     document.body.dataset.activeView = viewName;
+
+    // Persist active view so refreshing page returns to current location
+    try {
+      localStorage.setItem('musisurf_current_view', JSON.stringify({
+        view: viewName,
+        playlistId: viewName === 'playlist' ? state.activePlaylistId : null
+      }));
+    } catch (e) {}
 
     if (pushHistory) {
       navHistoryStack.push(viewName);
@@ -3252,8 +3297,8 @@
     });
     elements.modalPlaylistPickerList.appendChild(newPlItem);
 
-    // Liked Songs collection option
-    const isAlreadyLiked = state.likedSongs.some(t => t.id === track.id);
+    // Liked Songs collection option with checkbox
+    let isAlreadyLiked = state.likedSongs.some(t => t.id === track.id);
     const likedItem = document.createElement('div');
     likedItem.className = 'library-item';
     likedItem.style.marginBottom = '6px';
@@ -3265,22 +3310,34 @@
         </svg>
       </div>
       <div class="library-item-info">
-        <span class="library-item-title" style="font-weight: 700;">Liked Songs ${isAlreadyLiked ? '<span style="color:var(--accent-primary); font-size:0.8rem; margin-left:6px;">✓ Added</span>' : ''}</span>
+        <span class="library-item-title" style="font-weight: 700;">Liked Songs</span>
         <span class="library-item-meta">${state.likedSongs.length} songs</span>
+      </div>
+      <div class="modal-playlist-checkbox ${isAlreadyLiked ? 'checked' : ''}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
       </div>
     `;
     likedItem.addEventListener('click', () => {
-      if (!isAlreadyLiked) {
-        state.likedSongs.unshift(track);
-        saveLikedSongs();
-        updateHeartIcon(track.id);
-        updateAllPlaylistTickBadges(track.id);
-        showToast('Added to Liked Songs', '♥');
+      isAlreadyLiked = state.likedSongs.some(t => t.id === track.id);
+      const chk = likedItem.querySelector('.modal-playlist-checkbox');
+      if (isAlreadyLiked) {
+        state.likedSongs = state.likedSongs.filter(t => t.id !== track.id);
+        chk.classList.remove('checked');
+        showToast('Removed from Liked Songs', 'ℹ');
       } else {
-        showToast('Already in Liked Songs', '♥');
+        state.likedSongs.unshift(track);
+        chk.classList.add('checked');
+        showToast('Added to Liked Songs', '♥');
       }
-      elements.addToPlaylistModal.style.display = 'none';
-      pendingTrackForPlaylist = null;
+      saveLikedSongs();
+      updateHeartIcon(track.id);
+      updateAllPlaylistTickBadges(track.id);
+      likedItem.querySelector('.library-item-meta').textContent = `${state.likedSongs.length} songs`;
+      if (state.activePlaylistId === 'liked') {
+        renderPlaylistView('liked');
+      }
     });
     elements.modalPlaylistPickerList.appendChild(likedItem);
 
@@ -3293,6 +3350,8 @@
       elements.modalPlaylistPickerList.appendChild(emptyNote);
     } else {
       state.customPlaylists.forEach(pl => {
+        if (!pl.tracks) pl.tracks = [];
+        let inThisPl = pl.tracks.some(t => t.id === track.id);
         const item = document.createElement('div');
         item.className = 'library-item';
         item.style.cursor = 'pointer';
@@ -3302,21 +3361,32 @@
           </div>
           <div class="library-item-info">
             <span class="library-item-title">${escapeHtml(pl.name)}</span>
-            <span class="library-item-meta">${pl.tracks?.length || 0} songs</span>
+            <span class="library-item-meta">${pl.tracks.length} songs</span>
+          </div>
+          <div class="modal-playlist-checkbox ${inThisPl ? 'checked' : ''}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
           </div>
         `;
         item.addEventListener('click', () => {
-          if (!pl.tracks) pl.tracks = [];
-          if (!pl.tracks.some(t => t.id === track.id)) {
-            pl.tracks.push(track);
-            saveStoredPlaylists();
-            updateAllPlaylistTickBadges(track.id);
-            showToast(`Added to "${pl.name}"`, '✓');
+          inThisPl = pl.tracks.some(t => t.id === track.id);
+          const chk = item.querySelector('.modal-playlist-checkbox');
+          if (inThisPl) {
+            pl.tracks = pl.tracks.filter(t => t.id !== track.id);
+            chk.classList.remove('checked');
+            showToast(`Removed from "${pl.name}"`, 'ℹ');
           } else {
-            showToast(`Already in "${pl.name}"`, 'ℹ');
+            pl.tracks.push(track);
+            chk.classList.add('checked');
+            showToast(`Added to "${pl.name}"`, '✓');
           }
-          elements.addToPlaylistModal.style.display = 'none';
-          pendingTrackForPlaylist = null;
+          saveStoredPlaylists();
+          updateAllPlaylistTickBadges(track.id);
+          item.querySelector('.library-item-meta').textContent = `${pl.tracks.length} songs`;
+          if (state.activePlaylistId === pl.id) {
+            renderPlaylistView(pl.id);
+          }
         });
         elements.modalPlaylistPickerList.appendChild(item);
       });
@@ -3650,6 +3720,13 @@
     if (elements.sleepTimerModal) elements.sleepTimerModal.style.display = 'none';
     closeQueueDrawer();
     document.body.style.overflow = '';
+
+    try {
+      localStorage.setItem('musisurf_current_view', JSON.stringify({
+        view: 'home',
+        playlistId: null
+      }));
+    } catch (e) {}
 
     switchView('home', { force: true });
     [elements.mobNavHome, elements.mobNavSearch, elements.mobNavLibrary].forEach(btn => {
@@ -4136,9 +4213,14 @@
       renderPlaylistView(newPl.id);
     });
 
-    // Add to Playlist Modal Close
+    // Add to Playlist Modal Close & Done
     if (elements.closeAddToPlaylistBtn) {
       elements.closeAddToPlaylistBtn.addEventListener('click', () => {
+        elements.addToPlaylistModal.style.display = 'none';
+      });
+    }
+    if (elements.doneAddToPlaylistBtn) {
+      elements.doneAddToPlaylistBtn.addEventListener('click', () => {
         elements.addToPlaylistModal.style.display = 'none';
       });
     }
@@ -4294,16 +4376,10 @@
         elements.audio.volume = state.isMuted ? 0 : state.volume;
         elements.audio.load();
         elements.audio.play().catch(e => console.warn('Proxy retry error:', e));
-      } else if (state.currentTrack && !state.currentTrack.isFallbackAttempted) {
-        state.currentTrack.isFallbackAttempted = true;
-        fetch(`/api/search?q=${encodeURIComponent(state.currentTrack.title + ' ' + state.currentTrack.artist)}&source=youtube`)
-          .then(r => r.json())
-          .then(data => {
-            if (data.results && data.results.length > 0) {
-              playTrack(data.results[0]);
-            }
-          })
-          .catch(e => console.warn('YouTube fallback failed:', e));
+      } else {
+        console.warn('Audio stream error for track:', state.currentTrack?.title);
+        state.isPlaying = false;
+        updatePlayPauseButton();
       }
     });
 
@@ -4762,6 +4838,15 @@
       });
     }
 
+    if (elements.mobOptRenamePlaylistBtn) {
+      elements.mobOptRenamePlaylistBtn.addEventListener('click', () => {
+        if (elements.mobilePlaylistOptionsModal) {
+          elements.mobilePlaylistOptionsModal.style.display = 'none';
+        }
+        promptRenameCurrentPlaylist();
+      });
+    }
+
     if (elements.mobOptDeletePlaylistBtn) {
       elements.mobOptDeletePlaylistBtn.addEventListener('click', () => {
         if (elements.mobilePlaylistOptionsModal) {
@@ -5056,11 +5141,6 @@
   // INITIALIZE APP
   // ==========================================================================
   function init() {
-    document.body.dataset.activeView = 'home';
-    try {
-      window.history.replaceState({ view: 'home', depth: 1 }, '', window.location.pathname);
-    } catch (e) {}
-
     loadStoredData();
     loadOfflineTracks();
     loadSettings();
@@ -5073,6 +5153,24 @@
     loadTrendingShelves();
     restoreLastPlayedState();
     updateProgress();
+
+    // Restore previous active view / playlist if user refreshed while browsing
+    let savedView = null;
+    try {
+      const savedStr = localStorage.getItem('musisurf_current_view');
+      if (savedStr) savedView = JSON.parse(savedStr);
+    } catch (e) {}
+
+    if (savedView && savedView.view === 'playlist' && savedView.playlistId) {
+      renderPlaylistView(savedView.playlistId);
+    } else if (savedView && ['library', 'search', 'localMusic', 'liked', 'downloaded'].includes(savedView.view)) {
+      switchView(savedView.view);
+    } else {
+      document.body.dataset.activeView = 'home';
+      try {
+        window.history.replaceState({ view: 'home', depth: 1 }, '', window.location.pathname);
+      } catch (e) {}
+    }
 
     // Ensure YouTube player initializes if YT script already loaded
     if (window.YT && window.YT.Player && !state.ytPlayer && typeof window.onYouTubeIframeAPIReady === 'function') {

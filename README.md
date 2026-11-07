@@ -1,6 +1,14 @@
-# 🌊 MusiSurf — 100% Ad-Free Full-Length Music Streaming
+<div align="center">
 
-> **Ride the wave of pure music with zero commercial interruptions.** Stream and download millions of full-length songs from across the internet with crystal-clear 320kbps audio, real-time synchronized karaoke lyrics, and dynamic audio visualizers.
+<img src="public/icons/icon-192.png" alt="MusiSurf Logo" width="96" />
+
+# MusiSurf
+
+<br/>
+
+<img src="public/preview.png" alt="MusiSurf Interface Preview" width="100%" />
+
+</div>
 
 ---
 

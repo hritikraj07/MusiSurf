@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=5.8">
+  <link rel="stylesheet" href="/styles.css?v=5.9">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -491,6 +491,12 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
                 </svg>
+              </button>
+              <button class="playlist-action-sub-btn rename-playlist-btn" id="renamePlaylistBtn" title="Rename Playlist" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                </svg>
+                <span>Rename</span>
               </button>
               <button class="playlist-action-sub-btn export-playlist-btn" id="exportPlaylistBtn" title="Export Playlist">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1292,6 +1298,14 @@
           </button>
         </div>
         <div class="mob-options-list">
+          <button class="mob-option-item" id="mobOptRenamePlaylistBtn">
+            <div class="mob-option-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+              </svg>
+            </div>
+            <span>Rename Playlist</span>
+          </button>
           <button class="mob-option-item" id="mobOptExportPlaylistBtn">
             <div class="mob-option-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1370,6 +1384,9 @@
         </div>
         <div class="modal-playlist-picker-list" id="modalPlaylistPickerList">
           <!-- Populated by JS -->
+        </div>
+        <div class="modal-footer" style="padding: 14px 20px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+          <button type="button" class="btn-primary" id="doneAddToPlaylistBtn" style="width: 100%; border-radius: 500px; padding: 12px; font-weight: 700;">Done</button>
         </div>
       </div>
     </div>
@@ -1534,7 +1551,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.30"></script>
+  <script src="/app.js?v=2.31"></script>
 </body>
 
 </html>

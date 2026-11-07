@@ -674,12 +674,13 @@ let trendingCacheTime = 0;
 async function fetchTrendingData() {
   const sections = await Promise.all(
     TRENDING_CATEGORIES.map(async (cat) => {
-      // Query multiple diverse artists/queries to guarantee distinct albums & thumbnails
-      const queryPromises = cat.queries.slice(0, 4).map(q => searchSaavn(q, 6));
+      // Shuffle queries so different top artists and moods are selected each time
+      const shuffledQueries = [...cat.queries].sort(() => Math.random() - 0.5);
+      const queryPromises = shuffledQueries.slice(0, 4).map(q => searchSaavn(q, 8));
       const resultsArray = await Promise.all(queryPromises);
       const combinedTracks = resultsArray.flat();
 
-      const uniqueTracks = deduplicateAndShuffle(combinedTracks, 10);
+      const uniqueTracks = deduplicateAndShuffle(combinedTracks, 12);
       return {
         id: cat.id,
         title: cat.title,
@@ -704,7 +705,9 @@ if (!process.env.VERCEL) {
 
 app.get('/api/trending', async (req, res) => {
   const now = Date.now();
-  if (trendingSectionsCache && now - trendingCacheTime < 1000 * 60 * 20) {
+  const forceRefresh = req.query.refresh === '1';
+
+  if (!forceRefresh && trendingSectionsCache && now - trendingCacheTime < 1000 * 60 * 5) {
     // Return a fresh shuffle of the distinct album tracks so home page is always dynamic
     const dynamicSections = trendingSectionsCache.map(sec => ({
       ...sec,
