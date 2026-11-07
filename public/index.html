@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=5.4">
+  <link rel="stylesheet" href="/styles.css?v=5.5">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -555,6 +555,7 @@
                   <th class="col-num">#</th>
                   <th class="col-title">Title</th>
                   <th class="col-album">Album</th>
+                  <th class="col-status"></th>
                   <th class="col-duration">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <circle cx="12" cy="12" r="10" />
@@ -673,6 +674,7 @@
                   <th class="col-num">#</th>
                   <th class="col-title">Title</th>
                   <th class="col-album">File Name</th>
+                  <th class="col-status"></th>
                   <th class="col-duration">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <circle cx="12" cy="12" r="10" />
@@ -1137,6 +1139,16 @@
             <line x1="12" y1="17" x2="12" y2="21"/>
           </svg>
         </button>
+        <button class="mob-bottom-icon-btn" id="mobPlayerQueueBtn" title="Queue" aria-label="View Queue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="8" y1="6" x2="21" y2="6"/>
+            <line x1="8" y1="12" x2="21" y2="12"/>
+            <line x1="8" y1="18" x2="21" y2="18"/>
+            <line x1="3" y1="6" x2="3.01" y2="6"/>
+            <line x1="3" y1="12" x2="3.01" y2="12"/>
+            <line x1="3" y1="18" x2="3.01" y2="18"/>
+          </svg>
+        </button>
         <button class="mob-bottom-icon-btn" id="mobPlayerOptionsBtn" title="More Options" aria-label="More Options">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
             <line x1="4" y1="7" x2="20" y2="7"/>
@@ -1468,7 +1480,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.26"></script>
+  <script src="/app.js?v=2.27"></script>
 </body>
 
 </html>

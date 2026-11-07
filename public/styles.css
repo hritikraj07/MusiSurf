@@ -1508,7 +1508,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .song-row.playing {
-  background-color: rgba(29, 185, 84, 0.16) !important;
+  background-color: transparent !important;
 }
 
 .song-row.playing .song-title-text {
@@ -1665,7 +1665,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .tracks-table tbody tr.playing {
-  background-color: rgba(29, 185, 84, 0.16) !important;
+  background-color: transparent !important;
 }
 
 .tracks-table tbody tr.playing .col-num {
@@ -1811,12 +1811,25 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   }
 }
 
+/* Playlist Status Column in Tracks Table */
+.tracks-table th.col-status,
+.tracks-table td.col-status {
+  width: 38px;
+  min-width: 38px;
+  text-align: center !important;
+  vertical-align: middle !important;
+  padding: 0 4px !important;
+}
+
+.tracks-table td.col-status .in-playlist-tick-badge {
+  margin-left: 0 !important;
+}
+
 /* In-Playlist / Saved Track Tick Badge (Spotify Style) */
 .in-playlist-tick-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-left: 9px; /* Breathable spacing after song name */
   vertical-align: middle;
   color: var(--accent-primary, #00f260);
   flex-shrink: 0;
@@ -1827,6 +1840,45 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   width: 15px;
   height: 15px;
   filter: drop-shadow(0 0 3px rgba(0, 242, 96, 0.45));
+}
+
+/* Desktop: Badges reveal only on song hover */
+@media (min-width: 769px) {
+  .tracks-table tbody tr .in-playlist-tick-badge,
+  .tracks-table tbody tr .downloaded-badge,
+  .song-row .in-playlist-tick-badge,
+  .song-row .downloaded-badge,
+  .quick-pick-tile .in-playlist-tick-badge,
+  .quick-pick-tile .downloaded-badge {
+    opacity: 0;
+    transition: opacity 0.18s ease;
+  }
+
+  .tracks-table tbody tr:hover .in-playlist-tick-badge,
+  .tracks-table tbody tr:hover .downloaded-badge,
+  .song-row:hover .in-playlist-tick-badge,
+  .song-row:hover .downloaded-badge,
+  .quick-pick-tile:hover .in-playlist-tick-badge,
+  .quick-pick-tile:hover .downloaded-badge {
+    opacity: 1;
+  }
+}
+
+/* Mobile: Badges always visible without hover */
+@media (max-width: 768px) {
+  .tracks-table th.col-status,
+  .tracks-table td.col-status {
+    width: 34px !important;
+    min-width: 34px !important;
+    text-align: center !important;
+    display: table-cell !important;
+    padding: 0 2px !important;
+  }
+
+  .in-playlist-tick-badge,
+  .downloaded-badge {
+    opacity: 1 !important;
+  }
 }
 
 /* Empty Search State */
@@ -1943,9 +1995,13 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .playlist-play-giant-btn {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
+  width: 56px !important;
+  height: 56px !important;
+  min-width: 56px !important;
+  min-height: 56px !important;
+  max-width: 56px !important;
+  max-height: 56px !important;
+  border-radius: 50% !important;
   background-color: var(--accent-primary);
   color: #000;
   border: none;
@@ -1954,6 +2010,8 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   justify-content: center;
   box-shadow: 0 8px 24px rgba(29, 185, 84, 0.4);
   cursor: pointer;
+  flex-shrink: 0 !important;
+  aspect-ratio: 1 / 1 !important;
   transition: transform var(--transition-fast), background-color var(--transition-fast);
 }
 
@@ -3273,12 +3331,13 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   transform: translateY(-1px);
 }
 
-/* Fullscreen Mobile Now Playing Screen */
+/* Fullscreen Mobile Now Playing Screen (100% Solid Opaque Background) */
 .mobile-now-playing-modal {
   position: fixed;
   inset: 0;
-  background: var(--mob-player-bg, linear-gradient(180deg, #1e2029 0%, #0c0d11 40%, #060709 100%));
-  z-index: 1000;
+  background-color: #08090b !important;
+  background: var(--mob-player-bg, linear-gradient(180deg, #1c1d25 0%, #0c0d11 48%, #08090b 100%)) !important;
+  z-index: 2200 !important;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -4253,6 +4312,44 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     width: 100% !important;
     padding: 0 4px !important;
     box-sizing: border-box !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .playlist-play-giant-btn {
+    width: 52px !important;
+    height: 52px !important;
+    min-width: 52px !important;
+    min-height: 52px !important;
+    max-width: 52px !important;
+    max-height: 52px !important;
+    border-radius: 50% !important;
+    flex-shrink: 0 !important;
+    aspect-ratio: 1 / 1 !important;
+  }
+
+  .playlist-shuffle-btn {
+    flex-shrink: 0 !important;
+  }
+
+  .playlist-sort-dropdown-wrap {
+    flex-shrink: 1 !important;
+  }
+
+  /* Fullscreen Queue Drawer on mobile */
+  .queue-drawer {
+    width: 100% !important;
+    max-width: 100% !important;
+    right: -100% !important;
+    height: 100dvh !important;
+    z-index: 2400 !important;
+    border-left: none !important;
+    padding: calc(env(safe-area-inset-top, 12px) + 12px) 20px calc(env(safe-area-inset-bottom, 16px) + 16px) !important;
+  }
+  .queue-drawer.open {
+    right: 0 !important;
+  }
+  .queue-backdrop {
+    z-index: 2390 !important;
   }
 
   /* On mobile: Hide the bulky wide text Delete Playlist button */

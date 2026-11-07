@@ -209,6 +209,7 @@
     mobShuffleBtn: document.getElementById('mobShuffleBtn'),
     mobRepeatBtn: document.getElementById('mobRepeatBtn'),
     mobPlayerLyricsBtn: document.getElementById('mobPlayerLyricsBtn'),
+    mobPlayerQueueBtn: document.getElementById('mobPlayerQueueBtn'),
     mobPlayerShareBtn: document.getElementById('mobPlayerShareBtn'),
     mobPlayerTimerBtn: document.getElementById('mobPlayerTimerBtn'),
     mobTimerBadge: document.getElementById('mobTimerBadge'),
@@ -376,14 +377,35 @@
     document.querySelectorAll(selector).forEach(el => {
       const trackId = el.dataset.trackId;
       if (!trackId) return;
-      const titleEl = el.querySelector('.song-title-text, .table-title-main, .song-title, .top-result-title, .quick-pick-title');
-      if (!titleEl) return;
-      const existingBadge = titleEl.querySelector('.in-playlist-tick-badge');
+
       const shouldHaveBadge = isTrackInAnyPlaylist(trackId);
-      if (shouldHaveBadge && !existingBadge) {
-        titleEl.insertAdjacentHTML('beforeend', getPlaylistTickBadgeHtml(trackId));
-      } else if (!shouldHaveBadge && existingBadge) {
-        existingBadge.remove();
+
+      // 1. Table row status column (Red circle position before duration)
+      const statusCell = el.querySelector('.col-status');
+      if (statusCell) {
+        statusCell.innerHTML = shouldHaveBadge ? getPlaylistTickBadgeHtml(trackId) : '';
+      }
+
+      // 2. Song row right actions (Red circle position before 3 dots)
+      const rightActions = el.querySelector('.song-row-right-actions');
+      if (rightActions) {
+        const existingBadge = rightActions.querySelector('.in-playlist-tick-badge');
+        if (shouldHaveBadge && !existingBadge) {
+          rightActions.insertAdjacentHTML('afterbegin', getPlaylistTickBadgeHtml(trackId));
+        } else if (!shouldHaveBadge && existingBadge) {
+          existingBadge.remove();
+        }
+      }
+
+      // 3. Search top result & Quick picks
+      const metaEl = el.querySelector('.top-result-meta, .quick-pick-info');
+      if (metaEl) {
+        const existingBadge = metaEl.querySelector('.in-playlist-tick-badge');
+        if (shouldHaveBadge && !existingBadge) {
+          metaEl.insertAdjacentHTML('beforeend', getPlaylistTickBadgeHtml(trackId));
+        } else if (!shouldHaveBadge && existingBadge) {
+          existingBadge.remove();
+        }
       }
     });
     if (state.currentTrack) {
@@ -976,15 +998,21 @@
       headerTitleWrap.style.visibility = 'visible';
     }
 
-    // Dynamic Atmospheric Background for Mobile Player Modal
+    // Dynamic Atmospheric Background for Mobile Player Modal (100% Solid Opaque, No Translucency)
     if (elements.mobilePlayerModal && track.image) {
       extractDominantColor(track.image, track.id).then(([r, g, b]) => {
         const darkR = Math.floor(r * 0.28);
         const darkG = Math.floor(g * 0.28);
         const darkB = Math.floor(b * 0.28);
+        const topR = Math.min(255, Math.floor(r * 0.72 + 10));
+        const topG = Math.min(255, Math.floor(g * 0.72 + 10));
+        const topB = Math.min(255, Math.floor(b * 0.72 + 14));
+        const midR = Math.min(255, Math.floor(darkR * 0.55 + 8));
+        const midG = Math.min(255, Math.floor(darkG * 0.55 + 9));
+        const midB = Math.min(255, Math.floor(darkB * 0.55 + 11));
         elements.mobilePlayerModal.style.setProperty(
           '--mob-player-bg',
-          `linear-gradient(180deg, rgba(${r}, ${g}, ${b}, 0.65) 0%, rgba(${darkR}, ${darkG}, ${darkB}, 0.42) 45%, #08090b 100%)`
+          `linear-gradient(180deg, rgb(${topR}, ${topG}, ${topB}) 0%, rgb(${midR}, ${midG}, ${midB}) 48%, #08090b 100%)`
         );
       }).catch(() => {});
     }
@@ -1949,7 +1977,7 @@
       tile.innerHTML = `
         <img src="${track.image}" alt="${track.title}" class="quick-pick-img">
         <div class="quick-pick-info">
-          <span class="quick-pick-title">${escapeHtml(track.title)}${getPlaylistTickBadgeHtml(track.id)}${getDownloadedBadgeHtml(track.id)}</span>
+          <span class="quick-pick-title">${escapeHtml(track.title)}${getDownloadedBadgeHtml(track.id)}</span>
         </div>
         <button class="quick-pick-play-btn" title="Play Full Song">
           <svg viewBox="0 0 24 24" fill="currentColor">
@@ -2081,9 +2109,10 @@
       <div class="top-result-header-row">
         <img src="${top.image}" alt="${escapeHtml(top.title)}" class="top-result-img">
         <div class="top-result-info">
-          <h4 class="top-result-title">${escapeHtml(top.title)}${getPlaylistTickBadgeHtml(top.id)}${getDownloadedBadgeHtml(top.id)}</h4>
+          <h4 class="top-result-title">${escapeHtml(top.title)}${getDownloadedBadgeHtml(top.id)}</h4>
           <div class="top-result-meta">
             <span class="top-result-artist">${escapeHtml(top.artist)}</span>
+            ${getPlaylistTickBadgeHtml(top.id)}
             <span class="top-result-pill">Song</span>
           </div>
         </div>
@@ -2266,14 +2295,16 @@
     row.dataset.trackId = track.id;
 
     const badgeHtml = getDownloadedBadgeHtml(track.id);
+    const tickHtml = getPlaylistTickBadgeHtml(track.id);
 
     row.innerHTML = `
       <img src="${track.image}" alt="${escapeHtml(track.title)}" class="song-thumb">
       <div class="song-info-col">
-        <div class="song-title-text">${escapeHtml(track.title)}${getPlaylistTickBadgeHtml(track.id)}${badgeHtml}</div>
+        <div class="song-title-text">${escapeHtml(track.title)}${badgeHtml}</div>
         <div class="song-artist-text">${escapeHtml(track.artist)}</div>
       </div>
       <div class="song-row-right-actions">
+        ${tickHtml}
         <button class="song-action-btn song-more-trigger" title="More Options">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <circle cx="12" cy="5" r="2"/>
@@ -2309,6 +2340,7 @@
     tr.dataset.trackId = track.id;
 
     const badgeHtml = getDownloadedBadgeHtml(track.id);
+    const tickHtml = getPlaylistTickBadgeHtml(track.id);
 
     tr.innerHTML = `
       <td class="col-num">${index}</td>
@@ -2316,12 +2348,13 @@
         <div class="table-title-cell">
           <img src="${track.image}" alt="${escapeHtml(track.title)}" class="table-cover" loading="lazy">
           <div>
-            <div class="table-title-main">${escapeHtml(track.title)}${getPlaylistTickBadgeHtml(track.id)}${badgeHtml}</div>
+            <div class="table-title-main">${escapeHtml(track.title)}${badgeHtml}</div>
             <div class="table-artist-sub">${escapeHtml(track.artist)}</div>
           </div>
         </div>
       </td>
       <td class="col-album">${escapeHtml(track.album || 'Single')}</td>
+      <td class="col-status">${tickHtml}</td>
       <td class="col-duration">${track.durationStr || '3:30'}</td>
       <td class="col-actions">
         <button class="song-action-btn song-more-trigger" title="More Options">
@@ -3371,12 +3404,14 @@
             <div class="table-title-cell">
               <img src="${track.image || DEFAULT_LOCAL_COVER}" alt="${track.title}" class="table-cover">
               <div>
-                <div class="table-title-main">${track.title}</div>
-                <div class="table-artist-sub">${track.artist || 'Local File'}</div>
+                <div class="table-title-main">${escapeHtml(track.title)}${getDownloadedBadgeHtml(track.id)}</div>
+                <div class="table-artist-sub">${escapeHtml(track.artist || 'Local File')}</div>
               </div>
             </div>
           </td>
-          <td class="col-album">${track.fileName || track.album || 'Device Storage'}</td>
+          <td class="col-album">${escapeHtml(track.fileName || track.album || 'Device Storage')}</td>
+          <td class="col-status">${getPlaylistTickBadgeHtml(track.id)}</td>
+          <td class="col-duration">${track.durationStr || '--:--'}</td>
           <td class="col-actions">
             <button class="song-action-btn add-to-queue-trigger" title="Add to Queue">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -3394,7 +3429,6 @@
               </svg>
             </button>
           </td>
-          <td class="col-duration">${track.durationStr || '--:--'}</td>
         `;
 
         tr.addEventListener('click', (e) => {
@@ -3832,7 +3866,8 @@
     document.addEventListener('click', (e) => {
       if (elements.queueDrawer && elements.queueDrawer.classList.contains('open')) {
         const isClickInside = elements.queueDrawer.contains(e.target);
-        const isClickOnBtn = elements.queueBtn && elements.queueBtn.contains(e.target);
+        const isClickOnBtn = (elements.queueBtn && elements.queueBtn.contains(e.target)) || 
+                             (elements.mobPlayerQueueBtn && elements.mobPlayerQueueBtn.contains(e.target));
         if (!isClickInside && !isClickOnBtn) {
           closeQueueDrawer();
         }
@@ -3842,7 +3877,8 @@
     document.addEventListener('touchend', (e) => {
       if (elements.queueDrawer && elements.queueDrawer.classList.contains('open')) {
         const isClickInside = elements.queueDrawer.contains(e.target);
-        const isClickOnBtn = elements.queueBtn && elements.queueBtn.contains(e.target);
+        const isClickOnBtn = (elements.queueBtn && elements.queueBtn.contains(e.target)) || 
+                             (elements.mobPlayerQueueBtn && elements.mobPlayerQueueBtn.contains(e.target));
         if (!isClickInside && !isClickOnBtn) {
           closeQueueDrawer();
         }
@@ -4419,6 +4455,18 @@
 
     if (elements.mobPlayerTimerBtn) {
       elements.mobPlayerTimerBtn.addEventListener('click', openSleepTimerModal);
+    }
+
+    if (elements.mobPlayerQueueBtn) {
+      elements.mobPlayerQueueBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (elements.queueDrawer) {
+          const willOpen = !elements.queueDrawer.classList.contains('open');
+          elements.queueDrawer.classList.toggle('open', willOpen);
+          if (elements.queueDrawerBackdrop) elements.queueDrawerBackdrop.classList.toggle('active', willOpen);
+          if (willOpen) updateQueueDrawerUI();
+        }
+      });
     }
 
     // Mobile Player 3-Bar Options Button & Bottom Sheet
