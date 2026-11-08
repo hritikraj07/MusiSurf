@@ -1142,7 +1142,44 @@
   // PLAYBACK CONTROLLER
   // ==========================================================================
   let crossfadeFadeInTimer = null;
+  let crossfadeFadeOutTimer = null;
+
+  function fadeAudioOutAndPause(callback) {
+    if (crossfadeFadeInTimer) {
+      clearInterval(crossfadeFadeInTimer);
+      crossfadeFadeInTimer = null;
+    }
+    if (crossfadeFadeOutTimer) {
+      clearInterval(crossfadeFadeOutTimer);
+      crossfadeFadeOutTimer = null;
+    }
+    const startVol = elements.audio.volume || state.volume || 0.8;
+    if (startVol <= 0.05 || elements.audio.paused) {
+      try { elements.audio.pause(); } catch (e) {}
+      if (typeof callback === 'function') callback();
+      return;
+    }
+
+    const fadeMs = 120;
+    const startTime = Date.now();
+    crossfadeFadeOutTimer = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(1, elapsed / fadeMs);
+      elements.audio.volume = Math.max(0, startVol * (1 - progress));
+      if (progress >= 1) {
+        clearInterval(crossfadeFadeOutTimer);
+        crossfadeFadeOutTimer = null;
+        try { elements.audio.pause(); } catch (e) {}
+        if (typeof callback === 'function') callback();
+      }
+    }, 15);
+  }
+
   function applyCrossfadeIn() {
+    if (crossfadeFadeOutTimer) {
+      clearInterval(crossfadeFadeOutTimer);
+      crossfadeFadeOutTimer = null;
+    }
     if (crossfadeFadeInTimer) {
       clearInterval(crossfadeFadeInTimer);
       crossfadeFadeInTimer = null;
@@ -1154,8 +1191,8 @@
     }
 
     const cf = state.settings.crossfade;
-    // Smooth 250ms ramp by default, or up to 3000ms if crossfade configured in settings
-    const rampDurationMs = (cf && cf > 0) ? Math.min(3000, (cf / 2) * 1000) : 250;
+    // Smooth 350ms ramp by default, or up to 3000ms if crossfade configured in settings
+    const rampDurationMs = (cf && cf > 0) ? Math.min(3000, (cf / 2) * 1000) : 350;
 
     elements.audio.volume = 0;
     const startTime = Date.now();
@@ -1654,12 +1691,13 @@
       : (!elements.audio.paused && !elements.audio.ended && elements.audio.currentTime > 0);
 
     if (state.isPlaying || isActuallyPlaying) {
-      // Pause both audio engines immediately
+      // Smooth fade-out pause
       state.isPlaying = false;
-      try { elements.audio.pause(); } catch (e) {}
-      if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
-        try { state.ytPlayer.pauseVideo(); } catch (e) {}
-      }
+      fadeAudioOutAndPause(() => {
+        if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
+          try { state.ytPlayer.pauseVideo(); } catch (e) {}
+        }
+      });
       updatePlayPauseButton();
     } else {
       // Resume playback
@@ -1757,17 +1795,12 @@
       const plPlay = elements.playAllPlaylistBtn.querySelector('.play-icon');
       const plPause = elements.playAllPlaylistBtn.querySelector('.pause-icon');
       const viewingTracks = state.viewingPlaylistTracks || [];
-      const isActivelyPlaying = isYouTubeActive()
-        ? (state.ytPlayer && typeof state.ytPlayer.getPlayerState === 'function' && state.ytPlayer.getPlayerState() === 1)
-        : (!elements.audio.paused && !elements.audio.ended && elements.audio.currentTime > 0);
       const isCurrentPlaylistPlaying = !!(
         state.isPlaying &&
-        isActivelyPlaying &&
-        state.currentTrack &&
         state.activePlaylistId &&
         state.viewingPlaylistId &&
-        state.activePlaylistId === state.viewingPlaylistId &&
-        viewingTracks.some(t => t.id === state.currentTrack.id)
+        String(state.activePlaylistId) === String(state.viewingPlaylistId) &&
+        (!state.currentTrack || viewingTracks.length === 0 || viewingTracks.some(t => String(t.id) === String(state.currentTrack.id)))
       );
       if (plPlay && plPause) {
         plPlay.style.display = isCurrentPlaylistPlaying ? 'none' : 'block';
@@ -1779,16 +1812,10 @@
     // Sync Library Playlist Cards Play/Pause Buttons
     document.querySelectorAll('.card-play-btn[data-playlist-id]').forEach(btn => {
       const plId = btn.dataset.playlistId;
-      const pl = state.customPlaylists?.find(p => p.id === plId);
-      const isActivelyPlaying = isYouTubeActive()
-        ? (state.ytPlayer && typeof state.ytPlayer.getPlayerState === 'function' && state.ytPlayer.getPlayerState() === 1)
-        : (!elements.audio.paused && !elements.audio.ended && elements.audio.currentTime > 0);
       const isThisPlPlaying = !!(
         state.isPlaying &&
-        isActivelyPlaying &&
         state.currentTrack &&
-        state.activePlaylistId === plId &&
-        (pl?.tracks || []).some(t => t.id === state.currentTrack.id)
+        String(state.activePlaylistId) === String(plId)
       );
       btn.innerHTML = isThisPlPlaying
         ? `<svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>`
@@ -2082,44 +2109,45 @@
   function getCurrentPlaybackTime() {
     let rawTime = null;
 
-    // 1. If HTML5 audio is actively playing or has progressed, always use its accurate hardware clock
-    if (!elements.audio.paused && elements.audio.currentTime > 0) {
-      state.activePlayerEngine = 'audio';
-      rawTime = elements.audio.currentTime;
-    } else if (state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
-      // 2. Check if YouTube player is actively playing, buffering or paused
-      try {
-        const pState = typeof state.ytPlayer.getPlayerState === 'function' ? state.ytPlayer.getPlayerState() : -1;
-        if (pState === 1 || pState === 2 || pState === 3) {
-          const ytCur = state.ytPlayer.getCurrentTime();
-          if (Number.isFinite(ytCur) && ytCur >= 0) {
-            state.activePlayerEngine = 'youtube';
-            rawTime = ytCur;
-          }
-        }
-      } catch (e) {}
-    }
-
-    // 3. Fallbacks
-    if (rawTime === null) {
-      const audioTime = elements.audio.currentTime;
-      if (Number.isFinite(audioTime) && audioTime > 0) {
-        state.activePlayerEngine = 'audio';
-        rawTime = audioTime;
-      } else if (state.activePlayerEngine === 'youtube' && state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
+    // 1. Primary check based on active playback engine
+    if (state.activePlayerEngine === 'youtube') {
+      if (state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
         try {
           const ytCur = state.ytPlayer.getCurrentTime();
           if (Number.isFinite(ytCur) && ytCur >= 0) rawTime = ytCur;
         } catch (e) {}
       }
+    } else {
+      if (Number.isFinite(elements.audio.currentTime) && elements.audio.currentTime >= 0) {
+        rawTime = elements.audio.currentTime;
+      }
     }
 
-    // Safeguard against transient 0-glitches during playback
+    // 2. Cross-engine fallbacks if primary reported null or 0
+    if (rawTime === null || (rawTime === 0 && lastKnownPlaybackTime > 0.5)) {
+      if (state.activePlayerEngine !== 'youtube' && state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
+        try {
+          const pState = typeof state.ytPlayer.getPlayerState === 'function' ? state.ytPlayer.getPlayerState() : -1;
+          if (pState === 1 || pState === 2 || pState === 3) {
+            const ytCur = state.ytPlayer.getCurrentTime();
+            if (Number.isFinite(ytCur) && ytCur > 0) {
+              state.activePlayerEngine = 'youtube';
+              rawTime = ytCur;
+            }
+          }
+        } catch (e) {}
+      } else if (state.activePlayerEngine === 'youtube' && !elements.audio.paused && elements.audio.currentTime > 0) {
+        state.activePlayerEngine = 'audio';
+        rawTime = elements.audio.currentTime;
+      }
+    }
+
+    // 3. Monotonic protection: prevent playback scrubber from glitching back to 0 or freezing
     if (state.isPlaying && !state.isDraggingProgress) {
-      if ((rawTime === null || rawTime === 0) && lastKnownPlaybackTime > 1.0) {
+      if ((rawTime === null || rawTime === 0) && lastKnownPlaybackTime > 0.3) {
         return lastKnownPlaybackTime;
       }
-      if (rawTime !== null && rawTime < 0.5 && lastKnownPlaybackTime > 1.5) {
+      if (rawTime !== null && rawTime < (lastKnownPlaybackTime - 1.5)) {
         return lastKnownPlaybackTime;
       }
     }
@@ -2133,29 +2161,21 @@
   }
 
   function getTotalDuration() {
-    if (!elements.audio.paused && elements.audio.currentTime > 0) {
-      const audioDur = elements.audio.duration;
-      if (Number.isFinite(audioDur) && audioDur > 0) return audioDur;
-    }
-    if (state.ytPlayer && typeof state.ytPlayer.getPlayerState === 'function') {
-      try {
-        const pState = state.ytPlayer.getPlayerState();
-        if (pState === 1 || pState === 3) {
-          const dur = state.ytPlayer.getDuration();
-          if (Number.isFinite(dur) && dur > 0) return dur;
-        }
-      } catch (e) {}
-    }
+    // 1. If HTML5 audio has valid finite duration, prefer it
     const audioDur = elements.audio.duration;
     if (Number.isFinite(audioDur) && audioDur > 0) {
       return audioDur;
     }
-    try {
-      if (state.ytPlayer && typeof state.ytPlayer.getDuration === 'function') {
+
+    // 2. If YouTube player has duration
+    if (state.ytPlayer && typeof state.ytPlayer.getDuration === 'function') {
+      try {
         const dur = state.ytPlayer.getDuration();
         if (Number.isFinite(dur) && dur > 0) return dur;
-      }
-    } catch (e) {}
+      } catch (e) {}
+    }
+
+    // 3. Fallback to track metadata duration
     return state.currentTrack?.duration || 0;
   }
 
@@ -2454,11 +2474,13 @@
   }
 
   function syncLyricsWithTime(currentTime) {
-    if (!state.hasSyncedLyrics || state.lyrics.length === 0) return;
+    if (!state.hasSyncedLyrics || !state.lyrics || state.lyrics.length === 0) return;
 
+    // Slight pre-roll (0.15s) for natural human reading alignment
+    const lyricClock = (Number(currentTime) || 0) + 0.15;
     let activeIdx = -1;
     for (let i = 0; i < state.lyrics.length; i++) {
-      if (currentTime >= state.lyrics[i].time) {
+      if (lyricClock >= state.lyrics[i].time) {
         activeIdx = i;
       } else {
         break;
@@ -3388,7 +3410,12 @@
   }
 
   function updateHeartIcon(currentTrackId) {
-    const isLiked = state.likedSongs.some(s => s.id === currentTrackId);
+    if (!currentTrackId && state.currentTrack) {
+      currentTrackId = state.currentTrack.id;
+    }
+    const isLiked = !!(state.likedSongs && state.likedSongs.some(s => String(s.id) === String(currentTrackId)));
+    
+    // 1. Desktop Player Heart Button
     if (elements.playerHeartBtn) {
       elements.playerHeartBtn.classList.toggle('liked', isLiked);
       const svg = elements.playerHeartBtn.querySelector('svg');
@@ -3397,6 +3424,8 @@
         svg.style.color = isLiked ? '#ff3b5c' : '';
       }
     }
+
+    // 2. Mobile Fullscreen Player Heart Button
     if (elements.mobPlayerHeartBtn) {
       elements.mobPlayerHeartBtn.classList.toggle('liked', isLiked);
       const mobSvg = elements.mobPlayerHeartBtn.querySelector('svg');
@@ -3404,6 +3433,42 @@
         mobSvg.setAttribute('fill', isLiked ? '#ff3b5c' : 'none');
         mobSvg.style.color = isLiked ? '#ff3b5c' : '';
       }
+    }
+
+    // 3. Mini Player Heart Button
+    if (elements.miniHeartBtn) {
+      elements.miniHeartBtn.classList.toggle('liked', isLiked);
+      const miniSvg = elements.miniHeartBtn.querySelector('svg');
+      if (miniSvg) {
+        miniSvg.setAttribute('fill', isLiked ? '#ff3b5c' : 'none');
+        miniSvg.style.color = isLiked ? '#ff3b5c' : '';
+      }
+    }
+
+    // 4. Now Playing Heart Button
+    if (elements.nowPlayingHeartBtn) {
+      elements.nowPlayingHeartBtn.classList.toggle('liked', isLiked);
+      const npSvg = elements.nowPlayingHeartBtn.querySelector('svg');
+      if (npSvg) {
+        npSvg.setAttribute('fill', isLiked ? '#ff3b5c' : 'none');
+        npSvg.style.color = isLiked ? '#ff3b5c' : '';
+      }
+    }
+
+    // 5. Song Row Heart Icons in Current Track Tables / Queues
+    if (currentTrackId) {
+      const matchSelector = `[data-track-id="${currentTrackId}"]`;
+      document.querySelectorAll(matchSelector).forEach(el => {
+        const rowHeart = el.matches('.song-action-btn') ? el : el.querySelector('.song-action-btn');
+        if (rowHeart) {
+          rowHeart.classList.toggle('liked', isLiked);
+          const svg = rowHeart.querySelector('svg');
+          if (svg) {
+            svg.setAttribute('fill', isLiked ? '#ff3b5c' : 'none');
+            svg.style.color = isLiked ? '#ff3b5c' : '';
+          }
+        }
+      });
     }
   }
 
@@ -3868,8 +3933,8 @@
 
       const isCurrentPlaylistTrack = !!(
         state.currentTrack &&
-        state.activePlaylistId === playlistId &&
-        listToPlay.some(t => t.id === state.currentTrack.id)
+        String(state.activePlaylistId) === String(playlistId) &&
+        listToPlay.some(t => String(t.id) === String(state.currentTrack.id))
       );
 
       if (isCurrentPlaylistTrack) {
@@ -3886,7 +3951,8 @@
         const queueList = [...listToPlay];
         state.activePlaylistTracks = [...listToPlay];
         state.activePlaylistId = playlistId;
-        const plObj = state.customPlaylists.find(p => p.id === playlistId);
+        state.viewingPlaylistId = playlistId;
+        const plObj = state.customPlaylists.find(p => String(p.id) === String(playlistId));
         if (plObj) {
           plObj.lastPlayedAt = Date.now();
           saveStoredPlaylists();
@@ -3897,6 +3963,7 @@
         } catch (e) {}
 
         playTrack(queueList[0], queueList);
+        updatePlayPauseButton();
       }
     };
 
@@ -4450,7 +4517,9 @@
           loadLyricsForTrack(state.currentTrack.title, state.currentTrack.artist);
         } else {
           state.activeLyricIndex = -1;
-          syncLyricsWithTime(getCurrentPlaybackTime());
+          requestAnimationFrame(() => {
+            syncLyricsWithTime(getCurrentPlaybackTime());
+          });
         }
       } else {
         if (elements.lyricsTrackTitle) elements.lyricsTrackTitle.textContent = 'No Song Playing';
@@ -4652,7 +4721,8 @@
         chk.classList.add('checked');
         showToast('Added to Liked Songs', '♥');
       }
-      saveLikedSongs();
+      saveStoredLikes();
+      updateLikedCountUI();
       updateHeartIcon(track.id);
       updateAllPlaylistTickBadges(track.id);
       likedItem.querySelector('.library-item-meta').textContent = `${state.likedSongs.length} songs`;
