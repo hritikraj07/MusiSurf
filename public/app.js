@@ -262,6 +262,15 @@
     renamePlaylistInput: document.getElementById('renamePlaylistInput'),
     cancelRenamePlaylistBtn: document.getElementById('cancelRenamePlaylistBtn'),
 
+    deletePlaylistConfirmModal: document.getElementById('deletePlaylistConfirmModal'),
+    deletePlaylistModalTargetName: document.getElementById('deletePlaylistModalTargetName'),
+    closeDeletePlaylistModalBtn: document.getElementById('closeDeletePlaylistModalBtn'),
+    cancelDeletePlaylistBtn: document.getElementById('cancelDeletePlaylistBtn'),
+    confirmDeletePlaylistModalBtn: document.getElementById('confirmDeletePlaylistModalBtn'),
+
+    playerShareBtn: document.getElementById('playerShareBtn'),
+    mobOptShareBtn: document.getElementById('mobOptShareBtn'),
+
     addToPlaylistModal: document.getElementById('addToPlaylistModal'),
     modalPlaylistPickerList: document.getElementById('modalPlaylistPickerList'),
     closeAddToPlaylistBtn: document.getElementById('closeAddToPlaylistBtn'),
@@ -894,12 +903,8 @@
     if (!state.currentTrack) return;
     try {
       const cur = getCurrentPlaybackTime();
-      if (state.restoredResumeTime > 0) {
-        if (cur >= Math.max(0.5, state.restoredResumeTime - 1.5)) {
-          state.restoredResumeTime = 0;
-        } else {
-          return;
-        }
+      if (state.restoredResumeTime > 0 && cur >= 0.5) {
+        state.restoredResumeTime = 0;
       }
       const dur = getTotalDuration();
       const data = {
@@ -1977,12 +1982,8 @@
       if (state.isDraggingProgress) return; // Don't override while user is actively dragging scrubber
 
       const cur = getCurrentPlaybackTime();
-      if (state.restoredResumeTime > 0) {
-        if (cur >= Math.max(0.5, state.restoredResumeTime - 1.5)) {
-          state.restoredResumeTime = 0;
-        } else {
-          return;
-        }
+      if (state.restoredResumeTime > 0 && cur >= 0.5) {
+        state.restoredResumeTime = 0;
       }
       const dur = getTotalDuration();
 
@@ -2845,6 +2846,15 @@
       <td class="col-album">${escapeHtml(track.album || 'Single')}</td>
       <td class="col-duration">${track.durationStr || '3:30'}</td>
       <td class="col-actions">
+        <button class="song-action-btn song-share-trigger" title="Share Song">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
+        </button>
         <button class="song-action-btn song-more-trigger" title="More Options">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <circle cx="12" cy="5" r="2"/>
@@ -2856,6 +2866,11 @@
     `;
 
     tr.addEventListener('click', (e) => {
+      if (e.target.closest('.song-share-trigger')) {
+        e.stopPropagation();
+        shareSong(track);
+        return;
+      }
       if (e.target.closest('.song-more-trigger')) {
         e.stopPropagation();
         openTrackOptionsMenu(track);
@@ -2899,8 +2914,35 @@
   }
 
   // ==========================================================================
-  // LIKED SONGS & PLAYLIST VIEW CONTROLLER
+  // SHARE SONG & LIKED SONGS & PLAYLIST VIEW CONTROLLER
   // ==========================================================================
+  function shareSong(track) {
+    if (!track) {
+      showToast('No song selected to share', 'ℹ️');
+      return;
+    }
+    const origin = window.location.origin;
+    const songParam = track.id || track.title;
+    const shareUrl = `${origin}/?track=${encodeURIComponent(songParam)}`;
+    const shareData = {
+      title: `${track.title} — MusiSurf`,
+      text: `Listen to "${track.title}" by ${track.artist} on MusiSurf!`,
+      url: shareUrl
+    };
+
+    if (navigator.share && /mobile|android|iphone|ipad/i.test(navigator.userAgent)) {
+      navigator.share(shareData).catch(() => {});
+    } else if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        showToast('Song link copied to clipboard! 🔗', '✨');
+      }).catch(() => {
+        prompt('Copy song link:', shareUrl);
+      });
+    } else {
+      prompt('Copy song link:', shareUrl);
+    }
+  }
+
   function toggleLikeSong(track) {
     const idx = state.likedSongs.findIndex(s => s.id === track.id);
     if (idx >= 0) {
@@ -3500,15 +3542,7 @@
 
     // Delete custom playlist (kept solely inside playlist view)
     elements.deletePlaylistBtn.onclick = () => {
-      if (confirm(`Are you sure you want to delete playlist "${title}"?`)) {
-        state.customPlaylists = state.customPlaylists.filter(p => p.id !== playlistId);
-        saveStoredPlaylists();
-        renderSidebarPlaylists();
-        updateLibraryUI();
-        const returnView = (window.innerWidth <= 768) ? 'library' : 'home';
-        switchView(returnView);
-        showToast(`Deleted playlist "${title}"`, '🗑️');
-      }
+      promptDeleteCurrentPlaylist(playlistId, title);
     };
 
     // Mobile 3-horizontal-bars button to open playlist options bottom sheet
@@ -3524,6 +3558,35 @@
         }
       };
     }
+  }
+
+  // Delete Custom Playlist Confirmation (MusiSurf Dark Themed Modal)
+  function promptDeleteCurrentPlaylist(playlistId, title) {
+    if (!playlistId || playlistId === 'liked' || playlistId === 'downloaded' || playlistId === 'local') return;
+    state._deletingPlaylistId = playlistId;
+    state._deletingPlaylistTitle = title;
+    if (elements.deletePlaylistConfirmModal) {
+      if (elements.deletePlaylistModalTargetName) {
+        elements.deletePlaylistModalTargetName.textContent = `"${title}"`;
+      }
+      elements.deletePlaylistConfirmModal.style.display = 'flex';
+    } else {
+      if (confirm(`Are you sure you want to delete playlist "${title}"?`)) {
+        executeDeletePlaylist(playlistId, title);
+      }
+    }
+  }
+
+  function executeDeletePlaylist(playlistId, title) {
+    state.customPlaylists = state.customPlaylists.filter(p => p.id !== playlistId);
+    saveStoredPlaylists();
+    renderSidebarPlaylists();
+    updateLibraryUI();
+    const returnView = (window.innerWidth <= 768) ? 'library' : 'home';
+    switchView(returnView);
+    showToast(`Deleted playlist "${title}"`, '🗑️');
+    state._deletingPlaylistId = null;
+    state._deletingPlaylistTitle = null;
   }
 
   // Rename Custom Playlist Action (MusiSurf Dark Themed Modal)
@@ -5022,6 +5085,51 @@
       });
     }
 
+    // Delete Playlist Confirmation Modal Handlers
+    if (elements.closeDeletePlaylistModalBtn) {
+      elements.closeDeletePlaylistModalBtn.addEventListener('click', () => {
+        if (elements.deletePlaylistConfirmModal) elements.deletePlaylistConfirmModal.style.display = 'none';
+        state._deletingPlaylistId = null;
+        state._deletingPlaylistTitle = null;
+      });
+    }
+
+    if (elements.cancelDeletePlaylistBtn) {
+      elements.cancelDeletePlaylistBtn.addEventListener('click', () => {
+        if (elements.deletePlaylistConfirmModal) elements.deletePlaylistConfirmModal.style.display = 'none';
+        state._deletingPlaylistId = null;
+        state._deletingPlaylistTitle = null;
+      });
+    }
+
+    if (elements.confirmDeletePlaylistModalBtn) {
+      elements.confirmDeletePlaylistModalBtn.addEventListener('click', () => {
+        if (elements.deletePlaylistConfirmModal) elements.deletePlaylistConfirmModal.style.display = 'none';
+        if (state._deletingPlaylistId) {
+          executeDeletePlaylist(state._deletingPlaylistId, state._deletingPlaylistTitle);
+        }
+      });
+    }
+
+    // Share Song Listeners (Desktop player bar & Mobile sheet)
+    if (elements.playerShareBtn) {
+      elements.playerShareBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        shareSong(state.currentTrack);
+      });
+    }
+
+    if (elements.mobOptShareBtn) {
+      elements.mobOptShareBtn.addEventListener('click', () => {
+        if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
+        if (state._optionsTrack) {
+          shareSong(state._optionsTrack);
+        } else {
+          shareSong(state.currentTrack);
+        }
+      });
+    }
+
     // Add to Playlist Modal Close & Done
     if (elements.closeAddToPlaylistBtn) {
       elements.closeAddToPlaylistBtn.addEventListener('click', () => {
@@ -5202,7 +5310,7 @@
     }
 
     // Close Modals on Backdrop Click
-    [elements.createPlaylistModal, elements.renamePlaylistModal, elements.addToPlaylistModal, elements.settingsModal].forEach(modal => {
+    [elements.createPlaylistModal, elements.renamePlaylistModal, elements.deletePlaylistConfirmModal, elements.addToPlaylistModal, elements.settingsModal, elements.exportFormatModal].forEach(modal => {
       if (modal) {
         modal.addEventListener('click', (e) => {
           if (e.target === modal) modal.style.display = 'none';
@@ -5221,14 +5329,10 @@
       savePlaybackState();
     });
     elements.audio.addEventListener('timeupdate', () => {
+      if (isYouTubeActive()) return;
       if (state.isPlaying && !state.isDraggingProgress && state.currentTrack) {
         const cur = elements.audio.currentTime || 0;
-        // Prevent flashing 0:00 when resuming a restored track on page reload
-        if (state.restoredResumeTime > 0) {
-          if (cur < Math.max(0.5, state.restoredResumeTime - 1.5)) {
-            try { elements.audio.currentTime = state.restoredResumeTime; } catch (e) {}
-            return;
-          }
+        if (state.restoredResumeTime > 0 && cur >= 0.5) {
           state.restoredResumeTime = 0;
         }
         const dur = getTotalDuration();
@@ -5831,6 +5935,10 @@
         elements.renamePlaylistModal.style.display = 'none';
         return;
       }
+      if (elements.deletePlaylistConfirmModal && elements.deletePlaylistConfirmModal.style.display !== 'none') {
+        elements.deletePlaylistConfirmModal.style.display = 'none';
+        return;
+      }
       if (elements.queueDrawer && elements.queueDrawer.classList.contains('open')) {
         elements.queueDrawer.classList.remove('open');
         if (elements.queueBtn) elements.queueBtn.classList.remove('active');
@@ -5987,6 +6095,7 @@
         if (elements.queueBtn) elements.queueBtn.classList.remove('active');
         elements.createPlaylistModal.style.display = 'none';
         if (elements.renamePlaylistModal) elements.renamePlaylistModal.style.display = 'none';
+        if (elements.deletePlaylistConfirmModal) elements.deletePlaylistConfirmModal.style.display = 'none';
         elements.addToPlaylistModal.style.display = 'none';
         if (elements.settingsModal) elements.settingsModal.style.display = 'none';
         if (elements.exportFormatModal) elements.exportFormatModal.style.display = 'none';

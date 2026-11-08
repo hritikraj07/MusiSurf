@@ -2934,6 +2934,30 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   height: 20px;
 }
 
+.player-share-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  border-radius: 50%;
+}
+
+.player-share-btn:hover {
+  color: #fff;
+  transform: scale(1.15);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.player-share-btn svg {
+  width: 19px;
+  height: 19px;
+}
+
 /* Player Center: Controls & Scrubber */
 .player-center {
   display: flex;
@@ -3436,6 +3460,25 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 .btn-primary:hover {
   background-color: #1ed760;
   transform: scale(1.04);
+}
+
+.btn-danger {
+  background-color: #ef4444;
+  border: none;
+  border-radius: 500px;
+  padding: 10px 24px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: transform var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.35);
+}
+
+.btn-danger:hover {
+  background-color: #dc2626;
+  transform: scale(1.04);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5);
 }
 
 /* Add to Playlist Picker List Modal */
@@ -4116,12 +4159,19 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 /* Smart Phones (< 768px) */
 @media (max-width: 768px) {
   /* Completely hide desktop-style vertical scrollbars on mobile viewport */
-  ::-webkit-scrollbar {
+  *::-webkit-scrollbar,
+  ::-webkit-scrollbar,
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  .content-scroll::-webkit-scrollbar,
+  div::-webkit-scrollbar {
     display: none !important;
     width: 0 !important;
     height: 0 !important;
+    opacity: 0 !important;
+    background: transparent !important;
   }
-  * {
+  *, html, body, .content-scroll {
     scrollbar-width: none !important;
     -ms-overflow-style: none !important;
   }
@@ -4359,7 +4409,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   body[data-active-view="library"] .content-scroll,
   body[data-active-view="playlist"] .content-scroll,
   body[data-active-view="lyrics"] .content-scroll {
-    padding-top: 18px !important;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 6px) !important;
     padding-bottom: calc(185px + env(safe-area-inset-bottom, 20px)) !important;
   }
 
@@ -5331,7 +5381,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .library-view-container {
-  padding: 8px 0 24px;
+  padding: 0 0 24px !important;
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -5869,7 +5919,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 
 @media (max-width: 768px) {
   .library-view-container {
-    padding: 16px 14px 24px !important;
+    padding: 0 !important;
   }
   .library-header-text .page-title {
     font-size: 1.8rem;

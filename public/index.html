@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=6.6">
+  <link rel="stylesheet" href="/styles.css?v=6.7">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -968,6 +968,16 @@
               d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
           </svg>
         </button>
+
+        <button class="player-share-btn" id="playerShareBtn" title="Share Song (Web & Desktop)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
+        </button>
       </div>
 
       <!-- Center: Controls & Scrubber -->
@@ -1289,6 +1299,18 @@
             </div>
             <span id="mobOptDownloadText">Download Song</span>
           </button>
+          <button class="mob-option-item" id="mobOptShareBtn">
+            <div class="mob-option-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+              </svg>
+            </div>
+            <span>Share Song</span>
+          </button>
           <button class="mob-option-item" id="mobOptRemovePlaylistBtn" style="display: none; color: #ef4444;">
             <div class="mob-option-icon" style="color: #ef4444;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1414,6 +1436,34 @@
             <button type="submit" class="btn-primary">Save Name</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Delete Playlist Confirmation Modal (MusiSurf Dark Theme) -->
+    <div class="modal-backdrop" id="deletePlaylistConfirmModal" style="display: none;">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 style="color: #ef4444; display: flex; align-items: center; gap: 8px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+            Delete Playlist
+          </h3>
+          <button class="modal-close-btn" id="closeDeletePlaylistModalBtn" title="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div style="padding: 16px 0 22px; color: var(--text-secondary); font-size: 14.5px; line-height: 1.55;">
+          Are you sure you want to delete playlist <strong id="deletePlaylistModalTargetName" style="color: #fff;"></strong>? This action cannot be undone and will permanently remove it from your library.
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px;">
+          <button type="button" class="btn-secondary" id="cancelDeletePlaylistBtn">Cancel</button>
+          <button type="button" class="btn-danger" id="confirmDeletePlaylistModalBtn">Delete</button>
+        </div>
       </div>
     </div>
 
@@ -1664,7 +1714,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.43"></script>
+  <script src="/app.js?v=2.45"></script>
 </body>
 
 </html>
