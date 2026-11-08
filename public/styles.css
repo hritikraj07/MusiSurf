@@ -117,6 +117,7 @@ html, body {
   column-gap: 8px;
   padding: 0;
   margin: 0;
+  transition: grid-template-columns 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 ::selection {
@@ -139,6 +140,8 @@ html, body {
 
 .app-layout.sidebar-full-width .main-wrapper {
   display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 .app-layout.sidebar-full-width .sidebar {
@@ -156,6 +159,11 @@ html, body {
   justify-content: space-between !important;
 }
 
+/* Hide collapse button when fullscreen - only keep restore full screen button */
+.app-layout.sidebar-full-width #collapseSidebarBtn {
+  display: none !important;
+}
+
 .app-layout.sidebar-full-width .library-header-actions {
   margin-left: auto !important;
   display: flex !important;
@@ -163,16 +171,17 @@ html, body {
   gap: 12px !important;
 }
 
+/* In fullscreen mode: make + icon instead of writing "+ Create" */
 .app-layout.sidebar-full-width #createPlaylistBtn {
   background: #242424 !important;
   color: #ffffff !important;
-  border-radius: 999px !important;
-  padding: 8px 18px !important;
+  border-radius: 50% !important;
+  width: 36px !important;
+  height: 36px !important;
+  padding: 0 !important;
   display: inline-flex !important;
   align-items: center !important;
-  gap: 8px !important;
-  font-weight: 600 !important;
-  font-size: 0.9rem !important;
+  justify-content: center !important;
   cursor: pointer !important;
   transition: background 0.2s, transform 0.15s !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
@@ -180,18 +189,19 @@ html, body {
 
 .app-layout.sidebar-full-width #createPlaylistBtn:hover {
   background: #333333 !important;
-  transform: scale(1.03) !important;
+  transform: scale(1.08) !important;
 }
 
 .app-layout.sidebar-full-width #createPlaylistBtn .create-playlist-btn-text {
-  display: inline !important;
+  display: none !important;
 }
 
-/* Fullscreen Mode: Library Search & Sort Row (Image 4) */
+/* Fullscreen Mode: Library Search & Sort Row (Search to the right, left of Recents) */
 .app-layout.sidebar-full-width .sidebar-library-search-row {
   display: flex !important;
   align-items: center !important;
-  justify-content: space-between !important;
+  justify-content: flex-end !important;
+  gap: 12px !important;
   padding: 8px 0 20px !important;
   margin-bottom: 8px !important;
 }
@@ -200,7 +210,7 @@ html, body {
   background: #242424 !important;
   border-radius: 8px !important;
   padding: 8px 14px !important;
-  width: 300px !important;
+  width: 260px !important;
   display: flex !important;
   align-items: center !important;
   gap: 8px !important;
@@ -220,7 +230,7 @@ html, body {
   display: block !important;
 }
 
-/* Fullscreen Mode: Responsive Card Grid Layout (Image 2) */
+/* Fullscreen Mode: Responsive Card Grid Layout (Image 2 & 4) */
 .app-layout.sidebar-full-width .library-content {
   display: grid !important;
   grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)) !important;
@@ -229,9 +239,13 @@ html, body {
   overflow-y: auto !important;
 }
 
+/* Equalize Replay, Liked Songs, Local Music, Downloads, and Playlists */
 .app-layout.sidebar-full-width .library-item,
 .app-layout.sidebar-full-width .playlist-list-item,
-.app-layout.sidebar-full-width .liked-songs-item {
+.app-layout.sidebar-full-width .liked-songs-item,
+.app-layout.sidebar-full-width .local-music-item,
+.app-layout.sidebar-full-width .downloaded-songs-item,
+.app-layout.sidebar-full-width .replay-nav-item {
   flex-direction: column !important;
   align-items: flex-start !important;
   background: #181818 !important;
@@ -248,13 +262,18 @@ html, body {
 
 .app-layout.sidebar-full-width .library-item:hover,
 .app-layout.sidebar-full-width .playlist-list-item:hover,
-.app-layout.sidebar-full-width .liked-songs-item:hover {
+.app-layout.sidebar-full-width .liked-songs-item:hover,
+.app-layout.sidebar-full-width .local-music-item:hover,
+.app-layout.sidebar-full-width .downloaded-songs-item:hover,
+.app-layout.sidebar-full-width .replay-nav-item:hover {
   background: #282828 !important;
   border-color: rgba(255, 255, 255, 0.05) !important;
 }
 
 .app-layout.sidebar-full-width .replay-cover-art-box,
 .app-layout.sidebar-full-width .liked-icon-box,
+.app-layout.sidebar-full-width .local-icon-box,
+.app-layout.sidebar-full-width .downloaded-icon-box,
 .app-layout.sidebar-full-width .playlist-cover-mini,
 .app-layout.sidebar-full-width .item-cover {
   width: 100% !important;
@@ -263,6 +282,22 @@ html, body {
   border-radius: 6px !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
   position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+}
+
+.app-layout.sidebar-full-width .local-icon-box .local-folder-icon-img {
+  width: 58% !important;
+  height: 58% !important;
+  object-fit: contain !important;
+}
+
+.app-layout.sidebar-full-width .liked-icon-box svg,
+.app-layout.sidebar-full-width .downloaded-icon-box svg {
+  width: 48px !important;
+  height: 48px !important;
 }
 
 .app-layout.sidebar-full-width .playlist-cover-img,
@@ -1243,7 +1278,7 @@ html, body {
   -webkit-user-select: none !important;
   outline: none !important;
   white-space: nowrap !important;
-  gap: 8px !important;
+  gap: 12px !important;
 }
 
 .library-header-left {
@@ -1254,7 +1289,7 @@ html, body {
   user-select: none !important;
   -webkit-user-select: none !important;
   outline: none !important;
-  flex: 1 1 auto !important;
+  flex: 0 1 auto !important;
   min-width: 0 !important;
   white-space: nowrap !important;
 }
@@ -1282,6 +1317,7 @@ html, body {
   -webkit-appearance: none !important;
   appearance: none !important;
   white-space: nowrap !important;
+  -webkit-tap-highlight-color: transparent !important;
 }
 
 .library-collapse-icon-btn:hover,
@@ -1308,6 +1344,7 @@ html, body {
   box-shadow: none !important;
   background: transparent !important;
   background-color: transparent !important;
+  border: none !important;
 }
 
 .library-heading {
@@ -1322,6 +1359,8 @@ html, body {
   display: inline-block !important;
   background: transparent !important;
   background-color: transparent !important;
+  outline: none !important;
+  border: none !important;
 }
 
 .library-header,
@@ -1346,7 +1385,7 @@ html, body {
 .library-header-actions {
   display: flex !important;
   align-items: center !important;
-  gap: 6px !important;
+  gap: 8px !important;
   flex-shrink: 0 !important;
   margin-left: auto !important;
 }
@@ -1355,13 +1394,13 @@ html, body {
   display: none;
 }
 
-/* Sidebar Library Filter & Sort Row (Upper of Replay - Image 3 & 4) */
+/* Sidebar Library Filter & Sort Row (Upper of Replay - Moved to the right, left of Recents) */
 .sidebar-library-search-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2px 6px 12px;
-  gap: 8px;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  padding: 2px 6px 12px !important;
+  gap: 8px !important;
 }
 
 .sidebar-lib-search-box {
@@ -1566,9 +1605,16 @@ html, body {
   display: none !important;
 }
 
+.sidebar.collapsed .library-collapse-icon-btn:hover .library-icon-morph .icon-books,
+#app.sidebar-collapsed .sidebar .library-collapse-icon-btn:hover .library-icon-morph .icon-books {
+  opacity: 0 !important;
+  display: none !important;
+}
+
 .sidebar.collapsed .library-collapse-icon-btn:hover .library-icon-morph .icon-expand,
 #app.sidebar-collapsed .sidebar .library-collapse-icon-btn:hover .library-icon-morph .icon-expand {
   opacity: 1 !important;
+  display: block !important;
   pointer-events: auto !important;
   transform: scale(1) !important;
 }

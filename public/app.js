@@ -1290,9 +1290,10 @@
     state.isTrackLoading = true;
     state.currentTrack = track;
 
-    // Immediately stop current playback smoothly without tearing down audio pipeline
+    // Immediately stop current playback smoothly and reset decoder position
     try {
       elements.audio.pause();
+      elements.audio.currentTime = customStartTime || 0;
     } catch (e) {}
     if (state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
       try {
@@ -2214,17 +2215,6 @@
       } else if (state.activePlayerEngine === 'youtube' && !elements.audio.paused && elements.audio.currentTime > 0) {
         state.activePlayerEngine = 'audio';
         rawTime = elements.audio.currentTime;
-      }
-    }
-
-    // 3. Monotonic protection: prevent playback scrubber from glitching back to 0 or jumping to end
-    const totalDur = getTotalDuration();
-    if (state.isPlaying && !state.isDraggingProgress && !state.isTrackLoading) {
-      if ((rawTime === null || rawTime === 0) && lastKnownPlaybackTime > 0.3 && (totalDur === 0 || lastKnownPlaybackTime < totalDur)) {
-        return lastKnownPlaybackTime;
-      }
-      if (rawTime !== null && lastKnownPlaybackTime > 0.5 && rawTime < (lastKnownPlaybackTime - 1.5) && (totalDur === 0 || lastKnownPlaybackTime < totalDur)) {
-        return lastKnownPlaybackTime;
       }
     }
 
@@ -3215,9 +3205,8 @@
       elements.clearSearchBtn.style.display = 'none';
       elements.searchResultsWrapper.style.display = 'none';
       elements.searchEmptyState.style.display = 'none';
-      if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'block';
+      if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'none';
       elements.searchBrowseSection.style.display = 'block';
-      renderSearchRecentUI();
     }
   }
 
@@ -3439,12 +3428,24 @@
       }
     }
 
-    // Contextual "Remove from this Playlist" button (only visible when inside a user-created playlist)
+    // Contextual "Remove from this Playlist" button (visible when track is in current playlist or any custom playlist)
     if (elements.mobOptRemovePlaylistBtn) {
-      const isCustomUserPlaylist = state.currentView === 'playlist' && 
-                                   state.activePlaylistId && 
-                                   !['liked', 'downloaded', 'local'].includes(state.activePlaylistId);
-      elements.mobOptRemovePlaylistBtn.style.display = isCustomUserPlaylist ? 'flex' : 'none';
+      const currentPlId = (state.currentView === 'playlist' && state.viewingPlaylistId) 
+        ? state.viewingPlaylistId 
+        : (state.activePlaylistId && !['liked', 'downloaded', 'local'].includes(state.activePlaylistId) ? state.activePlaylistId : null);
+      
+      const isTargetInCurrent = currentPlId && state.customPlaylists?.some(p => p.id === currentPlId && (p.tracks || []).some(t => String(t.id) === String(track.id)));
+      const containingPl = state.customPlaylists?.find(p => (p.tracks || []).some(t => String(t.id) === String(track.id)));
+
+      if (isTargetInCurrent || containingPl) {
+        elements.mobOptRemovePlaylistBtn.style.display = 'flex';
+        const span = elements.mobOptRemovePlaylistBtn.querySelector('span');
+        if (span) {
+          span.textContent = isTargetInCurrent ? 'Remove from this Playlist' : `Remove from ${containingPl.name}`;
+        }
+      } else {
+        elements.mobOptRemovePlaylistBtn.style.display = 'none';
+      }
     }
 
 
@@ -4891,15 +4892,10 @@
       renderReplayView(state._replayPeriod || 'this-month');
     }
     if (viewName === 'search') {
+      if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'none';
       if (!elements.globalSearchInput || !elements.globalSearchInput.value.trim()) {
-        if (state.isExploreMode) {
-          if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'none';
-        } else {
-          if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'block';
-        }
         if (elements.searchBrowseSection) elements.searchBrowseSection.style.display = 'block';
       }
-      renderSearchRecentUI();
     }
     if (!navigator.onLine && typeof updateOfflineModeUI === 'function') {
       updateOfflineModeUI(false);
@@ -5434,13 +5430,21 @@
         const formattedArtist = escapeHtml(track.artist || 'Local File');
 
         tr.innerHTML = `
-          <td class="col-num">${idx + 1}</td>
+          <td class="col-num">
+            <span class="track-num-text">${idx + 1}</span>
+            <span class="playing-equalizer-bars" aria-hidden="true">
+              <span class="eq-bar eq-bar-1"></span>
+              <span class="eq-bar eq-bar-2"></span>
+              <span class="eq-bar eq-bar-3"></span>
+              <span class="eq-bar eq-bar-4"></span>
+            </span>
+          </td>
           <td class="col-title">
             <div class="table-title-cell">
-              <img src="${track.image || DEFAULT_LOCAL_COVER}" alt="${track.title}" class="table-cover">
+              <img src="${escapeHtml(track.image || DEFAULT_LOCAL_COVER)}" alt="${formattedTitle}" class="table-cover" onerror="this.src='${DEFAULT_LOCAL_COVER}'">
               <div>
-                <div class="table-title-main"><span class="title-text-main" title="${escapeHtml(track.title)}">${formattedTitle}</span>${getPlaylistTickBadgeHtml(track.id)}${getDownloadedBadgeHtml(track.id)}</div>
-                <div class="table-artist-sub" title="${escapeHtml(track.artist || 'Local File')}">${formattedArtist}</div>
+                <div class="table-title-main"><span class="title-text-main" title="${formattedTitle}">${formattedTitle}</span>${getPlaylistTickBadgeHtml(track.id)}${getDownloadedBadgeHtml(track.id)}</div>
+                <div class="table-artist-sub" title="${formattedArtist}">${formattedArtist}</div>
               </div>
             </div>
           </td>
@@ -6162,9 +6166,8 @@
       state.isExploreMode = false;
       try { localStorage.setItem('musisurf_explore_mode', 'false'); } catch (e) {}
       if (elements.searchRecentSection) {
-        elements.searchRecentSection.style.display = 'block';
+        elements.searchRecentSection.style.display = 'none';
       }
-      renderSearchRecentUI();
       const val = elements.globalSearchInput.value.trim();
       if (val) {
         handleSearchAutocomplete(val);
@@ -6194,9 +6197,8 @@
       elements.clearSearchBtn.style.display = 'none';
       elements.searchResultsWrapper.style.display = 'none';
       elements.searchEmptyState.style.display = 'none';
-      if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'block';
+      if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'none';
       elements.searchBrowseSection.style.display = 'block';
-      renderSearchRecentUI();
       elements.globalSearchInput.focus();
     });
 
@@ -7589,15 +7591,22 @@
       elements.mobOptRemovePlaylistBtn.addEventListener('click', () => {
         if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
         const target = state.contextTrack || state.currentTrack;
-        if (target && state.activePlaylistId) {
-          const pl = state.customPlaylists.find(p => p.id === state.activePlaylistId);
-          if (pl) {
-            pl.tracks = (pl.tracks || []).filter(t => t.id !== target.id);
-            saveStoredPlaylists();
-            updateAllPlaylistTickBadges(target.id);
+        if (!target) return;
+        const currentPlId = (state.currentView === 'playlist' && state.viewingPlaylistId) 
+          ? state.viewingPlaylistId 
+          : (state.activePlaylistId && !['liked', 'downloaded', 'local'].includes(state.activePlaylistId) ? state.activePlaylistId : null);
+        let pl = currentPlId ? state.customPlaylists?.find(p => p.id === currentPlId) : null;
+        if (!pl || !(pl.tracks || []).some(t => String(t.id) === String(target.id))) {
+          pl = state.customPlaylists?.find(p => (p.tracks || []).some(t => String(t.id) === String(target.id)));
+        }
+        if (pl) {
+          pl.tracks = (pl.tracks || []).filter(t => String(t.id) !== String(target.id));
+          saveStoredPlaylists();
+          updateAllPlaylistTickBadges(target.id);
+          if (state.currentView === 'playlist' && state.viewingPlaylistId === pl.id) {
             renderPlaylistView(pl.id);
-            showToast(`Removed "${target.title}" from ${pl.name}`, '🗑️');
           }
+          showToast(`Removed "${target.title}" from ${pl.name}`, '🗑️');
         }
       });
     }
