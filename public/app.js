@@ -50,6 +50,7 @@
       durationMinutes: 0
     },
     recentlyPlayed: [],
+    restoredResumeTime: 0,
     contextTrack: null
   };
 
@@ -110,7 +111,6 @@
 
     // Search View
     searchRecentSection: document.getElementById('searchRecentSection'),
-    searchRecentWrap: document.getElementById('searchRecentWrap'),
     searchRecentGrid: document.getElementById('searchRecentGrid'),
     searchFreshBanner: document.getElementById('searchFreshBanner'),
     clearRecentBtn: document.getElementById('clearRecentBtn'),
@@ -551,29 +551,31 @@
     renderSearchRecentUI();
   }
 
-  // Render Recently Played section & fresh browser welcome state in Search View
+  // Render Recent section & plain empty state in Search View
   function renderSearchRecentUI() {
-    if (!elements.searchRecentWrap || !elements.searchFreshBanner) return;
+    if (!elements.searchRecentGrid || !elements.searchFreshBanner) return;
 
     if (!state.recentlyPlayed || state.recentlyPlayed.length === 0) {
-      elements.searchRecentWrap.style.display = 'none';
-      elements.searchFreshBanner.style.display = 'flex';
+      if (elements.searchRecentGrid) elements.searchRecentGrid.style.display = 'none';
+      if (elements.clearRecentBtn) elements.clearRecentBtn.style.display = 'none';
+      elements.searchFreshBanner.style.display = 'block';
       return;
     }
 
     elements.searchFreshBanner.style.display = 'none';
-    elements.searchRecentWrap.style.display = 'block';
+    if (elements.clearRecentBtn) elements.clearRecentBtn.style.display = 'inline-block';
 
     if (elements.searchRecentGrid) {
+      elements.searchRecentGrid.style.display = 'grid';
       elements.searchRecentGrid.innerHTML = '';
       state.recentlyPlayed.slice(0, 8).forEach(t => {
         const card = document.createElement('div');
         card.className = 'search-recent-card';
         card.innerHTML = `
-          <img src="${t.image}" alt="${escapeHtml(t.title)}" class="search-recent-cover" loading="lazy">
+          <img src="${t.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80'}" alt="${escapeHtml(t.title)}" class="search-recent-cover" loading="lazy">
           <div class="search-recent-info">
-            <div class="search-recent-title">${escapeHtml(t.title)}</div>
-            <div class="search-recent-artist">${escapeHtml(t.artist)}</div>
+            <div class="search-recent-title" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</div>
+            <div class="search-recent-artist" title="${escapeHtml(t.artist)}">${escapeHtml(t.artist)}</div>
           </div>
           <div class="search-recent-play-icon" title="Play Now">
             <svg viewBox="0 0 24 24" fill="currentColor">
@@ -847,6 +849,9 @@
     if (!state.currentTrack) return;
     try {
       const cur = getCurrentPlaybackTime();
+      if (state.restoredResumeTime > 0 && cur < Math.max(0.5, state.restoredResumeTime - 1.5)) {
+        return;
+      }
       const dur = getTotalDuration();
       const data = {
         track: state.currentTrack,
@@ -906,6 +911,7 @@
       highlightPlayingTrackInTables(track.id);
 
       const resumeTime = parseFloat(saved.currentTime) || 0;
+      state.restoredResumeTime = resumeTime;
       elements.currentTimeLabel.textContent = formatTime(resumeTime);
       if (elements.mobCurrentTime) elements.mobCurrentTime.textContent = formatTime(resumeTime);
       if (dur > 0) {
@@ -932,20 +938,38 @@
       state.isPlaying = false;
       updatePlayPauseButton();
 
+      const primeAudioResume = () => {
+        if (resumeTime > 0) {
+          try {
+            if (elements.audio.currentTime < resumeTime - 0.5) {
+              elements.audio.currentTime = resumeTime;
+            }
+          } catch (e) {}
+        }
+      };
+
       if (track.isLocal && track.id) {
         getLocalTrackBlobFromDB(track.id).then(blob => {
           if (blob) {
             elements.audio.src = URL.createObjectURL(blob);
             elements.audio.volume = state.isMuted ? 0 : state.volume;
-            elements.audio.currentTime = resumeTime;
+            primeAudioResume();
+            elements.audio.addEventListener('loadedmetadata', primeAudioResume, { once: true });
+            elements.audio.addEventListener('canplay', primeAudioResume, { once: true });
           }
         }).catch(() => {});
       } else {
         const offlineRecord = state.offlineTracks.find(t => t.id === track.id);
         if (offlineRecord && offlineRecord.audioBlob) {
-          elements.audio.src = URL.createObjectURL(offlineRecord.audioBlob);
+          let audioBlob = offlineRecord.audioBlob;
+          if (!audioBlob.type || audioBlob.type === 'application/octet-stream') {
+            audioBlob = new Blob([audioBlob], { type: 'audio/mp4' });
+          }
+          elements.audio.src = URL.createObjectURL(audioBlob);
           elements.audio.volume = state.isMuted ? 0 : state.volume;
-          elements.audio.currentTime = resumeTime;
+          primeAudioResume();
+          elements.audio.addEventListener('loadedmetadata', primeAudioResume, { once: true });
+          elements.audio.addEventListener('canplay', primeAudioResume, { once: true });
         } else if (track.source === 'youtube' || !track.hasDirectAudio) {
           const cueYt = () => {
             if (state.ytReady && state.ytPlayer && track.ytId) {
@@ -966,13 +990,9 @@
           if (audioSrc) {
             elements.audio.src = audioSrc;
             elements.audio.volume = state.isMuted ? 0 : state.volume;
-            const onCanPlay = () => {
-              if (resumeTime > 0 && resumeTime < (elements.audio.duration || 9999)) {
-                elements.audio.currentTime = resumeTime;
-              }
-              elements.audio.removeEventListener('canplay', onCanPlay);
-            };
-            elements.audio.addEventListener('canplay', onCanPlay);
+            primeAudioResume();
+            elements.audio.addEventListener('loadedmetadata', primeAudioResume, { once: true });
+            elements.audio.addEventListener('canplay', primeAudioResume, { once: true });
           }
         }
       }
@@ -1169,9 +1189,26 @@
           state.ytPlayer.stopVideo();
         }
 
-        const blobUrl = URL.createObjectURL(offlineRecord.audioBlob);
+        let audioBlob = offlineRecord.audioBlob;
+        if (!audioBlob.type || audioBlob.type === 'application/octet-stream') {
+          audioBlob = new Blob([audioBlob], { type: 'audio/mp4' });
+        }
+        const blobUrl = URL.createObjectURL(audioBlob);
         elements.audio.src = blobUrl;
         elements.audio.volume = state.isMuted ? 0 : state.volume;
+
+        // Chromium mobile duration calculation workaround for blobs
+        const onLoadedMeta = () => {
+          if (elements.audio.duration === Infinity) {
+            elements.audio.currentTime = 1e101;
+            elements.audio.ontimeupdate = function () {
+              this.ontimeupdate = null;
+              elements.audio.currentTime = 0;
+            };
+          }
+        };
+        elements.audio.addEventListener('loadedmetadata', onLoadedMeta, { once: true });
+
         elements.audio.load();
         elements.audio.play().catch(err => {
           console.warn('Offline playback error:', err);
@@ -1260,6 +1297,13 @@
     } else {
       // Resume playback
       state.isPlaying = true;
+      if (state.restoredResumeTime > 0) {
+        try {
+          if (elements.audio.currentTime < state.restoredResumeTime - 0.5) {
+            elements.audio.currentTime = state.restoredResumeTime;
+          }
+        } catch (e) {}
+      }
       if (state.currentTrack.source === 'youtube') {
         if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.playVideo === 'function') {
           try { state.ytPlayer.playVideo(); } catch (e) {}
@@ -1583,19 +1627,39 @@
   function getTotalDuration() {
     if (isYouTubeActive()) {
       const dur = state.ytPlayer && typeof state.ytPlayer.getDuration === 'function' ? state.ytPlayer.getDuration() : 0;
-      return dur > 0 ? dur : (state.currentTrack?.duration || 0);
+      return (Number.isFinite(dur) && dur > 0) ? dur : (state.currentTrack?.duration || 0);
     }
-    return elements.audio.duration || state.currentTrack?.duration || 0;
+    const audioDur = elements.audio.duration;
+    if (Number.isFinite(audioDur) && audioDur > 0) {
+      return audioDur;
+    }
+    return state.currentTrack?.duration || 0;
   }
 
   function seekTo(seconds) {
+    const total = getTotalDuration();
+    const targetSeconds = Math.max(0, Math.min(total > 0 ? total : 99999, Number(seconds) || 0));
     if (isYouTubeActive()) {
       if (state.ytPlayer && typeof state.ytPlayer.seekTo === 'function') {
-        state.ytPlayer.seekTo(seconds, true);
+        state.ytPlayer.seekTo(targetSeconds, true);
       }
     } else {
-      elements.audio.currentTime = seconds;
+      try {
+        elements.audio.currentTime = targetSeconds;
+      } catch (e) {
+        console.warn('Seek error:', e);
+      }
     }
+    if (total > 0) {
+      const pct = Math.min(100, (targetSeconds / total) * 100);
+      if (elements.progressFill) elements.progressFill.style.width = `${pct}%`;
+      if (elements.mobProgressFill) elements.mobProgressFill.style.width = `${pct}%`;
+      if (elements.miniPlayerFill) elements.miniPlayerFill.style.width = `${pct}%`;
+    }
+    const displayTime = formatTime(targetSeconds);
+    if (elements.currentTimeLabel) elements.currentTimeLabel.textContent = displayTime;
+    if (elements.mobCurrentTime) elements.mobCurrentTime.textContent = displayTime;
+    syncLyricsWithTime(targetSeconds);
   }
 
   function setVolume(pct) {
@@ -1638,6 +1702,9 @@
       if (state.isDraggingProgress) return; // Don't override while user is actively dragging scrubber
 
       const cur = getCurrentPlaybackTime();
+      if (state.restoredResumeTime > 0 && cur < Math.max(0.5, state.restoredResumeTime - 1.5)) {
+        return;
+      }
       const dur = getTotalDuration();
 
       elements.currentTimeLabel.textContent = formatTime(cur);
@@ -4144,7 +4211,7 @@
         const clientX = getClientX(e);
         const pct = (clientX - rect.left) / rect.width;
         updateScrubUI(pct);
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
       }
 
       function handleMove(e) {
@@ -4153,7 +4220,7 @@
         const clientX = getClientX(e);
         const pct = (clientX - rect.left) / rect.width;
         updateScrubUI(pct);
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
       }
 
       function handleEnd(e) {
@@ -4161,12 +4228,12 @@
         isDragging = false;
         barEl.classList.remove('scrubbing');
         const dur = getTotalDuration();
-        if (dur > 0) {
+        if (dur > 0 && Number.isFinite(dur)) {
           seekTo(dragPct * dur);
         }
         setTimeout(() => {
           state.isDraggingProgress = false;
-        }, 80);
+        }, 120);
       }
 
       // Mouse drag events
@@ -4534,7 +4601,15 @@
     elements.audio.addEventListener('timeupdate', () => {
       if (state.isPlaying && !state.isDraggingProgress && state.currentTrack) {
         const cur = elements.audio.currentTime || 0;
-        const dur = elements.audio.duration || state.currentTrack.duration || 0;
+        // Prevent flashing 0:00 when resuming a restored track on page reload
+        if (state.restoredResumeTime > 0) {
+          if (cur < Math.max(0.5, state.restoredResumeTime - 1.5)) {
+            try { elements.audio.currentTime = state.restoredResumeTime; } catch (e) {}
+            return;
+          }
+          state.restoredResumeTime = 0;
+        }
+        const dur = getTotalDuration();
         elements.currentTimeLabel.textContent = formatTime(cur);
         if (elements.mobCurrentTime) elements.mobCurrentTime.textContent = formatTime(cur);
         if (dur > 0) {
