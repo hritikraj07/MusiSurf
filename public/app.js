@@ -1147,20 +1147,18 @@
       clearInterval(crossfadeFadeInTimer);
       crossfadeFadeInTimer = null;
     }
-    const cf = state.settings.crossfade;
-    if (!cf || cf <= 0) {
-      elements.audio.volume = state.isMuted ? 0 : state.volume;
-      return;
-    }
     const targetVol = state.isMuted ? 0 : state.volume;
     if (targetVol <= 0) {
       elements.audio.volume = 0;
       return;
     }
 
+    const cf = state.settings.crossfade;
+    // Smooth 250ms ramp by default, or up to 3000ms if crossfade configured in settings
+    const rampDurationMs = (cf && cf > 0) ? Math.min(3000, (cf / 2) * 1000) : 250;
+
     elements.audio.volume = 0;
     const startTime = Date.now();
-    const rampDurationMs = Math.min(3000, (cf / 2) * 1000);
     crossfadeFadeInTimer = setInterval(() => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(1, elapsed / rampDurationMs);
@@ -1169,7 +1167,7 @@
         clearInterval(crossfadeFadeInTimer);
         crossfadeFadeInTimer = null;
       }
-    }, 40);
+    }, 20);
   }
 
   // Shuffle Mode Persistence Controller
@@ -1258,6 +1256,7 @@
     }
 
     // Reset progress freeze safeguard for new track
+    lastKnownPlaybackTime = customStartTime || 0;
     state.restoredResumeTime = customStartTime || 0;
     if (customStartTime > 0) {
       if (elements.currentTimeLabel) elements.currentTimeLabel.textContent = formatTime(customStartTime);
@@ -2078,40 +2077,59 @@
     return state.activePlayerEngine === 'youtube';
   }
 
+  let lastKnownPlaybackTime = 0;
+
   function getCurrentPlaybackTime() {
+    let rawTime = null;
+
     // 1. If HTML5 audio is actively playing or has progressed, always use its accurate hardware clock
     if (!elements.audio.paused && elements.audio.currentTime > 0) {
       state.activePlayerEngine = 'audio';
-      return elements.audio.currentTime;
-    }
-
-    // 2. Check if YouTube player is actively playing
-    if (state.ytPlayer && typeof state.ytPlayer.getPlayerState === 'function') {
+      rawTime = elements.audio.currentTime;
+    } else if (state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
+      // 2. Check if YouTube player is actively playing, buffering or paused
       try {
-        const pState = state.ytPlayer.getPlayerState();
-        if (pState === 1 || pState === 3) {
-          state.activePlayerEngine = 'youtube';
+        const pState = typeof state.ytPlayer.getPlayerState === 'function' ? state.ytPlayer.getPlayerState() : -1;
+        if (pState === 1 || pState === 2 || pState === 3) {
           const ytCur = state.ytPlayer.getCurrentTime();
-          if (Number.isFinite(ytCur) && ytCur >= 0) return ytCur;
+          if (Number.isFinite(ytCur) && ytCur >= 0) {
+            state.activePlayerEngine = 'youtube';
+            rawTime = ytCur;
+          }
         }
       } catch (e) {}
     }
 
     // 3. Fallbacks
-    const audioTime = elements.audio.currentTime;
-    if (Number.isFinite(audioTime) && audioTime > 0) {
-      state.activePlayerEngine = 'audio';
-      return audioTime;
+    if (rawTime === null) {
+      const audioTime = elements.audio.currentTime;
+      if (Number.isFinite(audioTime) && audioTime > 0) {
+        state.activePlayerEngine = 'audio';
+        rawTime = audioTime;
+      } else if (state.activePlayerEngine === 'youtube' && state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
+        try {
+          const ytCur = state.ytPlayer.getCurrentTime();
+          if (Number.isFinite(ytCur) && ytCur >= 0) rawTime = ytCur;
+        } catch (e) {}
+      }
     }
 
-    if (state.activePlayerEngine === 'youtube' && state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
-      try {
-        const ytCur = state.ytPlayer.getCurrentTime();
-        if (Number.isFinite(ytCur) && ytCur >= 0) return ytCur;
-      } catch (e) {}
+    // Safeguard against transient 0-glitches during playback
+    if (state.isPlaying && !state.isDraggingProgress) {
+      if ((rawTime === null || rawTime === 0) && lastKnownPlaybackTime > 1.0) {
+        return lastKnownPlaybackTime;
+      }
+      if (rawTime !== null && rawTime < 0.5 && lastKnownPlaybackTime > 1.5) {
+        return lastKnownPlaybackTime;
+      }
     }
 
-    return audioTime || 0;
+    if (rawTime !== null && Number.isFinite(rawTime) && rawTime >= 0) {
+      lastKnownPlaybackTime = rawTime;
+      return rawTime;
+    }
+
+    return lastKnownPlaybackTime || 0;
   }
 
   function getTotalDuration() {
@@ -2144,6 +2162,7 @@
   function seekTo(seconds) {
     const total = getTotalDuration();
     const targetSeconds = Math.max(0, Math.min(total > 0 ? total : 99999, Number(seconds) || 0));
+    lastKnownPlaybackTime = targetSeconds;
     if (isYouTubeActive() || state.activePlayerEngine === 'youtube') {
       if (state.ytPlayer && typeof state.ytPlayer.seekTo === 'function') {
         state.ytPlayer.seekTo(targetSeconds, true);
@@ -3232,15 +3251,6 @@
       <td class="col-album">${escapeHtml(track.album || 'Single')}</td>
       <td class="col-duration">${track.durationStr || '3:30'}</td>
       <td class="col-actions">
-        <button class="song-action-btn song-share-trigger" title="Share Song">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="18" cy="5" r="3"></circle>
-            <circle cx="6" cy="12" r="3"></circle>
-            <circle cx="18" cy="19" r="3"></circle>
-            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-          </svg>
-        </button>
         <button class="song-action-btn song-more-trigger" title="More Options">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <circle cx="12" cy="5" r="2"/>
@@ -3856,28 +3866,24 @@
         return;
       }
 
-      const isActivelyPlaying = isYouTubeActive()
-        ? (state.ytPlayer && typeof state.ytPlayer.getPlayerState === 'function' && state.ytPlayer.getPlayerState() === 1)
-        : (!elements.audio.paused && !elements.audio.ended && elements.audio.currentTime > 0);
-
-      const isThisPlPlaying = !!(
-        state.isPlaying &&
-        isActivelyPlaying &&
+      const isCurrentPlaylistTrack = !!(
         state.currentTrack &&
         state.activePlaylistId === playlistId &&
         listToPlay.some(t => t.id === state.currentTrack.id)
       );
 
-      if (isThisPlPlaying) {
+      if (isCurrentPlaylistTrack) {
         togglePlayPause();
       } else {
-        let queueList = [...listToPlay];
-        if (state.isPlaylistShuffle && queueList.length > 1) {
-          for (let i = queueList.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [queueList[i], queueList[j]] = [queueList[j], queueList[i]];
-          }
-        }
+        // Play playlist strictly in order starting from track 1 (no random shuffle)
+        state.isPlaylistShuffle = false;
+        state.isShuffled = false;
+        saveShuffleState();
+        if (elements.shufflePlaylistBtn) elements.shufflePlaylistBtn.classList.remove('active');
+        if (elements.shuffleBtn) elements.shuffleBtn.classList.remove('active');
+        if (elements.mobShuffleBtn) elements.mobShuffleBtn.classList.remove('active');
+
+        const queueList = [...listToPlay];
         state.activePlaylistTracks = [...listToPlay];
         state.activePlaylistId = playlistId;
         const plObj = state.customPlaylists.find(p => p.id === playlistId);
@@ -3885,16 +3891,12 @@
           plObj.lastPlayedAt = Date.now();
           saveStoredPlaylists();
         }
-        if (elements.shufflePlaylistBtn) elements.shufflePlaylistBtn.classList.toggle('active', state.isPlaylistShuffle);
         const playlistCover = (listToPlay && listToPlay[0]?.image) || (tracks && tracks[0]?.image) || '';
         try {
           recordRecentlyPlayedPlaylist({ id: playlistId, name: title, image: playlistCover, tracks: listToPlay });
         } catch (e) {}
 
-        const songToStart = (state.isPlaying && state.currentTrack && listToPlay.some(t => t.id === state.currentTrack.id))
-          ? state.currentTrack
-          : queueList[0];
-        playTrack(songToStart, queueList);
+        playTrack(queueList[0], queueList);
       }
     };
 
@@ -4502,10 +4504,13 @@
           card.querySelector('.card-play-btn')?.addEventListener('click', (e) => {
             e.stopPropagation();
             if (pl.tracks && pl.tracks.length > 0) {
-              const isPlayingNow = state.isPlaying && state.activePlaylistId === pl.id && state.currentTrack && pl.tracks.some(t => t.id === state.currentTrack.id);
-              if (isPlayingNow) {
+              const isThisPlTrack = state.activePlaylistId === pl.id && state.currentTrack && pl.tracks.some(t => t.id === state.currentTrack.id);
+              if (isThisPlTrack) {
                 togglePlayPause();
               } else {
+                state.isPlaylistShuffle = false;
+                state.isShuffled = false;
+                saveShuffleState();
                 state.activePlaylistId = pl.id;
                 state.activePlaylistTracks = [...pl.tracks];
                 recordRecentlyPlayedPlaylist(pl);
@@ -6455,7 +6460,7 @@
     elements.audio.addEventListener('timeupdate', () => {
       if (isYouTubeActive()) return;
       if (state.isPlaying && !state.isDraggingProgress && state.currentTrack) {
-        const cur = elements.audio.currentTime || 0;
+        const cur = getCurrentPlaybackTime();
         if (state.restoredResumeTime > 0 && cur >= 0.5) {
           state.restoredResumeTime = 0;
         }

@@ -2877,6 +2877,8 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   scroll-behavior: smooth;
   scrollbar-width: none; /* Hide scrollbar on Firefox while preserving vertical scroll */
   -ms-overflow-style: none; /* Hide scrollbar on IE & Edge */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 1) 12%, rgba(0, 0, 0, 1) 88%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 1) 12%, rgba(0, 0, 0, 1) 88%, transparent 100%);
 }
 
 .lyrics-scroll-body::-webkit-scrollbar {
@@ -5055,11 +5057,28 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     display: none !important;
   }
 
-  /* Remove top bar settings button on mobile (accessible only in Library view) */
-  .header-right,
+  /* Keep top bar settings gear button always visible on top nav across all devices */
+  .top-header-right,
+  .header-right {
+    display: flex !important;
+    align-items: center !important;
+    flex-shrink: 0 !important;
+    margin-left: auto !important;
+  }
+
   .header-settings-btn,
   #headerSettingsBtn {
-    display: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 50% !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    color: #f3f4f6 !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
   }
 
   .header-settings-btn:active {
@@ -8062,6 +8081,8 @@ body[data-active-view="lyrics"] .content-scroll {
   padding: 80px 20px 220px !important;
   scroll-behavior: smooth;
   scrollbar-width: none !important;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 1) 12%, rgba(0, 0, 0, 1) 88%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 1) 12%, rgba(0, 0, 0, 1) 88%, transparent 100%);
 }
 
 #lyricsView .lyrics-lines-container {
