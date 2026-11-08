@@ -889,15 +889,16 @@ app.get('/api/download', async (req, res) => {
   if (rawArtist) {
     cleanName = `${cleanName} - ${rawArtist.replace(/[\\/:*?"<>|]/g, '').trim()}`;
   }
-  const filename = `${cleanName || 'MusiSurf-Track'}.mp4`;
+  const filename = `${cleanName || 'MusiSurf-Track'}.mp3`;
+  const encodedFilename = encodeURIComponent(filename);
 
   // 1. If direct 320kbps audioUrl is provided (JioSaavn)
   if (audioUrl && audioUrl.startsWith('http')) {
     try {
       const audioRes = await fetch(audioUrl);
       if (audioRes.ok) {
-        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-        res.setHeader('Content-Type', audioRes.headers.get('content-type') || 'audio/mp4');
+        res.setHeader('Content-Disposition', `attachment; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`);
+        res.setHeader('Content-Type', 'audio/mpeg');
         if (audioRes.headers.get('content-length')) {
           res.setHeader('Content-Length', audioRes.headers.get('content-length'));
         }
@@ -918,8 +919,8 @@ app.get('/api/download', async (req, res) => {
       if (matchTracks && matchTracks.length > 0 && matchTracks[0].audioUrl) {
         const audioRes = await fetch(matchTracks[0].audioUrl);
         if (audioRes.ok) {
-          res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-          res.setHeader('Content-Type', audioRes.headers.get('content-type') || 'audio/mp4');
+          res.setHeader('Content-Disposition', `attachment; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`);
+          res.setHeader('Content-Type', 'audio/mpeg');
           const { Readable } = require('stream');
           const stream = Readable.fromWeb(audioRes.body);
           return stream.pipe(res);
@@ -935,8 +936,8 @@ app.get('/api/download', async (req, res) => {
     try {
       const ytdl = await getYtdl();
       if (ytdl) {
-        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-        res.setHeader('Content-Type', 'audio/mp4');
+        res.setHeader('Content-Disposition', `attachment; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`);
+        res.setHeader('Content-Type', 'audio/mpeg');
 
         const stream = await ytdl.download(ytId, {
           filter: { hasAudio: true, hasVideo: false }

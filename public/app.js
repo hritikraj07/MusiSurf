@@ -1095,13 +1095,40 @@
     }, 40);
   }
 
+  // Shuffle Mode Persistence Controller
+  function saveShuffleState() {
+    try {
+      localStorage.setItem('musisurf_shuffle_mode', JSON.stringify({
+        isShuffled: !!state.isShuffled,
+        isPlaylistShuffle: !!state.isPlaylistShuffle
+      }));
+    } catch (e) {}
+  }
+
+  function loadShuffleState() {
+    try {
+      const raw = localStorage.getItem('musisurf_shuffle_mode');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        state.isShuffled = !!parsed.isShuffled;
+        state.isPlaylistShuffle = !!parsed.isPlaylistShuffle;
+        if (elements.shuffleBtn) elements.shuffleBtn.classList.toggle('active', state.isShuffled);
+        if (elements.mobShuffleBtn) elements.mobShuffleBtn.classList.toggle('active', state.isShuffled);
+        if (elements.shufflePlaylistBtn) elements.shufflePlaylistBtn.classList.toggle('active', state.isPlaylistShuffle);
+      }
+    } catch (e) {}
+  }
+
+  let activePlayToken = 0;
   async function playTrack(track, queueList = null, addToHistory = true) {
     if (!track) return;
+    const currentToken = ++activePlayToken;
 
-    // Immediately stop any existing playback on both engines to prevent 2 songs playing
+    // Immediately stop and reset both engines completely to prevent 2-3 previous songs playing concurrently
     try {
       elements.audio.pause();
-      elements.audio.currentTime = 0;
+      elements.audio.removeAttribute('src');
+      elements.audio.load();
     } catch (e) {}
     if (state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
       try {
@@ -1110,6 +1137,10 @@
       } catch (e) {}
     }
     stopBackgroundKeepAlive();
+    if (crossfadeFadeInTimer) {
+      clearInterval(crossfadeFadeInTimer);
+      crossfadeFadeInTimer = null;
+    }
 
     // Reset progress freeze safeguard for new track
     state.restoredResumeTime = 0;
@@ -1260,9 +1291,12 @@
       });
     } else {
       let offlineRecord = track.audioBlob ? track : state.offlineTracks.find(t => t.id === track.id);
-      if (offlineRecord && !offlineRecord.audioBlob) {
+      
+      // If offline and we need to fetch blob from IDB
+      if (!navigator.onLine && offlineRecord && !offlineRecord.audioBlob) {
         try {
           const db = await getOfflineDB();
+          if (currentToken !== activePlayToken) return;
           const tx = db.transaction(OFFLINE_STORE_NAME, 'readonly');
           const store = tx.objectStore(OFFLINE_STORE_NAME);
           const req = store.get(track.id);
@@ -1270,6 +1304,7 @@
             req.onsuccess = () => res(req.result);
             req.onerror = () => res(null);
           });
+          if (currentToken !== activePlayToken) return;
           if (storedItem && storedItem.audioBlob) {
             offlineRecord = { ...offlineRecord, audioBlob: storedItem.audioBlob };
             const idx = state.offlineTracks.findIndex(t => t.id === track.id);
@@ -1288,7 +1323,7 @@
 
         let audioBlob = offlineRecord.audioBlob;
         if (!audioBlob.type || audioBlob.type === 'application/octet-stream') {
-          audioBlob = new Blob([audioBlob], { type: 'audio/mp4' });
+          audioBlob = new Blob([audioBlob], { type: 'audio/mpeg' });
         }
         const blobUrl = URL.createObjectURL(audioBlob);
         elements.audio.src = blobUrl;
@@ -1296,6 +1331,7 @@
         elements.audio.load();
         applyCrossfadeIn();
         elements.audio.play().catch(err => {
+          if (currentToken !== activePlayToken || err.name === 'AbortError') return;
           console.warn('Offline playback error:', err);
         });
       } else {
@@ -1332,11 +1368,16 @@
           const playPromise = elements.audio.play();
           if (playPromise !== undefined) {
             playPromise.catch(err => {
+              // Disregard aborted play requests or outdated track requests
+              if (currentToken !== activePlayToken || err.name === 'AbortError') return;
               console.warn('Direct stream playback error, checking fallbacks:', err);
               if (streamUrl && elements.audio.src !== streamUrl) {
                 elements.audio.src = streamUrl;
                 elements.audio.load();
-                elements.audio.play().catch(directErr => console.warn('Stream proxy fallback failed:', directErr));
+                elements.audio.play().catch(directErr => {
+                  if (currentToken !== activePlayToken || directErr.name === 'AbortError') return;
+                  console.warn('Stream proxy fallback failed:', directErr);
+                });
               } else if (isYtTrack) {
                 // Secondary fallback to YouTube iframe if direct audio extraction fails
                 const ytId = track.ytId || (track.id ? track.id.replace('yt_', '') : '');
@@ -1523,7 +1564,7 @@
 
     const cleanTitle = (track.title || 'Track').replace(/[\\/:*?"<>|]/g, '').trim();
     const cleanArtist = (track.artist || 'MusiSurf').replace(/[\\/:*?"<>|]/g, '').trim();
-    const downloadFilename = `${cleanTitle} - ${cleanArtist}.mp4`;
+    const downloadFilename = `${cleanTitle} - ${cleanArtist}.mp3`;
     const isMobile = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
     let streamUrl = '';
@@ -1575,14 +1616,19 @@
       renderPlaylistView('downloaded');
     }
 
-    // 2. On desktop, also trigger browser file download to computer's Downloads folder
-    if (!isMobile) {
+    // 2. Trigger browser file download to computer/Android device Downloads folder as MP3
+    try {
       const a = document.createElement('a');
       a.href = streamUrl;
       a.setAttribute('download', downloadFilename);
+      a.style.display = 'none';
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      setTimeout(() => {
+        try { document.body.removeChild(a); } catch (e) {}
+      }, 300);
+    } catch (e) {
+      console.warn('File download trigger error:', e);
     }
 
     // 3. In background: asynchronously fetch audio stream blob and persist to IndexedDB for 100% offline playback
@@ -1731,7 +1777,12 @@
     seekTo(0);
   }
 
+  let isTrackEnding = false;
   function onTrackEnded() {
+    if (isTrackEnding) return;
+    isTrackEnding = true;
+    setTimeout(() => { isTrackEnding = false; }, 600);
+
     if (state.repeatMode === 'one' && state.currentTrack) {
       if (state.currentTrack._introTrimmed) state.currentTrack._introTrimmed = false;
       seekTo(0);
@@ -3139,6 +3190,109 @@
         const tr = createTableRow(track, idx + 1, sortedTracks);
         elements.playlistTracksBody.appendChild(tr);
       });
+
+      // Custom Sort: Drag-and-Drop & Touch Reordering (Desktop & Android)
+      if (isCustom && sortMode === 'custom') {
+        const rows = elements.playlistTracksBody.querySelectorAll('tr');
+        let dragSrcIdx = null;
+
+        rows.forEach((tr, rIdx) => {
+          tr.setAttribute('draggable', 'true');
+          tr.classList.add('sortable-row');
+          tr.dataset.sortIndex = rIdx;
+
+          // Desktop HTML5 drag events
+          tr.addEventListener('dragstart', (e) => {
+            dragSrcIdx = rIdx;
+            tr.classList.add('is-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', rIdx);
+          });
+
+          tr.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            tr.classList.add('drag-over-row');
+          });
+
+          tr.addEventListener('dragleave', () => {
+            tr.classList.remove('drag-over-row');
+          });
+
+          tr.addEventListener('drop', (e) => {
+            e.preventDefault();
+            tr.classList.remove('drag-over-row');
+            const toIdx = rIdx;
+            if (dragSrcIdx !== null && dragSrcIdx !== toIdx) {
+              const pl = state.customPlaylists.find(p => p.id === playlistId);
+              if (pl && pl.tracks) {
+                const [moved] = pl.tracks.splice(dragSrcIdx, 1);
+                pl.tracks.splice(toIdx, 0, moved);
+                saveStoredPlaylists();
+                renderPlaylistView(playlistId);
+                showToast(`Moved "${moved.title}" to #${toIdx + 1}`, '↕️');
+              }
+            }
+          });
+
+          tr.addEventListener('dragend', () => {
+            tr.classList.remove('is-dragging');
+            rows.forEach(r => r.classList.remove('drag-over-row'));
+          });
+
+          // Touch Drag Reordering for Mobile & Android devices
+          let touchStartY = 0;
+          let isTouching = false;
+          let touchTargetRow = null;
+
+          tr.addEventListener('touchstart', (e) => {
+            if (e.target.closest('button') || e.target.closest('.song-more-trigger')) return;
+            touchStartY = e.touches[0].clientY;
+            isTouching = true;
+            dragSrcIdx = rIdx;
+          }, { passive: true });
+
+          tr.addEventListener('touchmove', (e) => {
+            if (!isTouching || dragSrcIdx === null) return;
+            const currentY = e.touches[0].clientY;
+            if (Math.abs(currentY - touchStartY) > 12) {
+              tr.classList.add('is-dragging');
+              const element = document.elementFromPoint(e.touches[0].clientX, currentY);
+              const hovered = element ? element.closest('tr.sortable-row') : null;
+              if (hovered && hovered !== tr) {
+                if (touchTargetRow && touchTargetRow !== hovered) {
+                  touchTargetRow.classList.remove('drag-over-row');
+                }
+                hovered.classList.add('drag-over-row');
+                touchTargetRow = hovered;
+              }
+            }
+          }, { passive: true });
+
+          tr.addEventListener('touchend', () => {
+            if (isTouching) {
+              tr.classList.remove('is-dragging');
+              if (touchTargetRow) {
+                touchTargetRow.classList.remove('drag-over-row');
+                const toIdx = parseInt(touchTargetRow.dataset.sortIndex, 10);
+                if (!isNaN(toIdx) && dragSrcIdx !== null && dragSrcIdx !== toIdx) {
+                  const pl = state.customPlaylists.find(p => p.id === playlistId);
+                  if (pl && pl.tracks) {
+                    const [moved] = pl.tracks.splice(dragSrcIdx, 1);
+                    pl.tracks.splice(toIdx, 0, moved);
+                    saveStoredPlaylists();
+                    renderPlaylistView(playlistId);
+                    showToast(`Moved "${moved.title}" to #${toIdx + 1}`, '↕️');
+                  }
+                }
+              }
+            }
+            isTouching = false;
+            touchTargetRow = null;
+            dragSrcIdx = null;
+          });
+        });
+      }
     }
 
     // Sync playlist tracking
@@ -3160,13 +3314,18 @@
       if (isCurrentPlaylist && isCurrentTrackInPlaylist && state.currentTrack) {
         togglePlayPause();
       } else {
+        let queueList = [...listToPlay];
+        if (state.isPlaylistShuffle && queueList.length > 1) {
+          for (let i = queueList.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [queueList[i], queueList[j]] = [queueList[j], queueList[i]];
+          }
+        }
         state.activePlaylistTracks = [...listToPlay];
         state.activePlaylistId = playlistId;
-        state.isPlaylistShuffle = false;
-        state.isShuffled = false;
-        if (elements.shufflePlaylistBtn) elements.shufflePlaylistBtn.classList.remove('active');
+        if (elements.shufflePlaylistBtn) elements.shufflePlaylistBtn.classList.toggle('active', state.isPlaylistShuffle);
         recordRecentlyPlayedPlaylist({ id: playlistId, name: title, image: coverUrl, tracks: listToPlay });
-        playTrack(listToPlay[0], listToPlay);
+        playTrack(queueList[0], queueList);
       }
     };
 
@@ -3179,8 +3338,9 @@
     elements.shufflePlaylistBtn.onclick = () => {
       if (!tracks || tracks.length === 0) return;
       state.isPlaylistShuffle = !state.isPlaylistShuffle;
-      elements.shufflePlaylistBtn.classList.toggle('active', state.isPlaylistShuffle);
       state.isShuffled = state.isPlaylistShuffle;
+      saveShuffleState();
+      elements.shufflePlaylistBtn.classList.toggle('active', state.isPlaylistShuffle);
       if (elements.shuffleBtn) elements.shuffleBtn.classList.toggle('active', state.isShuffled);
       if (elements.mobShuffleBtn) elements.mobShuffleBtn.classList.toggle('active', state.isShuffled);
 
@@ -3654,17 +3814,6 @@
           card.className = 'track-card custom-playlist-card';
           card.style.cursor = 'pointer';
 
-          let customOrderControls = '';
-          if (sortMode === 'custom') {
-            customOrderControls = `
-              <div class="custom-playlist-reorder-bar" onclick="event.stopPropagation()">
-                <button class="reorder-btn move-up-btn" title="Move Left/Up" ${idx === 0 ? 'disabled style="opacity:0.35;cursor:default;"' : ''}>◀</button>
-                <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">#${idx + 1}</span>
-                <button class="reorder-btn move-down-btn" title="Move Right/Down" ${idx === sortedPlaylists.length - 1 ? 'disabled style="opacity:0.35;cursor:default;"' : ''}>▶</button>
-              </div>
-            `;
-          }
-
           const isThisPlPlaying = state.isPlaying && state.activePlaylistId === pl.id && state.currentTrack && (pl.tracks || []).some(t => t.id === state.currentTrack.id);
           const playPauseIconSvg = isThisPlPlaying
             ? `<svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>`
@@ -3680,36 +3829,8 @@
             <div class="card-info">
               <span class="card-title">${escapeHtml(pl.name)}</span>
               <span class="card-artist">${(pl.tracks || []).length} songs</span>
-              ${customOrderControls}
             </div>
           `;
-
-          if (sortMode === 'custom') {
-            card.querySelector('.move-up-btn')?.addEventListener('click', (e) => {
-              e.stopPropagation();
-              const realIdx = state.customPlaylists.findIndex(p => p.id === pl.id);
-              if (realIdx > 0) {
-                const temp = state.customPlaylists[realIdx];
-                state.customPlaylists[realIdx] = state.customPlaylists[realIdx - 1];
-                state.customPlaylists[realIdx - 1] = temp;
-                saveStoredPlaylists();
-                renderSidebarPlaylists();
-                updateLibraryUI();
-              }
-            });
-            card.querySelector('.move-down-btn')?.addEventListener('click', (e) => {
-              e.stopPropagation();
-              const realIdx = state.customPlaylists.findIndex(p => p.id === pl.id);
-              if (realIdx < state.customPlaylists.length - 1) {
-                const temp = state.customPlaylists[realIdx];
-                state.customPlaylists[realIdx] = state.customPlaylists[realIdx + 1];
-                state.customPlaylists[realIdx + 1] = temp;
-                saveStoredPlaylists();
-                renderSidebarPlaylists();
-                updateLibraryUI();
-              }
-            });
-          }
 
           card.querySelector('.card-play-btn')?.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -4429,12 +4550,21 @@
     // Shuffle Mode Toggle
     elements.shuffleBtn.addEventListener('click', () => {
       state.isShuffled = !state.isShuffled;
+      state.isPlaylistShuffle = state.isShuffled;
+      saveShuffleState();
       elements.shuffleBtn.classList.toggle('active', state.isShuffled);
+      if (elements.mobShuffleBtn) elements.mobShuffleBtn.classList.toggle('active', state.isShuffled);
+      if (elements.shufflePlaylistBtn) elements.shufflePlaylistBtn.classList.toggle('active', state.isShuffled);
+
       if (state.isShuffled && state.queue.length > 1) {
-        state.queue.sort(() => Math.random() - 0.5);
-        showToast('Queue Shuffled');
+        const current = state.currentTrack;
+        const remaining = state.queue.filter(t => t.id !== current?.id);
+        remaining.sort(() => Math.random() - 0.5);
+        state.queue = current ? [current, ...remaining] : remaining;
+        state.queueIndex = 0;
+        showToast('Shuffle Mode: Random', '🔀');
       } else {
-        showToast('Shuffle Off');
+        showToast('Shuffle Mode: In Order', '📋');
       }
       updateQueueDrawerUI();
     });
@@ -5796,6 +5926,7 @@
     loadStoredData();
     loadOfflineTracks();
     loadSettings();
+    loadShuffleState();
     loadLocalTracksFromDB();
     setDynamicGreeting();
     setVolume(state.volume);

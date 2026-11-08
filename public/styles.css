@@ -6980,6 +6980,40 @@ body[data-active-view="lyrics"] .content-scroll {
   height: 18px;
 }
 
+/* Custom Playlist Drag & Drop Sorting */
+.sortable-row {
+  transition: background 0.15s ease, transform 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-y;
+}
+
+.sortable-row .col-num {
+  cursor: grab;
+  position: relative;
+}
+
+.sortable-row:hover .col-num::after {
+  content: ' ↕';
+  font-size: 0.8rem;
+  color: var(--accent-primary, #00f260);
+  opacity: 0.8;
+}
+
+.sortable-row.is-dragging {
+  opacity: 0.45 !important;
+  background: rgba(0, 242, 96, 0.12) !important;
+}
+
+.sortable-row.is-dragging .col-num {
+  cursor: grabbing;
+}
+
+.sortable-row.drag-over-row {
+  border-top: 2px solid var(--accent-primary, #00f260) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
 
 
 

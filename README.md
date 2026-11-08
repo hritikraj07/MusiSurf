@@ -4,7 +4,7 @@
 
 <br/>
 
-<img src="public/preview.jpg" alt="MusiSurf Interface Preview" width="100%" />
+<img src="public/preview.png" alt="MusiSurf Interface Preview" width="100%" />
 
 </div>
 
