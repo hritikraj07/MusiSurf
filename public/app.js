@@ -204,6 +204,7 @@
     playlistEmptyState: document.getElementById('playlistEmptyState'),
     playAllPlaylistBtn: document.getElementById('playAllPlaylistBtn'),
     shufflePlaylistBtn: document.getElementById('shufflePlaylistBtn'),
+    pinPlaylistBtn: document.getElementById('pinPlaylistBtn'),
     renamePlaylistBtn: document.getElementById('renamePlaylistBtn'),
     playlistTracksSortSelect: document.getElementById('playlistTracksSortSelect'),
     deletePlaylistBtn: document.getElementById('deletePlaylistBtn'),
@@ -211,6 +212,8 @@
     mobilePlaylistMoreBtn: document.getElementById('mobilePlaylistMoreBtn'),
     mobilePlaylistOptionsModal: document.getElementById('mobilePlaylistOptionsModal'),
     closeMobPlaylistOptionsBtn: document.getElementById('closeMobPlaylistOptionsBtn'),
+    mobOptPinPlaylistBtn: document.getElementById('mobOptPinPlaylistBtn'),
+    mobOptPinPlaylistText: document.getElementById('mobOptPinPlaylistText'),
     mobOptRenamePlaylistBtn: document.getElementById('mobOptRenamePlaylistBtn'),
     mobOptDeletePlaylistBtn: document.getElementById('mobOptDeletePlaylistBtn'),
     mobOptExportPlaylistBtn: document.getElementById('mobOptExportPlaylistBtn'),
@@ -1192,18 +1195,33 @@
     } catch (e) {}
   }
 
-  // Strict Content Filter: Only Category 10 (Music) & Podcasts allowed (Zero gaming, vlogs, reactions)
+  // Strict Content Filter: Strictly Pure Music Only (Zero podcasts, zero gaming, vlogs, reactions)
   function isContentFilterAllowed(t) {
     if (!t) return false;
-    if (t.isLocal || t.source === 'saavn') return true;
-    const cat = String(t.categoryId || '');
+    // Local device and JioSaavn tracks are 100% pure music
+    if (t.isLocal || t.source === 'saavn' || t.source === 'jiosaavn') return true;
+
     const title = (t.title || '').toLowerCase();
     const artist = (t.artist || '').toLowerCase();
+
+    // Podcasts and episodes are completely blocked
     const isPodcast = title.includes('podcast') || title.includes('episode') ||
                       artist.includes('podcast') || artist.includes('episode') ||
                       Boolean(t.isPodcast);
-    if (cat === '10' || isPodcast) return true;
-    return false;
+    if (isPodcast) return false;
+
+    // Gaming, vlogs, reactions, unboxing, etc. are completely blocked
+    const isBlocked = /\b(gameplay|walkthrough|playthrough|let'?s play|gaming|gamer|fortnite|minecraft|roblox|gta|valorant|cod|apex legends|pubg|vlog|prank|reaction|unboxing|mukbang|tutorial)\b/i.test(title) ||
+                      /\b(gaming|gamer|vlogs|vlogger|news live)\b/i.test(artist);
+    if (isBlocked) return false;
+
+    // Category check: if categoryId is present and not '10', block it
+    if (t.categoryId && String(t.categoryId) !== '10' && String(t.categoryId) !== '0') {
+      return false;
+    }
+
+    // Default: allow pure music track
+    return true;
   }
 
   let activePlayToken = 0;
@@ -1212,7 +1230,7 @@
 
     // Strict Content Filter check
     if (!isContentFilterAllowed(track)) {
-      showToast('⚠️ Content Blocked: MusiSurf strictly plays Music and Podcasts only.', '🚫');
+      showToast('⚠️ Content Blocked: MusiSurf strictly plays pure Music only.', '🚫');
       state.isPlaying = false;
       updatePlayPauseButton();
       return;
@@ -1413,9 +1431,9 @@
       });
     }
 
-    // Strict Content Filter Check: Only Category 10 (Music) & Podcasts permitted
+    // Strict Content Filter Check: Pure Music Only
     if (!isContentFilterAllowed(track)) {
-      showToast('⚠️ Playback Blocked: MusiSurf strictly plays Music and Podcasts only.', '🚫');
+      showToast('⚠️ Playback Blocked: MusiSurf strictly plays pure Music only.', '🚫');
       state.isPlaying = false;
       updatePlayPauseButton();
       return;
@@ -2767,12 +2785,12 @@
 
     elements.searchAutocompleteDropdown.innerHTML = suggestions.map(item => `
       <div class="search-suggestion-item" data-query="${escapeHtml(item.text)}">
-        <svg class="suggestion-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg class="suggestion-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;min-width:16px;min-height:16px;flex-shrink:0;">
           <circle cx="11" cy="11" r="8"/>
           <line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
         <span class="suggestion-text">${escapeHtml(item.label)}</span>
-        <svg class="suggestion-arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg class="suggestion-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;min-width:14px;min-height:14px;flex-shrink:0;">
           <polyline points="9 18 15 12 9 6"/>
         </svg>
       </div>
@@ -3010,13 +3028,13 @@
           <th class="col-num">#</th>
           <th class="col-title">Title</th>
           <th class="col-album">Album</th>
-          <th class="col-actions"></th>
           <th class="col-duration">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"/>
               <polyline points="12 6 12 12 16 14"/>
             </svg>
           </th>
+          <th class="col-actions"></th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -3590,6 +3608,7 @@
     if (playlistId === 'liked') {
       tracks = state.likedSongs;
       elements.deletePlaylistBtn.style.display = 'none';
+      if (elements.pinPlaylistBtn) elements.pinPlaylistBtn.style.display = 'none';
       if (elements.renamePlaylistBtn) elements.renamePlaylistBtn.style.display = 'none';
       if (elements.mobilePlaylistMoreBtn) elements.mobilePlaylistMoreBtn.style.display = 'none';
       elements.playlistCoverArt.innerHTML = createPlaylistCollageHtml(
@@ -3604,6 +3623,7 @@
       desc = 'Stored locally on your device. Listen anywhere 100% offline with zero internet!';
       tracks = state.offlineTracks;
       elements.deletePlaylistBtn.style.display = 'none';
+      if (elements.pinPlaylistBtn) elements.pinPlaylistBtn.style.display = 'none';
       if (elements.renamePlaylistBtn) elements.renamePlaylistBtn.style.display = 'none';
       if (elements.mobilePlaylistMoreBtn) elements.mobilePlaylistMoreBtn.style.display = 'none';
       elements.playlistCoverArt.innerHTML = createPlaylistCollageHtml(
@@ -3619,6 +3639,7 @@
       desc = 'Songs from your device storage. Play offline anytime without consuming data!';
       tracks = state.localTracks || [];
       elements.deletePlaylistBtn.style.display = 'none';
+      if (elements.pinPlaylistBtn) elements.pinPlaylistBtn.style.display = 'none';
       if (elements.renamePlaylistBtn) elements.renamePlaylistBtn.style.display = 'none';
       if (elements.mobilePlaylistMoreBtn) elements.mobilePlaylistMoreBtn.style.display = 'none';
       elements.playlistCoverArt.innerHTML = createPlaylistCollageHtml(
@@ -3636,6 +3657,11 @@
         tracks = pl.tracks || [];
         isCustom = true;
         elements.deletePlaylistBtn.style.display = 'inline-flex';
+        if (elements.pinPlaylistBtn) {
+          elements.pinPlaylistBtn.style.display = 'inline-flex';
+          elements.pinPlaylistBtn.classList.toggle('active', Boolean(pl.isPinned));
+          elements.pinPlaylistBtn.title = pl.isPinned ? 'Unpin Playlist' : 'Pin Playlist';
+        }
         if (elements.renamePlaylistBtn) elements.renamePlaylistBtn.style.display = 'inline-flex';
         if (elements.mobilePlaylistMoreBtn) elements.mobilePlaylistMoreBtn.style.display = 'inline-flex';
         elements.playlistCoverArt.innerHTML = createPlaylistCollageHtml(
@@ -3848,7 +3874,7 @@
           recordRecentlyPlayedPlaylist({ id: playlistId, name: title, image: playlistCover, tracks: listToPlay });
         } catch (e) {}
 
-        const songToStart = (state.activePlaylistId === playlistId && state.currentTrack && listToPlay.some(t => t.id === state.currentTrack.id))
+        const songToStart = (state.isPlaying && state.currentTrack && listToPlay.some(t => t.id === state.currentTrack.id))
           ? state.currentTrack
           : queueList[0];
         playTrack(songToStart, queueList);
@@ -3904,6 +3930,21 @@
 
     updatePlayPauseButton();
 
+    // Pin playlist action
+    if (elements.pinPlaylistBtn && isCustom) {
+      elements.pinPlaylistBtn.onclick = () => {
+        const pl = state.customPlaylists.find(p => p.id === playlistId);
+        if (pl) {
+          pl.isPinned = !pl.isPinned;
+          saveStoredPlaylists();
+          renderSidebarPlaylists();
+          elements.pinPlaylistBtn.classList.toggle('active', Boolean(pl.isPinned));
+          elements.pinPlaylistBtn.title = pl.isPinned ? 'Unpin Playlist' : 'Pin Playlist';
+          showToast(pl.isPinned ? '📌 Playlist pinned to Library' : 'Playlist unpinned from Library', '📌');
+        }
+      };
+    }
+
     // Rename playlist action
     if (elements.renamePlaylistBtn) {
       elements.renamePlaylistBtn.onclick = () => promptRenameCurrentPlaylist();
@@ -3928,6 +3969,27 @@
           const subEl = document.getElementById('mobPlaylistOptionsSub');
           if (titleEl) titleEl.textContent = title;
           if (subEl) subEl.textContent = `${tracks.length} songs • Custom Playlist`;
+
+          const pl = state.customPlaylists.find(p => p.id === playlistId);
+          if (elements.mobOptPinPlaylistBtn && pl) {
+            if (elements.mobOptPinPlaylistText) {
+              elements.mobOptPinPlaylistText.textContent = pl.isPinned ? 'Unpin Playlist' : 'Pin Playlist';
+            }
+            elements.mobOptPinPlaylistBtn.onclick = () => {
+              if (elements.mobilePlaylistOptionsModal) {
+                elements.mobilePlaylistOptionsModal.style.display = 'none';
+              }
+              pl.isPinned = !pl.isPinned;
+              saveStoredPlaylists();
+              renderSidebarPlaylists();
+              if (elements.pinPlaylistBtn) {
+                elements.pinPlaylistBtn.classList.toggle('active', Boolean(pl.isPinned));
+                elements.pinPlaylistBtn.title = pl.isPinned ? 'Unpin Playlist' : 'Pin Playlist';
+              }
+              showToast(pl.isPinned ? '📌 Playlist pinned to Library' : 'Playlist unpinned from Library', '📌');
+            };
+          }
+
           elements.mobilePlaylistOptionsModal.style.display = 'flex';
         }
       };
@@ -4114,10 +4176,21 @@
   }
 
   function renderSidebarPlaylists() {
+    if (!elements.customPlaylistsList) return;
     elements.customPlaylistsList.innerHTML = '';
-    state.customPlaylists.forEach(pl => {
+
+    // Sort playlists: pinned playlists first, then unpinned by lastPlayedAt or creation
+    const sorted = [...(state.customPlaylists || [])].sort((a, b) => {
+      const aPinned = Boolean(a.isPinned);
+      const bPinned = Boolean(b.isPinned);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      return (b.lastPlayedAt || b.createdAt || 0) - (a.lastPlayedAt || a.createdAt || 0);
+    });
+
+    sorted.forEach(pl => {
       const div = document.createElement('div');
-      div.className = 'playlist-list-item';
+      div.className = `playlist-list-item library-item ${pl.isPinned ? 'is-pinned' : ''}`;
       div.innerHTML = `
         <div class="playlist-cover-mini">
           ${createPlaylistCollageHtml(pl.tracks)}
@@ -4126,6 +4199,7 @@
           <span class="library-item-title">${escapeHtml(pl.name)}</span>
           <span class="library-item-meta">Playlist • ${pl.tracks?.length || 0} songs</span>
         </div>
+        ${pl.isPinned ? '<span class="sidebar-pin-icon" title="Pinned">📌</span>' : ''}
       `;
       div.addEventListener('click', () => {
         renderPlaylistView(pl.id);
@@ -6339,13 +6413,21 @@
         const ytId = state.currentTrack.ytId || (state.currentTrack.id ? state.currentTrack.id.replace('yt_', '') : '');
         if (ytId && state.ytReady && state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
           if (!isContentFilterAllowed(state.currentTrack)) {
-            showToast('Playback Blocked: Video is not Category 10 (Music) or Podcast.', '🚫');
+            showToast('Playback Blocked: MusiSurf strictly plays pure Music only.', '🚫');
             return;
           }
           try {
+            state.activePlayerEngine = 'youtube';
+            state.isPlaying = true;
+            try {
+              elements.audio.pause();
+              elements.audio.removeAttribute('src');
+              elements.audio.load();
+            } catch (e) {}
             state.ytPlayer.loadVideoById(ytId);
             state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
             state.ytPlayer.playVideo();
+            updatePlayPauseButton();
             return;
           } catch (e) {
             console.warn('YouTube fallback playback error:', e);

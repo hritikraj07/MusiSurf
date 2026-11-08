@@ -335,15 +335,15 @@ function getDedupeKey(title, artist) {
   return `${normTitle}__${artistTokens}`;
 }
 
-// Strict Content Filter: Strictly return only Music and Podcasts (Zero gaming, vlogs, reactions, etc.)
+// Strict Content Filter: Strictly return only pure Music (Zero gaming, vlogs, reactions, podcasts, etc.)
 function validateStrictMusicOrPodcast(rawTitle, rawChannel) {
   const t = (rawTitle || '').toLowerCase();
   const c = (rawChannel || '').toLowerCase();
 
-  // Podcasts and episodes are explicitly allowed
+  // Podcasts and episodes are completely blocked per user requirement
   const isPodcast = t.includes('podcast') || t.includes('episode') || c.includes('podcast') || /\b(ep\s*\d+|ep\.\s*\d+)\b/i.test(t);
   if (isPodcast) {
-    return { allowed: true, categoryId: '10', isPodcast: true };
+    return { allowed: false, categoryId: '0', isPodcast: true };
   }
 
   // Blacklist standard non-music YouTube content (gaming, vlogs, reactions, tech, unboxing, tutorials, etc.)
@@ -821,16 +821,16 @@ app.get('/api/stream', async (req, res) => {
   }
 });
 
-// YouTube Content Validation (Strictly permits Category 10: Music or Podcasts/Episodes)
+// YouTube Content Validation (Strictly permits pure Music - Category 10; rejects podcasts & non-music)
 app.get('/api/validate-content', async (req, res) => {
   const ytId = (req.query.id || '').trim();
   const title = (req.query.title || '').trim().toLowerCase();
 
   if (!ytId) return res.status(400).json({ allowed: false, error: 'Missing id' });
 
-  // If title indicates podcast or episode, it is valid!
-  if (title.includes('podcast') || title.includes('episode')) {
-    return res.json({ allowed: true, categoryId: '10', isPodcast: true });
+  // If title indicates podcast or episode or non-music, block it
+  if (title.includes('podcast') || title.includes('episode') || /\b(gameplay|walkthrough|vlog|prank|reaction|unboxing)\b/i.test(title)) {
+    return res.json({ allowed: false, categoryId: '0', isPodcast: true });
   }
 
   try {
@@ -843,11 +843,11 @@ app.get('/api/validate-content', async (req, res) => {
     const catMatch = html.match(/"categoryId":\s*"(\d+)"/);
     const categoryId = catMatch ? catMatch[1] : '10';
 
-    const isMusicOrPodcast = categoryId === '10' || title.includes('podcast') || title.includes('episode');
+    const isMusic = categoryId === '10';
     return res.json({
-      allowed: isMusicOrPodcast,
+      allowed: isMusic,
       categoryId: categoryId,
-      isPodcast: title.includes('podcast') || title.includes('episode')
+      isPodcast: false
     });
   } catch (err) {
     // Fail-safe to avoid false blocking on network hiccups
