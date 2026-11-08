@@ -1,20 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
   <defs>
-    <!-- Vibrant Spotify Emerald Gradient -->
+    <!-- Modern Platinum & Pure White Gradient -->
     <linearGradient id="musiLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1ed760"/>
-      <stop offset="100%" stop-color="#1db954"/>
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="60%" stop-color="#f0f2f5"/>
+      <stop offset="100%" stop-color="#cfd4dc"/>
     </linearGradient>
 
-    <!-- Pitch Black Backdrop -->
+    <!-- Deep Obsidian Charcoal Backdrop -->
     <radialGradient id="musiLogoBg" cx="50%" cy="40%" r="75%">
-      <stop offset="0%" stop-color="#121212"/>
-      <stop offset="70%" stop-color="#050505"/>
-      <stop offset="100%" stop-color="#000000"/>
+      <stop offset="0%" stop-color="#18191e"/>
+      <stop offset="70%" stop-color="#0e0f12"/>
+      <stop offset="100%" stop-color="#08090a"/>
     </radialGradient>
 
     <filter id="musiGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#1ed760" flood-opacity="0.45"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#ffffff" flood-opacity="0.25"/>
     </filter>
   </defs>
 

@@ -8,10 +8,10 @@
   <meta name="description"
     content="Stream millions of full songs on MusiSurf. Ultra-fast music streaming, real-time synchronized lyrics, and personalized playlists.">
 
-  <!-- Favicon: Rich MusiSurf Obsidian & Emerald Logo -->
-  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg?v=5.4">
-  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png?v=5.4">
-  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png?v=5.4">
+  <!-- Favicon: Rich MusiSurf Obsidian Logo -->
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg?v=7.90">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png?v=7.90">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png?v=7.90">
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -114,7 +114,7 @@
       <div class="sidebar-library">
         <div class="library-header">
           <div class="library-header-left">
-            <button class="library-header-btn" id="collapseSidebarBtn" title="Collapse Your Library" aria-label="Your Library">
+            <button class="library-collapse-icon-btn" id="collapseSidebarBtn" title="Collapse / Expand sidebar" aria-label="Collapse sidebar">
               <div class="library-icon-morph">
                 <!-- Normal Books Icon -->
                 <svg class="icon-books" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -136,6 +136,8 @@
                   <polyline points="13 9 16 12 13 15" />
                 </svg>
               </div>
+            </button>
+            <button class="library-nav-btn" id="navLibraryBtn" title="Go to Your Library" aria-label="Your Library">
               <span class="library-heading">Your Library</span>
             </button>
           </div>
@@ -652,7 +654,7 @@
           </div>
         </section>
 
-        <!-- REPLAY VIEW (Listening Statistics - Image 5) -->
+        <!-- REPLAY VIEW (Redesigned Compact Listening Dashboard) -->
         <section class="view-section" id="replayView">
           <div class="replay-container">
             <!-- Replay Header -->
@@ -670,79 +672,61 @@
               </div>
             </div>
 
-            <!-- Replay Hero Card with Spinning Vinyl (Image 5) -->
-            <div class="replay-hero-card">
-              <div class="replay-hero-left">
-                <span class="replay-stat-label">Minutes listened</span>
-                <h2 class="replay-stat-number" id="replayMinutesCount">677</h2>
-                <p class="replay-stat-subtext" id="replayPlaysCount">198 plays • 7 days of listening</p>
-                <div class="replay-hero-actions">
-                  <button class="replay-play-btn" id="playReplayBtn">
+            <!-- Sleek Compact Replay Dashboard: Sound Capsule & Top Song ONLY -->
+            <div class="replay-compact-dashboard">
+              
+              <!-- Card 1: Sound Capsule (Minutes Listened with Real-Time Updates) -->
+              <div class="replay-capsule-card">
+                <div class="replay-capsule-top">
+                  <span class="replay-card-badge">SOUND CAPSULE</span>
+                  <div class="replay-live-pulse-badge">
+                    <span class="replay-live-dot"></span>
+                    <span>Live Tracking</span>
+                  </div>
+                </div>
+                
+                <div class="replay-capsule-body">
+                  <div class="replay-stat-row">
+                    <h2 class="replay-stat-number" id="replayMinutesCount">161</h2>
+                    <span class="replay-stat-unit">MINS LISTENED</span>
+                  </div>
+                  <p class="replay-stat-subtext" id="replayPlaysCount">18 plays • 7 days of listening</p>
+                </div>
+
+                <div class="replay-capsule-actions">
+                  <button class="replay-play-btn" id="playReplayBtn" title="Play Your Replay">
                     <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                     <span>Play your Replay</span>
                   </button>
-                  <button class="replay-share-btn" id="shareReplayBtn">
+                  <button class="replay-share-btn" id="shareReplayBtn" title="Share Replay Stats">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                     <span>Share</span>
                   </button>
                 </div>
               </div>
-              <div class="replay-hero-right">
-                <div class="replay-vinyl-wrap">
-                  <div class="replay-vinyl-record" id="replayVinylDisk">
-                    <div class="vinyl-groove vinyl-groove-1"></div>
-                    <div class="vinyl-groove vinyl-groove-2"></div>
-                    <div class="vinyl-groove vinyl-groove-3"></div>
-                    <div class="vinyl-center-label">
-                      <img src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200&auto=format&fit=crop&q=80" id="replayVinylArt" class="vinyl-art-img" alt="Top Track Art">
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
 
-            <!-- Replay Lower Cards Grid (Image 5) -->
-            <div class="replay-grid">
-              <!-- Top Artist Card -->
-              <div class="replay-card replay-top-artist-card">
-                <span class="replay-card-tag">Top artist</span>
-                <div class="replay-artist-body">
-                  <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80" id="replayTopArtistImg" class="replay-artist-avatar" alt="The Weeknd">
-                  <div class="replay-artist-meta">
-                    <h3 id="replayTopArtistName" class="replay-artist-name">The Weeknd</h3>
-                    <p id="replayTopArtistStats" class="replay-artist-hours">1.9 hrs • 31 plays</p>
+              <!-- Card 2: Top Song (Most Played Song - Compact, Sleek Art + Details) -->
+              <div class="replay-top-song-card">
+                <div class="replay-card-top">
+                  <span class="replay-card-badge">TOP SONG</span>
+                  <span class="replay-card-hint">Most Played</span>
+                </div>
+
+                <div class="replay-top-song-content">
+                  <div class="replay-song-artwork-wrap">
+                    <img src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=240&auto=format&fit=crop&q=80" id="replayTopSongImg" class="replay-top-song-artwork" alt="Top Song Art">
+                    <button class="replay-song-play-overlay-btn" id="playTopSongBtn" title="Play Top Song">
+                      <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+                    </button>
+                  </div>
+                  <div class="replay-song-details">
+                    <h3 class="replay-song-title" id="replayTopSongTitle">Starboy</h3>
+                    <p class="replay-song-artist" id="replayTopSongArtist">The Weeknd</p>
+                    <div class="replay-song-meta-pill" id="replayTopSongPlays">14 plays • 3:50</div>
                   </div>
                 </div>
               </div>
 
-              <!-- Your Hour Card -->
-              <div class="replay-card replay-hour-card">
-                <span class="replay-card-tag">Your hour</span>
-                <div class="replay-hour-body">
-                  <h3 id="replayPeakHour" class="replay-hour-val">6 AM</h3>
-                  <p id="replayPeakHourSub" class="replay-hour-sub">10% of all your listening</p>
-                  <div class="replay-hour-chart">
-                    <svg viewBox="0 0 300 80" class="hour-chart-svg" preserveAspectRatio="none">
-                      <defs>
-                        <linearGradient id="hourChartGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                          <stop offset="0%" stop-color="#1ed760" stop-opacity="0.35"/>
-                          <stop offset="100%" stop-color="#1ed760" stop-opacity="0"/>
-                        </linearGradient>
-                      </defs>
-                      <path class="hour-chart-area" d="M 0,65 Q 40,65 75,20 T 150,55 T 225,40 T 300,70 L 300,80 L 0,80 Z" fill="url(#hourChartGrad)" />
-                      <path class="hour-chart-line" d="M 0,65 Q 40,65 75,20 T 150,55 T 225,40 T 300,70" fill="none" stroke="#ffffff" stroke-width="2.5" />
-                      <circle cx="75" cy="20" r="5" fill="#1ed760" stroke="#ffffff" stroke-width="2" class="hour-chart-point" />
-                      <line x1="75" y1="20" x2="75" y2="80" stroke="rgba(255,255,255,0.25)" stroke-dasharray="3,3" />
-                    </svg>
-                    <div class="hour-chart-labels">
-                      <span>12 AM</span>
-                      <span>6 AM</span>
-                      <span>12 PM</span>
-                      <span>6 PM</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </section>
@@ -1746,6 +1730,26 @@
               </div>
             </div>
 
+            <!-- Remove Dead Silence Card -->
+            <div class="settings-section-block">
+              <span class="settings-section-label">Dead Silence</span>
+              <div class="sound-card-item">
+                <div class="sound-card-left">
+                  <div class="sound-icon-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+                  </div>
+                  <div class="sound-meta">
+                    <h3 class="sound-title">Remove dead silence</h3>
+                    <p class="sound-desc">Automatically skip silent intro and outro segments in audio tracks</p>
+                  </div>
+                </div>
+                <label class="sound-toggle-switch">
+                  <input type="checkbox" id="deadSilenceToggleSwitch" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
             <!-- Output Device Card -->
             <div class="settings-section-block">
               <span class="settings-section-label">Output</span>
@@ -2080,7 +2084,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=7.70"></script>
+  <script src="/app.js?v=7.90"></script>
 </body>
 
 </html>

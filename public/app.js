@@ -55,6 +55,7 @@
     recentlyPlayed: [],
     restoredResumeTime: 0,
     contextTrack: null,
+    totalListenedSeconds: parseInt(localStorage.getItem('musisurf_total_listened_sec'), 10) || 9660,
     activePlayerEngine: 'audio',
     activeSearchFilter: 'all'
   };
@@ -163,12 +164,11 @@
     replayPlaysCount: document.getElementById('replayPlaysCount'),
     playReplayBtn: document.getElementById('playReplayBtn'),
     shareReplayBtn: document.getElementById('shareReplayBtn'),
-    replayVinylDisk: document.getElementById('replayVinylDisk'),
-    replayVinylArt: document.getElementById('replayVinylArt'),
-    replayTopArtistImg: document.getElementById('replayTopArtistImg'),
-    replayTopArtistName: document.getElementById('replayTopArtistName'),
-    replayTopArtistStats: document.getElementById('replayTopArtistStats'),
-    replayPeakHour: document.getElementById('replayPeakHour'),
+    replayTopSongImg: document.getElementById('replayTopSongImg'),
+    replayTopSongTitle: document.getElementById('replayTopSongTitle'),
+    replayTopSongArtist: document.getElementById('replayTopSongArtist'),
+    replayTopSongPlays: document.getElementById('replayTopSongPlays'),
+    playTopSongBtn: document.getElementById('playTopSongBtn'),
 
     // Lyrics Soundwave
     lyricsSoundwaveBars: document.getElementById('lyricsSoundwaveBars'),
@@ -364,6 +364,7 @@
     equalizerSlidersWrap: document.getElementById('equalizerSlidersWrap'),
     automixToggleSwitch: document.getElementById('automixToggleSwitch'),
     skipSilenceToggleSwitch: document.getElementById('skipSilenceToggleSwitch'),
+    deadSilenceToggleSwitch: document.getElementById('deadSilenceToggleSwitch'),
     speedPillsRow: document.getElementById('speedPillsRow'),
     streamQualityPills: document.getElementById('streamQualityPills'),
     volumeLevelingPills: document.getElementById('volumeLevelingPills'),
@@ -2224,6 +2225,22 @@
 
       elements.currentTimeLabel.textContent = formatTime(cur);
       if (elements.mobCurrentTime) elements.mobCurrentTime.textContent = formatTime(cur);
+
+      // Real-time Sound Capsule Tracking: live updates total listened minutes
+      const nowTs = Date.now();
+      if (!state._lastPlaybackSecTick) state._lastPlaybackSecTick = nowTs;
+      if (nowTs - state._lastPlaybackSecTick >= 1000) {
+        state._lastPlaybackSecTick = nowTs;
+        state.totalListenedSeconds = (state.totalListenedSeconds || 0) + 1;
+        if (state.totalListenedSeconds % 10 === 0) {
+          try { localStorage.setItem('musisurf_total_listened_sec', state.totalListenedSeconds); } catch (e) {}
+        }
+        if (elements.views && elements.views.replay && elements.views.replay.classList.contains('active')) {
+          if (elements.replayMinutesCount) {
+            elements.replayMinutesCount.textContent = Math.max(1, Math.floor(state.totalListenedSeconds / 60)).toLocaleString();
+          }
+        }
+      }
 
       if (dur > 0) {
         const pct = Math.min(100, (cur / dur) * 100);
@@ -4656,6 +4673,9 @@
     if (elements.crossfadeValueLabel) elements.crossfadeValueLabel.textContent = cf === 0 ? 'Off' : `${cf}s`;
 
     // Skip Silence & Automix
+    if (elements.deadSilenceToggleSwitch) {
+      elements.deadSilenceToggleSwitch.checked = state.settings.removeDeadSilence !== false;
+    }
     if (elements.skipSilenceToggleSwitch) {
       elements.skipSilenceToggleSwitch.checked = state.settings.removeDeadSilence !== false;
     }
@@ -5072,11 +5092,13 @@
 
     const libHeader = document.getElementById('navLibraryBtn');
     if (libHeader) {
-      libHeader.addEventListener('click', () => {
+      libHeader.addEventListener('click', (e) => {
+        e.stopPropagation();
         const appEl = document.getElementById('app');
         if (appEl && appEl.classList.contains('sidebar-collapsed')) {
           applySidebarCollapsedState(false);
         }
+        switchView('library');
       });
     }
   }
@@ -5256,7 +5278,7 @@
   }
 
   // ==========================================================================
-  // REPLAY FEATURE CONTROLLER (Image 4 & 5 - Listening Stats & Spinning Vinyl)
+  // REPLAY FEATURE CONTROLLER (Redesigned Compact Sound Capsule & Top Song Only)
   // ==========================================================================
   function renderReplayView(period = 'this-month') {
     state._replayPeriod = period;
@@ -5267,36 +5289,67 @@
 
     const songsPool = [...(state.history || []), ...(state.recentlyPlayed || []), ...(state.likedSongs || [])];
     const totalPlays = Math.max(18, songsPool.length);
-    const totalMinutes = Math.max(76, Math.round(songsPool.reduce((acc, t) => acc + (t.duration || 210), 0) / 60));
 
-    if (elements.replayMinutesCount) elements.replayMinutesCount.textContent = totalMinutes.toLocaleString();
-    if (elements.replayPlaysCount) elements.replayPlaysCount.textContent = `${totalPlays} plays • 7 days of listening`;
+    // Dynamic Live Sound Capsule Minutes
+    const totalMinutes = Math.max(1, Math.floor((state.totalListenedSeconds || 9660) / 60));
 
-    const artistCounts = {};
+    if (elements.replayMinutesCount) {
+      elements.replayMinutesCount.textContent = totalMinutes.toLocaleString();
+    }
+    if (elements.replayPlaysCount) {
+      elements.replayPlaysCount.textContent = `${totalPlays} plays • 7 days of listening`;
+    }
+
+    // Determine #1 Most Played Song from history and recently played
+    const songFrequencies = {};
+    const songObjects = {};
+
     songsPool.forEach(t => {
-      if (t && t.artist) {
-        artistCounts[t.artist] = (artistCounts[t.artist] || 0) + 1;
+      if (t && (t.id || t.title)) {
+        const key = t.id || t.title;
+        songFrequencies[key] = (songFrequencies[key] || 0) + 1;
+        if (!songObjects[key]) songObjects[key] = t;
       }
     });
 
-    let topArtistName = 'The Weeknd';
+    let topSongKey = null;
     let maxPlays = 0;
-    Object.keys(artistCounts).forEach(art => {
-      if (artistCounts[art] > maxPlays) {
-        maxPlays = artistCounts[art];
-        topArtistName = art;
+    Object.keys(songFrequencies).forEach(k => {
+      if (songFrequencies[k] > maxPlays) {
+        maxPlays = songFrequencies[k];
+        topSongKey = k;
       }
     });
 
-    const topArtistTrack = songsPool.find(t => t.artist === topArtistName) || state.currentTrack || songsPool[0];
-    const topArtistImg = topArtistTrack?.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200&auto=format&fit=crop&q=80';
+    const topSong = (topSongKey && songObjects[topSongKey]) || state.currentTrack || songsPool[0] || {
+      title: 'Starboy',
+      artist: 'The Weeknd',
+      image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=240&auto=format&fit=crop&q=80',
+      duration: 230
+    };
 
-    if (elements.replayTopArtistName) elements.replayTopArtistName.textContent = topArtistName;
-    if (elements.replayTopArtistImg) elements.replayTopArtistImg.src = topArtistImg;
-    if (elements.replayTopArtistStats) elements.replayTopArtistStats.textContent = `${Math.round(totalMinutes / 60 * 10) / 10} hrs • ${Math.max(12, maxPlays * 2)} plays`;
+    const finalTopPlays = Math.max(14, maxPlays);
 
-    if (elements.replayVinylArt) {
-      elements.replayVinylArt.src = (state.currentTrack?.image) || topArtistImg;
+    if (elements.replayTopSongImg) {
+      elements.replayTopSongImg.src = topSong.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=240&auto=format&fit=crop&q=80';
+    }
+    if (elements.replayTopSongTitle) {
+      elements.replayTopSongTitle.textContent = topSong.title || 'Starboy';
+    }
+    if (elements.replayTopSongArtist) {
+      elements.replayTopSongArtist.textContent = topSong.artist || 'The Weeknd';
+    }
+    if (elements.replayTopSongPlays) {
+      elements.replayTopSongPlays.textContent = `${finalTopPlays} plays • ${formatTime(topSong.duration || 210)}`;
+    }
+
+    // Wire instant play for the #1 Top Song
+    if (elements.playTopSongBtn) {
+      elements.playTopSongBtn.onclick = (e) => {
+        e.stopPropagation();
+        playTrack(topSong);
+        showToast(`Playing #1 Top Song: ${topSong.title}`, '🔥');
+      };
     }
   }
 
@@ -5318,15 +5371,16 @@
   }
 
   function shareReplay() {
-    const minutes = elements.replayMinutesCount?.textContent || '677';
-    const artist = elements.replayTopArtistName?.textContent || 'The Weeknd';
-    const text = `🔥 My MusiSurf Replay: ${minutes} minutes listened, Top Artist: ${artist}! Ride the wave of pure music at ${window.location.origin}`;
+    const minutes = elements.replayMinutesCount?.textContent || '161';
+    const topSong = elements.replayTopSongTitle?.textContent || 'Top Track';
+    const artist = elements.replayTopSongArtist?.textContent || 'Artist';
+    const text = `🔥 My MusiSurf Sound Capsule: ${minutes} minutes listened, Top Song: ${topSong} by ${artist}! Ride the wave of pure music at ${window.location.origin}`;
     if (navigator.share) {
-      navigator.share({ title: 'MusiSurf Replay', text: text, url: window.location.href }).catch(() => {});
+      navigator.share({ title: 'MusiSurf Sound Capsule', text: text, url: window.location.href }).catch(() => {});
     } else {
       try {
         navigator.clipboard.writeText(text);
-        showToast('Replay stats copied to clipboard! 📋', '✨');
+        showToast('Sound Capsule stats copied to clipboard! 📋', '✨');
       } catch (e) {
         showToast(text, '🔥');
       }
@@ -6214,11 +6268,23 @@
     }
 
     const skipSilenceSwitch = elements.skipSilenceToggleSwitch || document.getElementById('skipSilenceToggleSwitch');
+    const deadSilenceSwitch = elements.deadSilenceToggleSwitch || document.getElementById('deadSilenceToggleSwitch');
+
     if (skipSilenceSwitch) {
       skipSilenceSwitch.addEventListener('change', () => {
         state.settings.removeDeadSilence = skipSilenceSwitch.checked;
+        if (deadSilenceSwitch) deadSilenceSwitch.checked = skipSilenceSwitch.checked;
         saveSettings();
         showToast(skipSilenceSwitch.checked ? 'Skip silence enabled (-42 dB)' : 'Skip silence disabled', '⚡');
+      });
+    }
+
+    if (deadSilenceSwitch) {
+      deadSilenceSwitch.addEventListener('change', () => {
+        state.settings.removeDeadSilence = deadSilenceSwitch.checked;
+        if (skipSilenceSwitch) skipSilenceSwitch.checked = deadSilenceSwitch.checked;
+        saveSettings();
+        showToast(deadSilenceSwitch.checked ? 'Remove dead silence enabled' : 'Remove dead silence disabled', '⚡');
       });
     }
 
@@ -6367,8 +6433,8 @@
       });
     }
 
-    // Close Modals on Backdrop Click
-    [elements.createPlaylistModal, elements.renamePlaylistModal, elements.deletePlaylistConfirmModal, elements.addToPlaylistModal, elements.settingsModal, elements.exportFormatModal].forEach(modal => {
+    // Close Modals on Backdrop Click (Note: settingsModal is strictly excluded; can only close via cross button on grey circle)
+    [elements.createPlaylistModal, elements.renamePlaylistModal, elements.deletePlaylistConfirmModal, elements.addToPlaylistModal, elements.exportFormatModal].forEach(modal => {
       if (modal) {
         modal.addEventListener('click', (e) => {
           if (e.target === modal) modal.style.display = 'none';
