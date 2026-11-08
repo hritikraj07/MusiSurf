@@ -984,7 +984,7 @@
       const primeAudioResume = () => {
         if (resumeTime > 0) {
           try {
-            if (elements.audio.currentTime < resumeTime - 0.5) {
+            if (Math.abs(elements.audio.currentTime - resumeTime) > 0.5) {
               elements.audio.currentTime = resumeTime;
             }
           } catch (e) {}
@@ -996,6 +996,8 @@
           if (blob) {
             elements.audio.src = URL.createObjectURL(blob);
             elements.audio.volume = state.isMuted ? 0 : state.volume;
+            elements.audio.preload = 'auto';
+            elements.audio.load();
             primeAudioResume();
             elements.audio.addEventListener('loadedmetadata', primeAudioResume, { once: true });
             elements.audio.addEventListener('canplay', primeAudioResume, { once: true });
@@ -1010,29 +1012,29 @@
           }
           elements.audio.src = URL.createObjectURL(audioBlob);
           elements.audio.volume = state.isMuted ? 0 : state.volume;
+          elements.audio.preload = 'auto';
+          elements.audio.load();
           primeAudioResume();
           elements.audio.addEventListener('loadedmetadata', primeAudioResume, { once: true });
           elements.audio.addEventListener('canplay', primeAudioResume, { once: true });
-        } else if (track.source === 'youtube' || !track.hasDirectAudio) {
-          const cueYt = () => {
-            if (state.ytReady && state.ytPlayer && track.ytId) {
-              if (typeof state.ytPlayer.cueVideoById === 'function') {
-                state.ytPlayer.cueVideoById({
-                  videoId: track.ytId,
-                  startSeconds: resumeTime
-                });
-              }
-              state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
-            } else {
-              setTimeout(cueYt, 300);
-            }
-          };
-          setTimeout(cueYt, 500);
         } else {
+          // Direct audio for YouTube and JioSaavn tracks
+          const isYtTrack = track.source === 'youtube' || track.ytId || (track.id && track.id.startsWith('yt_'));
+          if (isYtTrack && !track.streamUrl) {
+            const ytId = track.ytId || (track.id ? track.id.replace('yt_', '') : '');
+            if (ytId) {
+              track.streamUrl = `/api/yt-stream?id=${encodeURIComponent(ytId)}`;
+              track.audioUrl = track.audioUrl || track.streamUrl;
+              track.hasDirectAudio = true;
+            }
+          }
           const audioSrc = track.audioUrl || track.streamUrl;
           if (audioSrc) {
+            track.hasDirectAudio = true;
             elements.audio.src = audioSrc;
             elements.audio.volume = state.isMuted ? 0 : state.volume;
+            elements.audio.preload = 'auto';
+            elements.audio.load();
             primeAudioResume();
             elements.audio.addEventListener('loadedmetadata', primeAudioResume, { once: true });
             elements.audio.addEventListener('canplay', primeAudioResume, { once: true });
@@ -1042,23 +1044,6 @@
     } catch (e) {
       console.warn('Error restoring last played track:', e);
     }
-  }
-
-  function attachOneTimeResumeGesture() {
-    const resume = () => {
-      if (elements.audio.paused && state.currentTrack && state.currentTrack.source !== 'youtube') {
-        elements.audio.play().then(() => {
-          state.isPlaying = true;
-          updatePlayPauseButton();
-        }).catch(() => {});
-      }
-      window.removeEventListener('click', resume);
-      window.removeEventListener('keydown', resume);
-      window.removeEventListener('touchstart', resume);
-    };
-    window.addEventListener('click', resume, { once: true });
-    window.addEventListener('keydown', resume, { once: true });
-    window.addEventListener('touchstart', resume, { once: true });
   }
 
   // ==========================================================================
@@ -1120,7 +1105,7 @@
   }
 
   let activePlayToken = 0;
-  async function playTrack(track, queueList = null, addToHistory = true) {
+  async function playTrack(track, queueList = null, addToHistory = true, customStartTime = 0) {
     if (!track) return;
     const currentToken = ++activePlayToken;
 
@@ -1143,13 +1128,18 @@
     }
 
     // Reset progress freeze safeguard for new track
-    state.restoredResumeTime = 0;
-    if (elements.currentTimeLabel) elements.currentTimeLabel.textContent = '0:00';
-    if (elements.progressFill) elements.progressFill.style.width = '0%';
-    if (elements.mobCurrentTime) elements.mobCurrentTime.textContent = '0:00';
-    if (elements.mobProgressFill) elements.mobProgressFill.style.width = '0%';
-    if (elements.miniPlayerFill) elements.miniPlayerFill.style.width = '0%';
-    if (elements.progressBuffer) elements.progressBuffer.style.width = '0%';
+    state.restoredResumeTime = customStartTime || 0;
+    if (customStartTime > 0) {
+      if (elements.currentTimeLabel) elements.currentTimeLabel.textContent = formatTime(customStartTime);
+      if (elements.mobCurrentTime) elements.mobCurrentTime.textContent = formatTime(customStartTime);
+    } else {
+      if (elements.currentTimeLabel) elements.currentTimeLabel.textContent = '0:00';
+      if (elements.progressFill) elements.progressFill.style.width = '0%';
+      if (elements.mobCurrentTime) elements.mobCurrentTime.textContent = '0:00';
+      if (elements.mobProgressFill) elements.mobProgressFill.style.width = '0%';
+      if (elements.miniPlayerFill) elements.miniPlayerFill.style.width = '0%';
+      if (elements.progressBuffer) elements.progressBuffer.style.width = '0%';
+    }
 
     recordRecentlyPlayed(track);
 
@@ -1285,6 +1275,13 @@
       elements.audio.src = blobUrl;
       elements.audio.volume = state.isMuted ? 0 : state.volume;
       elements.audio.load();
+      if (customStartTime > 0) {
+        const seekStartTime = () => {
+          try { elements.audio.currentTime = customStartTime; } catch (e) {}
+        };
+        elements.audio.addEventListener('loadedmetadata', seekStartTime, { once: true });
+        elements.audio.addEventListener('canplay', seekStartTime, { once: true });
+      }
       applyCrossfadeIn();
       elements.audio.play().catch(err => {
         console.warn('Local storage audio play error:', err);
@@ -1329,6 +1326,13 @@
         elements.audio.src = blobUrl;
         elements.audio.volume = state.isMuted ? 0 : state.volume;
         elements.audio.load();
+        if (customStartTime > 0) {
+          const seekStartTime = () => {
+            try { elements.audio.currentTime = customStartTime; } catch (e) {}
+          };
+          elements.audio.addEventListener('loadedmetadata', seekStartTime, { once: true });
+          elements.audio.addEventListener('canplay', seekStartTime, { once: true });
+        }
         applyCrossfadeIn();
         elements.audio.play().catch(err => {
           if (currentToken !== activePlayToken || err.name === 'AbortError') return;
@@ -1364,6 +1368,13 @@
         if (audioSrc) {
           elements.audio.src = audioSrc;
           elements.audio.load();
+          if (customStartTime > 0) {
+            const seekStartTime = () => {
+              try { elements.audio.currentTime = customStartTime; } catch (e) {}
+            };
+            elements.audio.addEventListener('loadedmetadata', seekStartTime, { once: true });
+            elements.audio.addEventListener('canplay', seekStartTime, { once: true });
+          }
           applyCrossfadeIn();
           const playPromise = elements.audio.play();
           if (playPromise !== undefined) {
@@ -1446,13 +1457,7 @@
       state.isPlaying = true;
       updatePlayPauseButton();
 
-      if (state.restoredResumeTime > 0) {
-        try {
-          if (elements.audio.currentTime < state.restoredResumeTime - 0.5) {
-            elements.audio.currentTime = state.restoredResumeTime;
-          }
-        } catch (e) {}
-      }
+      const resumeTime = state.restoredResumeTime || 0;
 
       if (isYouTubeActive()) {
         if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.playVideo === 'function') {
@@ -1463,21 +1468,43 @@
         const isYtTrack = state.currentTrack.source === 'youtube' || state.currentTrack.ytId || (state.currentTrack.id && state.currentTrack.id.startsWith('yt_'));
         if (isYtTrack && !state.currentTrack.streamUrl) {
           const ytId = state.currentTrack.ytId || state.currentTrack.id.replace('yt_', '');
-          state.currentTrack.streamUrl = `/api/yt-stream?id=${encodeURIComponent(ytId)}`;
-          state.currentTrack.audioUrl = state.currentTrack.audioUrl || state.currentTrack.streamUrl;
-          state.currentTrack.hasDirectAudio = true;
+          if (ytId) {
+            state.currentTrack.streamUrl = `/api/yt-stream?id=${encodeURIComponent(ytId)}`;
+            state.currentTrack.audioUrl = state.currentTrack.audioUrl || state.currentTrack.streamUrl;
+            state.currentTrack.hasDirectAudio = true;
+          }
         }
 
+        const desiredSrc = state.currentTrack.audioUrl || state.currentTrack.streamUrl;
         if (!elements.audio.src || elements.audio.src === '' || elements.audio.src.endsWith('/')) {
-          playTrack(state.currentTrack, state.queue, false);
-          return;
+          if (desiredSrc) {
+            elements.audio.src = desiredSrc;
+            elements.audio.volume = state.isMuted ? 0 : state.volume;
+            elements.audio.preload = 'auto';
+            elements.audio.load();
+          } else {
+            playTrack(state.currentTrack, state.queue, false, resumeTime);
+            return;
+          }
+        }
+
+        if (resumeTime > 0) {
+          try {
+            if (Math.abs(elements.audio.currentTime - resumeTime) > 0.5) {
+              elements.audio.currentTime = resumeTime;
+            }
+          } catch (e) {}
         }
 
         const resumePromise = elements.audio.play();
         if (resumePromise !== undefined) {
-          resumePromise.catch(err => {
+          resumePromise.then(() => {
+            if (resumeTime > 0) {
+              try { elements.audio.currentTime = resumeTime; } catch (e) {}
+            }
+          }).catch(err => {
             console.warn('Audio resume error, attempting full playTrack:', err);
-            playTrack(state.currentTrack, state.queue, false);
+            playTrack(state.currentTrack, state.queue, false, resumeTime);
           });
         }
       }
@@ -5806,7 +5833,7 @@
         return;
       }
 
-      if (e.code === 'Space') {
+      if (e.code === 'Space' || e.key === ' ' || e.keyCode === 32) {
         e.preventDefault();
         togglePlayPause();
       } else if (e.key === 'ArrowRight' && e.ctrlKey) {

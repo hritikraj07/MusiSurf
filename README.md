@@ -2,6 +2,10 @@
 
 # <img src="public/icons/icon-192.png" alt="MusiSurf Logo" width="44" height="44" style="vertical-align: middle; margin-right: 10px; border-radius: 10px;" /> MusiSurf
 
+<br/>
+
+<img src="public/home-preview.png" alt="MusiSurf Home Page" width="100%" />
+
 </div>
 
 ---
