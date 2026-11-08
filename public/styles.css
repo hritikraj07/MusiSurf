@@ -4935,20 +4935,48 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
    FULLSCREEN SETTINGS VIEW & DEAD SILENCE / CROSSFADE / IMPORT CONTROLS
    ========================================================================== */
 .fullscreen-settings-modal {
-  position: fixed !important;
-  inset: 0 !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  z-index: 3000 !important;
-  background: #0d0f15 !important;
+  position: fixed;
+  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 3000;
+  background: #0d0f15;
+  display: none;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+#settingsModal[style*="display: none"] {
+  display: none !important;
+}
+
+#settingsModal[style*="display: flex"],
+.fullscreen-settings-modal.active {
   display: flex !important;
-  flex-direction: column !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  animation: modalFadeIn 0.2s ease forwards !important;
-  box-sizing: border-box !important;
+  animation: modalFadeIn 0.2s ease forwards;
+}
+
+/* For web/desktop: in setting at very bottom also show persistent player controls */
+@media (min-width: 769px) {
+  #settingsModal[style*="display: flex"],
+  .fullscreen-settings-modal.active {
+    bottom: var(--player-height, 90px) !important;
+    height: calc(100vh - var(--player-height, 90px)) !important;
+  }
+  .player-bar {
+    z-index: 3100 !important;
+  }
+}
+
+/* On mobile: Hide desktop keyboard shortcuts table */
+@media (max-width: 768px) {
+  .desktop-controls-group {
+    display: none !important;
+  }
 }
 
 .settings-fullscreen-header {

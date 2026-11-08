@@ -3647,6 +3647,9 @@
       } catch (e) {}
     }
 
+    // Close settings modal when switching views
+    if (elements.settingsModal) elements.settingsModal.style.display = 'none';
+
     // Toggle active view element
     Object.keys(elements.views).forEach(key => {
       if (elements.views[key]) {
@@ -5975,6 +5978,8 @@
         window.history.replaceState({ view: 'home', depth: 1 }, '', window.location.pathname);
       } catch (e) {}
     }
+
+    if (elements.settingsModal) elements.settingsModal.style.display = 'none';
 
     // Ensure YouTube player initializes if YT script already loaded
     if (window.YT && window.YT.Player && !state.ytPlayer && typeof window.onYouTubeIframeAPIReady === 'function') {
