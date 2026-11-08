@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=6.7">
+  <link rel="stylesheet" href="/styles.css?v=6.8">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -42,126 +42,109 @@
 </head>
 
 <body class="theme-dark">
-  <!-- App Splash Loading Screen (Smooth Mobile & First-Load Experience) -->
-  <div id="appSplashScreen" class="app-splash-screen">
-    <div class="splash-card">
-      <div class="splash-logo-wrap">
-        <div class="splash-ring splash-ring-1"></div>
-        <div class="splash-ring splash-ring-2"></div>
-        <div class="splash-logo-circle">
-          <svg viewBox="0 0 100 100" class="splash-logo-svg" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="splashLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#00F296"/>
-                <stop offset="50%" stop-color="#10B981"/>
-                <stop offset="100%" stop-color="#00D2FF"/>
-              </linearGradient>
-            </defs>
-            <!-- Headphone Band -->
-            <path d="M 19 55 A 31 31 0 0 1 81 55" fill="none" stroke="url(#splashLogoGrad)" stroke-width="6.5" stroke-linecap="round"/>
-            <!-- Left Earcup -->
-            <rect x="11" y="45" width="10" height="22" rx="5" fill="url(#splashLogoGrad)"/>
-            <rect x="18" y="49" width="5" height="14" rx="2" fill="url(#splashLogoGrad)"/>
-            <!-- Right Earcup -->
-            <rect x="79" y="45" width="10" height="22" rx="5" fill="url(#splashLogoGrad)"/>
-            <rect x="77" y="49" width="5" height="14" rx="2" fill="url(#splashLogoGrad)"/>
-            <!-- Pill Condenser Microphone -->
-            <rect x="38" y="38" width="24" height="42" rx="12" fill="url(#splashLogoGrad)"/>
-            <!-- 4 Horizontal Grille Slots -->
-            <rect x="38" y="46" width="13" height="2.5" rx="1.25" fill="#090e0c"/>
-            <rect x="38" y="51.5" width="13" height="2.5" rx="1.25" fill="#090e0c"/>
-            <rect x="38" y="57" width="13" height="2.5" rx="1.25" fill="#090e0c"/>
-            <rect x="38" y="62.5" width="13" height="2.5" rx="1.25" fill="#090e0c"/>
-            <!-- Bottom Knob and Stem Cutout -->
-            <circle cx="50" cy="72.5" r="3.2" fill="#090e0c"/>
-            <rect x="48.8" y="72.5" width="2.4" height="7.5" fill="#090e0c"/>
-          </svg>
-        </div>
-      </div>
-      <h1 class="splash-brand">Musi<span class="splash-highlight">Surf</span></h1>
-      <p class="splash-tagline">Feel every beat • Unlimited streaming</p>
-      <div class="splash-progress-track">
-        <div class="splash-progress-bar"></div>
-      </div>
-    </div>
-  </div>
   <div id="app" class="app-layout">
 
-    <!-- Left Sidebar -->
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-brand">
-        <a href="#" class="brand-link" id="navBrand">
-          <div class="brand-logo-container">
-            <svg class="brand-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="brandLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#00F296"/>
-                  <stop offset="50%" stop-color="#10B981"/>
-                  <stop offset="100%" stop-color="#00D2FF"/>
-                </linearGradient>
-              </defs>
-              <!-- Headphone Band -->
-              <path d="M 19 55 A 31 31 0 0 1 81 55" fill="none" stroke="url(#brandLogoGrad)" stroke-width="6.5" stroke-linecap="round"/>
-              <!-- Left Earcup -->
-              <rect x="11" y="45" width="10" height="22" rx="5" fill="url(#brandLogoGrad)"/>
-              <rect x="18" y="49" width="5" height="14" rx="2" fill="url(#brandLogoGrad)"/>
-              <!-- Right Earcup -->
-              <rect x="79" y="45" width="10" height="22" rx="5" fill="url(#brandLogoGrad)"/>
-              <rect x="77" y="49" width="5" height="14" rx="2" fill="url(#brandLogoGrad)"/>
-              <!-- Pill Condenser Microphone -->
-              <rect x="38" y="38" width="24" height="42" rx="12" fill="url(#brandLogoGrad)"/>
-              <!-- 4 Horizontal Grille Slots -->
-              <rect x="38" y="46" width="13" height="2.5" rx="1.25" fill="#0d1411"/>
-              <rect x="38" y="51.5" width="13" height="2.5" rx="1.25" fill="#0d1411"/>
-              <rect x="38" y="57" width="13" height="2.5" rx="1.25" fill="#0d1411"/>
-              <rect x="38" y="62.5" width="13" height="2.5" rx="1.25" fill="#0d1411"/>
-              <!-- Bottom Knob and Stem Cutout -->
-              <circle cx="50" cy="72.5" r="3.2" fill="#0d1411"/>
-              <rect x="48.8" y="72.5" width="2.4" height="7.5" fill="#0d1411"/>
+    <!-- Top Navigation & Global Search Header (Modern Spotify Style) -->
+    <header class="top-header" id="topHeader">
+      <!-- Left: Navigation Arrows + Home Button -->
+      <div class="top-header-left">
+        <div class="top-nav-arrows">
+          <button class="top-circle-btn" id="historyBackBtn" title="Go back">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6" />
             </svg>
-          </div>
-          <span class="brand-name">Musi<span class="brand-highlight">Surf</span></span>
-        </a>
+          </button>
+          <button class="top-circle-btn" id="historyForwardBtn" title="Go forward">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </div>
+        <button class="top-circle-btn top-home-btn" id="topHomeBtn" title="Home">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+          </svg>
+        </button>
       </div>
 
-      <!-- Navigation Links -->
-      <nav class="sidebar-nav">
-        <ul class="nav-list">
-          <li class="nav-item">
-            <button class="nav-btn active" id="navHomeBtn" data-view="home">
-              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                <polyline points="9 22 9 12 15 12 15 22" />
-              </svg>
-              <span>Home</span>
-            </button>
-          </li>
-          <li class="nav-item">
-            <button class="nav-btn" id="navSearchBtn" data-view="search">
-              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.3-4.3" />
-              </svg>
-              <span>Search</span>
-            </button>
-          </li>
-        </ul>
-      </nav>
+      <!-- Center: Rounded Pill Search + Autocomplete + Compass (Categories) -->
+      <div class="top-header-center">
+        <div class="top-search-pill" id="topSearchPill">
+          <svg class="search-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+          <input type="text" id="globalSearchInput" class="search-input"
+            placeholder="What do you want to play?" autocomplete="off" spellcheck="false">
+          <button class="clear-search-btn" id="clearSearchBtn" title="Clear search" style="display: none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+          <span class="search-shortcut-badge">/</span>
+        </div>
 
-      <!-- Library Section -->
+        <!-- Floating Autocomplete Search Suggestions Dropdown (Image 5) -->
+        <div class="search-autocomplete-dropdown" id="searchAutocompleteDropdown" style="display: none;"></div>
+
+        <!-- Compass / Music Categories Button -->
+        <button class="top-circle-btn top-compass-btn" id="topCompassBtn" title="Explore Categories">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" fill="currentColor" fill-opacity="0.3" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Right: User Avatar + Desktop Window Controls -->
+      <div class="top-header-right">
+        <button class="top-avatar-btn" id="topAvatarBtn" title="Account & Settings">
+          <span class="top-avatar-initial">R</span>
+        </button>
+
+        <div class="window-controls-group">
+          <button class="win-ctrl-btn" id="winMinimizeBtn" title="Miniplayer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <button class="win-ctrl-btn" id="winMaximizeBtn" title="Toggle Fullscreen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+          </button>
+          <button class="win-ctrl-btn win-close-btn" id="winCloseBtn" title="Settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Left Sidebar (Directly Starts with Your Library) -->
+    <aside class="sidebar" id="sidebar">
+      <!-- Library Section Header with Hover Collapse Button -->
       <div class="sidebar-library">
         <div class="library-header">
-          <div class="library-title-group" id="navLibraryBtn" role="button" tabindex="0" title="Your Library">
-            <svg class="library-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path d="m16 6 4 14" />
-              <path d="M12 6v14" />
-              <path d="M8 8v12" />
-              <path d="M4 4v16" />
-            </svg>
-            <span class="library-heading">Your Library</span>
+          <div class="library-header-left">
+            <button class="collapse-sidebar-btn" id="collapseSidebarBtn" title="Collapse Your Library">
+              <svg class="collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="9" y1="3" x2="9" y2="21" />
+                <polyline points="15 9 12 12 15 15" />
+              </svg>
+              <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display: none;">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="9" y1="3" x2="9" y2="21" />
+                <polyline points="13 9 16 12 13 15" />
+              </svg>
+            </button>
+            <div class="library-title-group" id="navLibraryBtn" role="button" tabindex="0" title="Your Library">
+              <svg class="library-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="m16 6 4 14" />
+                <path d="M12 6v14" />
+                <path d="M8 8v12" />
+                <path d="M4 4v16" />
+              </svg>
+              <span class="library-heading">Your Library</span>
+            </div>
           </div>
           <button class="icon-action-btn" id="createPlaylistBtn" title="Create Playlist" aria-label="Create Playlist">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
@@ -173,8 +156,8 @@
         </div>
 
         <div class="library-content">
-          <!-- Liked Songs Pill/Card -->
-          <div class="library-item liked-songs-item" id="navLikedBtn" data-view="liked">
+          <!-- Liked Songs -->
+          <div class="library-item liked-songs-item" id="navLikedBtn" data-view="liked" title="Liked Songs">
             <div class="liked-icon-box">
               <svg viewBox="0 0 24 24" fill="currentColor">
                 <path
@@ -183,12 +166,12 @@
             </div>
             <div class="library-item-info">
               <span class="library-item-title">Liked Songs</span>
-              <span class="library-item-meta" id="likedCountMeta">0 songs • Auto-saved</span>
+              <span class="library-item-meta" id="likedCountMeta">Playlist • 0 tracks</span>
             </div>
           </div>
 
-          <!-- Downloaded Songs (Offline Listening in MusiSurf) -->
-          <div class="library-item downloaded-songs-item" id="navDownloadedBtn" data-view="downloaded">
+          <!-- Downloaded Songs (Offline Listening) -->
+          <div class="library-item downloaded-songs-item" id="navDownloadedBtn" data-view="downloaded" title="Downloads">
             <div class="downloaded-icon-box">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -197,13 +180,13 @@
               </svg>
             </div>
             <div class="library-item-info">
-              <span class="library-item-title">Downloaded</span>
-              <span class="library-item-meta" id="downloadedCountMeta">0 songs • Offline Ready</span>
+              <span class="library-item-title">Downloads</span>
+              <span class="library-item-meta" id="downloadedCountMeta">Playlist • 0 tracks</span>
             </div>
           </div>
 
           <!-- Local Music (Device Storage) -->
-          <div class="library-item local-music-item" id="navLocalMusicBtn" data-view="localMusic">
+          <div class="library-item local-music-item" id="navLocalMusicBtn" data-view="localMusic" title="Local Music">
             <div class="local-icon-box">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"/>
@@ -213,8 +196,8 @@
               </svg>
             </div>
             <div class="library-item-info">
-              <span class="library-item-title">Local Files</span>
-              <span class="library-item-meta" id="localCountMeta">0 songs • On Device</span>
+              <span class="library-item-title">Local Music</span>
+              <span class="library-item-meta" id="localCountMeta">On this device</span>
             </div>
           </div>
 
@@ -228,29 +211,6 @@
 
     <!-- Main Content Area -->
     <main class="main-wrapper" id="mainWrapper">
-      <!-- Top Navigation & Search Header -->
-      <header class="top-header" id="topHeader">
-        <div class="header-left">
-          <!-- Global Interactive Search Box -->
-          <div class="search-box-wrapper" id="searchBoxWrapper">
-            <div class="search-box">
-              <svg class="search-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.3-4.3" />
-              </svg>
-              <input type="text" id="globalSearchInput" class="search-input"
-                placeholder="What song or artist do you want to play?" autocomplete="off" spellcheck="false">
-              <button class="clear-search-btn" id="clearSearchBtn" title="Clear search" style="display: none;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-              <span class="search-shortcut-badge">/</span>
-            </div>
-          </div>
-        </div>
-      </header>
 
       <!-- Offline Status Banner -->
       <div class="offline-banner" id="offlineBanner" style="display: none;">
@@ -429,6 +389,15 @@
 
             <!-- Active Results Section -->
             <div class="search-results-wrapper" id="searchResultsWrapper" style="display: none;">
+              <!-- Filter Pills Row (Image 5) -->
+              <div class="search-filter-pills" id="searchFilterPills">
+                <button type="button" class="search-filter-pill active" data-filter="all">All</button>
+                <button type="button" class="search-filter-pill" data-filter="songs">Songs</button>
+                <button type="button" class="search-filter-pill" data-filter="videos">Videos</button>
+                <button type="button" class="search-filter-pill" data-filter="albums">Albums</button>
+                <button type="button" class="search-filter-pill" data-filter="artists">Artists</button>
+                <button type="button" class="search-filter-pill" data-filter="playlists">Playlists</button>
+              </div>
               <!-- Top Result + Songs Table Layout -->
               <div class="results-top-grid">
                 <!-- Top Result Card -->
@@ -1085,6 +1054,30 @@
             </div>
           </div>
         </div>
+
+        <!-- Miniplayer Trigger (Picture in Picture & Floating Card) -->
+        <button class="player-icon-btn miniplayer-btn" id="miniplayerBtn" title="Open Miniplayer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <rect x="11" y="11" width="8" height="8" rx="1" fill="currentColor" fill-opacity="0.25"/>
+          </svg>
+        </button>
+
+        <!-- Fullscreen Trigger -->
+        <button class="player-icon-btn fullscreen-btn" id="fullscreenBtn" title="Toggle Fullscreen">
+          <svg class="fs-expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 3 21 3 21 9"/>
+            <polyline points="9 21 3 21 3 15"/>
+            <line x1="21" y1="3" x2="14" y2="10"/>
+            <line x1="3" y1="21" x2="10" y2="14"/>
+          </svg>
+          <svg class="fs-collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+            <polyline points="4 14 10 14 10 20"/>
+            <polyline points="20 10 14 10 14 4"/>
+            <line x1="14" y1="10" x2="21" y2="3"/>
+            <line x1="3" y1="21" x2="10" y2="14"/>
+          </svg>
+        </button>
       </div>
     </footer>
 
@@ -1709,12 +1702,62 @@
     <!-- Toast Notification Container -->
     <div class="toast-container" id="toastContainer"></div>
 
+    <!-- Floating In-App Mini Player Widget (Picture-in-Picture / Floating) -->
+    <div class="floating-miniplayer" id="floatingMiniplayer" style="display: none;">
+      <div class="miniplayer-header">
+        <span class="miniplayer-header-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <rect x="11" y="11" width="8" height="8" rx="1" fill="currentColor" fill-opacity="0.3"/>
+          </svg>
+          Mini Player
+        </span>
+        <div class="miniplayer-header-actions">
+          <button class="mini-header-btn" id="expandFloatingMiniplayerBtn" title="Expand Full App">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+          </button>
+          <button class="mini-header-btn" id="closeFloatingMiniplayerBtn" title="Close Mini Player">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="miniplayer-body">
+        <img src="" id="miniplayerCover" class="miniplayer-cover" alt="Album Cover">
+        <div class="miniplayer-info">
+          <h4 id="miniplayerTitle" class="miniplayer-title">No track playing</h4>
+          <p id="miniplayerArtist" class="miniplayer-artist">—</p>
+        </div>
+        <button class="mini-heart-btn" id="miniHeartBtn" title="Like Song">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        </button>
+      </div>
+      <div class="miniplayer-progress-wrap">
+        <span id="miniplayerCurrentTime">0:00</span>
+        <div class="miniplayer-scrubber-bar" id="miniplayerScrubber">
+          <div class="miniplayer-scrubber-fill" id="miniplayerScrubberFill"></div>
+        </div>
+        <span id="miniplayerTotalTime">0:00</span>
+      </div>
+      <div class="miniplayer-controls">
+        <button class="mini-ctrl-btn" id="miniPrevBtn" title="Previous Track">
+          <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2.5"/></svg>
+        </button>
+        <button class="mini-ctrl-play-btn" id="miniPlayPauseBtn" title="Play / Pause">
+          <svg class="mini-play-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <svg class="mini-pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display: none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        </button>
+        <button class="mini-ctrl-btn" id="miniNextBtn" title="Next Track">
+          <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2.5"/></svg>
+        </button>
+      </div>
+    </div>
+
   </div>
 
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.45"></script>
+  <script src="/app.js?v=2.46"></script>
 </body>
 
 </html>

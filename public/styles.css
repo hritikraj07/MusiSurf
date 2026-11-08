@@ -3,22 +3,22 @@
    ========================================================================== */
 
 :root {
-  /* Core Color Palette */
-  --bg-base: #08090b;
-  --bg-surface: #121316;
-  --bg-surface-elevated: #1a1c22;
-  --bg-card: rgba(255, 255, 255, 0.04);
-  --bg-card-hover: rgba(255, 255, 255, 0.09);
-  --bg-glass: rgba(18, 19, 22, 0.75);
+  /* Core Color Palette — Pitch Black and Slate (Spotify Grade) */
+  --bg-base: #000000;
+  --bg-surface: #121212;
+  --bg-surface-elevated: #181818;
+  --bg-card: #181818;
+  --bg-card-hover: #282828;
+  --bg-glass: rgba(18, 18, 18, 0.85);
   
   /* Brand Accent Colors */
-  --accent-primary: #1db954;
-  --accent-secondary: #00f2fe;
+  --accent-primary: #1ed760;
+  --accent-secondary: #1db954;
   --accent-cyan: #4facfe;
   --accent-violet: #8a2be2;
   --accent-pink: #ff2a85;
-  --accent-gradient: linear-gradient(135deg, #1db954 0%, #00f2fe 100%);
-  --accent-glow: 0 0 24px rgba(29, 185, 84, 0.35);
+  --accent-gradient: linear-gradient(135deg, #1ed760 0%, #1db954 100%);
+  --accent-glow: 0 0 24px rgba(30, 215, 96, 0.35);
   --accent-cyan-glow: 0 0 24px rgba(0, 242, 254, 0.35);
 
   /* Typography Colors */
@@ -29,12 +29,12 @@
 
   /* Borders & Dividers */
   --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-active: rgba(29, 185, 84, 0.5);
+  --border-active: rgba(30, 215, 96, 0.5);
 
   /* Layout Constants */
   --sidebar-width: 280px;
-  --player-height: 94px;
-  --top-header-height: 68px;
+  --player-height: 80px;
+  --top-header-height: 64px;
 
   /* Transitions & Shadows */
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
@@ -99,34 +99,43 @@ html, body {
   background: rgba(255, 255, 255, 0.3);
 }
 
-/* Master App Layout Grid */
+/* Master App Layout Grid (Modern Spotify Desktop Structure) */
 .app-layout {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
-  grid-template-rows: 1fr var(--player-height);
+  grid-template-rows: var(--top-header-height) 1fr var(--player-height);
   grid-template-areas:
+    "topbar  topbar"
     "sidebar main"
     "player  player";
   height: 100vh;
   width: 100vw;
-  background-color: var(--bg-base);
+  background-color: #000000;
   overflow: hidden;
   position: relative;
+  gap: 8px 8px;
+  padding: 0;
+}
+
+.app-layout.sidebar-collapsed {
+  grid-template-columns: 72px 1fr !important;
 }
 
 /* ==========================================================================
-   LEFT SIDEBAR
+   LEFT SIDEBAR (Spotify Style)
    ========================================================================== */
 .sidebar {
   grid-area: sidebar;
-  background-color: #000000;
+  background-color: #121212;
+  border-radius: 8px;
+  margin: 0 0 0 8px;
   display: flex;
   flex-direction: column;
-  padding: 20px 14px 12px;
-  gap: 16px;
-  border-right: 1px solid var(--border-subtle);
+  padding: 12px 8px;
+  border-right: none;
   overflow: hidden;
   z-index: 10;
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .sidebar-brand {
@@ -572,11 +581,13 @@ html, body {
 }
 
 /* ==========================================================================
-   MAIN WRAPPER & TOP HEADER
+   MAIN WRAPPER & TOP HEADER (Modern Spotify Desktop Layout)
    ========================================================================== */
 .main-wrapper {
   grid-area: main;
-  background: linear-gradient(180deg, #181920 0%, #0d0e11 280px, #08090b 100%);
+  background-color: #121212;
+  border-radius: 8px;
+  margin: 0 8px 0 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -584,109 +595,203 @@ html, body {
 }
 
 .top-header {
+  grid-area: topbar;
   height: var(--top-header-height);
-  padding: 0 24px;
+  padding: 0 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  background-color: rgba(14, 15, 19, 0.75);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background-color: #000000;
   z-index: 50;
-  border-bottom: 1px solid var(--border-subtle);
-  position: sticky;
-  top: 0;
+  border-bottom: none;
 }
 
-.header-left {
+.top-header-left {
   display: flex;
   align-items: center;
-  gap: 16px;
-  flex: 1;
-  min-width: 0;
-  max-width: 650px;
+  gap: 12px;
 }
 
-.history-controls {
+.top-nav-arrows {
   display: flex;
+  align-items: center;
   gap: 8px;
-  flex-shrink: 0;
 }
 
-.history-btn {
-  width: 32px;
-  height: 32px;
+.top-circle-btn {
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background-color: rgba(0, 0, 0, 0.5);
+  background: rgba(255, 255, 255, 0.08);
   border: none;
-  color: #fff;
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  flex-shrink: 0;
   transition: all var(--transition-fast);
 }
 
-.history-btn svg {
+.top-circle-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  transform: scale(1.05);
+}
+
+.top-circle-btn svg {
   width: 16px;
   height: 16px;
 }
 
-.history-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
+.top-home-btn {
+  width: 44px;
+  height: 44px;
+  background: #1f1f1f;
+  color: #fff;
 }
 
-.history-btn:not(:disabled):hover {
-  background-color: rgba(255, 255, 255, 0.2);
-  transform: scale(1.05);
+.top-home-btn:hover {
+  background: #2a2a2a;
+  transform: scale(1.06);
 }
 
-/* Search Box */
-.search-box-wrapper {
-  flex: 1;
-  min-width: 0;
+.top-home-btn svg {
+  width: 22px;
+  height: 22px;
 }
 
-.search-box {
-  position: relative;
+.top-header-center {
   display: flex;
   align-items: center;
-  background-color: #242424;
-  border: 1px solid transparent;
+  gap: 12px;
+  flex: 1;
+  max-width: 580px;
+  position: relative;
+}
+
+.top-search-pill {
+  flex: 1;
+  height: 46px;
+  background: #1f1f1f;
   border-radius: 500px;
-  height: 44px;
+  display: flex;
+  align-items: center;
   padding: 0 16px;
-  min-width: 0;
+  gap: 10px;
+  color: #fff;
+  border: 1px solid transparent;
   transition: all var(--transition-fast);
+  position: relative;
 }
 
-.search-box:focus-within {
-  background-color: #2a2a2a;
+.top-search-pill:hover {
+  background: #282828;
+}
+
+.top-search-pill:focus-within {
+  background: #282828;
   border-color: #ffffff;
-  box-shadow: 0 0 16px rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.12);
 }
 
-.search-input-icon {
-  width: 18px;
-  height: 18px;
-  color: var(--text-secondary);
-  flex-shrink: 0;
-  margin-right: 10px;
-}
-
-.search-input {
+.top-search-pill .search-input {
   flex: 1;
   background: transparent;
   border: none;
   outline: none;
   color: #fff;
-  font-size: 0.9rem;
-  font-family: inherit;
+  font-size: 14px;
   font-weight: 500;
   min-width: 0;
+}
+
+.top-search-pill .search-input::placeholder {
+  color: #b3b3b3;
+}
+
+.top-compass-btn {
+  width: 44px;
+  height: 44px;
+  background: #1f1f1f;
+  color: #b3b3b3;
+  flex-shrink: 0;
+}
+
+.top-compass-btn:hover,
+.top-compass-btn.active {
+  color: #fff;
+  background: #2a2a2a;
+  transform: scale(1.06);
+}
+
+.top-compass-btn.active {
+  color: var(--accent-primary) !important;
+}
+
+.top-compass-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.top-header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.top-avatar-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #79b8ff;
+  color: #081729;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.top-avatar-btn:hover {
+  transform: scale(1.08);
+}
+
+.window-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.win-ctrl-btn {
+  background: transparent;
+  border: none;
+  color: #a7a7a7;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.win-ctrl-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.win-ctrl-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.win-close-btn:hover {
+  background: #e81123 !important;
+  color: #fff !important;
 }
 
 .search-input::placeholder {
@@ -723,6 +828,332 @@ html, body {
   margin-left: 8px;
   flex-shrink: 0;
 }
+
+/* Autocomplete Floating Dropdown (Image 5) */
+.search-autocomplete-dropdown {
+  position: absolute;
+  top: 52px;
+  left: 0;
+  right: 56px;
+  background: #242424;
+  border-radius: 12px;
+  padding: 8px 0;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 1200;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.search-suggestion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  color: #fff;
+}
+
+.search-suggestion-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.sugg-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sugg-icon {
+  width: 16px;
+  height: 16px;
+  color: #a7a7a7;
+  flex-shrink: 0;
+}
+
+.sugg-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.sugg-arrow {
+  width: 14px;
+  height: 14px;
+  color: #727272;
+  flex-shrink: 0;
+}
+
+/* Search Filter Pills (Image 5) */
+.search-filter-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.search-filter-pill {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #fff;
+  padding: 7px 18px;
+  border-radius: 500px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.search-filter-pill:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.search-filter-pill.active {
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+
+/* Sidebar Library Header & Hover Collapse Button (Image 4) */
+.library-header {
+  padding: 6px 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.library-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.collapse-sidebar-btn {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar:hover .collapse-sidebar-btn,
+.sidebar.collapsed .collapse-sidebar-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.collapse-sidebar-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.collapse-sidebar-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Collapsed Sidebar Mode */
+.sidebar.collapsed {
+  width: 72px !important;
+  padding: 12px 6px !important;
+}
+
+.sidebar.collapsed .library-heading,
+.sidebar.collapsed .library-item-info,
+.sidebar.collapsed #createPlaylistBtn {
+  display: none !important;
+}
+
+.sidebar.collapsed .library-header {
+  justify-content: center !important;
+}
+
+.sidebar.collapsed .library-item {
+  justify-content: center !important;
+  padding: 8px 0 !important;
+}
+
+/* Floating Miniplayer Widget (Image 1) */
+.floating-miniplayer {
+  position: fixed;
+  bottom: calc(var(--player-height) + 16px);
+  right: 20px;
+  width: 320px;
+  background: rgba(24, 24, 24, 0.96);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.85);
+  padding: 14px;
+  z-index: 2500;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: miniplayerSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes miniplayerSlideIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.miniplayer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #a7a7a7;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.miniplayer-header-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.miniplayer-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mini-header-btn {
+  background: transparent;
+  border: none;
+  color: #a7a7a7;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mini-header-btn:hover { color: #fff; }
+.mini-header-btn svg { width: 14px; height: 14px; }
+
+.miniplayer-body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.miniplayer-cover {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #282828;
+  flex-shrink: 0;
+}
+
+.miniplayer-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.miniplayer-title {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.miniplayer-artist {
+  color: #b3b3b3;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mini-heart-btn {
+  background: transparent;
+  border: none;
+  color: #b3b3b3;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mini-heart-btn:hover { color: #fff; }
+.mini-heart-btn svg { width: 18px; height: 18px; }
+
+.miniplayer-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #a7a7a7;
+}
+
+.miniplayer-scrubber-bar {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  position: relative;
+  cursor: pointer;
+}
+
+.miniplayer-scrubber-fill {
+  height: 100%;
+  width: 0%;
+  background: #ffffff;
+  border-radius: 4px;
+}
+
+.miniplayer-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.mini-ctrl-btn {
+  background: transparent;
+  border: none;
+  color: #b3b3b3;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mini-ctrl-btn:hover { color: #fff; }
+.mini-ctrl-btn svg { width: 18px; height: 18px; }
+
+.mini-ctrl-play-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #000;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.mini-ctrl-play-btn:hover { transform: scale(1.06); }
+.mini-ctrl-play-btn svg { width: 18px; height: 18px; }
+.mini-ctrl-play-btn .mini-play-icon { margin-left: 2px; }
 
 .header-right {
   display: flex;
@@ -4178,8 +4609,16 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 
   .app-layout {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr;
-    grid-template-areas: "main";
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "topbar"
+      "main";
+    gap: 0;
+  }
+
+  .main-wrapper {
+    border-radius: 0 !important;
+    margin: 0 !important;
   }
 
   /* Completely hide desktop left sidebar on mobile */
@@ -4397,26 +4836,45 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     padding: 16px 14px calc(185px + env(safe-area-inset-bottom, 20px)) !important;
   }
 
-  /* Hide search bar and header on Home, Library, Playlist, and Lyrics views on mobile */
-  body[data-active-view="home"] .top-header,
-  body[data-active-view="library"] .top-header,
-  body[data-active-view="playlist"] .top-header,
+  /* Only hide top header when lyrics view is active */
   body[data-active-view="lyrics"] .top-header {
     display: none !important;
-  }
-
-  body[data-active-view="home"] .content-scroll,
-  body[data-active-view="library"] .content-scroll,
-  body[data-active-view="playlist"] .content-scroll,
-  body[data-active-view="lyrics"] .content-scroll {
-    padding-top: calc(env(safe-area-inset-top, 0px) + 6px) !important;
-    padding-bottom: calc(185px + env(safe-area-inset-bottom, 20px)) !important;
   }
 
   .top-header {
     height: 56px;
     padding: 0 10px;
     gap: 8px;
+    border-radius: 0;
+  }
+
+  .top-header-left .top-nav-arrows {
+    display: none !important;
+  }
+
+  .top-header-left .top-home-btn {
+    width: 38px;
+    height: 38px;
+  }
+
+  .top-header-center {
+    max-width: none;
+    gap: 8px;
+  }
+
+  .top-search-pill {
+    height: 40px;
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .top-compass-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .window-controls-group {
+    display: none !important;
   }
 
   .header-left {
