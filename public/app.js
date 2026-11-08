@@ -894,8 +894,12 @@
     if (!state.currentTrack) return;
     try {
       const cur = getCurrentPlaybackTime();
-      if (state.restoredResumeTime > 0 && cur < Math.max(0.5, state.restoredResumeTime - 1.5)) {
-        return;
+      if (state.restoredResumeTime > 0) {
+        if (cur >= Math.max(0.5, state.restoredResumeTime - 1.5)) {
+          state.restoredResumeTime = 0;
+        } else {
+          return;
+        }
       }
       const dur = getTotalDuration();
       const data = {
@@ -957,6 +961,11 @@
 
       const resumeTime = parseFloat(saved.currentTime) || 0;
       state.restoredResumeTime = resumeTime;
+      if (resumeTime > 0) {
+        setTimeout(() => {
+          state.restoredResumeTime = 0;
+        }, 3000);
+      }
       elements.currentTimeLabel.textContent = formatTime(resumeTime);
       if (elements.mobCurrentTime) elements.mobCurrentTime.textContent = formatTime(resumeTime);
       if (dur > 0) {
@@ -1850,26 +1859,39 @@
   }
 
   function isYouTubeActive() {
-    return !!(
-      state.currentTrack &&
-      state.currentTrack.source === 'youtube' &&
-      !state.currentTrack.hasDirectAudio &&
-      state.ytPlayer &&
-      typeof state.ytPlayer.getPlayerState === 'function'
-    );
+    if (!state.currentTrack) return false;
+    if (state.ytPlayer && typeof state.ytPlayer.getPlayerState === 'function') {
+      try {
+        const pState = state.ytPlayer.getPlayerState();
+        // 1 = PLAYING, 3 = BUFFERING
+        if (pState === 1 || pState === 3) return true;
+        // If it's a YouTube track and HTML5 audio is paused with 0 currentTime (e.g. paused YouTube video)
+        const isYt = state.currentTrack.source === 'youtube' || state.currentTrack.ytId || (state.currentTrack.id && state.currentTrack.id.startsWith('yt_'));
+        if (isYt && elements.audio.paused && (!elements.audio.src || elements.audio.currentTime === 0)) {
+          return true;
+        }
+      } catch (e) {}
+    }
+    return false;
   }
 
   function getCurrentPlaybackTime() {
     if (isYouTubeActive()) {
-      return state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function' ? state.ytPlayer.getCurrentTime() : 0;
+      try {
+        if (state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
+          return state.ytPlayer.getCurrentTime() || 0;
+        }
+      } catch (e) {}
     }
     return elements.audio.currentTime || 0;
   }
 
   function getTotalDuration() {
     if (isYouTubeActive()) {
-      const dur = state.ytPlayer && typeof state.ytPlayer.getDuration === 'function' ? state.ytPlayer.getDuration() : 0;
-      return (Number.isFinite(dur) && dur > 0) ? dur : (state.currentTrack?.duration || 0);
+      try {
+        const dur = state.ytPlayer && typeof state.ytPlayer.getDuration === 'function' ? state.ytPlayer.getDuration() : 0;
+        if (Number.isFinite(dur) && dur > 0) return dur;
+      } catch (e) {}
     }
     const audioDur = elements.audio.duration;
     if (Number.isFinite(audioDur) && audioDur > 0) {
@@ -1955,8 +1977,12 @@
       if (state.isDraggingProgress) return; // Don't override while user is actively dragging scrubber
 
       const cur = getCurrentPlaybackTime();
-      if (state.restoredResumeTime > 0 && cur < Math.max(0.5, state.restoredResumeTime - 1.5)) {
-        return;
+      if (state.restoredResumeTime > 0) {
+        if (cur >= Math.max(0.5, state.restoredResumeTime - 1.5)) {
+          state.restoredResumeTime = 0;
+        } else {
+          return;
+        }
       }
       const dur = getTotalDuration();
 
@@ -3405,7 +3431,10 @@
           saveStoredPlaylists();
         }
         if (elements.shufflePlaylistBtn) elements.shufflePlaylistBtn.classList.toggle('active', state.isPlaylistShuffle);
-        recordRecentlyPlayedPlaylist({ id: playlistId, name: title, image: coverUrl, tracks: listToPlay });
+        const playlistCover = (listToPlay && listToPlay[0]?.image) || (tracks && tracks[0]?.image) || '';
+        try {
+          recordRecentlyPlayedPlaylist({ id: playlistId, name: title, image: playlistCover, tracks: listToPlay });
+        } catch (e) {}
         playTrack(queueList[0], queueList);
       }
     };
@@ -3427,7 +3456,10 @@
 
       state.activePlaylistTracks = [...tracks];
       state.activePlaylistId = playlistId;
-      recordRecentlyPlayedPlaylist({ id: playlistId, name: title, image: coverUrl, tracks: tracks });
+      const shuffleCover = (tracks && tracks[0]?.image) || '';
+      try {
+        recordRecentlyPlayedPlaylist({ id: playlistId, name: title, image: shuffleCover, tracks: tracks });
+      } catch (e) {}
 
       if (state.isPlaylistShuffle) {
         elements.shufflePlaylistBtn.title = "Mode: Random (No Repeats) • Click for In-Order";
