@@ -1834,65 +1834,38 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   }
 }
 
-/* In-Playlist / Saved Track Tick Badge (Spotify Style - Previous Location & Visible on Hover) */
+/* In-Playlist / Saved Track Tick Badge (Spotify Style - Placed right after the title with breathable spacing) */
 .in-playlist-tick-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  vertical-align: middle;
-  color: var(--accent-primary, #00f260);
-  flex-shrink: 0;
-  transition: opacity 0.2s ease, transform var(--transition-fast);
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  vertical-align: middle !important;
+  color: var(--accent-primary, #00f260) !important;
+  flex-shrink: 0 !important;
+  margin-left: 8px !important; /* Breathable spacing after song name! */
+  margin-right: 2px !important;
+  opacity: 1 !important;
+  transition: transform var(--transition-fast) !important;
 }
 
 .in-playlist-tick-badge svg {
-  width: 16px;
-  height: 16px;
-  filter: drop-shadow(0 0 3px rgba(0, 242, 96, 0.45));
+  width: 15px !important;
+  height: 15px !important;
+  filter: drop-shadow(0 0 3px rgba(0, 242, 96, 0.45)) !important;
 }
 
-.tracks-table th.col-status,
-.tracks-table td.col-status {
-  width: 36px;
-  min-width: 36px;
-  text-align: center !important;
-  vertical-align: middle !important;
-  padding: 0 4px !important;
+.song-title-text,
+.table-title-main {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  overflow: hidden !important;
 }
 
-.song-row-right-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
-/* Desktop: Visible on hover only */
-@media (min-width: 769px) {
-  .tracks-table tbody tr .col-status .in-playlist-tick-badge,
-  .song-row .song-row-right-actions .in-playlist-tick-badge {
-    opacity: 0;
-  }
-
-  .tracks-table tbody tr:hover .col-status .in-playlist-tick-badge,
-  .song-row:hover .song-row-right-actions .in-playlist-tick-badge {
-    opacity: 1;
-  }
-}
-
-/* Mobile: Displayed neatly next to 3 dots */
-@media (max-width: 768px) {
-  .tracks-table th.col-status,
-  .tracks-table td.col-status {
-    width: 28px !important;
-    min-width: 28px !important;
-    padding: 0 2px !important;
-  }
-  .song-row-right-actions .in-playlist-tick-badge,
-  .tracks-table tbody tr .col-status .in-playlist-tick-badge {
-    opacity: 1 !important;
-  }
+.title-text-main {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Empty Search State */
@@ -5732,90 +5705,111 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   fill: #000;
 }
 
-/* Playlist Active Download Progress Card */
-.playlist-download-status-card {
+/* On mobile: Keep export ONLY in three horizontal lines options modal */
+@media (max-width: 768px) {
+  #exportPlaylistBtn {
+    display: none !important;
+  }
+}
+
+/* Offline State: Non-downloaded songs fade out */
+body.is-offline .track-row:not(.is-downloaded),
+body.is-offline .song-row:not(.is-downloaded),
+body.is-offline .tracks-table tbody tr:not(.is-downloaded),
+body.is-offline .quick-pick-tile:not(.is-downloaded),
+body.is-offline .queue-card:not(.is-downloaded) {
+  opacity: 0.35 !important;
+  filter: grayscale(0.6) !important;
+  cursor: not-allowed !important;
+}
+
+/* Offline State: Library non-downloaded playlists/cards fade out */
+body.is-offline .library-hub-card:not(.lib-hub-downloaded),
+body.is-offline .custom-playlist-card:not(.is-downloaded) {
+  opacity: 0.35 !important;
+  filter: grayscale(0.5) !important;
+}
+
+body.is-offline .lib-hub-downloaded {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 16px rgba(0, 242, 96, 0.25) !important;
+}
+
+/* Offline View States: Home & Search strictly show offline messaging */
+body.is-offline #homeView > *:not(#homeOfflineState) {
+  display: none !important;
+}
+
+body.is-offline #homeOfflineState {
+  display: flex !important;
+}
+
+body.is-offline #searchTrendingRow,
+body.is-offline #searchResultsSection,
+body.is-offline #searchEmptyState {
+  display: none !important;
+}
+
+body.is-offline #searchOfflineState {
+  display: flex !important;
+}
+
+/* Home Offline State Banner (When offline, show only message) */
+.home-offline-state {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  background: rgba(5, 117, 230, 0.12);
-  border: 1px solid rgba(0, 242, 150, 0.35);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-radius: 12px;
-  padding: 14px 18px;
-  margin-bottom: 20px;
-  animation: slideUpModal 0.25s ease forwards;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 80px 24px 100px;
+  min-height: 55vh;
 }
 
-.playlist-download-status-card.completed {
+.home-offline-state .offline-icon-box {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
   background: rgba(0, 242, 96, 0.12);
-  border-color: rgba(0, 242, 96, 0.45);
-}
-
-.dl-status-left {
+  border: 1px solid rgba(0, 242, 96, 0.28);
+  color: var(--accent-primary);
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
+  margin-bottom: 24px;
 }
 
-.dl-status-spinner {
-  width: 20px;
-  height: 20px;
-  border: 2.5px solid rgba(0, 242, 150, 0.25);
-  border-top-color: var(--accent-primary, #00f260);
-  border-radius: 50%;
-  animation: dlSpin 0.75s linear infinite;
-  flex-shrink: 0;
+.home-offline-state .offline-icon-box svg {
+  width: 38px;
+  height: 38px;
 }
 
-.playlist-download-status-card.completed .dl-status-spinner {
-  border-color: transparent;
-  animation: none;
-  background: var(--accent-primary, #00f260);
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M13.7 4.3a1 1 0 0 0-1.4 0L6.5 10.1 3.7 7.3a1 1 0 0 0-1.4 1.4l3.5 3.5a1 1 0 0 0 1.4 0l6.5-6.5a1 1 0 0 0 0-1.4z'/%3E%3C/svg%3E") no-repeat center;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M13.7 4.3a1 1 0 0 0-1.4 0L6.5 10.1 3.7 7.3a1 1 0 0 0-1.4 1.4l3.5 3.5a1 1 0 0 0 1.4 0l6.5-6.5a1 1 0 0 0 0-1.4z'/%3E%3C/svg%3E") no-repeat center;
-}
-
-@keyframes dlSpin {
-  to { transform: rotate(360deg); }
-}
-
-.dl-status-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.dl-status-title {
-  font-size: 0.88rem;
+.home-offline-state .offline-heading {
+  font-size: 1.4rem;
   font-weight: 700;
   color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin: 0 0 24px;
+  max-width: 500px;
+  line-height: 1.35;
 }
 
-.dl-status-sub {
-  font-size: 0.76rem;
-  color: var(--text-secondary);
+.offline-go-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 28px;
+  border-radius: 500px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  background-color: var(--accent-primary);
+  color: #000;
+  border: none;
+  transition: transform var(--transition-fast), filter var(--transition-fast);
 }
 
-.dl-status-progress-track {
-  width: 100%;
-  height: 5px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.dl-status-progress-fill {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, #0575e6, #00f260);
-  border-radius: 999px;
-  transition: width 0.3s ease;
+.offline-go-btn:hover {
+  transform: scale(1.04);
+  filter: brightness(1.1);
 }
 
 .song-action-btn.download-song-trigger.downloaded {

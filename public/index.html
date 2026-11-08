@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=6.0">
+  <link rel="stylesheet" href="/styles.css?v=6.1">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -271,6 +271,21 @@
 
         <!-- HOME VIEW -->
         <section class="view-section active" id="homeView">
+          <!-- Home Offline State (Only shown while offline) -->
+          <div class="home-offline-state" id="homeOfflineState" style="display: none;">
+            <div class="offline-icon-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="8 12 11 15 16 9" />
+              </svg>
+            </div>
+            <h2 class="offline-heading">Listen to your downloaded songs because you're offline</h2>
+            <button type="button" class="btn-primary offline-go-btn" id="homeGoDownloadedBtn">
+              <svg viewBox="0 0 24 24" fill="currentColor" style="width: 18px; height: 18px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <span>Listen to Downloaded Songs</span>
+            </button>
+          </div>
+
           <!-- Dynamic Time Greeting & Quick Picks -->
           <div class="hero-welcome">
             <div class="welcome-heading-row">
@@ -441,6 +456,20 @@
               <p>Try searching with artist name or different keywords. MusiSurf searches millions of full tracks from
                 the internet.</p>
             </div>
+
+            <!-- Offline Search State -->
+            <div class="search-empty-state search-offline-state" id="searchOfflineState" style="display: none;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="8 12 11 15 16 9" />
+              </svg>
+              <h3>Listen to downloaded songs</h3>
+              <p>You are offline. Online search is unavailable.</p>
+              <button type="button" class="btn-primary offline-go-btn" id="searchGoDownloadedBtn" style="margin-top: 14px;">
+                <svg viewBox="0 0 24 24" fill="currentColor" style="width: 16px; height: 16px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                <span>Listen to Downloaded Songs</span>
+              </button>
+            </div>
           </div>
         </section>
 
@@ -498,10 +527,10 @@
                 </svg>
               </button>
               <button class="playlist-action-icon-btn export-playlist-btn" id="exportPlaylistBtn" title="Export Playlist">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
                 </svg>
               </button>
               <button class="playlist-action-sub-btn delete-playlist-btn" id="deletePlaylistBtn" title="Delete Playlist" style="display: none;">
@@ -564,20 +593,6 @@
             </div>
           </div>
 
-          <!-- Dynamic Downloading Progress Bar Indicator inside Playlist -->
-          <div id="playlistDownloadStatusCard" class="playlist-download-status-card" style="display: none;">
-            <div class="dl-status-left">
-              <div class="dl-status-spinner" id="dlStatusSpinner"></div>
-              <div class="dl-status-info">
-                <span class="dl-status-title" id="dlStatusTitle">Downloading Song...</span>
-                <span class="dl-status-sub" id="dlStatusSub">Saving to Downloaded Songs for 100% offline playback</span>
-              </div>
-            </div>
-            <div class="dl-status-progress-track">
-              <div class="dl-status-progress-fill" id="dlStatusProgressFill"></div>
-            </div>
-          </div>
-
           <!-- Playlist Songs Table -->
           <div class="playlist-table-wrapper">
             <table class="tracks-table" id="playlistTracksTable">
@@ -586,7 +601,6 @@
                   <th class="col-num">#</th>
                   <th class="col-title">Title</th>
                   <th class="col-album">Album</th>
-                  <th class="col-status"></th>
                   <th class="col-duration">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <circle cx="12" cy="12" r="10" />
@@ -705,7 +719,6 @@
                   <th class="col-num">#</th>
                   <th class="col-title">Title</th>
                   <th class="col-album">File Name</th>
-                  <th class="col-status"></th>
                   <th class="col-duration">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <circle cx="12" cy="12" r="10" />
@@ -1186,6 +1199,16 @@
             <line x1="12" y1="17" x2="12" y2="21"/>
           </svg>
         </button>
+        <button class="mob-bottom-icon-btn" id="mobPlayerQueueBtn" title="Queue" aria-label="Open Queue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="8" y1="6" x2="21" y2="6"/>
+            <line x1="8" y1="12" x2="21" y2="12"/>
+            <line x1="8" y1="18" x2="21" y2="18"/>
+            <line x1="3" y1="6" x2="3.01" y2="6"/>
+            <line x1="3" y1="12" x2="3.01" y2="12"/>
+            <line x1="3" y1="18" x2="3.01" y2="18"/>
+          </svg>
+        </button>
         <button class="mob-bottom-icon-btn" id="mobPlayerOptionsBtn" title="More Options" aria-label="More Options">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
             <line x1="4" y1="7" x2="20" y2="7"/>
@@ -1295,10 +1318,10 @@
           </button>
           <button class="mob-option-item" id="mobOptExportPlaylistBtn">
             <div class="mob-option-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
               </svg>
             </div>
             <span>Export Playlist</span>
@@ -1538,7 +1561,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.32"></script>
+  <script src="/app.js?v=2.33"></script>
 </body>
 
 </html>

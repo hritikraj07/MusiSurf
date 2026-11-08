@@ -139,10 +139,10 @@
     mobOptRenamePlaylistBtn: document.getElementById('mobOptRenamePlaylistBtn'),
     mobOptDeletePlaylistBtn: document.getElementById('mobOptDeletePlaylistBtn'),
     mobOptExportPlaylistBtn: document.getElementById('mobOptExportPlaylistBtn'),
-    playlistDownloadStatusCard: document.getElementById('playlistDownloadStatusCard'),
-    dlStatusTitle: document.getElementById('dlStatusTitle'),
-    dlStatusSub: document.getElementById('dlStatusSub'),
-    dlStatusProgressFill: document.getElementById('dlStatusProgressFill'),
+    homeOfflineState: document.getElementById('homeOfflineState'),
+    homeGoDownloadedBtn: document.getElementById('homeGoDownloadedBtn'),
+    searchOfflineState: document.getElementById('searchOfflineState'),
+    searchGoDownloadedBtn: document.getElementById('searchGoDownloadedBtn'),
     playlistBackBtn: document.getElementById('playlistBackBtn'),
 
     // Lyrics View
@@ -345,6 +345,14 @@
     }
   }
 
+  // Middle ellipsis for long song titles and artist names (e.g. "PARESH PAHUJA...na Mishra")
+  function truncateMiddle(str, maxLength = 28, frontChars = 15, backChars = 10) {
+    if (!str || typeof str !== 'string') return '';
+    const trimmed = str.trim();
+    if (trimmed.length <= maxLength) return trimmed;
+    return `${trimmed.slice(0, frontChars).trim()}...${trimmed.slice(-backChars).trim()}`;
+  }
+
   // Check if track is saved in any playlist (Liked songs, Downloads, or Custom playlists)
   function isTrackInAnyPlaylist(trackId) {
     if (!trackId) return false;
@@ -355,9 +363,10 @@
   }
 
   // Spotify-style green circular checkmark badge for songs already in playlists / library
+  // Placed right after the title with breathable 8px margin spacing per user request ("only here add little space after name and for mobile too")
   function getPlaylistTickBadgeHtml(trackId) {
     if (isTrackInAnyPlaylist(trackId)) {
-      return `<span class="in-playlist-tick-badge" title="Saved in your playlist / library" aria-label="In playlist"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm3.707 6.293-4.5 4.5a1 1 0 0 1-1.414 0l-2-2a1 1 0 1 1 1.414-1.414L6.5 8.586l3.793-3.793a1 1 0 0 1 1.414 1.414z"/></svg></span>`;
+      return `<span class="in-playlist-tick-badge" style="margin-left: 8px;" title="Saved in your playlist / library" aria-label="In playlist"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm3.707 6.293-4.5 4.5a1 1 0 0 1-1.414 0l-2-2a1 1 0 1 1 1.414-1.414L6.5 8.586l3.793-3.793a1 1 0 0 1 1.414 1.414z"/></svg></span>`;
     }
     return '';
   }
@@ -369,10 +378,10 @@
     const tickHtml = inPlaylist ? getPlaylistTickBadgeHtml(track.id) : '';
     const dlHtml = getDownloadedBadgeHtml(track.id);
     if (elements.playerTitle) {
-      elements.playerTitle.innerHTML = `${escapeHtml(track.title)}${tickHtml}${dlHtml}`;
+      elements.playerTitle.innerHTML = `<span class="title-text-main">${escapeHtml(truncateMiddle(track.title, 34, 18, 12))}</span>${tickHtml}${dlHtml}`;
     }
     if (elements.mobPlayerTitle) {
-      elements.mobPlayerTitle.innerHTML = `${escapeHtml(track.title)}${tickHtml}${dlHtml}`;
+      elements.mobPlayerTitle.innerHTML = `<span class="title-text-main">${escapeHtml(truncateMiddle(track.title, 30, 16, 10))}</span>${tickHtml}${dlHtml}`;
     }
   }
 
@@ -384,30 +393,40 @@
       if (!trackId) return;
 
       const shouldHaveBadge = isTrackInAnyPlaylist(trackId);
+      const isDownloaded = isTrackDownloaded(trackId);
+      el.classList.toggle('is-downloaded', isDownloaded);
 
-      // Clean up stray tick if inside title
+      // Clean up legacy status column and right-actions badge
+      const statusCell = el.querySelector('.col-status');
+      if (statusCell) statusCell.innerHTML = '';
+      const rightActions = el.querySelector('.song-row-right-actions');
+      if (rightActions) {
+        const stray = rightActions.querySelector('.in-playlist-tick-badge');
+        if (stray) stray.remove();
+      }
+
+      // Target title container (song-title-text or table-title-main or quick-pick-title)
       const titleContainer = el.querySelector(
         '.table-title-main, .song-title-text, .quick-pick-title, .top-result-title, .queue-card-title, .queue-now-playing-title'
       );
       if (titleContainer) {
-        const strayBadge = titleContainer.querySelector('.in-playlist-tick-badge');
-        if (strayBadge) strayBadge.remove();
-      }
-
-      // 1. Table row status column (before duration column)
-      const statusCell = el.querySelector('.col-status');
-      if (statusCell) {
-        statusCell.innerHTML = shouldHaveBadge ? getPlaylistTickBadgeHtml(trackId) : '';
-      }
-
-      // 2. Song row right actions (before 3 dots)
-      const rightActions = el.querySelector('.song-row-right-actions');
-      if (rightActions) {
-        const existingBadge = rightActions.querySelector('.in-playlist-tick-badge');
-        if (shouldHaveBadge && !existingBadge) {
-          rightActions.insertAdjacentHTML('afterbegin', getPlaylistTickBadgeHtml(trackId));
-        } else if (!shouldHaveBadge && existingBadge) {
-          existingBadge.remove();
+        const existingTick = titleContainer.querySelector('.in-playlist-tick-badge');
+        if (shouldHaveBadge) {
+          if (!existingTick) {
+            const dlBadge = titleContainer.querySelector('.downloaded-badge');
+            const tickWrapper = document.createElement('span');
+            tickWrapper.innerHTML = getPlaylistTickBadgeHtml(trackId);
+            const tickNode = tickWrapper.firstElementChild;
+            if (tickNode) {
+              if (dlBadge) {
+                titleContainer.insertBefore(tickNode, dlBadge);
+              } else {
+                titleContainer.appendChild(tickNode);
+              }
+            }
+          }
+        } else if (existingTick) {
+          existingTick.remove();
         }
       }
     });
@@ -1310,23 +1329,11 @@
     updateAllDownloadedBadges(track.id);
     updateAllPlaylistTickBadges(track.id);
 
-    // Show downloading status card in playlist view
-    if (elements.playlistDownloadStatusCard) {
-      elements.playlistDownloadStatusCard.classList.remove('completed');
-      elements.playlistDownloadStatusCard.style.display = 'flex';
-      if (elements.dlStatusTitle) elements.dlStatusTitle.textContent = `Downloading "${track.title}"...`;
-      if (elements.dlStatusSub) elements.dlStatusSub.textContent = 'Saving to Downloaded Songs for 100% offline playback';
-      if (elements.dlStatusProgressFill) elements.dlStatusProgressFill.style.width = '35%';
-    }
-
     showToast(`Downloading "${track.title}" to Downloaded Songs...`, '⏳');
 
     // If currently viewing Downloaded playlist, refresh view instantly
     if (state.currentView === 'downloaded' || (state.currentView === 'playlist' && state.activePlaylistId === 'downloaded')) {
       renderPlaylistView('downloaded');
-      if (elements.playlistDownloadStatusCard) {
-        elements.playlistDownloadStatusCard.style.display = 'flex';
-      }
     }
 
     // 2. On desktop, also trigger browser file download to computer's Downloads folder
@@ -1342,7 +1349,6 @@
     // 3. In background: asynchronously fetch audio stream blob and persist to IndexedDB for 100% offline playback
     (async () => {
       try {
-        if (elements.dlStatusProgressFill) elements.dlStatusProgressFill.style.width = '65%';
         const fetchTarget = track.audioUrl ? `/api/stream?url=${encodeURIComponent(track.audioUrl)}` : streamUrl;
         const res = await fetch(fetchTarget);
         if (res.ok) {
@@ -1356,25 +1362,9 @@
             state.offlineTracks[idx].audioBlob = blob;
           }
         }
-        if (elements.dlStatusProgressFill) elements.dlStatusProgressFill.style.width = '100%';
-        if (elements.playlistDownloadStatusCard) {
-          elements.playlistDownloadStatusCard.classList.add('completed');
-          if (elements.dlStatusTitle) elements.dlStatusTitle.textContent = `✓ Downloaded "${track.title}"!`;
-          if (elements.dlStatusSub) elements.dlStatusSub.textContent = 'Saved to Downloaded Songs • 100% Offline Ready';
-          setTimeout(() => {
-            if (elements.playlistDownloadStatusCard) {
-              elements.playlistDownloadStatusCard.style.display = 'none';
-              elements.playlistDownloadStatusCard.classList.remove('completed');
-              if (elements.dlStatusProgressFill) elements.dlStatusProgressFill.style.width = '0%';
-            }
-          }, 3500);
-        }
         showToast(`✓ "${track.title}" is ready for offline listening!`, '✓');
       } catch (err) {
         console.warn('Background offline blob caching note:', err.message);
-        if (elements.playlistDownloadStatusCard) {
-          elements.playlistDownloadStatusCard.style.display = 'none';
-        }
       }
     })();
   }
@@ -2075,6 +2065,14 @@
     elements.searchBrowseSection.style.display = 'none';
     elements.searchResultsWrapper.style.display = 'none';
     elements.searchEmptyState.style.display = 'none';
+
+    if (!navigator.onLine) {
+      if (elements.searchLoading) elements.searchLoading.style.display = 'none';
+      if (elements.searchOfflineState) elements.searchOfflineState.style.display = 'flex';
+      return;
+    }
+
+    if (elements.searchOfflineState) elements.searchOfflineState.style.display = 'none';
     elements.searchLoading.style.display = 'flex';
 
     try {
@@ -2293,20 +2291,22 @@
 
   function createSongRow(track, queueList) {
     const row = document.createElement('div');
-    row.className = `song-row ${state.currentTrack?.id === track.id ? 'playing' : ''}`;
+    const isDownloaded = isTrackDownloaded(track.id);
+    row.className = `song-row ${state.currentTrack?.id === track.id ? 'playing' : ''} ${isDownloaded ? 'is-downloaded' : ''}`;
     row.dataset.trackId = track.id;
 
     const badgeHtml = getDownloadedBadgeHtml(track.id);
     const tickHtml = getPlaylistTickBadgeHtml(track.id);
+    const formattedTitle = escapeHtml(truncateMiddle(track.title, 32, 16, 12));
+    const formattedArtist = escapeHtml(truncateMiddle(track.artist, 28, 14, 10));
 
     row.innerHTML = `
       <img src="${track.image}" alt="${escapeHtml(track.title)}" class="song-thumb">
       <div class="song-info-col">
-        <div class="song-title-text">${escapeHtml(track.title)}${badgeHtml}</div>
-        <div class="song-artist-text">${escapeHtml(track.artist)}</div>
+        <div class="song-title-text"><span class="title-text-main" title="${escapeHtml(track.title)}">${formattedTitle}</span>${tickHtml}${badgeHtml}</div>
+        <div class="song-artist-text" title="${escapeHtml(track.artist)}">${formattedArtist}</div>
       </div>
       <div class="song-row-right-actions">
-        ${tickHtml}
         <button class="song-action-btn song-more-trigger" title="More Options">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <circle cx="12" cy="5" r="2"/>
@@ -2327,6 +2327,11 @@
         e.stopPropagation();
         return;
       }
+      if (!navigator.onLine && !isTrackDownloaded(track.id)) {
+        e.stopPropagation();
+        showToast("You're offline! Listen to your downloaded songs.", '⚡');
+        return;
+      }
       if (state.currentView === 'search' || state.currentView === 'home') {
         state.activePlaylistId = null;
       }
@@ -2338,11 +2343,14 @@
 
   function createTableRow(track, index, queueList) {
     const tr = document.createElement('tr');
-    tr.className = state.currentTrack?.id === track.id ? 'playing' : '';
+    const isDownloaded = isTrackDownloaded(track.id);
+    tr.className = `${state.currentTrack?.id === track.id ? 'playing' : ''} ${isDownloaded ? 'is-downloaded' : ''}`;
     tr.dataset.trackId = track.id;
 
     const badgeHtml = getDownloadedBadgeHtml(track.id);
     const tickHtml = getPlaylistTickBadgeHtml(track.id);
+    const formattedTitle = escapeHtml(truncateMiddle(track.title, 34, 18, 12));
+    const formattedArtist = escapeHtml(truncateMiddle(track.artist, 30, 15, 11));
 
     tr.innerHTML = `
       <td class="col-num">${index}</td>
@@ -2350,13 +2358,12 @@
         <div class="table-title-cell">
           <img src="${track.image}" alt="${escapeHtml(track.title)}" class="table-cover" loading="lazy">
           <div>
-            <div class="table-title-main">${escapeHtml(track.title)}${badgeHtml}</div>
-            <div class="table-artist-sub">${escapeHtml(track.artist)}</div>
+            <div class="table-title-main"><span class="title-text-main" title="${escapeHtml(track.title)}">${formattedTitle}</span>${tickHtml}${badgeHtml}</div>
+            <div class="table-artist-sub" title="${escapeHtml(track.artist)}">${formattedArtist}</div>
           </div>
         </div>
       </td>
-      <td class="col-album">${escapeHtml(track.album || 'Single')}</td>
-      <td class="col-status">${tickHtml}</td>
+      <td class="col-album">${escapeHtml(truncateMiddle(track.album || 'Single', 24, 12, 8))}</td>
       <td class="col-duration">${track.durationStr || '3:30'}</td>
       <td class="col-actions">
         <button class="song-action-btn song-more-trigger" title="More Options">
@@ -2377,6 +2384,11 @@
       }
       if (e.target.closest('.song-action-btn')) {
         e.stopPropagation();
+        return;
+      }
+      if (!navigator.onLine && !isTrackDownloaded(track.id)) {
+        e.stopPropagation();
+        showToast("You're offline! Listen to your downloaded songs.", '⚡');
         return;
       }
       if (state.currentView === 'search' || state.currentView === 'home') {
@@ -3111,6 +3123,9 @@
     if (viewName === 'library') {
       updateLibraryUI();
     }
+    if (!navigator.onLine && typeof updateOfflineModeUI === 'function') {
+      updateOfflineModeUI(false);
+    }
     if (viewName === 'lyrics') {
       if (state.currentTrack) {
         if (elements.lyricsTrackTitle) elements.lyricsTrackTitle.textContent = state.currentTrack.title || 'Song Title';
@@ -3562,8 +3577,12 @@
       elements.localTracksTbody.innerHTML = '';
       state.localTracks.forEach((track, idx) => {
         const tr = document.createElement('tr');
-        tr.className = state.currentTrack?.id === track.id ? 'playing' : '';
+        const isDownloaded = isTrackDownloaded(track.id);
+        tr.className = `${state.currentTrack?.id === track.id ? 'playing' : ''} ${isDownloaded ? 'is-downloaded' : ''}`;
         tr.dataset.trackId = track.id;
+
+        const formattedTitle = escapeHtml(truncateMiddle(track.title, 34, 18, 12));
+        const formattedArtist = escapeHtml(truncateMiddle(track.artist || 'Local File', 30, 15, 11));
 
         tr.innerHTML = `
           <td class="col-num">${idx + 1}</td>
@@ -3571,13 +3590,12 @@
             <div class="table-title-cell">
               <img src="${track.image || DEFAULT_LOCAL_COVER}" alt="${track.title}" class="table-cover">
               <div>
-                <div class="table-title-main">${escapeHtml(track.title)}${getDownloadedBadgeHtml(track.id)}</div>
-                <div class="table-artist-sub">${escapeHtml(track.artist || 'Local File')}</div>
+                <div class="table-title-main"><span class="title-text-main" title="${escapeHtml(track.title)}">${formattedTitle}</span>${getPlaylistTickBadgeHtml(track.id)}${getDownloadedBadgeHtml(track.id)}</div>
+                <div class="table-artist-sub" title="${escapeHtml(track.artist || 'Local File')}">${formattedArtist}</div>
               </div>
             </div>
           </td>
-          <td class="col-album">${escapeHtml(track.fileName || track.album || 'Device Storage')}</td>
-          <td class="col-status">${getPlaylistTickBadgeHtml(track.id)}</td>
+          <td class="col-album">${escapeHtml(truncateMiddle(track.fileName || track.album || 'Device Storage', 24, 12, 8))}</td>
           <td class="col-duration">${track.durationStr || '--:--'}</td>
           <td class="col-actions">
             <button class="song-action-btn add-to-queue-trigger" title="Add to Queue">
@@ -5099,12 +5117,38 @@
       });
     }
 
-    // Network connection status changes
-    function handleNetworkChange() {
-      const isOnline = navigator.onLine;
+    if (elements.homeGoDownloadedBtn) {
+      elements.homeGoDownloadedBtn.addEventListener('click', () => {
+        renderPlaylistView('downloaded');
+      });
+    }
+
+    if (elements.searchGoDownloadedBtn) {
+      elements.searchGoDownloadedBtn.addEventListener('click', () => {
+        renderPlaylistView('downloaded');
+      });
+    }
+
+    // Network connection status changes & offline UI controller
+    function updateOfflineModeUI(isOnline = navigator.onLine) {
+      document.body.classList.toggle('is-offline', !isOnline);
       if (elements.offlineBanner) {
         elements.offlineBanner.style.display = isOnline ? 'none' : 'flex';
       }
+      if (elements.homeOfflineState) {
+        elements.homeOfflineState.style.display = isOnline ? 'none' : 'flex';
+      }
+      if (elements.searchOfflineState) {
+        elements.searchOfflineState.style.display = isOnline ? 'none' : 'flex';
+        if (!isOnline && elements.searchResultsWrapper) {
+          elements.searchResultsWrapper.style.display = 'none';
+        }
+      }
+    }
+
+    function handleNetworkChange() {
+      const isOnline = navigator.onLine;
+      updateOfflineModeUI(isOnline);
       if (!isOnline) {
         showToast('Offline Mode: Internet disconnected. Playing from your Downloaded songs.', '⚡');
         if (state.offlineTracks.length > 0 && state.currentView === 'home') {
@@ -5117,9 +5161,7 @@
 
     window.addEventListener('online', handleNetworkChange);
     window.addEventListener('offline', handleNetworkChange);
-    if (!navigator.onLine && elements.offlineBanner) {
-      elements.offlineBanner.style.display = 'flex';
-    }
+    updateOfflineModeUI(navigator.onLine);
 
     // Uninterrupted Background Tab Playback Handler
     document.addEventListener('visibilitychange', () => {
