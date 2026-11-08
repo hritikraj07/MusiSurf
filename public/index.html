@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=8.26">
+  <link rel="stylesheet" href="/styles.css?v=8.27">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -731,12 +731,20 @@
         <!-- SYNCHRONIZED LYRICS VIEW (Exact Match to Image 2 - Dynamic Atmospheric Backdrop) -->
         <section class="view-section" id="lyricsView">
           <div class="lyrics-view-container" id="lyricsContainer">
-            <button class="lyrics-view-close-btn" id="closeLyricsBtn" title="Close Lyrics">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
+            <div class="lyrics-view-top-actions">
+              <div class="lyrics-sync-controls" id="lyricsSyncControls" title="Fine-tune audio lyrics synchronization">
+                <button class="lyrics-sync-btn" id="lyricsSyncMinus" title="Delay lyrics by 0.5s">-0.5s</button>
+                <span class="lyrics-sync-label" id="lyricsSyncLabel">Sync: 0.0s</span>
+                <button class="lyrics-sync-btn" id="lyricsSyncPlus" title="Advance lyrics by 0.5s">+0.5s</button>
+                <button class="lyrics-sync-btn lyrics-sync-reset-btn" id="lyricsSyncReset" title="Reset sync offset">↺</button>
+              </div>
+              <button class="lyrics-view-close-btn" id="closeLyricsBtn" title="Close Lyrics">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
 
             <!-- Desktop & Mobile Two-Column Layout (Image 2) -->
             <div class="lyrics-main-grid">
@@ -867,13 +875,13 @@
             <input type="file" id="localAudioFileInput" multiple accept="audio/*,.mp3,.wav,.m4a,.flac,.ogg,.aac"
               style="display: none;">
 
-            <button class="btn-secondary" id="playAllLocalBtn" style="display: none;">
+            <button class="btn-secondary" id="playAllLocalBtn" style="display: none; white-space: nowrap !important;">
               <svg viewBox="0 0 24 24" fill="currentColor">
                 <polygon points="5 3 19 12 5 21 5 3" />
               </svg>
-              <span>Play All</span>
+              <span style="white-space: nowrap !important;">Play</span>
             </button>
-            <button class="btn-secondary" id="clearAllLocalBtn" style="display: none;"
+            <button class="btn-secondary clear-local-music-btn" id="clearAllLocalBtn" style="display: none;"
               title="Remove all local files from list">
               Clear All
             </button>
@@ -2175,7 +2183,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=8.26"></script>
+  <script src="/app.js?v=8.27"></script>
 </body>
 
 </html>

@@ -1261,10 +1261,13 @@ html, body {
 
 .library-collapse-icon-btn,
 .library-nav-btn,
-.library-header-btn {
+.library-header-btn,
+#collapseSidebarBtn,
+#navLibraryBtn {
   display: inline-flex !important;
   align-items: center !important;
   background: transparent !important;
+  background-color: transparent !important;
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
@@ -1283,18 +1286,28 @@ html, body {
 
 .library-collapse-icon-btn:hover,
 .library-nav-btn:hover,
-.library-header-btn:hover {
+.library-header-btn:hover,
+#collapseSidebarBtn:hover,
+#navLibraryBtn:hover {
   color: #ffffff !important;
   background: rgba(255, 255, 255, 0.08) !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 .library-collapse-icon-btn:focus,
 .library-collapse-icon-btn:focus-visible,
+.library-collapse-icon-btn:active,
 .library-nav-btn:focus,
-.library-nav-btn:focus-visible {
+.library-nav-btn:focus-visible,
+.library-nav-btn:active,
+#collapseSidebarBtn:focus,
+#collapseSidebarBtn:active,
+#navLibraryBtn:focus,
+#navLibraryBtn:active {
   outline: none !important;
   box-shadow: none !important;
   background: transparent !important;
+  background-color: transparent !important;
 }
 
 .library-heading {
@@ -1307,6 +1320,8 @@ html, body {
   -webkit-user-select: none !important;
   white-space: nowrap !important;
   display: inline-block !important;
+  background: transparent !important;
+  background-color: transparent !important;
 }
 
 .library-header-actions {
@@ -1599,33 +1614,46 @@ html, body {
 .sidebar.collapsed #expandLibraryFullBtn,
 .sidebar.collapsed .library-header-actions,
 .sidebar.collapsed .sidebar-library-search-row,
+.sidebar.collapsed .library-content,
+.sidebar.collapsed .sidebar-footer,
+.sidebar.collapsed .library-pinned-item,
+.sidebar.collapsed .library-item,
 #app.sidebar-collapsed .sidebar .library-heading,
 #app.sidebar-collapsed .sidebar .library-item-info,
 #app.sidebar-collapsed .sidebar .sidebar-pin-icon,
 #app.sidebar-collapsed .sidebar #createPlaylistBtn,
 #app.sidebar-collapsed .sidebar #expandLibraryFullBtn,
 #app.sidebar-collapsed .sidebar .library-header-actions,
-#app.sidebar-collapsed .sidebar .sidebar-library-search-row {
+#app.sidebar-collapsed .sidebar .sidebar-library-search-row,
+#app.sidebar-collapsed .sidebar .library-content,
+#app.sidebar-collapsed .sidebar .sidebar-footer,
+#app.sidebar-collapsed .sidebar .library-pinned-item,
+#app.sidebar-collapsed .sidebar .library-item {
   display: none !important;
 }
 
-.sidebar.collapsed .library-pinned-item,
-.sidebar.collapsed .library-item {
+.sidebar.collapsed .library-header,
+#app.sidebar-collapsed .sidebar .library-header {
   justify-content: center !important;
-  padding: 6px 0 !important;
-  width: 100% !important;
+  padding: 14px 0 !important;
   margin: 0 auto !important;
+  width: 100% !important;
 }
 
-.sidebar.collapsed .replay-cover-art-box,
-.sidebar.collapsed .liked-icon-box,
-.sidebar.collapsed .item-cover {
-  width: 50px !important;
-  height: 50px !important;
-  min-width: 50px !important;
-  min-height: 50px !important;
-  border-radius: 8px !important;
+.sidebar.collapsed .library-header-left,
+#app.sidebar-collapsed .sidebar .library-header-left {
+  justify-content: center !important;
   margin: 0 auto !important;
+  width: 100% !important;
+  flex: none !important;
+}
+
+.sidebar.collapsed .library-collapse-icon-btn,
+#app.sidebar-collapsed .sidebar .library-collapse-icon-btn {
+  margin: 0 auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 /* ==========================================================================
@@ -3260,23 +3288,26 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   filter: drop-shadow(0 0 3px rgba(0, 242, 96, 0.45)) !important;
 }
 
-/* In-playlist tick badge: only visible on hover / active, except in now playing bars */
-.song-row .in-playlist-tick-badge,
-.tracks-table tbody tr .in-playlist-tick-badge,
-.quick-pick-tile .in-playlist-tick-badge,
+/* In-playlist tick badge:
+   Outside playlists (Search results, Home, Quick Picks, Top Results): ALWAYS visible without hovering
+   Inside playlists (#playlistView): visible on hover */
+.search-results-section .in-playlist-tick-badge,
+#searchView .tracks-table tbody tr .in-playlist-tick-badge,
 .top-result-card .in-playlist-tick-badge,
-.queue-card .in-playlist-tick-badge {
+.quick-pick-tile .in-playlist-tick-badge,
+.queue-card .in-playlist-tick-badge,
+.song-row .in-playlist-tick-badge,
+#homeView .in-playlist-tick-badge {
+  opacity: 1 !important;
+}
+
+#playlistView .tracks-table tbody tr .in-playlist-tick-badge {
   opacity: 0 !important;
   transition: opacity 0.2s ease !important;
 }
 
-.song-row:hover .in-playlist-tick-badge,
-.song-row:active .in-playlist-tick-badge,
-.tracks-table tbody tr:hover .in-playlist-tick-badge,
-.tracks-table tbody tr:active .in-playlist-tick-badge,
-.quick-pick-tile:hover .in-playlist-tick-badge,
-.top-result-card:hover .in-playlist-tick-badge,
-.queue-card:hover .in-playlist-tick-badge {
+#playlistView .tracks-table tbody tr:hover .in-playlist-tick-badge,
+#playlistView .tracks-table tbody tr:active .in-playlist-tick-badge {
   opacity: 1 !important;
 }
 
@@ -6432,11 +6463,39 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .local-actions-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  margin-bottom: 20px !important;
+  flex-wrap: nowrap !important;
+}
+
+#playAllLocalBtn {
+  white-space: nowrap !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+#clearAllLocalBtn,
+.clear-local-music-btn {
+  color: #ff4d4d !important;
+  border: 1px solid rgba(255, 77, 77, 0.45) !important;
+  background: rgba(255, 77, 77, 0.08) !important;
+  white-space: nowrap !important;
+  border-radius: 500px !important;
+  padding: 8px 18px !important;
+  font-weight: 600 !important;
+  transition: all var(--transition-fast) !important;
+  cursor: pointer !important;
+}
+
+#clearAllLocalBtn:hover,
+.clear-local-music-btn:hover {
+  background: #ff4d4d !important;
+  color: #ffffff !important;
+  border-color: #ff4d4d !important;
+  box-shadow: 0 0 12px rgba(255, 77, 77, 0.35) !important;
 }
 
 .add-local-files-btn {
@@ -8851,10 +8910,55 @@ body[data-active-view="lyrics"] .content-scroll {
   box-sizing: border-box;
 }
 
-.lyrics-view-close-btn {
+.lyrics-view-top-actions {
   position: absolute;
   top: 20px;
   right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 25;
+}
+
+.lyrics-sync-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 3px 6px;
+}
+
+.lyrics-sync-btn {
+  background: transparent;
+  border: none;
+  color: #a7a7a7;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lyrics-sync-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.lyrics-sync-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #e0e0e0;
+  padding: 0 4px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lyrics-view-close-btn {
+  position: relative;
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -9449,17 +9553,17 @@ body[data-active-view="lyrics"] .content-scroll {
   max-width: 100% !important;
   width: 100% !important;
   margin: 0 !important;
-  padding: 24px 32px 36px !important;
+  padding: 16px 28px 24px !important;
   box-sizing: border-box !important;
 }
 
 .replay-compact-dashboard {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 16px !important;
   width: 100% !important;
   max-width: 100% !important;
-  margin: 20px 0 0 !important;
+  margin: 14px 0 0 !important;
   box-sizing: border-box !important;
 }
 
@@ -9467,11 +9571,11 @@ body[data-active-view="lyrics"] .content-scroll {
   background: linear-gradient(135deg, #181920 0%, #101115 100%);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
-  padding: 24px 28px;
+  padding: 20px 24px !important;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 220px;
+  min-height: auto !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
   transition: border-color var(--transition-fast), transform var(--transition-fast);
 }
@@ -9480,11 +9584,12 @@ body[data-active-view="lyrics"] .content-scroll {
   background: var(--top-song-bg, linear-gradient(135deg, #181920 0%, #101115 100%)) !important;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
-  padding: 32px 36px !important;
+  padding: 24px 28px !important;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  min-height: 250px !important;
+  justify-content: flex-start !important;
+  gap: 16px !important;
+  min-height: auto !important;
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
   transition: border-color var(--transition-fast), transform var(--transition-fast), background 0.4s ease;
   position: relative;
@@ -9647,12 +9752,12 @@ body[data-active-view="lyrics"] .content-scroll {
 
 .replay-song-artwork-wrap {
   position: relative;
-  width: 90px;
-  height: 90px;
-  border-radius: 12px;
+  width: 110px !important;
+  height: 110px !important;
+  border-radius: 14px !important;
   overflow: hidden;
   flex-shrink: 0;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
   background: #20222a;
 }
 
@@ -9683,8 +9788,8 @@ body[data-active-view="lyrics"] .content-scroll {
 }
 
 .replay-song-play-overlay-btn svg {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   fill: #ffffff;
 }
 
@@ -9693,22 +9798,24 @@ body[data-active-view="lyrics"] .content-scroll {
   flex-direction: column;
   min-width: 0;
   flex: 1;
+  gap: 4px;
 }
 
 .replay-song-title {
-  font-size: 1.15rem;
+  font-size: 1.45rem !important;
   font-weight: 800;
   color: #ffffff;
-  margin: 0 0 4px;
+  margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.25;
 }
 
 .replay-song-artist {
-  font-size: 0.88rem;
+  font-size: 1.05rem !important;
   color: #9ea0a8;
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -9718,13 +9825,13 @@ body[data-active-view="lyrics"] .content-scroll {
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  padding: 6px 14px !important;
   border-radius: 999px;
-  font-size: 0.74rem;
+  font-size: 0.85rem !important;
   font-weight: 700;
-  color: #e4e7ec;
+  color: #ffffff !important;
 }
 
 @media (max-width: 768px) {

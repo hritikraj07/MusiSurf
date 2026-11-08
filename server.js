@@ -918,7 +918,8 @@ app.get('/api/lyrics', async (req, res) => {
           trackName: data.trackName,
           artistName: data.artistName,
           syncedLyrics: data.syncedLyrics,
-          plainLyrics: data.plainLyrics
+          plainLyrics: data.plainLyrics,
+          duration: data.duration || null
         });
       }
     }
@@ -948,7 +949,8 @@ app.get('/api/lyrics', async (req, res) => {
           trackName: item.trackName,
           artistName: item.artistName,
           syncedLyrics: item.syncedLyrics,
-          plainLyrics: item.plainLyrics
+          plainLyrics: item.plainLyrics,
+          duration: item.duration || null
         });
       }
     }

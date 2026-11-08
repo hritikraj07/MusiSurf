@@ -223,6 +223,11 @@
     lyricsLinesContainer: document.getElementById('lyricsLinesContainer'),
     lyricsScrollBody: document.getElementById('lyricsScrollBody'),
     closeLyricsBtn: document.getElementById('closeLyricsBtn'),
+    lyricsSyncControls: document.getElementById('lyricsSyncControls'),
+    lyricsSyncMinus: document.getElementById('lyricsSyncMinus'),
+    lyricsSyncPlus: document.getElementById('lyricsSyncPlus'),
+    lyricsSyncReset: document.getElementById('lyricsSyncReset'),
+    lyricsSyncLabel: document.getElementById('lyricsSyncLabel'),
 
     // Queue Drawer
     queueDrawer: document.getElementById('queueDrawer'),
@@ -1590,9 +1595,8 @@
 
         if (audioSrc) {
           state.activePlayerEngine = 'audio';
-          if (elements.audio.src !== audioSrc) {
-            elements.audio.src = audioSrc;
-          }
+          elements.audio.src = audioSrc;
+          elements.audio.load();
           if (customStartTime > 0) {
             try { elements.audio.currentTime = customStartTime; } catch (e) {}
             const seekStartTime = () => {
@@ -1606,6 +1610,9 @@
           const onAudioReady = () => {
             if (currentToken === activePlayToken) {
               state.isTrackLoading = false;
+              if (state.isPlaying && elements.audio.paused) {
+                elements.audio.play().catch(() => {});
+              }
             }
           };
           elements.audio.addEventListener('playing', onAudioReady, { once: true });
@@ -1618,8 +1625,15 @@
           const playPromise = elements.audio.play();
           if (playPromise !== undefined) {
             playPromise.catch(err => {
-              // Disregard aborted play requests or outdated track requests
-              if (currentToken !== activePlayToken || err.name === 'AbortError') return;
+              if (currentToken !== activePlayToken) return;
+              if (err.name === 'AbortError') {
+                elements.audio.addEventListener('canplay', () => {
+                  if (currentToken === activePlayToken && state.isPlaying) {
+                    elements.audio.play().catch(() => {});
+                  }
+                }, { once: true });
+                return;
+              }
               console.warn('Direct stream playback error, checking fallbacks:', err);
               if (streamUrl && elements.audio.src !== streamUrl) {
                 elements.audio.src = streamUrl;
@@ -2107,9 +2121,24 @@
   function onTrackEnded() {
     if (isTrackEnding) return;
     const cur = getCurrentPlaybackTime();
-    const knownDur = state.currentTrack?.duration || 0;
-    if (knownDur > 15 && cur < (knownDur - 8)) {
+    const knownDur = getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || parseDurationToSeconds(state.currentTrack?.durationStr) || 0;
+    if (knownDur > 15 && cur < (knownDur - 10)) {
       console.warn('Preventing premature onTrackEnded: cur=' + cur + ', knownDur=' + knownDur);
+      const isYtTrack = state.currentTrack?.source === 'youtube' || state.currentTrack?.ytId || (state.currentTrack?.id && state.currentTrack.id.startsWith('yt_'));
+      if (isYtTrack && state.ytReady && state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
+        const ytId = state.currentTrack.ytId || (state.currentTrack.id ? state.currentTrack.id.replace('yt_', '') : '');
+        if (ytId) {
+          state.activePlayerEngine = 'youtube';
+          try {
+            elements.audio.pause();
+            elements.audio.removeAttribute('src');
+          } catch (e) {}
+          state.ytPlayer.loadVideoById(ytId, cur);
+          state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
+          state.ytPlayer.playVideo();
+          return;
+        }
+      }
       if (elements.audio && !elements.audio.seeking) {
         elements.audio.play().catch(() => {});
       }
@@ -2227,18 +2256,11 @@
 
   function getTotalDuration() {
     const metaDur = parseDurationToSeconds(state.currentTrack?.duration) || parseDurationToSeconds(state.currentTrack?.durationStr) || 0;
-    const audioDur = Number(elements.audio?.duration) || 0;
-
-    // 1. If we have a known metadata duration, verify audioDur against it.
-    // Chunked WebM streams report buffered chunk length (e.g. 8s) as audio.duration.
-    // If audioDur is significantly smaller than metadata duration, metadata duration is truth.
     if (metaDur > 0) {
-      if (Number.isFinite(audioDur) && audioDur >= (metaDur - 5) && audioDur !== Infinity) {
-        return audioDur;
-      }
       return metaDur;
     }
 
+    const audioDur = Number(elements.audio?.duration) || 0;
     if (Number.isFinite(audioDur) && audioDur > 0 && audioDur !== Infinity) {
       return audioDur;
     }
@@ -2451,8 +2473,29 @@
       elements.lyricsLoading.style.display = 'none';
 
       if (data.success && data.syncedLyrics) {
-        // Parse LRC format [mm:ss.xx] line
-        const parsed = parseLrc(data.syncedLyrics);
+        state.rawSyncedLyrics = data.syncedLyrics;
+        const trackDur = Math.round(getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || parseDurationToSeconds(state.currentTrack?.durationStr) || 0);
+        const lrcDur = data.duration ? parseInt(data.duration, 10) : 0;
+        let autoIntroOffset = 0;
+        if (trackDur > 0 && lrcDur > 0) {
+          const delta = trackDur - lrcDur;
+          if (delta > 2 && delta < 60) {
+            autoIntroOffset = delta;
+          }
+        }
+        state.lyricsAutoIntroOffset = autoIntroOffset;
+
+        const trackKey = state.currentTrack?.id || (title + '_' + artist);
+        let manualOffset = 0;
+        try {
+          const saved = localStorage.getItem(`musisurf_lyrics_offset_${trackKey}`);
+          if (saved !== null) manualOffset = parseFloat(saved) || 0;
+        } catch (e) {}
+        state.lyricsManualOffset = manualOffset;
+        updateLyricsSyncControlsUI();
+
+        // Parse LRC format [mm:ss.xx] line with combined offset
+        const parsed = parseLrc(data.syncedLyrics, autoIntroOffset + manualOffset);
         if (parsed.length > 0) {
           state.lyrics = parsed;
           state.hasSyncedLyrics = true;
@@ -2499,7 +2542,46 @@
     }
   }
 
-  function parseLrc(lrcText) {
+  function updateLyricsSyncControlsUI() {
+    if (!elements.lyricsSyncLabel) return;
+    const total = (state.lyricsAutoIntroOffset || 0) + (state.lyricsManualOffset || 0);
+    const sign = total > 0 ? '+' : '';
+    elements.lyricsSyncLabel.textContent = `Sync: ${sign}${total.toFixed(1)}s`;
+  }
+
+  function adjustLyricsOffset(delta) {
+    if (!state.rawSyncedLyrics) return;
+    state.lyricsManualOffset = Number(((state.lyricsManualOffset || 0) + delta).toFixed(1));
+    const trackKey = state.currentTrack?.id || (state.currentTrack?.title + '_' + state.currentTrack?.artist);
+    try {
+      localStorage.setItem(`musisurf_lyrics_offset_${trackKey}`, state.lyricsManualOffset.toString());
+    } catch (e) {}
+    updateLyricsSyncControlsUI();
+    const parsed = parseLrc(state.rawSyncedLyrics, (state.lyricsAutoIntroOffset || 0) + state.lyricsManualOffset);
+    if (parsed.length > 0) {
+      state.lyrics = parsed;
+      state.hasSyncedLyrics = true;
+      renderLyricsLines(parsed);
+    }
+  }
+
+  function resetLyricsOffset() {
+    if (!state.rawSyncedLyrics) return;
+    state.lyricsManualOffset = 0;
+    const trackKey = state.currentTrack?.id || (state.currentTrack?.title + '_' + state.currentTrack?.artist);
+    try {
+      localStorage.removeItem(`musisurf_lyrics_offset_${trackKey}`);
+    } catch (e) {}
+    updateLyricsSyncControlsUI();
+    const parsed = parseLrc(state.rawSyncedLyrics, state.lyricsAutoIntroOffset || 0);
+    if (parsed.length > 0) {
+      state.lyrics = parsed;
+      state.hasSyncedLyrics = true;
+      renderLyricsLines(parsed);
+    }
+  }
+
+  function parseLrc(lrcText, extraOffset = 0) {
     const lines = lrcText.split('\n');
     const result = [];
     const timeReg = /\[(\d{2}):(\d{2})\.?(\d{2,3})?\]/g;
@@ -2508,6 +2590,7 @@
     if (offsetMatch) {
       offset = (parseInt(offsetMatch[1], 10) || 0) / 1000;
     }
+    const combinedOffset = offset + (Number(extraOffset) || 0);
 
     for (const line of lines) {
       const matches = [...line.matchAll(timeReg)];
@@ -2518,7 +2601,7 @@
           const mins = parseInt(match[1], 10);
           const secs = parseInt(match[2], 10);
           const ms = match[3] ? parseInt(match[3].padEnd(3, '0').slice(0, 3), 10) : 0;
-          const time = Math.max(0, mins * 60 + secs + (ms / 1000) + offset);
+          const time = Math.max(0, mins * 60 + secs + (ms / 1000) + combinedOffset);
           result.push({ time, text });
         }
       }
@@ -3417,16 +3500,12 @@
   }
 
   function formatDateAdded(ts) {
-    if (!ts) return 'Recently';
-    const d = new Date(ts);
-    if (isNaN(d.getTime())) return 'Recently';
-    const now = new Date();
-    const diffMs = now - d;
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays <= 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const d = ts ? new Date(ts) : new Date();
+    const validDate = isNaN(d.getTime()) ? new Date() : d;
+    const day = String(validDate.getDate()).padStart(2, '0');
+    const month = String(validDate.getMonth() + 1).padStart(2, '0');
+    const year = String(validDate.getFullYear()).slice(-2);
+    return `${day}/${month}/${year}`;
   }
 
   function createTableRow(track, index, queueList) {
@@ -5278,6 +5357,8 @@
   }
 
   async function clearAllLocalTracksFromDB() {
+    if (!state.localTracks || state.localTracks.length === 0) return;
+    if (!confirm('Are you sure you want to remove all local tracks from MusiSurf?')) return;
     try {
       const db = await getLocalDB();
       const tx = db.transaction(LOCAL_STORE_NAME, 'readwrite');
@@ -5293,7 +5374,7 @@
     }
   }
 
-  const DEFAULT_LOCAL_COVER = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23161822"/><stop offset="100%" stop-color="%230c0e14"/></linearGradient><linearGradient id="acc" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%231db954"/><stop offset="100%" stop-color="%2300f260"/></linearGradient></defs><rect width="300" height="300" rx="16" fill="url(%23bg)"/><rect x="1" y="1" width="298" height="298" rx="15" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2"/><circle cx="150" cy="150" r="64" fill="rgba(29,185,84,0.12)"/><path d="M130 190V110l55-12v82M130 148l55-12" stroke="url(%23acc)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="114" cy="190" r="16" fill="url(%23acc)"/><circle cx="169" cy="178" r="16" fill="url(%23acc)"/></svg>';
+  const DEFAULT_LOCAL_COVER = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%231a1b24"/><stop offset="100%" stop-color="%230d0e14"/></linearGradient><linearGradient id="acc" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23ffffff"/><stop offset="100%" stop-color="%23cbd5e1"/></linearGradient></defs><rect width="300" height="300" rx="16" fill="url(%23bg)"/><rect x="1" y="1" width="298" height="298" rx="15" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2"/><circle cx="150" cy="150" r="64" fill="rgba(255,255,255,0.06)"/><path d="M130 190V110l55-12v82M130 148l55-12" stroke="url(%23acc)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="114" cy="190" r="16" fill="url(%23acc)"/><circle cx="169" cy="178" r="16" fill="url(%23acc)"/></svg>';
 
   function updateLocalMusicUI() {
     const count = state.localTracks.length;
@@ -5805,7 +5886,7 @@
       maxPlays = 14;
     }
 
-    const finalTopPlays = Math.max(14, maxPlays);
+    const finalTopPlays = maxPlays > 0 ? maxPlays : (state.history?.length || 1);
 
     if (elements.replayTopSongImg) {
       elements.replayTopSongImg.src = topSong.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=240&auto=format&fit=crop&q=80';
@@ -5817,7 +5898,7 @@
       elements.replayTopSongArtist.textContent = topSong.artist || 'The Weeknd';
     }
     if (elements.replayTopSongPlays) {
-      elements.replayTopSongPlays.textContent = `${finalTopPlays} plays`;
+      elements.replayTopSongPlays.textContent = `${finalTopPlays} ${finalTopPlays === 1 ? 'play' : 'plays'}`;
     }
 
     // Match top song card background dynamically to song album/cover artwork
@@ -6464,6 +6545,24 @@
     };
     if (elements.lyricsBtn) elements.lyricsBtn.addEventListener('click', toggleLyricsView);
     if (elements.closeLyricsBtn) elements.closeLyricsBtn.addEventListener('click', handleCloseLyrics);
+    if (elements.lyricsSyncMinus) {
+      elements.lyricsSyncMinus.addEventListener('click', (e) => {
+        e.stopPropagation();
+        adjustLyricsOffset(-0.5);
+      });
+    }
+    if (elements.lyricsSyncPlus) {
+      elements.lyricsSyncPlus.addEventListener('click', (e) => {
+        e.stopPropagation();
+        adjustLyricsOffset(0.5);
+      });
+    }
+    if (elements.lyricsSyncReset) {
+      elements.lyricsSyncReset.addEventListener('click', (e) => {
+        e.stopPropagation();
+        resetLyricsOffset();
+      });
+    }
 
     // Song image is explicitly not clickable per user specification
     if (elements.playerCoverWrapper) {
