@@ -354,6 +354,7 @@
     libPlaylistsSection: document.getElementById('libPlaylistsSection'),
     libHeaderAddPlaylistBtn: document.getElementById('libHeaderAddPlaylistBtn'),
     closeSettingsModalBtn: document.getElementById('closeSettingsModalBtn'),
+    closeSettingsTopRightBtn: document.getElementById('closeSettingsTopRightBtn'),
     deadSilenceOnRadio: document.getElementById('deadSilenceOnRadio'),
     deadSilenceOffRadio: document.getElementById('deadSilenceOffRadio'),
     crossfadeSlider: document.getElementById('crossfadeSlider'),
@@ -1273,12 +1274,12 @@
     }
 
     const currentToken = ++activePlayToken;
+    state.isTrackLoading = true;
+    state.currentTrack = track;
 
-    // Immediately stop and reset both engines completely to prevent 2-3 previous songs playing concurrently
+    // Immediately stop current playback smoothly without tearing down audio pipeline
     try {
       elements.audio.pause();
-      elements.audio.removeAttribute('src');
-      elements.audio.load();
     } catch (e) {}
     if (state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
       try {
@@ -1292,7 +1293,7 @@
       crossfadeFadeInTimer = null;
     }
 
-    // Reset progress freeze safeguard for new track
+    // Reset progress and scrubber safeguards for new track
     lastKnownPlaybackTime = customStartTime || 0;
     state.restoredResumeTime = customStartTime || 0;
     if (customStartTime > 0) {
@@ -1304,6 +1305,7 @@
       if (elements.mobCurrentTime) elements.mobCurrentTime.textContent = '0:00';
       if (elements.mobProgressFill) elements.mobProgressFill.style.width = '0%';
       if (elements.miniPlayerFill) elements.miniPlayerFill.style.width = '0%';
+      if (elements.miniplayerScrubberFill) elements.miniplayerScrubberFill.style.width = '0%';
       if (elements.progressBuffer) elements.progressBuffer.style.width = '0%';
     }
 
@@ -1581,16 +1583,31 @@
 
         if (audioSrc) {
           state.activePlayerEngine = 'audio';
-          elements.audio.src = audioSrc;
-          elements.audio.load();
+          if (elements.audio.src !== audioSrc) {
+            elements.audio.src = audioSrc;
+          }
           if (customStartTime > 0) {
+            try { elements.audio.currentTime = customStartTime; } catch (e) {}
             const seekStartTime = () => {
               try { elements.audio.currentTime = customStartTime; } catch (e) {}
             };
             elements.audio.addEventListener('loadedmetadata', seekStartTime, { once: true });
             elements.audio.addEventListener('canplay', seekStartTime, { once: true });
+          } else {
+            try { elements.audio.currentTime = 0; } catch (e) {}
           }
-          applyCrossfadeIn();
+          const onAudioReady = () => {
+            if (currentToken === activePlayToken) {
+              state.isTrackLoading = false;
+            }
+          };
+          elements.audio.addEventListener('playing', onAudioReady, { once: true });
+          elements.audio.addEventListener('canplay', onAudioReady, { once: true });
+          if (state.settings.crossfade > 0) {
+            applyCrossfadeIn();
+          } else {
+            elements.audio.volume = state.isMuted ? 0 : state.volume;
+          }
           const playPromise = elements.audio.play();
           if (playPromise !== undefined) {
             playPromise.catch(err => {
@@ -2107,6 +2124,10 @@
   let lastKnownPlaybackTime = 0;
 
   function getCurrentPlaybackTime() {
+    if (state.isTrackLoading) {
+      return state.restoredResumeTime || 0;
+    }
+
     let rawTime = null;
 
     // 1. Primary check based on active playback engine
@@ -2142,12 +2163,13 @@
       }
     }
 
-    // 3. Monotonic protection: prevent playback scrubber from glitching back to 0 or freezing
-    if (state.isPlaying && !state.isDraggingProgress) {
-      if ((rawTime === null || rawTime === 0) && lastKnownPlaybackTime > 0.3) {
+    // 3. Monotonic protection: prevent playback scrubber from glitching back to 0 or jumping to end
+    const totalDur = getTotalDuration();
+    if (state.isPlaying && !state.isDraggingProgress && !state.isTrackLoading) {
+      if ((rawTime === null || rawTime === 0) && lastKnownPlaybackTime > 0.3 && (totalDur === 0 || lastKnownPlaybackTime < totalDur)) {
         return lastKnownPlaybackTime;
       }
-      if (rawTime !== null && rawTime < (lastKnownPlaybackTime - 1.5)) {
+      if (rawTime !== null && lastKnownPlaybackTime > 0.5 && rawTime < (lastKnownPlaybackTime - 1.5) && (totalDur === 0 || lastKnownPlaybackTime < totalDur)) {
         return lastKnownPlaybackTime;
       }
     }
@@ -2255,6 +2277,16 @@
 
     if (state.isPlaying && state.currentTrack) {
       if (state.isDraggingProgress) return; // Don't override while user is actively dragging scrubber
+
+      if (state.isTrackLoading) {
+        elements.currentTimeLabel.textContent = formatTime(state.restoredResumeTime || 0);
+        if (elements.mobCurrentTime) elements.mobCurrentTime.textContent = formatTime(state.restoredResumeTime || 0);
+        elements.progressFill.style.width = '0%';
+        if (elements.mobProgressFill) elements.mobProgressFill.style.width = '0%';
+        if (elements.miniPlayerFill) elements.miniPlayerFill.style.width = '0%';
+        if (elements.miniplayerScrubberFill) elements.miniplayerScrubberFill.style.width = '0%';
+        return;
+      }
 
       const cur = getCurrentPlaybackTime();
       if (state.restoredResumeTime > 0 && cur >= 0.5) {
@@ -2449,9 +2481,22 @@
     lyrics.forEach((item, idx) => {
       const div = document.createElement('div');
       div.className = 'lyric-line';
-      div.textContent = item.text;
       div.dataset.index = idx;
       div.dataset.time = item.time;
+
+      // Tokenize sentence into individual words for live karaoke word-by-word glow
+      const tokens = item.text.split(/(\s+)/);
+      let wordIdx = 0;
+      div.innerHTML = tokens.map(tok => {
+        if (/^\s+$/.test(tok)) {
+          return tok;
+        }
+        const wHtml = `<span class="lyric-word" data-w="${wordIdx}">${escapeHtml(tok)}</span>`;
+        wordIdx++;
+        return wHtml;
+      }).join('');
+      div.dataset.totalWords = wordIdx;
+
       div.addEventListener('click', () => {
         seekTo(item.time);
       });
@@ -2508,8 +2553,10 @@
         } else if (idx < activeIdx) {
           lineEl.classList.remove('active');
           lineEl.classList.add('passed');
+          lineEl.querySelectorAll('.lyric-word').forEach(w => w.classList.remove('singing', 'glowing', 'sung'));
         } else {
           lineEl.classList.remove('active', 'passed');
+          lineEl.querySelectorAll('.lyric-word').forEach(w => w.classList.remove('singing', 'glowing', 'sung'));
         }
       });
 
@@ -2522,6 +2569,37 @@
         } else {
           snippetEl.textContent = 'Tap to view synchronized lyrics';
           snippetEl.style.color = '';
+        }
+      }
+    }
+
+    // Word-by-Word Live Glow Karaoke Engine (Desktop & Mobile)
+    if (activeIdx >= 0 && state.lyrics[activeIdx]) {
+      const activeLineEl = elements.lyricsLinesContainer.querySelector(`.lyric-line[data-index="${activeIdx}"]`);
+      if (activeLineEl) {
+        const curLineTime = state.lyrics[activeIdx].time;
+        const nextLineTime = (activeIdx + 1 < state.lyrics.length) ? state.lyrics[activeIdx + 1].time : (curLineTime + 4.5);
+        const lineDuration = Math.max(0.6, Math.min(7.0, nextLineTime - curLineTime));
+        const lineElapsed = Math.max(0, lyricClock - curLineTime);
+        const progress = Math.max(0, Math.min(1, lineElapsed / lineDuration));
+
+        const words = activeLineEl.querySelectorAll('.lyric-word');
+        const numWords = words.length;
+        if (numWords > 0) {
+          const currentWordFloat = progress * numWords;
+          const currentWordIdx = Math.floor(currentWordFloat);
+
+          words.forEach((wEl, wI) => {
+            if (wI < currentWordIdx) {
+              wEl.classList.add('sung', 'glowing');
+              wEl.classList.remove('singing');
+            } else if (wI === currentWordIdx) {
+              wEl.classList.add('singing', 'glowing');
+              wEl.classList.remove('sung');
+            } else {
+              wEl.classList.remove('singing', 'glowing', 'sung');
+            }
+          });
         }
       }
     }
@@ -3260,7 +3338,15 @@
     const formattedArtist = escapeHtml(track.artist);
 
     tr.innerHTML = `
-      <td class="col-num">${index}</td>
+      <td class="col-num">
+        <span class="track-num-text">${index}</span>
+        <span class="playing-equalizer-bars" aria-hidden="true">
+          <span class="eq-bar eq-bar-1"></span>
+          <span class="eq-bar eq-bar-2"></span>
+          <span class="eq-bar eq-bar-3"></span>
+          <span class="eq-bar eq-bar-4"></span>
+        </span>
+      </td>
       <td class="col-title">
         <div class="table-title-cell">
           <img src="${track.image}" alt="${escapeHtml(track.title)}" class="table-cover" loading="lazy">
@@ -5407,6 +5493,12 @@
         if (totalDur > 0) seekTo(pct * totalDur);
       });
     }
+    const miniQueueBtn = document.getElementById('miniQueueBtn');
+    if (miniQueueBtn) {
+      miniQueueBtn.addEventListener('click', () => {
+        if (elements.queueBtn) elements.queueBtn.click();
+      });
+    }
   }
 
   // ==========================================================================
@@ -5472,7 +5564,20 @@
       elements.replayTopSongArtist.textContent = topSong.artist || 'The Weeknd';
     }
     if (elements.replayTopSongPlays) {
-      elements.replayTopSongPlays.textContent = `${finalTopPlays} plays • ${formatTime(topSong.duration || 210)}`;
+      elements.replayTopSongPlays.textContent = `${finalTopPlays} plays`;
+    }
+
+    // Match top song card background dynamically to song album/cover artwork
+    const replayTopCard = document.querySelector('.replay-top-song-card');
+    if (replayTopCard && topSong.image) {
+      extractDominantColor(topSong.image, topSong.id || 'replay_top').then(([r, g, b]) => {
+        const topR = Math.min(255, Math.floor(r * 0.45 + 12));
+        const topG = Math.min(255, Math.floor(g * 0.45 + 14));
+        const topB = Math.min(255, Math.floor(b * 0.45 + 18));
+        replayTopCard.style.setProperty('--top-song-bg', `linear-gradient(135deg, rgb(${topR}, ${topG}, ${topB}) 0%, #101115 100%)`);
+      }).catch(() => {
+        replayTopCard.style.setProperty('--top-song-bg', `linear-gradient(135deg, #1e2430 0%, #101115 100%)`);
+      });
     }
 
     // Wire instant play for the #1 Top Song
@@ -6255,6 +6360,7 @@
     if (elements.openSettingsBtn) elements.openSettingsBtn.addEventListener('click', openSettingsModal);
     if (elements.headerSettingsBtn) elements.headerSettingsBtn.addEventListener('click', openSettingsModal);
     if (elements.closeSettingsModalBtn) elements.closeSettingsModalBtn.addEventListener('click', closeSettingsModal);
+    if (elements.closeSettingsTopRightBtn) elements.closeSettingsTopRightBtn.addEventListener('click', closeSettingsModal);
     if (elements.libHubSettingsBtn) elements.libHubSettingsBtn.addEventListener('click', openSettingsModal);
 
     // Initialize History Buttons State
@@ -6569,7 +6675,12 @@
     // Audio Element Native Events
     elements.audio.addEventListener('play', () => {
       state.isPlaying = true;
+      state.isTrackLoading = false;
       updatePlayPauseButton();
+    });
+    elements.audio.addEventListener('playing', () => {
+      state.isPlaying = true;
+      state.isTrackLoading = false;
     });
     elements.audio.addEventListener('pause', () => {
       state.isPlaying = false;
@@ -6577,7 +6688,7 @@
       savePlaybackState();
     });
     elements.audio.addEventListener('timeupdate', () => {
-      if (isYouTubeActive()) return;
+      if (isYouTubeActive() || state.isTrackLoading) return;
       if (state.isPlaying && !state.isDraggingProgress && state.currentTrack) {
         const cur = getCurrentPlaybackTime();
         if (state.restoredResumeTime > 0 && cur >= 0.5) {

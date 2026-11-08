@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=8.20">
+  <link rel="stylesheet" href="/styles.css?v=8.22">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -701,7 +701,7 @@
                   <div class="replay-song-details">
                     <h3 class="replay-song-title" id="replayTopSongTitle">Starboy</h3>
                     <p class="replay-song-artist" id="replayTopSongArtist">The Weeknd</p>
-                    <div class="replay-song-meta-pill" id="replayTopSongPlays">14 plays • 3:50</div>
+                    <div class="replay-song-meta-pill" id="replayTopSongPlays">14 plays</div>
                   </div>
                 </div>
               </div>
@@ -725,10 +725,6 @@
                 </div>
 
                 <div class="replay-capsule-actions">
-                  <button class="replay-play-btn" id="playReplayBtn" title="Play Your Replay">
-                    <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                    <span>Play your Replay</span>
-                  </button>
                   <button class="replay-share-btn" id="shareReplayBtn" title="Share Replay Stats">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                     <span>Share</span>
@@ -1139,6 +1135,14 @@
             </div>
           </div>
         </div>
+
+        <!-- Miniplayer (PiP) Trigger -->
+        <button class="player-icon-btn" id="miniplayerBtn" title="Miniplayer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+            <rect x="12" y="9" width="8" height="6" rx="1" ry="1"/>
+          </svg>
+        </button>
 
         <!-- Fullscreen Trigger -->
         <button class="player-icon-btn fullscreen-btn" id="fullscreenBtn" title="Toggle Fullscreen">
@@ -1615,6 +1619,10 @@
     <!-- Spotify Two-Pane Settings Modal (Exact match to Reference Images 1, 2, 3) -->
     <div class="fullscreen-settings-modal" id="settingsModal" style="display: none;">
       <div class="settings-modal-shell">
+        <!-- Close Settings Cross Button on Top Right (Yellow Circle in Reference) -->
+        <button class="settings-close-circle-btn settings-shell-close-btn" id="closeSettingsTopRightBtn" title="Close Settings" aria-label="Close Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
         
         <!-- Left Sidebar: Settings Navigation Categories -->
         <aside class="settings-sidebar">
@@ -2090,6 +2098,55 @@
       </div>
     </div>
 
+    <!-- Desktop Floating Miniplayer (Exact Match to User Reference Image 2) -->
+    <div class="floating-miniplayer-card" id="floatingMiniplayer" style="display: none;">
+      <div class="miniplayer-art-wrap" id="miniplayerArtWrap">
+        <img src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80" id="miniplayerCover" class="miniplayer-art-img" alt="Miniplayer Cover" />
+        <button class="miniplayer-close-btn" id="closeFloatingMiniplayerBtn" title="Close Miniplayer" aria-label="Close Miniplayer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <div class="miniplayer-art-bottom-overlay">
+          <!-- Live Scrubber Track -->
+          <div class="miniplayer-scrubber-track" id="miniplayerScrubber" role="slider" aria-label="Seek track" tabindex="0">
+            <div class="miniplayer-scrubber-fill" id="miniplayerScrubberFill"></div>
+          </div>
+          <!-- Playback Controls Bar -->
+          <div class="miniplayer-controls-row">
+            <button class="miniplayer-ctrl-btn" id="miniShuffleBtn" title="Shuffle">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+            </button>
+            <button class="miniplayer-ctrl-btn" id="miniPrevBtn" title="Previous">
+              <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="3"/></svg>
+            </button>
+            <button class="miniplayer-play-btn" id="miniPlayPauseBtn" title="Play / Pause">
+              <svg class="mini-play-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+              <svg class="mini-pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display: none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+            </button>
+            <button class="miniplayer-ctrl-btn" id="miniNextBtn" title="Next">
+              <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="3"/></svg>
+            </button>
+            <button class="miniplayer-ctrl-btn" id="miniRepeatBtn" title="Repeat">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="miniplayer-info-bottom">
+        <div class="miniplayer-meta">
+          <div class="miniplayer-track-title" id="miniplayerTitle">MusiSurf</div>
+          <div class="miniplayer-track-artist" id="miniplayerArtist">—</div>
+        </div>
+        <div class="miniplayer-actions">
+          <button class="miniplayer-action-btn miniplayer-heart-btn" id="miniHeartBtn" title="Save to Liked Songs">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          </button>
+          <button class="miniplayer-action-btn miniplayer-queue-btn" id="miniQueueBtn" title="Queue">
+            <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Notification Container -->
     <div class="toast-container" id="toastContainer"></div>
 
@@ -2098,7 +2155,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=8.20"></script>
+  <script src="/app.js?v=8.22"></script>
 </body>
 
 </html>
