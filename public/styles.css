@@ -8559,33 +8559,786 @@ body[data-active-view="lyrics"] .content-scroll {
   }
 }
 
-/* Listening Streak Flame Badge (Image 4 & 5) */
-.top-streak-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.15s;
+/* ==========================================================================
+   GLOBAL SEARCH INPUT ICON STRICT SIZING (Fixes Massive Magnifying Glass Bug)
+   ========================================================================== */
+.search-input-icon {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  max-width: 18px !important;
+  max-height: 18px !important;
+  flex-shrink: 0 !important;
+  color: #b3b3b3 !important;
+  pointer-events: none !important;
+  margin-right: 8px;
 }
 
-.top-streak-badge:hover {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.25);
+/* ==========================================================================
+   TOP BAR SETTINGS BUTTON (Replaces R Avatar Circle)
+   ========================================================================== */
+.top-settings-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #181818;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #b3b3b3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+
+.top-settings-btn:hover {
+  background: #282828;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
+.top-settings-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ==========================================================================
+   MINIPLAYER ALWAYS ON TOP
+   ========================================================================== */
+.floating-miniplayer {
+  z-index: 999999 !important;
+  pointer-events: auto !important;
+}
+
+/* ==========================================================================
+   SPOTIFY TWO-PANE SETTINGS MODAL & SOUND / PLAYBACK UI (Images 1, 2, 3)
+   ========================================================================== */
+.fullscreen-settings-modal {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 3000;
+  background: #000000 !important;
+  color: #ffffff;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.settings-modal-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  width: 100%;
+  height: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 28px;
+  gap: 40px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Settings Left Sidebar */
+.settings-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  padding-right: 20px;
+}
+
+.settings-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-brand-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+}
+
+.settings-close-circle-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #181818;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #b3b3b3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.settings-close-circle-btn:hover {
+  background: #282828;
+  color: #ffffff;
+  transform: scale(1.06);
+}
+
+.settings-close-circle-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.settings-search-pill-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #181818;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 500px;
+  padding: 8px 14px;
+}
+
+.settings-search-icon {
+  width: 15px;
+  height: 15px;
+  color: #727272;
+  flex-shrink: 0;
+}
+
+.settings-search-field {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #fff;
+  font-size: 0.88rem;
+  width: 100%;
+}
+
+.settings-search-field::placeholder {
+  color: #727272;
+}
+
+.settings-category-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-cat-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #a7a7a7;
+  font-size: 0.94rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.settings-cat-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.settings-cat-btn.active {
+  background: #242424;
+  color: #ffffff;
+}
+
+.settings-cat-btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* Settings Main Panel */
+.settings-main-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 12px;
+  padding-bottom: 60px;
+}
+
+.settings-tab-view {
+  display: none;
+  flex-direction: column;
+  gap: 28px;
+  animation: fadeIn 0.2s ease forwards;
+}
+
+.settings-tab-view.active {
+  display: flex;
+}
+
+.settings-tab-header {
+  margin-bottom: 8px;
+}
+
+.settings-tab-title {
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+
+.settings-tab-desc {
+  font-size: 0.95rem;
+  color: #727272;
+}
+
+.settings-section-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-section-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #a7a7a7;
+  text-transform: capitalize;
+}
+
+/* Sound Cards (Image 1) */
+.sound-card-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #181818;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 16px 20px;
+  gap: 20px;
+}
+
+.sound-card-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+}
+
+.sound-icon-box {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #242424;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #b3b3b3;
+  flex-shrink: 0;
+}
+
+.sound-icon-box svg {
+  width: 20px;
+  height: 20px;
+}
+
+.sound-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.sound-title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.sound-desc {
+  font-size: 0.84rem;
+  color: #727272;
+}
+
+.sound-subnote {
+  font-size: 0.8rem;
+  color: #535353;
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+/* Sound Pills Group */
+.sound-pills-group {
+  display: inline-flex;
+  background: #242424;
+  border-radius: 500px;
+  padding: 3px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.sound-pill-btn {
+  background: transparent;
+  border: none;
+  border-radius: 500px;
+  padding: 6px 14px;
+  color: #a7a7a7;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sound-pill-btn:hover {
+  color: #fff;
+}
+
+.sound-pill-btn.active {
+  background: #3e3e3e;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* Sound Device Select Dropdown */
+.sound-device-select {
+  background: #242424;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  min-width: 240px;
+  max-width: 320px;
+}
+
+.sound-device-select option {
+  background: #181818;
+  color: #fff;
+}
+
+/* Sound Toggle Switch */
+.sound-toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.sound-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.sound-toggle-switch .toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #3e3e3e;
+  transition: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 34px;
+}
+
+.sound-toggle-switch .toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 50%;
+}
+
+.sound-toggle-switch input:checked + .toggle-slider {
+  background-color: #1ed760;
+}
+
+.sound-toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+
+/* 10-Band Equalizer Sliders */
+.equalizer-sliders-container {
+  background: #181818;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 10px;
+}
+
+.eq-bands-row {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  gap: 12px;
+  height: 180px;
+}
+
+.eq-band-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: #727272;
+}
+
+.eq-vertical-slider {
+  -webkit-appearance: slider-vertical;
+  writing-mode: bt-lr;
+  width: 8px;
+  height: 110px;
+  accent-color: #1ed760;
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   CROSSFADE CARD UI (Exact match to Reference Image 2)
+   ========================================================================== */
+.crossfade-card-container {
+  background: #181818;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.crossfade-card-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.crossfade-headline {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 1.15rem;
+  color: #ffffff;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.crossfade-live-time {
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.crossfade-subtext-right {
+  font-size: 0.92rem;
+  color: #727272;
+}
+
+.crossfade-gradient-slider-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.crossfade-gradient-input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #8b5cf6 0%, #38bdf8 100%);
+  outline: none;
+  cursor: pointer;
+}
+
+.crossfade-gradient-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.crossfade-gradient-input::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.crossfade-gradient-input::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: none;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+}
+
+.crossfade-boundary-labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #535353;
+  letter-spacing: 0.08em;
+}
+
+/* ==========================================================================
+   4-CARD PLAYBACK FEATURES GRID (Exact match to Reference Image 3)
+   ========================================================================== */
+.playback-features-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-top: 10px;
+}
+
+@media (max-width: 900px) {
+  .playback-features-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.playback-feature-card {
+  background: #181818;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.feat-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.feat-card-title {
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.feat-card-desc {
+  font-size: 0.85rem;
+  color: #a7a7a7;
+  line-height: 1.45;
+}
+
+.feat-quality-badge {
+  background: #242424;
+  color: #1ed760;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 500px;
+  border: 1px solid rgba(30, 215, 96, 0.25);
+}
+
+.feat-speed-pills-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.speed-pill-btn {
+  background: #242424;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 500px;
+  color: #b3b3b3;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.speed-pill-btn:hover {
+  background: #2a2a2a;
+  color: #fff;
+}
+
+.speed-pill-btn.active {
+  background: #1ed760;
+  color: #000000;
+  border-color: #1ed760;
+}
+
+/* ==========================================================================
+   PODCASTS EXPLORE SECTION (CSS Grid Layout)
+   ========================================================================== */
+.search-podcasts-section {
+  margin-top: 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.podcasts-section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.podcasts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 18px;
+}
+
+.podcast-card {
+  background: #181818;
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid transparent;
+}
+
+.podcast-card:hover {
+  background: #282828;
+  border-color: rgba(255, 255, 255, 0.08);
+  transform: translateY(-4px);
+}
+
+.podcast-art-box {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.6);
+}
+
+.podcast-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.podcast-card:hover .podcast-img {
   transform: scale(1.04);
 }
 
-.sidebar-pin-badge {
-  font-size: 11px;
-  margin-left: auto;
-  opacity: 0.75;
+.podcast-play-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #1ed760;
+  color: #000000;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(8px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
+
+.podcast-play-btn svg {
+  width: 20px;
+  height: 20px;
+  margin-left: 2px;
+}
+
+.podcast-card:hover .podcast-play-btn {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.podcast-play-btn:hover {
+  transform: scale(1.08) !important;
+  background: #1fdf64;
+}
+
+.podcast-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.podcast-host {
+  font-size: 0.82rem;
+  color: #a7a7a7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.podcast-category-tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #1ed760;
+  background: rgba(30, 215, 96, 0.12);
+  padding: 3px 8px;
+  border-radius: 4px;
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+/* Settings Modal Responsive Breakpoint */
+@media (max-width: 768px) {
+  .settings-modal-shell {
+    grid-template-columns: 1fr;
+    padding: 20px 14px;
+    gap: 20px;
+    overflow-y: auto;
+  }
+  .settings-sidebar {
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-right: 0;
+    padding-bottom: 16px;
+  }
+  .settings-category-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 6px;
+  }
+  .settings-cat-btn {
+    white-space: nowrap;
+    padding: 8px 12px;
+  }
+  .sound-card-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .sound-pills-group {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .sound-pill-btn {
+    flex: 1;
+    text-align: center;
+  }
+  .sound-device-select {
+    width: 100%;
+    max-width: none;
+  }
+}
+
 
 
 

@@ -335,6 +335,29 @@ function getDedupeKey(title, artist) {
   return `${normTitle}__${artistTokens}`;
 }
 
+// Strict Content Filter: Strictly return only Music and Podcasts (Zero gaming, vlogs, reactions, etc.)
+function validateStrictMusicOrPodcast(rawTitle, rawChannel) {
+  const t = (rawTitle || '').toLowerCase();
+  const c = (rawChannel || '').toLowerCase();
+
+  // Podcasts and episodes are explicitly allowed
+  const isPodcast = t.includes('podcast') || t.includes('episode') || c.includes('podcast') || /\b(ep\s*\d+|ep\.\s*\d+)\b/i.test(t);
+  if (isPodcast) {
+    return { allowed: true, categoryId: '10', isPodcast: true };
+  }
+
+  // Blacklist standard non-music YouTube content (gaming, vlogs, reactions, tech, unboxing, tutorials, etc.)
+  const isBlocked = /\b(gameplay|walkthrough|playthrough|let'?s play|gaming|gamer|fortnite|minecraft|roblox|gta\s*[v5]?|valorant|cod|warzone|apex legends|pubg|speedrun|vlog|daily vlog|prank|reaction to|reacting to|reacts to|unboxing|tech review|phone review|tutorial|how to fix|news live|breaking news|mukbang|haul|storytime|makeup tutorial|grwm|tiktok compilation|fails compilation)\b/i.test(t) ||
+                    /\b(gaming|gamer|walkthrough|playthrough|vlogs|vlogger|news live)\b/i.test(c);
+
+  if (isBlocked) {
+    return { allowed: false, categoryId: '0', isPodcast: false };
+  }
+
+  // Allowed Music (YouTube Music Category 10)
+  return { allowed: true, categoryId: '10', isPodcast: false };
+}
+
 // Universal Multi-Source YouTube Search Engine (Innertube JSON API + Cookie Scraper Fallback)
 async function searchYouTube(query, limit = 30) {
   if (!query) return [];
@@ -377,6 +400,11 @@ async function searchYouTube(query, limit = 30) {
 
             const rawTitle = v.title?.runs?.[0]?.text || 'Unknown Title';
             const rawChannel = v.ownerText?.runs?.[0]?.text || 'Universal Audio';
+
+            // Strict Content Filter check: Zero gaming, vlogs, reactions allowed
+            const filterCheck = validateStrictMusicOrPodcast(rawTitle, rawChannel);
+            if (!filterCheck.allowed) continue;
+
             const durationStr = v.lengthText?.simpleText || '3:30';
             const thumb = v.thumbnail?.thumbnails?.slice(-1)[0]?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
             const viewStr = v.viewCountText?.simpleText || v.shortViewCountText?.simpleText || '';
@@ -406,6 +434,8 @@ async function searchYouTube(query, limit = 30) {
               playCount: playCount,
               isVerified: isVerified,
               source: 'youtube',
+              categoryId: filterCheck.categoryId,
+              isPodcast: filterCheck.isPodcast,
               hasDirectAudio: true
             });
 
@@ -450,6 +480,11 @@ async function searchYouTube(query, limit = 30) {
 
               const rawTitle = v.title?.runs?.[0]?.text || 'Unknown Title';
               const rawChannel = v.ownerText?.runs?.[0]?.text || 'Universal Audio';
+
+              // Strict Content Filter check: Zero gaming, vlogs, reactions allowed
+              const filterCheck = validateStrictMusicOrPodcast(rawTitle, rawChannel);
+              if (!filterCheck.allowed) continue;
+
               const durationStr = v.lengthText?.simpleText || '3:30';
               const thumb = v.thumbnail?.thumbnails?.slice(-1)[0]?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
               const viewStr = v.viewCountText?.simpleText || v.shortViewCountText?.simpleText || '';
@@ -479,6 +514,8 @@ async function searchYouTube(query, limit = 30) {
                 playCount: playCount,
                 isVerified: isVerified,
                 source: 'youtube',
+                categoryId: filterCheck.categoryId,
+                isPodcast: filterCheck.isPodcast,
                 hasDirectAudio: true
               });
 
@@ -781,6 +818,40 @@ app.get('/api/stream', async (req, res) => {
   } catch (err) {
     console.error('Stream proxy error:', err.message);
     res.status(500).send('Stream error');
+  }
+});
+
+// YouTube Content Validation (Strictly permits Category 10: Music or Podcasts/Episodes)
+app.get('/api/validate-content', async (req, res) => {
+  const ytId = (req.query.id || '').trim();
+  const title = (req.query.title || '').trim().toLowerCase();
+
+  if (!ytId) return res.status(400).json({ allowed: false, error: 'Missing id' });
+
+  // If title indicates podcast or episode, it is valid!
+  if (title.includes('podcast') || title.includes('episode')) {
+    return res.json({ allowed: true, categoryId: '10', isPodcast: true });
+  }
+
+  try {
+    const resp = await fetch(`https://www.youtube.com/watch?v=${ytId}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+      }
+    });
+    const html = await resp.text();
+    const catMatch = html.match(/"categoryId":\s*"(\d+)"/);
+    const categoryId = catMatch ? catMatch[1] : '10';
+
+    const isMusicOrPodcast = categoryId === '10' || title.includes('podcast') || title.includes('episode');
+    return res.json({
+      allowed: isMusicOrPodcast,
+      categoryId: categoryId,
+      isPodcast: title.includes('podcast') || title.includes('episode')
+    });
+  } catch (err) {
+    // Fail-safe to avoid false blocking on network hiccups
+    return res.json({ allowed: true, categoryId: '10' });
   }
 });
 

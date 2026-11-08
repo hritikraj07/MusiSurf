@@ -29,12 +29,12 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=7.5">
+  <link rel="stylesheet" href="/styles.css?v=7.6">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
         for (var name of names) {
-          if (name !== 'musisurf-v7.5') caches.delete(name);
+          if (name !== 'musisurf-v7.6') caches.delete(name);
         }
       });
     }
@@ -70,7 +70,7 @@
       <!-- Center: Rounded Pill Search + Autocomplete + Compass (Categories) -->
       <div class="top-header-center">
         <div class="top-search-pill" id="topSearchPill">
-          <svg class="search-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg class="search-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; min-width: 18px; min-height: 18px; max-width: 18px; max-height: 18px; flex-shrink: 0;">
             <circle cx="11" cy="11" r="8" />
             <path d="m21 21-4.3-4.3" />
           </svg>
@@ -85,7 +85,7 @@
           <span class="search-shortcut-badge">/</span>
         </div>
 
-        <!-- Floating Autocomplete Search Suggestions Dropdown (Image 5) -->
+        <!-- Floating Autocomplete Search Suggestions Dropdown -->
         <div class="search-autocomplete-dropdown" id="searchAutocompleteDropdown" style="display: none;"></div>
 
         <!-- Compass / Music Categories Button -->
@@ -97,28 +97,14 @@
         </button>
       </div>
 
-      <!-- Right: Listening Streak + User Avatar + Desktop Window Controls -->
+      <!-- Right: Settings Gear Button (Matching Website UI) -->
       <div class="top-header-right">
-        <div class="top-streak-badge" id="topStreakBadge" title="Listening Streak">
-          <span class="streak-flame">🔥</span>
-          <span class="streak-days" id="streakDaysCount">10 days</span>
-        </div>
-
-        <button class="top-avatar-btn" id="topAvatarBtn" title="Account & Settings">
-          <span class="top-avatar-initial">R</span>
+        <button class="top-circle-btn top-settings-btn" id="headerSettingsBtn" title="Settings" aria-label="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
         </button>
-
-        <div class="window-controls-group">
-          <button class="win-ctrl-btn" id="winMinimizeBtn" title="Miniplayer">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
-          <button class="win-ctrl-btn" id="winMaximizeBtn" title="Toggle Fullscreen">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
-          </button>
-          <button class="win-ctrl-btn win-close-btn" id="winCloseBtn" title="Settings">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
       </div>
     </header>
 
@@ -397,6 +383,114 @@
               </div>
             </div>
 
+            <!-- Podcasts Section on Explore Page (CSS Grid Layout) -->
+            <div class="search-podcasts-section" id="searchPodcastsSection">
+              <div class="podcasts-section-header">
+                <div>
+                  <h2 class="section-title">Podcasts & Shows</h2>
+                  <p class="section-subtitle">Deep dives, top interviews, stories, and comedy</p>
+                </div>
+              </div>
+              <div class="podcasts-grid" id="podcastsGrid">
+                <!-- Curated Top Podcasts with 1-Click Stream -->
+                <div class="podcast-card" data-query="The Joe Rogan Experience podcast">
+                  <div class="podcast-art-box">
+                    <img src="https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=360&auto=format&fit=crop&q=80" alt="The Joe Rogan Experience" class="podcast-img">
+                    <button class="podcast-play-btn" title="Play Episode" aria-label="Play">
+                      <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+                    </button>
+                  </div>
+                  <h4 class="podcast-title">The Joe Rogan Experience</h4>
+                  <p class="podcast-host">Joe Rogan</p>
+                  <span class="podcast-category-tag">Interviews & Culture</span>
+                </div>
+
+                <div class="podcast-card" data-query="Huberman Lab podcast">
+                  <div class="podcast-art-box">
+                    <img src="https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=360&auto=format&fit=crop&q=80" alt="Huberman Lab" class="podcast-img">
+                    <button class="podcast-play-btn" title="Play Episode" aria-label="Play">
+                      <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+                    </button>
+                  </div>
+                  <h4 class="podcast-title">Huberman Lab</h4>
+                  <p class="podcast-host">Dr. Andrew Huberman</p>
+                  <span class="podcast-category-tag">Science & Health</span>
+                </div>
+
+                <div class="podcast-card" data-query="The Diary Of A CEO podcast">
+                  <div class="podcast-art-box">
+                    <img src="https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=360&auto=format&fit=crop&q=80" alt="The Diary Of A CEO" class="podcast-img">
+                    <button class="podcast-play-btn" title="Play Episode" aria-label="Play">
+                      <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+                    </button>
+                  </div>
+                  <h4 class="podcast-title">The Diary Of A CEO</h4>
+                  <p class="podcast-host">Steven Bartlett</p>
+                  <span class="podcast-category-tag">Business & Life</span>
+                </div>
+
+                <div class="podcast-card" data-query="Lex Fridman Podcast">
+                  <div class="podcast-art-box">
+                    <img src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=360&auto=format&fit=crop&q=80" alt="Lex Fridman Podcast" class="podcast-img">
+                    <button class="podcast-play-btn" title="Play Episode" aria-label="Play">
+                      <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+                    </button>
+                  </div>
+                  <h4 class="podcast-title">Lex Fridman Podcast</h4>
+                  <p class="podcast-host">Lex Fridman</p>
+                  <span class="podcast-category-tag">AI, Tech & Science</span>
+                </div>
+
+                <div class="podcast-card" data-query="SmartLess podcast">
+                  <div class="podcast-art-box">
+                    <img src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=360&auto=format&fit=crop&q=80" alt="SmartLess" class="podcast-img">
+                    <button class="podcast-play-btn" title="Play Episode" aria-label="Play">
+                      <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+                    </button>
+                  </div>
+                  <h4 class="podcast-title">SmartLess</h4>
+                  <p class="podcast-host">Jason Bateman, Sean Hayes, Will Arnett</p>
+                  <span class="podcast-category-tag">Comedy</span>
+                </div>
+
+                <div class="podcast-card" data-query="Anything Goes with Emma Chamberlain podcast">
+                  <div class="podcast-art-box">
+                    <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=360&auto=format&fit=crop&q=80" alt="Anything Goes" class="podcast-img">
+                    <button class="podcast-play-btn" title="Play Episode" aria-label="Play">
+                      <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+                    </button>
+                  </div>
+                  <h4 class="podcast-title">Anything Goes</h4>
+                  <p class="podcast-host">Emma Chamberlain</p>
+                  <span class="podcast-category-tag">Lifestyle & Thoughts</span>
+                </div>
+
+                <div class="podcast-card" data-query="Conan O'Brien Needs A Friend podcast">
+                  <div class="podcast-art-box">
+                    <img src="https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=360&auto=format&fit=crop&q=80" alt="Conan O'Brien Needs A Friend" class="podcast-img">
+                    <button class="podcast-play-btn" title="Play Episode" aria-label="Play">
+                      <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+                    </button>
+                  </div>
+                  <h4 class="podcast-title">Conan O'Brien Needs A Friend</h4>
+                  <p class="podcast-host">Conan O'Brien / Team Coco</p>
+                  <span class="podcast-category-tag">Comedy & Talks</span>
+                </div>
+
+                <div class="podcast-card" data-query="On Purpose with Jay Shetty podcast">
+                  <div class="podcast-art-box">
+                    <img src="https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=360&auto=format&fit=crop&q=80" alt="On Purpose with Jay Shetty" class="podcast-img">
+                    <button class="podcast-play-btn" title="Play Episode" aria-label="Play">
+                      <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+                    </button>
+                  </div>
+                  <h4 class="podcast-title">On Purpose with Jay Shetty</h4>
+                  <p class="podcast-host">Jay Shetty</p>
+                  <span class="podcast-category-tag">Mindset & Wellness</span>
+                </div>
+              </div>
+            </div>
+
             <!-- Real-time Search Loading -->
             <div class="search-loading" id="searchLoading" style="display: none;">
               <div class="equalizer-loader">
@@ -414,6 +508,7 @@
               <div class="search-filter-pills" id="searchFilterPills">
                 <button type="button" class="search-filter-pill active" data-filter="all">All</button>
                 <button type="button" class="search-filter-pill" data-filter="songs">Songs</button>
+                <button type="button" class="search-filter-pill" data-filter="podcasts">Podcasts</button>
                 <button type="button" class="search-filter-pill" data-filter="videos">Videos</button>
                 <button type="button" class="search-filter-pill" data-filter="albums">Albums</button>
                 <button type="button" class="search-filter-pill" data-filter="artists">Artists</button>
@@ -1715,139 +1810,391 @@
       </div>
     </div>
 
-    <!-- Full-Screen Settings View -->
+    <!-- Spotify Two-Pane Settings Modal (Exact match to Reference Images 1, 2, 3) -->
     <div class="fullscreen-settings-modal" id="settingsModal" style="display: none;">
-      <div class="settings-fullscreen-header">
-        <button class="settings-back-btn" id="closeSettingsModalBtn" title="Back">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="19" y1="12" x2="5" y2="12"></line>
-            <polyline points="12 19 5 12 12 5"></polyline>
-          </svg>
-          <span>Back</span>
-        </button>
-        <h2 class="settings-nav-title">Settings</h2>
-      </div>
-
-      <div class="settings-fullscreen-content">
-        <!-- Section: Audio Playback -->
-        <div class="settings-group">
-          <h3 class="settings-group-title">Audio Playback</h3>
-
-          <!-- Remove Dead Silence -->
-          <div class="settings-card-item">
-            <div class="settings-item-header">
-              <span class="settings-item-title">Remove Dead Silence</span>
-              <p class="settings-item-desc">Automatically trim silent delay from the start and ending of songs. Section pauses in the middle of a song are NEVER removed.</p>
-            </div>
-            <div class="settings-radio-list">
-              <label class="settings-radio-row">
-                <input type="radio" name="deadSilenceRadio" id="deadSilenceOnRadio" value="on" checked>
-                <span class="radio-custom"></span>
-                <div class="radio-label-content">
-                  <span class="radio-label-title">Enabled (Recommended)</span>
-                  <span class="radio-label-desc">Skip leading and trailing dead silence only for instant playback</span>
-                </div>
-              </label>
-              <label class="settings-radio-row">
-                <input type="radio" name="deadSilenceRadio" id="deadSilenceOffRadio" value="off">
-                <span class="radio-custom"></span>
-                <div class="radio-label-content">
-                  <span class="radio-label-title">Disabled</span>
-                  <span class="radio-label-desc">Play tracks with untouched original intro and outro silence</span>
-                </div>
-              </label>
-            </div>
+      <div class="settings-modal-shell">
+        
+        <!-- Left Sidebar: Settings Navigation Categories -->
+        <aside class="settings-sidebar">
+          <div class="settings-sidebar-header">
+            <h2 class="settings-brand-title">Settings</h2>
+            <button class="settings-close-circle-btn" id="closeSettingsModalBtn" title="Close Settings">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
           </div>
 
-          <!-- Crossfade Feature -->
-          <div class="settings-card-item">
-            <div class="settings-item-header">
-              <div class="settings-title-row">
-                <span class="settings-item-title">Crossfade</span>
-                <span class="settings-value-pill" id="crossfadeValueLabel">Off</span>
-              </div>
-              <p class="settings-item-desc">Allows tracks to seamlessly fade into each other. As the song ends, its volume decreases while the next upcoming song volume increases.</p>
-            </div>
-            <div class="crossfade-slider-wrap">
-              <input type="range" class="crossfade-range" id="crossfadeSlider" min="0" max="10" step="2" value="0">
-              <div class="crossfade-steps-labels">
-                <span class="step-label active" data-val="0">Off</span>
-                <span class="step-label" data-val="2">2s</span>
-                <span class="step-label" data-val="4">4s</span>
-                <span class="step-label" data-val="6">6s</span>
-                <span class="step-label" data-val="8">8s</span>
-                <span class="step-label" data-val="10">10s</span>
-              </div>
-            </div>
+          <div class="settings-search-pill-box">
+            <svg class="settings-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" id="settingsSearchInput" class="settings-search-field" placeholder="Search settings">
           </div>
-        </div>
 
-        <!-- Section: Controls (Matching Image 3) -->
-        <div class="settings-group desktop-controls-group">
-          <h3 class="settings-group-title">Controls</h3>
+          <nav class="settings-category-nav">
+            <button class="settings-cat-btn" data-target="settingsAccountSection">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <span>Account</span>
+            </button>
+            <button class="settings-cat-btn" data-target="settingsPlaybackSection">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <span>Playback</span>
+            </button>
+            <button class="settings-cat-btn active" data-target="settingsSoundSection">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="22"/><line x1="6" y1="6" x2="6" y2="18"/><line x1="18" y1="8" x2="18" y2="16"/><line x1="2" y1="10" x2="2" y2="14"/><line x1="22" y1="10" x2="22" y2="14"/></svg>
+              <span>Sound</span>
+            </button>
+            <button class="settings-cat-btn" data-target="settingsLyricsSection">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+              <span>Lyrics</span>
+            </button>
+            <button class="settings-cat-btn" data-target="settingsDisplaySection">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+              <span>Display</span>
+            </button>
+            <button class="settings-cat-btn" data-target="settingsLibrarySection">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/></svg>
+              <span>Library</span>
+            </button>
+            <button class="settings-cat-btn" data-target="settingsDataSection">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              <span>Your data</span>
+            </button>
+            <button class="settings-cat-btn" data-target="settingsAboutSection">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              <span>About</span>
+            </button>
+          </nav>
+        </aside>
 
-          <div class="settings-card-item keyboard-controls-card">
-            <div class="controls-columns-grid">
-              <!-- Left Column -->
-              <div class="controls-col">
-                <div class="control-shortcut-row">
-                  <div class="shortcut-keys-cell">
-                    <kbd class="ctrl-key-badge">Space</kbd>
-                  </div>
-                  <span class="shortcut-action-desc">Play / pause</span>
-                </div>
-                <div class="control-shortcut-row">
-                  <div class="shortcut-keys-cell">
-                    <kbd class="ctrl-key-badge">↑</kbd>
-                    <kbd class="ctrl-key-badge">↓</kbd>
-                  </div>
-                  <span class="shortcut-action-desc">Volume</span>
-                </div>
-                <div class="control-shortcut-row">
-                  <div class="shortcut-keys-cell">
-                    <kbd class="ctrl-key-badge">R</kbd>
-                  </div>
-                  <span class="shortcut-action-desc">Repeat</span>
-                </div>
-                <div class="control-shortcut-row">
-                  <div class="shortcut-keys-cell">
-                    <kbd class="ctrl-key-badge">L</kbd>
-                  </div>
-                  <span class="shortcut-action-desc">Lyrics</span>
-                </div>
-              </div>
+        <!-- Right Main Content Panel (Category Views) -->
+        <main class="settings-main-panel">
+          
+          <!-- SOUND TAB CONTENT (Image 1 Active Tab) -->
+          <section class="settings-tab-view active" id="settingsSoundSection">
+            <div class="settings-tab-header">
+              <h1 class="settings-tab-title">Sound</h1>
+              <p class="settings-tab-desc">Quality, loudness, where it plays and how it's shaped</p>
+            </div>
 
-              <!-- Right Column -->
-              <div class="controls-col">
-                <div class="control-shortcut-row">
-                  <div class="shortcut-keys-cell">
-                    <kbd class="ctrl-key-badge">←</kbd>
-                    <kbd class="ctrl-key-badge">→</kbd>
+            <!-- Streaming Quality Card -->
+            <div class="settings-section-block">
+              <span class="settings-section-label">Streaming</span>
+              <div class="sound-card-item">
+                <div class="sound-card-left">
+                  <div class="sound-icon-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
                   </div>
-                  <span class="shortcut-action-desc">Seek 5 s</span>
+                  <div class="sound-meta">
+                    <h3 class="sound-title">Streaming quality</h3>
+                    <p class="sound-desc">The highest quality MusiSurf streams</p>
+                  </div>
                 </div>
-                <div class="control-shortcut-row">
-                  <div class="shortcut-keys-cell">
-                    <kbd class="ctrl-key-badge">S</kbd>
-                  </div>
-                  <span class="shortcut-action-desc">Shuffle</span>
-                </div>
-                <div class="control-shortcut-row">
-                  <div class="shortcut-keys-cell">
-                    <kbd class="ctrl-key-badge">Q</kbd>
-                  </div>
-                  <span class="shortcut-action-desc">Queue</span>
-                </div>
-                <div class="control-shortcut-row">
-                  <div class="shortcut-keys-cell">
-                    <kbd class="ctrl-key-badge">/</kbd>
-                  </div>
-                  <span class="shortcut-action-desc">Search</span>
+                <div class="sound-pills-group" id="streamQualityPills">
+                  <button type="button" class="sound-pill-btn" data-quality="low">Low</button>
+                  <button type="button" class="sound-pill-btn" data-quality="medium">Medium</button>
+                  <button type="button" class="sound-pill-btn active" data-quality="high">High</button>
+                  <button type="button" class="sound-pill-btn" data-quality="lossless">Lossless</button>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+
+            <!-- Loudness / Volume Leveling Card -->
+            <div class="settings-section-block">
+              <span class="settings-section-label">Loudness</span>
+              <div class="sound-card-item">
+                <div class="sound-card-left">
+                  <div class="sound-icon-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                  </div>
+                  <div class="sound-meta">
+                    <h3 class="sound-title">Volume leveling</h3>
+                    <p class="sound-desc">Bring every song to a similar loudness</p>
+                  </div>
+                </div>
+                <div class="sound-pills-group" id="volumeLevelingPills">
+                  <button type="button" class="sound-pill-btn" data-level="off">Off</button>
+                  <button type="button" class="sound-pill-btn" data-level="quiet">Quiet</button>
+                  <button type="button" class="sound-pill-btn" data-level="normal">Normal</button>
+                  <button type="button" class="sound-pill-btn active" data-level="loud">Loud</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Output Device Card -->
+            <div class="settings-section-block">
+              <span class="settings-section-label">Output</span>
+              <div class="sound-card-item">
+                <div class="sound-card-left">
+                  <div class="sound-icon-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="12" cy="14" r="4"/><line x1="12" y1="6" x2="12.01" y2="6"/></svg>
+                  </div>
+                  <div class="sound-meta">
+                    <h3 class="sound-title">Output device</h3>
+                    <p class="sound-desc">Following the system default</p>
+                  </div>
+                </div>
+                <div class="sound-select-box">
+                  <select id="settingsAudioOutputSelect" class="sound-device-select">
+                    <option value="default">Speakers (System Default)</option>
+                  </select>
+                </div>
+              </div>
+              <p class="sound-subnote">If the device disappears (a headset unplugged, Bluetooth dropped), playback pauses and goes back to the system default.</p>
+            </div>
+
+            <!-- Equalizer Card -->
+            <div class="settings-section-block">
+              <span class="settings-section-label">Equalizer</span>
+              <div class="sound-card-item">
+                <div class="sound-card-left">
+                  <div class="sound-icon-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+                  </div>
+                  <div class="sound-meta">
+                    <h3 class="sound-title">Equalizer</h3>
+                    <p class="sound-desc">Shape the sound with 10 bands</p>
+                  </div>
+                </div>
+                <label class="sound-toggle-switch">
+                  <input type="checkbox" id="equalizerToggleSwitch">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+
+              <!-- 10-Band Equalizer Sliders (Expanded when switch is on) -->
+              <div class="equalizer-sliders-container" id="equalizerSlidersWrap" style="display: none;">
+                <div class="eq-bands-row">
+                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="32"><span>32Hz</span></div>
+                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="64"><span>64Hz</span></div>
+                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="125"><span>125Hz</span></div>
+                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="250"><span>250Hz</span></div>
+                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="500"><span>500Hz</span></div>
+                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="1000"><span>1kHz</span></div>
+                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="2000"><span>2kHz</span></div>
+                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="4000"><span>4kHz</span></div>
+                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="8000"><span>8kHz</span></div>
+                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="16000"><span>16kHz</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- PLAYBACK TAB CONTENT (Image 2 Crossfade + Image 3 4-Feature Cards) -->
+          <section class="settings-tab-view" id="settingsPlaybackSection">
+            <div class="settings-tab-header">
+              <h1 class="settings-tab-title">Playback</h1>
+              <p class="settings-tab-desc">Fades, transitions, audio speeds and gapless playback</p>
+            </div>
+
+            <!-- Exact Crossfade Card (Image 2) -->
+            <div class="crossfade-card-container">
+              <div class="crossfade-card-top-row">
+                <span class="crossfade-headline">Crossfade • <strong class="crossfade-live-time" id="liveCrossfadeSeconds">7.5 s</strong></span>
+                <span class="crossfade-subtext-right">Drag to shape the blend</span>
+              </div>
+              
+              <!-- Gradient Track Slider -->
+              <div class="crossfade-gradient-slider-wrap">
+                <input type="range" class="crossfade-gradient-input" id="crossfadeSlider" min="0" max="12" step="0.5" value="7.5">
+              </div>
+
+              <!-- Hard Cut to Long Blend Boundary Labels -->
+              <div class="crossfade-boundary-labels">
+                <span>0 S • HARD CUT</span>
+                <span>12 S • LONG BLEND</span>
+              </div>
+            </div>
+
+            <!-- 4 Playback Feature Cards Grid (Exact Image 3) -->
+            <div class="playback-features-grid">
+              
+              <!-- Card 1: Automix -->
+              <div class="playback-feature-card">
+                <div class="feat-card-header">
+                  <h4 class="feat-card-title">Automix</h4>
+                  <label class="sound-toggle-switch mini-toggle">
+                    <input type="checkbox" id="automixToggleSwitch" checked>
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <p class="feat-card-desc">Estimates the next track's tempo and lands the fade on a beat boundary.</p>
+              </div>
+
+              <!-- Card 2: Skip silence -->
+              <div class="playback-feature-card">
+                <div class="feat-card-header">
+                  <h4 class="feat-card-title">Skip silence</h4>
+                  <label class="sound-toggle-switch mini-toggle">
+                    <input type="checkbox" id="skipSilenceToggleSwitch" checked>
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <p class="feat-card-desc">Scans the head and tail of a track at -42 dB and seeks past the dead air.</p>
+              </div>
+
+              <!-- Card 3: Speed, pitch intact -->
+              <div class="playback-feature-card">
+                <div class="feat-card-header">
+                  <h4 class="feat-card-title">Speed, pitch intact</h4>
+                </div>
+                <p class="feat-card-desc">0.5 to 2 times playback with the pitch left alone. Good for podcasts and practice.</p>
+                <div class="feat-speed-pills-row" id="speedPillsRow">
+                  <button type="button" class="speed-pill-btn" data-speed="0.8">0.8x</button>
+                  <button type="button" class="speed-pill-btn active" data-speed="1.0">1.0x</button>
+                  <button type="button" class="speed-pill-btn" data-speed="1.2">1.2x</button>
+                  <button type="button" class="speed-pill-btn" data-speed="1.5">1.5x</button>
+                  <button type="button" class="speed-pill-btn" data-speed="2.0">2.0x</button>
+                </div>
+              </div>
+
+              <!-- Card 4: Quality tiers -->
+              <div class="playback-feature-card">
+                <div class="feat-card-header">
+                  <h4 class="feat-card-title">Quality tiers</h4>
+                  <span class="feat-quality-badge">256 kbps AAC Max</span>
+                </div>
+                <p class="feat-card-desc">Low, medium and high. Streams play at up to 256 kbps AAC, the best bitrate YouTube Music serves; local files keep their own.</p>
+              </div>
+
+            </div>
+
+            <!-- Keyboard Controls Table (Desktop convenience) -->
+            <div class="desktop-controls-group">
+              <h3 class="settings-group-title">Desktop Keyboard Shortcuts</h3>
+              <div class="settings-card-item keyboard-controls-card">
+                <div class="controls-columns-grid">
+                  <div class="controls-col">
+                    <div class="control-shortcut-row"><kbd class="ctrl-key-badge">Space</kbd><span class="shortcut-action-desc">Play / pause</span></div>
+                    <div class="control-shortcut-row"><kbd class="ctrl-key-badge">↑</kbd><kbd class="ctrl-key-badge">↓</kbd><span class="shortcut-action-desc">Volume</span></div>
+                    <div class="control-shortcut-row"><kbd class="ctrl-key-badge">R</kbd><span class="shortcut-action-desc">Repeat</span></div>
+                    <div class="control-shortcut-row"><kbd class="ctrl-key-badge">L</kbd><span class="shortcut-action-desc">Lyrics</span></div>
+                  </div>
+                  <div class="controls-col">
+                    <div class="control-shortcut-row"><kbd class="ctrl-key-badge">←</kbd><kbd class="ctrl-key-badge">→</kbd><span class="shortcut-action-desc">Seek 5 s</span></div>
+                    <div class="control-shortcut-row"><kbd class="ctrl-key-badge">S</kbd><span class="shortcut-action-desc">Shuffle</span></div>
+                    <div class="control-shortcut-row"><kbd class="ctrl-key-badge">Q</kbd><span class="shortcut-action-desc">Queue</span></div>
+                    <div class="control-shortcut-row"><kbd class="ctrl-key-badge">/</kbd><span class="shortcut-action-desc">Search</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ACCOUNT TAB CONTENT -->
+          <section class="settings-tab-view" id="settingsAccountSection">
+            <div class="settings-tab-header">
+              <h1 class="settings-tab-title">Account</h1>
+              <p class="settings-tab-desc">Your MusiSurf profile and cloud sync</p>
+            </div>
+            <div class="settings-section-block">
+              <div class="sound-card-item">
+                <div class="sound-card-left">
+                  <div class="sound-meta">
+                    <h3 class="sound-title">Free Streaming Tier</h3>
+                    <p class="sound-desc">Unlimited music, custom playlists, high quality audio & podcasts.</p>
+                  </div>
+                </div>
+                <span class="feat-quality-badge">Active</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- LYRICS TAB CONTENT -->
+          <section class="settings-tab-view" id="settingsLyricsSection">
+            <div class="settings-tab-header">
+              <h1 class="settings-tab-title">Lyrics</h1>
+              <p class="settings-tab-desc">Synchronized lyric display and alignment preferences</p>
+            </div>
+            <div class="settings-section-block">
+              <div class="sound-card-item">
+                <div class="sound-card-left">
+                  <div class="sound-meta">
+                    <h3 class="sound-title">Synchronized Auto-Scroll</h3>
+                    <p class="sound-desc">Scroll lines smoothly in real-time as words are sung</p>
+                  </div>
+                </div>
+                <label class="sound-toggle-switch mini-toggle">
+                  <input type="checkbox" id="lyricsAutoScrollToggle" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <!-- DISPLAY TAB CONTENT -->
+          <section class="settings-tab-view" id="settingsDisplaySection">
+            <div class="settings-tab-header">
+              <h1 class="settings-tab-title">Display</h1>
+              <p class="settings-tab-desc">Theme, dark mode, animations and visualizer</p>
+            </div>
+            <div class="settings-section-block">
+              <div class="sound-card-item">
+                <div class="sound-card-left">
+                  <div class="sound-meta">
+                    <h3 class="sound-title">Pitch Black OLED Theme</h3>
+                    <p class="sound-desc">Deep blacks with Spotify emerald accents</p>
+                  </div>
+                </div>
+                <span class="feat-quality-badge">Enabled</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- LIBRARY TAB CONTENT -->
+          <section class="settings-tab-view" id="settingsLibrarySection">
+            <div class="settings-tab-header">
+              <h1 class="settings-tab-title">Library</h1>
+              <p class="settings-tab-desc">Manage local storage, offline cache, and downloads</p>
+            </div>
+            <div class="settings-section-block">
+              <div class="sound-card-item">
+                <div class="sound-card-left">
+                  <div class="sound-meta">
+                    <h3 class="sound-title">Clear Offline Cache</h3>
+                    <p class="sound-desc">Remove locally cached audio files to free up disk space</p>
+                  </div>
+                </div>
+                <button type="button" class="sound-pill-btn" id="clearCacheSettingsBtn">Clear Cache</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- DATA TAB CONTENT -->
+          <section class="settings-tab-view" id="settingsDataSection">
+            <div class="settings-tab-header">
+              <h1 class="settings-tab-title">Your data</h1>
+              <p class="settings-tab-desc">Privacy, listening history and offline data storage</p>
+            </div>
+            <div class="settings-section-block">
+              <div class="sound-card-item">
+                <div class="sound-card-left">
+                  <div class="sound-meta">
+                    <h3 class="sound-title">Local-First Storage</h3>
+                    <p class="sound-desc">Your playlists and liked songs are saved directly on this device.</p>
+                  </div>
+                </div>
+                <span class="feat-quality-badge">Private</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- ABOUT TAB CONTENT -->
+          <section class="settings-tab-view" id="settingsAboutSection">
+            <div class="settings-tab-header">
+              <h1 class="settings-tab-title">About</h1>
+              <p class="settings-tab-desc">Version and build info</p>
+            </div>
+            <div class="settings-section-block">
+              <div class="sound-card-item">
+                <div class="sound-card-left">
+                  <div class="sound-meta">
+                    <h3 class="sound-title">MusiSurf</h3>
+                    <p class="sound-desc">Version 7.6 • Pitch Black & Spotify Emerald Edition</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </main>
       </div>
     </div>
 
@@ -1961,7 +2308,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.50"></script>
+  <script src="/app.js?v=7.60"></script>
 </body>
 
 </html>

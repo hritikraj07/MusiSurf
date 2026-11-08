@@ -115,6 +115,8 @@
     topHomeBtn: document.getElementById('topHomeBtn'),
     topCompassBtn: document.getElementById('topCompassBtn'),
     topAvatarBtn: document.getElementById('topAvatarBtn'),
+    headerSettingsBtn: document.getElementById('headerSettingsBtn'),
+    sidebar: document.getElementById('sidebar'),
     winMinimizeBtn: document.getElementById('winMinimizeBtn'),
     winMaximizeBtn: document.getElementById('winMaximizeBtn'),
     winCloseBtn: document.getElementById('winCloseBtn'),
@@ -353,6 +355,17 @@
     deadSilenceOffRadio: document.getElementById('deadSilenceOffRadio'),
     crossfadeSlider: document.getElementById('crossfadeSlider'),
     crossfadeValueLabel: document.getElementById('crossfadeValueLabel'),
+    liveCrossfadeSeconds: document.getElementById('liveCrossfadeSeconds'),
+    settingsAudioOutputSelect: document.getElementById('settingsAudioOutputSelect'),
+    equalizerToggleSwitch: document.getElementById('equalizerToggleSwitch'),
+    equalizerSlidersWrap: document.getElementById('equalizerSlidersWrap'),
+    automixToggleSwitch: document.getElementById('automixToggleSwitch'),
+    skipSilenceToggleSwitch: document.getElementById('skipSilenceToggleSwitch'),
+    speedPillsRow: document.getElementById('speedPillsRow'),
+    streamQualityPills: document.getElementById('streamQualityPills'),
+    volumeLevelingPills: document.getElementById('volumeLevelingPills'),
+    searchPodcastsSection: document.getElementById('searchPodcastsSection'),
+    podcastsGrid: document.getElementById('podcastsGrid'),
     exportFormatModal: document.getElementById('exportFormatModal'),
     closeExportFormatModalBtn: document.getElementById('closeExportFormatModalBtn'),
     exportAsJsonBtn: document.getElementById('exportAsJsonBtn'),
@@ -1179,9 +1192,32 @@
     } catch (e) {}
   }
 
+  // Strict Content Filter: Only Category 10 (Music) & Podcasts allowed (Zero gaming, vlogs, reactions)
+  function isContentFilterAllowed(t) {
+    if (!t) return false;
+    if (t.isLocal || t.source === 'saavn') return true;
+    const cat = String(t.categoryId || '');
+    const title = (t.title || '').toLowerCase();
+    const artist = (t.artist || '').toLowerCase();
+    const isPodcast = title.includes('podcast') || title.includes('episode') ||
+                      artist.includes('podcast') || artist.includes('episode') ||
+                      Boolean(t.isPodcast);
+    if (cat === '10' || isPodcast) return true;
+    return false;
+  }
+
   let activePlayToken = 0;
   async function playTrack(track, queueList = null, addToHistory = true, customStartTime = 0) {
     if (!track) return;
+
+    // Strict Content Filter check
+    if (!isContentFilterAllowed(track)) {
+      showToast('⚠️ Content Blocked: MusiSurf strictly plays Music and Podcasts only.', '🚫');
+      state.isPlaying = false;
+      updatePlayPauseButton();
+      return;
+    }
+
     const currentToken = ++activePlayToken;
 
     // Immediately stop and reset both engines completely to prevent 2-3 previous songs playing concurrently
@@ -1377,6 +1413,14 @@
       });
     }
 
+    // Strict Content Filter Check: Only Category 10 (Music) & Podcasts permitted
+    if (!isContentFilterAllowed(track)) {
+      showToast('⚠️ Playback Blocked: MusiSurf strictly plays Music and Podcasts only.', '🚫');
+      state.isPlaying = false;
+      updatePlayPauseButton();
+      return;
+    }
+
     // Determine playback mechanism
     if (track.isLocal && track.fileBlob) {
       // Local device storage file playback (100% on device)
@@ -1509,6 +1553,11 @@
                 // Secondary fallback to YouTube iframe if direct audio extraction fails
                 const ytId = track.ytId || (track.id ? track.id.replace('yt_', '') : '');
                 if (ytId && state.ytReady && state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
+                  // Strict categoryId 10 / Podcast check before YouTube IFrame player loads
+                  if (!isContentFilterAllowed(track)) {
+                    showToast('Playback Blocked: MusiSurf strictly plays Music and Podcasts only.', '🚫');
+                    return;
+                  }
                   try {
                     state.activePlayerEngine = 'youtube';
                     try {
@@ -1530,6 +1579,11 @@
           // Fallback directly to YouTube iframe player if no audioSrc
           const ytId = track.ytId || (track.id ? track.id.replace('yt_', '') : '');
           if (ytId && state.ytReady && state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
+            // Strict categoryId 10 / Podcast check before YouTube IFrame player loads
+            if (!isContentFilterAllowed(track)) {
+              showToast('Playback Blocked: MusiSurf strictly plays Music and Podcasts only.', '🚫');
+              return;
+            }
             state.activePlayerEngine = 'youtube';
             try {
               elements.audio.pause();
@@ -2758,7 +2812,14 @@
           return;
         }
         const isVideo = track.source === 'youtube' || track.ytId || (track.id && track.id.startsWith('yt_'));
-        if (filterType === 'songs') {
+        const isPodcast = (track.title || '').toLowerCase().includes('podcast') ||
+                          (track.title || '').toLowerCase().includes('episode') ||
+                          (track.artist || '').toLowerCase().includes('podcast') ||
+                          Boolean(track.isPodcast);
+
+        if (filterType === 'podcasts') {
+          row.style.display = isPodcast ? '' : 'none';
+        } else if (filterType === 'songs') {
           row.style.display = !isVideo ? '' : 'none';
         } else if (filterType === 'videos') {
           row.style.display = isVideo ? '' : 'none';
@@ -2776,7 +2837,12 @@
     if (elements.topResultCard && elements.topResultCard._trackData) {
       const top = elements.topResultCard._trackData;
       const isVideo = top.source === 'youtube' || top.ytId || (top.id && top.id.startsWith('yt_'));
+      const isPodcast = (top.title || '').toLowerCase().includes('podcast') ||
+                        (top.title || '').toLowerCase().includes('episode') ||
+                        (top.artist || '').toLowerCase().includes('podcast') ||
+                        Boolean(top.isPodcast);
       let showTop = true;
+      if (filterType === 'podcasts' && !isPodcast) showTop = false;
       if (filterType === 'songs' && isVideo) showTop = false;
       if (filterType === 'videos' && !isVideo) showTop = false;
       if (filterType === 'playlists') showTop = false;
@@ -4499,7 +4565,7 @@
   }
 
   // ==========================================================================
-  // SETTINGS CONTROLLER (Dead Silence Remover & Keyboard Shortcuts)
+  // SETTINGS CONTROLLER (Dead Silence Remover, Crossfade & Sound Preferences)
   // ==========================================================================
   function loadSettings() {
     try {
@@ -4509,21 +4575,46 @@
       }
     } catch (e) {}
 
-    if (elements.deadSilenceOnRadio && elements.deadSilenceOffRadio) {
-      if (state.settings.removeDeadSilence) {
-        elements.deadSilenceOnRadio.checked = true;
-      } else {
-        elements.deadSilenceOffRadio.checked = true;
-      }
+    // Crossfade Slider (Image 2)
+    const cf = typeof state.settings.crossfade === 'number' ? state.settings.crossfade : 7.5;
+    if (elements.crossfadeSlider) elements.crossfadeSlider.value = cf;
+    if (elements.liveCrossfadeSeconds) elements.liveCrossfadeSeconds.textContent = `${cf} s`;
+    if (elements.crossfadeValueLabel) elements.crossfadeValueLabel.textContent = cf === 0 ? 'Off' : `${cf}s`;
+
+    // Skip Silence & Automix
+    if (elements.skipSilenceToggleSwitch) {
+      elements.skipSilenceToggleSwitch.checked = state.settings.removeDeadSilence !== false;
+    }
+    if (elements.automixToggleSwitch) {
+      elements.automixToggleSwitch.checked = state.settings.automix !== false;
     }
 
-    if (elements.crossfadeSlider && elements.crossfadeValueLabel) {
-      const cf = typeof state.settings.crossfade === 'number' ? state.settings.crossfade : 0;
-      elements.crossfadeSlider.value = cf;
-      elements.crossfadeValueLabel.textContent = cf === 0 ? 'Off' : `${cf}s`;
-      document.querySelectorAll('.crossfade-steps-labels .step-label').forEach(lbl => {
-        lbl.classList.toggle('active', parseInt(lbl.dataset.val, 10) === cf);
-      });
+    // Streaming Quality
+    const quality = state.settings.streamingQuality || 'high';
+    document.querySelectorAll('#streamQualityPills .sound-pill-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.quality === quality);
+    });
+
+    // Volume Leveling
+    const leveling = state.settings.volumeLeveling || 'loud';
+    document.querySelectorAll('#volumeLevelingPills .sound-pill-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.level === leveling);
+    });
+
+    // Playback Speed
+    const speed = state.settings.playbackSpeed || 1.0;
+    if (elements.audio) {
+      elements.audio.playbackRate = speed;
+      elements.audio.preservesPitch = true;
+    }
+    document.querySelectorAll('#speedPillsRow .speed-pill-btn').forEach(btn => {
+      btn.classList.toggle('active', parseFloat(btn.dataset.speed) === speed);
+    });
+
+    // Equalizer
+    if (elements.equalizerToggleSwitch && elements.equalizerSlidersWrap) {
+      elements.equalizerToggleSwitch.checked = !!state.settings.equalizerEnabled;
+      elements.equalizerSlidersWrap.style.display = state.settings.equalizerEnabled ? 'block' : 'none';
     }
   }
 
@@ -4895,19 +4986,30 @@
     const isCollapsed = localStorage.getItem('musisurf_sidebar_collapsed') === 'true';
     applySidebarCollapsedState(isCollapsed);
 
-    if (elements.collapseSidebarBtn) {
-      elements.collapseSidebarBtn.addEventListener('click', (e) => {
+    const btn = elements.collapseSidebarBtn || document.getElementById('collapseSidebarBtn');
+    if (btn) {
+      btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const appEl = document.getElementById('app');
         const currentlyCollapsed = appEl ? appEl.classList.contains('sidebar-collapsed') : false;
         applySidebarCollapsedState(!currentlyCollapsed);
       });
     }
+
+    const libHeader = document.getElementById('navLibraryBtn');
+    if (libHeader) {
+      libHeader.addEventListener('click', () => {
+        const appEl = document.getElementById('app');
+        if (appEl && appEl.classList.contains('sidebar-collapsed')) {
+          applySidebarCollapsedState(false);
+        }
+      });
+    }
   }
 
   function applySidebarCollapsedState(collapsed) {
     const appEl = document.getElementById('app');
-    const sidebarEl = elements.sidebar;
+    const sidebarEl = elements.sidebar || document.getElementById('sidebar');
     if (!appEl || !sidebarEl) return;
     if (collapsed) {
       appEl.classList.add('sidebar-collapsed');
@@ -4917,12 +5019,13 @@
       sidebarEl.classList.remove('collapsed');
     }
     localStorage.setItem('musisurf_sidebar_collapsed', collapsed ? 'true' : 'false');
-    if (elements.collapseSidebarBtn) {
-      const collapseIcon = elements.collapseSidebarBtn.querySelector('.collapse-icon');
-      const expandIcon = elements.collapseSidebarBtn.querySelector('.expand-icon');
+    const btn = elements.collapseSidebarBtn || document.getElementById('collapseSidebarBtn');
+    if (btn) {
+      const collapseIcon = btn.querySelector('.collapse-icon');
+      const expandIcon = btn.querySelector('.expand-icon');
       if (collapseIcon) collapseIcon.style.display = collapsed ? 'none' : 'block';
       if (expandIcon) expandIcon.style.display = collapsed ? 'block' : 'none';
-      elements.collapseSidebarBtn.title = collapsed ? 'Expand Your Library' : 'Collapse Your Library';
+      btn.title = collapsed ? 'Expand Your Library' : 'Collapse Your Library';
     }
   }
 
@@ -5916,54 +6019,199 @@
       });
     }
 
-    if (elements.deadSilenceOnRadio) {
-      elements.deadSilenceOnRadio.addEventListener('change', () => {
-        state.settings.removeDeadSilence = true;
-        saveSettings();
-        showToast('Dead silence removal enabled (intro & outro only)', '✨');
-      });
-    }
-
-    if (elements.deadSilenceOffRadio) {
-      elements.deadSilenceOffRadio.addEventListener('change', () => {
-        state.settings.removeDeadSilence = false;
-        saveSettings();
-        showToast('Dead silence removal disabled', '⚙');
-      });
-    }
-
-    // Crossfade Slider & Steps Listeners
-    if (elements.crossfadeSlider) {
-      elements.crossfadeSlider.addEventListener('input', (e) => {
-        const val = parseInt(e.target.value, 10) || 0;
-        state.settings.crossfade = val;
-        if (elements.crossfadeValueLabel) {
-          elements.crossfadeValueLabel.textContent = val === 0 ? 'Off' : `${val}s`;
-        }
-        document.querySelectorAll('.crossfade-steps-labels .step-label').forEach(lbl => {
-          lbl.classList.toggle('active', parseInt(lbl.dataset.val, 10) === val);
+    // Two-Pane Settings Category Navigation (Image 1)
+    document.querySelectorAll('.settings-cat-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.settings-cat-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const targetId = btn.dataset.target;
+        document.querySelectorAll('.settings-tab-view').forEach(view => {
+          view.classList.toggle('active', view.id === targetId);
         });
       });
-      elements.crossfadeSlider.addEventListener('change', () => {
-        saveSettings();
-        showToast(state.settings.crossfade === 0 ? 'Crossfade turned off' : `Crossfade set to ${state.settings.crossfade}s`, '🎚️');
+    });
+
+    // Settings Search Filter
+    const settingsSearchField = document.getElementById('settingsSearchInput');
+    if (settingsSearchField) {
+      settingsSearchField.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        document.querySelectorAll('.settings-tab-view .sound-card-item, .settings-tab-view .playback-feature-card').forEach(item => {
+          const txt = item.textContent.toLowerCase();
+          item.style.display = (!query || txt.includes(query)) ? '' : 'none';
+        });
       });
     }
 
-    // Step labels direct tap/click support
-    document.querySelectorAll('.crossfade-steps-labels .step-label').forEach(lbl => {
-      lbl.addEventListener('click', () => {
-        const val = parseInt(lbl.dataset.val, 10) || 0;
-        state.settings.crossfade = val;
-        if (elements.crossfadeSlider) elements.crossfadeSlider.value = val;
-        if (elements.crossfadeValueLabel) {
-          elements.crossfadeValueLabel.textContent = val === 0 ? 'Off' : `${val}s`;
-        }
-        document.querySelectorAll('.crossfade-steps-labels .step-label').forEach(l => {
-          l.classList.toggle('active', parseInt(l.dataset.val, 10) === val);
+    // Audio Output Device Enumeration & Switching
+    async function populateAudioOutputDevices(selectEl) {
+      if (!selectEl || !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const outputs = devices.filter(d => d.kind === 'audiooutput');
+        selectEl.innerHTML = '';
+        const defOpt = document.createElement('option');
+        defOpt.value = 'default';
+        defOpt.textContent = 'Speakers (System Default)';
+        selectEl.appendChild(defOpt);
+        outputs.forEach(d => {
+          if (d.deviceId !== 'default') {
+            const opt = document.createElement('option');
+            opt.value = d.deviceId;
+            opt.textContent = d.label || `Audio Output (${d.deviceId.slice(0, 8)})`;
+            selectEl.appendChild(opt);
+          }
         });
+      } catch (err) {
+        console.warn('Audio device enum note:', err);
+      }
+    }
+
+    const outputSelect = elements.settingsAudioOutputSelect || document.getElementById('settingsAudioOutputSelect');
+    if (outputSelect) {
+      populateAudioOutputDevices(outputSelect);
+      outputSelect.addEventListener('change', async (e) => {
+        const deviceId = e.target.value;
+        if (typeof elements.audio.setSinkId === 'function') {
+          try {
+            await elements.audio.setSinkId(deviceId === 'default' ? '' : deviceId);
+            showToast('Audio output switched', '🔊');
+          } catch (err) {
+            console.warn('setSinkId error:', err);
+          }
+        }
+      });
+      if (navigator.mediaDevices) {
+        navigator.mediaDevices.addEventListener('devicechange', () => {
+          populateAudioOutputDevices(outputSelect);
+        });
+      }
+    }
+
+    // Equalizer Toggle Switch
+    const eqToggle = elements.equalizerToggleSwitch || document.getElementById('equalizerToggleSwitch');
+    const eqSliders = elements.equalizerSlidersWrap || document.getElementById('equalizerSlidersWrap');
+    if (eqToggle && eqSliders) {
+      eqToggle.addEventListener('change', () => {
+        eqSliders.style.display = eqToggle.checked ? 'block' : 'none';
+        state.settings.equalizerEnabled = eqToggle.checked;
         saveSettings();
-        showToast(val === 0 ? 'Crossfade turned off' : `Crossfade set to ${val}s`, '🎚️');
+        showToast(eqToggle.checked ? '10-Band Equalizer enabled' : 'Equalizer bypassed', '🎛️');
+      });
+    }
+
+    // Equalizer Vertical Slider Gain Adjustments
+    document.querySelectorAll('.eq-vertical-slider').forEach(slider => {
+      slider.addEventListener('input', (e) => {
+        const freq = e.target.dataset.freq;
+        const gain = parseFloat(e.target.value) || 0;
+        if (!state.settings.eqBands) state.settings.eqBands = {};
+        state.settings.eqBands[freq] = gain;
+        saveSettings();
+      });
+    });
+
+    // Crossfade Slider (Image 2 Gradient Track)
+    const crossfadeSlider = elements.crossfadeSlider || document.getElementById('crossfadeSlider');
+    const liveTimeLabel = elements.liveCrossfadeSeconds || document.getElementById('liveCrossfadeSeconds');
+    if (crossfadeSlider) {
+      crossfadeSlider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value) || 0;
+        state.settings.crossfade = val;
+        if (liveTimeLabel) liveTimeLabel.textContent = `${val.toFixed(1)} s`;
+        if (elements.crossfadeValueLabel) elements.crossfadeValueLabel.textContent = val === 0 ? 'Off' : `${val.toFixed(1)}s`;
+      });
+      crossfadeSlider.addEventListener('change', (e) => {
+        const val = parseFloat(e.target.value) || 0;
+        state.settings.crossfade = val;
+        saveSettings();
+        showToast(val === 0 ? 'Crossfade turned off' : `Crossfade set to ${val.toFixed(1)} s`, '🎚️');
+      });
+    }
+
+    // Automix & Skip Silence Toggles (Image 3)
+    const automixSwitch = elements.automixToggleSwitch || document.getElementById('automixToggleSwitch');
+    if (automixSwitch) {
+      automixSwitch.addEventListener('change', () => {
+        state.settings.automix = automixSwitch.checked;
+        saveSettings();
+        showToast(automixSwitch.checked ? 'Automix enabled' : 'Automix disabled', '🎶');
+      });
+    }
+
+    const skipSilenceSwitch = elements.skipSilenceToggleSwitch || document.getElementById('skipSilenceToggleSwitch');
+    if (skipSilenceSwitch) {
+      skipSilenceSwitch.addEventListener('change', () => {
+        state.settings.removeDeadSilence = skipSilenceSwitch.checked;
+        saveSettings();
+        showToast(skipSilenceSwitch.checked ? 'Skip silence enabled (-42 dB)' : 'Skip silence disabled', '⚡');
+      });
+    }
+
+    // Speed / Pitch Intact Controller (0.8x - 2.0x, Image 3)
+    document.querySelectorAll('#speedPillsRow .speed-pill-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#speedPillsRow .speed-pill-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const speed = parseFloat(btn.dataset.speed) || 1.0;
+        state.settings.playbackSpeed = speed;
+        if (elements.audio) {
+          elements.audio.playbackRate = speed;
+          elements.audio.preservesPitch = true;
+        }
+        saveSettings();
+        showToast(`Playback speed: ${speed}x (pitch intact)`, '⏩');
+      });
+    });
+
+    // Streaming Quality Pills
+    document.querySelectorAll('#streamQualityPills .sound-pill-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#streamQualityPills .sound-pill-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.settings.streamingQuality = btn.dataset.quality;
+        saveSettings();
+        showToast(`Streaming quality: ${btn.textContent}`, '📶');
+      });
+    });
+
+    // Volume Leveling Pills
+    document.querySelectorAll('#volumeLevelingPills .sound-pill-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#volumeLevelingPills .sound-pill-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.settings.volumeLeveling = btn.dataset.level;
+        saveSettings();
+        showToast(`Volume leveling: ${btn.textContent}`, '🔊');
+      });
+    });
+
+    // Clear Offline Cache Button
+    const clearCacheBtn = document.getElementById('clearCacheSettingsBtn');
+    if (clearCacheBtn) {
+      clearCacheBtn.addEventListener('click', async () => {
+        try {
+          if ('caches' in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map(k => caches.delete(k)));
+          }
+          showToast('Offline cache cleared successfully', '🧹');
+        } catch (e) {
+          showToast('Cache cleared', '🧹');
+        }
+      });
+    }
+
+    // Curated Podcasts Card Clicks in Explore Section
+    document.querySelectorAll('.podcast-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const query = card.dataset.query;
+        if (query) {
+          if (elements.globalSearchInput) elements.globalSearchInput.value = query;
+          if (elements.clearSearchBtn) elements.clearSearchBtn.style.display = 'flex';
+          switchView('search');
+          performSearch(query);
+        }
       });
     });
 
@@ -6090,6 +6338,10 @@
       if (isYtTrack) {
         const ytId = state.currentTrack.ytId || (state.currentTrack.id ? state.currentTrack.id.replace('yt_', '') : '');
         if (ytId && state.ytReady && state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
+          if (!isContentFilterAllowed(state.currentTrack)) {
+            showToast('Playback Blocked: Video is not Category 10 (Music) or Podcast.', '🚫');
+            return;
+          }
           try {
             state.ytPlayer.loadVideoById(ytId);
             state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);

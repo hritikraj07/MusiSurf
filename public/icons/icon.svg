@@ -1,21 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
   <defs>
-    <!-- Premium Radiant Emerald to Neon Cyan Gradient -->
+    <!-- Vibrant Spotify Emerald Gradient -->
     <linearGradient id="musiLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#00F296"/>
-      <stop offset="50%" stop-color="#10B981"/>
-      <stop offset="100%" stop-color="#00D2FF"/>
+      <stop offset="0%" stop-color="#1ed760"/>
+      <stop offset="100%" stop-color="#1db954"/>
     </linearGradient>
 
-    <!-- Deep Obsidian Backdrop with Inner Luminescence -->
+    <!-- Pitch Black Backdrop -->
     <radialGradient id="musiLogoBg" cx="50%" cy="40%" r="75%">
-      <stop offset="0%" stop-color="#121e1a"/>
-      <stop offset="70%" stop-color="#090e0c"/>
-      <stop offset="100%" stop-color="#040605"/>
+      <stop offset="0%" stop-color="#121212"/>
+      <stop offset="70%" stop-color="#050505"/>
+      <stop offset="100%" stop-color="#000000"/>
     </radialGradient>
 
     <filter id="musiGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#00F296" flood-opacity="0.45"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#1ed760" flood-opacity="0.45"/>
     </filter>
   </defs>
 
@@ -40,13 +39,13 @@
     <rect x="38" y="38" width="24" height="42" rx="12" fill="url(#musiLogoGrad)"/>
 
     <!-- 4 Horizontal Grille Slots -->
-    <rect x="38" y="46" width="13" height="2.5" rx="1.25" fill="#090e0c"/>
-    <rect x="38" y="51.5" width="13" height="2.5" rx="1.25" fill="#090e0c"/>
-    <rect x="38" y="57" width="13" height="2.5" rx="1.25" fill="#090e0c"/>
-    <rect x="38" y="62.5" width="13" height="2.5" rx="1.25" fill="#090e0c"/>
+    <rect x="38" y="46" width="13" height="2.5" rx="1.25" fill="#000000"/>
+    <rect x="38" y="51.5" width="13" height="2.5" rx="1.25" fill="#000000"/>
+    <rect x="38" y="57" width="13" height="2.5" rx="1.25" fill="#000000"/>
+    <rect x="38" y="62.5" width="13" height="2.5" rx="1.25" fill="#000000"/>
 
     <!-- Bottom Circular Knob and Stem Cutout -->
-    <circle cx="50" cy="72.5" r="3.2" fill="#090e0c"/>
-    <rect x="48.8" y="72.5" width="2.4" height="7.5" fill="#090e0c"/>
+    <circle cx="50" cy="72.5" r="3.2" fill="#000000"/>
+    <rect x="48.8" y="72.5" width="2.4" height="7.5" fill="#000000"/>
   </g>
 </svg>
