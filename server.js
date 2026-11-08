@@ -890,6 +890,7 @@ app.get('/api/yt-stream', async (req, res) => {
 app.get('/api/lyrics', async (req, res) => {
   const track = (req.query.track || '').trim();
   const artist = (req.query.artist || '').trim();
+  const duration = req.query.duration ? parseInt(req.query.duration, 10) : null;
 
   if (!track) {
     return res.json({ success: false, message: 'Track name is required' });
@@ -898,7 +899,10 @@ app.get('/api/lyrics', async (req, res) => {
   try {
     const cleanTrack = track.replace(/\(.*\)|\[.*\]|- .*/g, '').trim();
     const cleanArtist = artist.split(',')[0].trim();
-    const url = `https://lrclib.net/api/get?track_name=${encodeURIComponent(cleanTrack)}&artist_name=${encodeURIComponent(cleanArtist)}`;
+    let url = `https://lrclib.net/api/get?track_name=${encodeURIComponent(cleanTrack)}&artist_name=${encodeURIComponent(cleanArtist)}`;
+    if (duration && duration > 0) {
+      url += `&duration=${duration}`;
+    }
 
     const response = await fetch(url, {
       headers: {
@@ -917,7 +921,6 @@ app.get('/api/lyrics', async (req, res) => {
           plainLyrics: data.plainLyrics
         });
       }
-      // If syncedLyrics is empty, fall through to search to find a synced version!
     }
 
     // Fallback: search query on lrclib
@@ -929,7 +932,17 @@ app.get('/api/lyrics', async (req, res) => {
     if (searchRes.ok) {
       const list = await searchRes.json();
       if (Array.isArray(list) && list.length > 0) {
-        const item = list.find(l => l.syncedLyrics) || list[0];
+        let item = null;
+        if (duration && duration > 0) {
+          const syncedList = list.filter(l => l.syncedLyrics);
+          if (syncedList.length > 0) {
+            syncedList.sort((a, b) => Math.abs((a.duration || 0) - duration) - Math.abs((b.duration || 0) - duration));
+            item = syncedList[0];
+          }
+        }
+        if (!item) {
+          item = list.find(l => l.syncedLyrics) || list[0];
+        }
         return res.json({
           success: true,
           trackName: item.trackName,
@@ -944,6 +957,30 @@ app.get('/api/lyrics', async (req, res) => {
   } catch (err) {
     console.error('Lyrics error:', err.message);
     res.json({ success: false, message: 'Lyrics lookup error' });
+  }
+});
+
+// Image Proxy for Canvas Color Extraction (Zero CORS Issues)
+app.get('/api/image-proxy', async (req, res) => {
+  const imageUrl = req.query.url;
+  if (!imageUrl || !imageUrl.startsWith('http')) {
+    return res.status(400).send('Invalid url');
+  }
+  try {
+    const upstream = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+    if (!upstream.ok) return res.status(upstream.status).send('Failed to fetch image');
+    const contentType = upstream.headers.get('content-type') || 'image/jpeg';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    const arrayBuffer = await upstream.arrayBuffer();
+    res.send(Buffer.from(arrayBuffer));
+  } catch (e) {
+    res.status(500).send('Proxy error');
   }
 });
 

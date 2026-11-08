@@ -57,7 +57,10 @@
     contextTrack: null,
     totalListenedSeconds: parseInt(localStorage.getItem('musisurf_total_listened_sec'), 10) || 9660,
     activePlayerEngine: 'audio',
-    activeSearchFilter: 'all'
+    activeSearchFilter: 'all',
+    trackPlayCounts: (() => {
+      try { return JSON.parse(localStorage.getItem('musisurf_track_play_counts') || '{}'); } catch (e) { return {}; }
+    })()
   };
 
   // DOM Elements
@@ -1155,26 +1158,11 @@
       clearInterval(crossfadeFadeOutTimer);
       crossfadeFadeOutTimer = null;
     }
-    const startVol = elements.audio.volume || state.volume || 0.8;
-    if (startVol <= 0.05 || elements.audio.paused) {
-      try { elements.audio.pause(); } catch (e) {}
-      if (typeof callback === 'function') callback();
-      return;
-    }
-
-    const fadeMs = 120;
-    const startTime = Date.now();
-    crossfadeFadeOutTimer = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(1, elapsed / fadeMs);
-      elements.audio.volume = Math.max(0, startVol * (1 - progress));
-      if (progress >= 1) {
-        clearInterval(crossfadeFadeOutTimer);
-        crossfadeFadeOutTimer = null;
-        try { elements.audio.pause(); } catch (e) {}
-        if (typeof callback === 'function') callback();
-      }
-    }, 15);
+    try {
+      elements.audio.pause();
+    } catch (e) {}
+    elements.audio.volume = state.isMuted ? 0 : (state.volume || 0.8);
+    if (typeof callback === 'function') callback();
   }
 
   function applyCrossfadeIn() {
@@ -1262,6 +1250,33 @@
     return true;
   }
 
+  function recordTrackPlay(track) {
+    if (!track) return;
+    const key = track.id || track.title;
+    if (!key) return;
+    if (!state.trackPlayCounts) state.trackPlayCounts = {};
+    const entry = state.trackPlayCounts[key] || { count: 0, track: null, lastPlayed: 0 };
+    entry.count = (entry.count || 0) + 1;
+    entry.lastPlayed = Date.now();
+    entry.track = {
+      id: track.id || key,
+      title: track.title,
+      artist: track.artist,
+      image: track.image,
+      duration: track.duration,
+      durationStr: track.durationStr,
+      album: track.album || 'Single',
+      audioUrl: track.audioUrl,
+      streamUrl: track.streamUrl,
+      ytId: track.ytId,
+      source: track.source
+    };
+    state.trackPlayCounts[key] = entry;
+    try {
+      localStorage.setItem('musisurf_track_play_counts', JSON.stringify(state.trackPlayCounts));
+    } catch (e) {}
+  }
+
   let activePlayToken = 0;
   async function playTrack(track, queueList = null, addToHistory = true, customStartTime = 0) {
     if (!track) return;
@@ -1273,6 +1288,9 @@
       updatePlayPauseButton();
       return;
     }
+
+    recordTrackPlay(track);
+    applyLyricsDynamicBackground(track);
 
     const currentToken = ++activePlayToken;
     state.isTrackLoading = true;
@@ -2200,21 +2218,40 @@
     return lastKnownPlaybackTime || 0;
   }
 
+  function parseDurationToSeconds(val) {
+    if (typeof val === 'number' && Number.isFinite(val) && val > 0) return val;
+    if (typeof val === 'string') {
+      const trimmed = val.trim();
+      if (trimmed.includes(':')) {
+        const parts = trimmed.split(':').map(Number);
+        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+          return parts[0] * 60 + parts[1];
+        }
+        if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+          return parts[0] * 3600 + parts[1] * 60 + parts[2];
+        }
+      }
+      const num = Number(trimmed);
+      if (Number.isFinite(num) && num > 0) return num;
+    }
+    return 0;
+  }
+
   function getTotalDuration() {
-    const metaDur = Number(state.currentTrack?.duration) || 0;
-    const audioDur = Number(elements.audio.duration) || 0;
+    const metaDur = parseDurationToSeconds(state.currentTrack?.duration) || parseDurationToSeconds(state.currentTrack?.durationStr) || 0;
+    const audioDur = Number(elements.audio?.duration) || 0;
 
     // 1. If we have a known metadata duration, verify audioDur against it.
     // Chunked WebM streams report buffered chunk length (e.g. 8s) as audio.duration.
     // If audioDur is significantly smaller than metadata duration, metadata duration is truth.
     if (metaDur > 0) {
-      if (Number.isFinite(audioDur) && audioDur >= (metaDur - 5)) {
+      if (Number.isFinite(audioDur) && audioDur >= (metaDur - 5) && audioDur !== Infinity) {
         return audioDur;
       }
       return metaDur;
     }
 
-    if (Number.isFinite(audioDur) && audioDur > 0) {
+    if (Number.isFinite(audioDur) && audioDur > 0 && audioDur !== Infinity) {
       return audioDur;
     }
 
@@ -2427,7 +2464,12 @@
     }
 
     try {
-      const res = await fetch(`/api/lyrics?track=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`);
+      const durSec = Math.round(getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || parseDurationToSeconds(state.currentTrack?.durationStr) || 0);
+      let durParam = '';
+      if (durSec > 0) {
+        durParam = `&duration=${durSec}`;
+      }
+      const res = await fetch(`/api/lyrics?track=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}${durParam}`);
       const data = await res.json();
 
       elements.lyricsLoading.style.display = 'none';
@@ -2485,6 +2527,11 @@
     const lines = lrcText.split('\n');
     const result = [];
     const timeReg = /\[(\d{2}):(\d{2})\.?(\d{2,3})?\]/g;
+    let offset = 0;
+    const offsetMatch = lrcText.match(/\[offset:\s*([+-]?\d+)\]/i);
+    if (offsetMatch) {
+      offset = (parseInt(offsetMatch[1], 10) || 0) / 1000;
+    }
 
     for (const line of lines) {
       const matches = [...line.matchAll(timeReg)];
@@ -2495,7 +2542,7 @@
           const mins = parseInt(match[1], 10);
           const secs = parseInt(match[2], 10);
           const ms = match[3] ? parseInt(match[3].padEnd(3, '0').slice(0, 3), 10) : 0;
-          const time = mins * 60 + secs + ms / 1000;
+          const time = Math.max(0, mins * 60 + secs + (ms / 1000) + offset);
           result.push({ time, text });
         }
       }
@@ -3230,6 +3277,7 @@
           <th class="col-num">#</th>
           <th class="col-title">Title</th>
           <th class="col-album">Album</th>
+          <th class="col-date-added">Date added</th>
           <th class="col-duration">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"/>
@@ -3806,8 +3854,31 @@
         fallback();
       };
 
-      img.src = imgSrc;
+      if (typeof imgSrc === 'string' && imgSrc.startsWith('http') && !imgSrc.includes('/api/image-proxy')) {
+        img.src = `/api/image-proxy?url=${encodeURIComponent(imgSrc)}`;
+      } else {
+        img.src = imgSrc;
+      }
     });
+  }
+
+  async function applyLyricsDynamicBackground(track) {
+    const lyricsViewEl = document.getElementById('lyricsView');
+    if (!lyricsViewEl) return;
+    const current = track || state.currentTrack;
+    if (!current || !current.image) {
+      lyricsViewEl.style.setProperty('--lyrics-theme-color', '#181b22');
+      return;
+    }
+    try {
+      const [r, g, b] = await extractDominantColor(current.image, current.id || current.title || 'lyrics');
+      const topR = Math.min(255, Math.floor(r * 0.72 + 10));
+      const topG = Math.min(255, Math.floor(g * 0.72 + 10));
+      const topB = Math.min(255, Math.floor(b * 0.72 + 14));
+      lyricsViewEl.style.setProperty('--lyrics-theme-color', `rgb(${topR}, ${topG}, ${topB})`);
+    } catch (e) {
+      lyricsViewEl.style.setProperty('--lyrics-theme-color', '#181b22');
+    }
   }
 
   async function applyPlaylistDynamicBackground(playlistId, tracks, fallbackKey = 'playlist') {
@@ -4747,6 +4818,7 @@
     }
     if (viewName === 'lyrics') {
       if (state.currentTrack) {
+        applyLyricsDynamicBackground(state.currentTrack);
         if (elements.lyricsTrackTitle) elements.lyricsTrackTitle.textContent = state.currentTrack.title || 'Song Title';
         if (elements.lyricsTrackArtist) elements.lyricsTrackArtist.textContent = state.currentTrack.artist || 'Artist';
         if (elements.lyricsAlbumCover) {
@@ -5283,6 +5355,7 @@
             </div>
           </td>
           <td class="col-album">${escapeHtml(track.fileName || track.album || 'Device Storage')}</td>
+          <td class="col-date-added">${formatDateAdded(track.addedAt)}</td>
           <td class="col-duration">${track.durationStr || '--:--'}</td>
           <td class="col-actions">
             <button class="song-action-btn add-to-queue-trigger" title="Add to Queue">
@@ -5569,18 +5642,10 @@
     }
   }
 
-  // Floating In-App Miniplayer Management
+  // Floating In-App Miniplayer Management (Completely Removed as Requested)
   function toggleMiniPlayer(forceOpen = null) {
-    if (!elements.floatingMiniplayer) return;
-    const isCurrentlyHidden = elements.floatingMiniplayer.style.display === 'none' || !elements.floatingMiniplayer.style.display;
-    const shouldOpen = forceOpen !== null ? forceOpen : isCurrentlyHidden;
-
-    if (shouldOpen) {
-      syncMiniplayerTrack();
-      elements.floatingMiniplayer.style.display = 'flex';
-    } else {
-      elements.floatingMiniplayer.style.display = 'none';
-    }
+    if (elements.floatingMiniplayer) elements.floatingMiniplayer.style.display = 'none';
+    return;
   }
 
   function syncMiniplayerTrack() {
@@ -5730,33 +5795,28 @@
       elements.replayPlaysCount.textContent = `${totalPlays} plays • 7 days of listening`;
     }
 
-    // Determine #1 Most Played Song from history and recently played
-    const songFrequencies = {};
-    const songObjects = {};
-
-    songsPool.forEach(t => {
-      if (t && (t.id || t.title)) {
-        const key = t.id || t.title;
-        songFrequencies[key] = (songFrequencies[key] || 0) + 1;
-        if (!songObjects[key]) songObjects[key] = t;
-      }
-    });
-
-    let topSongKey = null;
+    // Determine #1 Most Played Song strictly from persistent track play counts
+    let topSong = null;
     let maxPlays = 0;
-    Object.keys(songFrequencies).forEach(k => {
-      if (songFrequencies[k] > maxPlays) {
-        maxPlays = songFrequencies[k];
-        topSongKey = k;
+    if (state.trackPlayCounts) {
+      for (const entry of Object.values(state.trackPlayCounts)) {
+        if (entry && entry.track && entry.count > maxPlays) {
+          maxPlays = entry.count;
+          topSong = entry.track;
+        }
       }
-    });
+    }
 
-    const topSong = (topSongKey && songObjects[topSongKey]) || state.currentTrack || songsPool[0] || {
-      title: 'Starboy',
-      artist: 'The Weeknd',
-      image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=240&auto=format&fit=crop&q=80',
-      duration: 230
-    };
+    if (!topSong) {
+      // Stable fallback: liked songs or history without changing to currently playing track
+      topSong = (state.likedSongs && state.likedSongs[0]) || (state.history && state.history[0]) || {
+        title: 'Starboy',
+        artist: 'The Weeknd',
+        image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=240&auto=format&fit=crop&q=80',
+        duration: 230
+      };
+      maxPlays = 14;
+    }
 
     const finalTopPlays = Math.max(14, maxPlays);
 
@@ -6590,6 +6650,13 @@
       loadSettings();
       if (elements.settingsModal) {
         elements.settingsModal.style.display = 'flex';
+        // Select Account tab by default as requested
+        document.querySelectorAll('.settings-cat-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.target === 'settingsAccountSection');
+        });
+        document.querySelectorAll('.settings-tab-view').forEach(view => {
+          view.classList.toggle('active', view.id === 'settingsAccountSection');
+        });
         try { window.history.pushState({ modal: 'settings' }, '', window.location.pathname); } catch (e) {}
       }
     };
