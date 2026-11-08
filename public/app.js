@@ -128,24 +128,12 @@
     collapseSidebarBtn: document.getElementById('collapseSidebarBtn'),
     searchAutocompleteDropdown: document.getElementById('searchAutocompleteDropdown'),
     searchFilterPills: document.getElementById('searchFilterPills'),
-    miniplayerBtn: document.getElementById('miniplayerBtn'),
     fullscreenBtn: document.getElementById('fullscreenBtn'),
-    floatingMiniplayer: document.getElementById('floatingMiniplayer'),
-    closeFloatingMiniplayerBtn: document.getElementById('closeFloatingMiniplayerBtn'),
-    expandFloatingMiniplayerBtn: document.getElementById('expandFloatingMiniplayerBtn'),
-    miniplayerCover: document.getElementById('miniplayerCover'),
-    miniplayerTitle: document.getElementById('miniplayerTitle'),
-    miniplayerArtist: document.getElementById('miniplayerArtist'),
-    miniHeartBtn: document.getElementById('miniHeartBtn'),
-    miniplayerCurrentTime: document.getElementById('miniplayerCurrentTime'),
-    miniplayerTotalTime: document.getElementById('miniplayerTotalTime'),
-    miniplayerScrubber: document.getElementById('miniplayerScrubber'),
-    miniplayerScrubberFill: document.getElementById('miniplayerScrubberFill'),
-    miniShuffleBtn: document.getElementById('miniShuffleBtn'),
-    miniPrevBtn: document.getElementById('miniPrevBtn'),
-    miniPlayPauseBtn: document.getElementById('miniPlayPauseBtn'),
-    miniNextBtn: document.getElementById('miniNextBtn'),
-    miniRepeatBtn: document.getElementById('miniRepeatBtn'),
+    sidebarLibSearchRow: document.getElementById('sidebarLibSearchRow'),
+    sidebarLibSearchBox: document.getElementById('sidebarLibSearchBox'),
+    sidebarLibSearchToggleBtn: document.getElementById('sidebarLibSearchToggleBtn'),
+    sidebarLibSearchInput: document.getElementById('sidebarLibSearchInput'),
+    sidebarLibSortBtn: document.getElementById('sidebarLibSortBtn'),
 
     // Right Sidebar Panel: Now Playing & About the Artist
     nowPlayingPanel: document.getElementById('nowPlayingPanel'),
@@ -2378,35 +2366,23 @@
         }
       }
 
-      if (dur > 0) {
-        const pct = Math.min(100, (cur / dur) * 100);
+      if (dur > 0 && Number.isFinite(dur)) {
+        const pct = Math.max(0, Math.min(100, (cur / dur) * 100));
         elements.progressFill.style.width = `${pct}%`;
         if (elements.mobProgressFill) elements.mobProgressFill.style.width = `${pct}%`;
         if (elements.miniPlayerFill) elements.miniPlayerFill.style.width = `${pct}%`;
-        if (elements.miniplayerScrubberFill) elements.miniplayerScrubberFill.style.width = `${pct}%`;
-        if (elements.miniplayerCurrentTime) elements.miniplayerCurrentTime.textContent = formatTime(cur);
-        if (elements.miniplayerTotalTime) elements.miniplayerTotalTime.textContent = formatTime(dur);
 
         // Update buffer bar for HTML5 audio
         if (elements.audio.buffered && elements.audio.buffered.length > 0) {
-          const bufEnd = elements.audio.buffered.end(elements.audio.buffered.length - 1);
-          elements.progressBuffer.style.width = `${Math.min(100, (bufEnd / dur) * 100)}%`;
+          try {
+            const bufEnd = elements.audio.buffered.end(elements.audio.buffered.length - 1);
+            elements.progressBuffer.style.width = `${Math.min(100, (bufEnd / dur) * 100)}%`;
+          } catch (e) {}
         }
-      }
-
-      // Check Intelligent Dead Silence Removal (Start & Ending ONLY - Middle is untouched)
-      const expectedEnd = (state.currentTrack?.duration > 10) ? state.currentTrack.duration : dur;
-      if (state.settings.removeDeadSilence && expectedEnd > 10 && !elements.audio.paused && !elements.audio.seeking) {
-        // 1. START SILENCE ONLY: Skip initial digital/encoder lead-in padding (0.6s) once
-        if (!state.currentTrack._introTrimmed && cur < 0.6) {
-          state.currentTrack._introTrimmed = true;
-          seekTo(0.6);
-        }
-
-        // 2. END SILENCE ONLY: Skip tail silence in the last 1.2 seconds of song
-        if (cur >= expectedEnd - 1.2) {
-          onTrackEnded();
-        }
+      } else {
+        elements.progressFill.style.width = '0%';
+        if (elements.mobProgressFill) elements.mobProgressFill.style.width = '0%';
+        if (elements.miniPlayerFill) elements.miniPlayerFill.style.width = '0%';
       }
 
       // Crossfade Fade-Out: As song ends, decrease volume smoothly
@@ -2964,12 +2940,12 @@
 
     elements.searchAutocompleteDropdown.innerHTML = recents.map(item => `
       <div class="search-suggestion-item" data-query="${escapeHtml(item.title || item.name || item)}">
-        <svg class="suggestion-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;min-width:16px;min-height:16px;flex-shrink:0;">
+        <svg class="suggestion-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px !important; height: 16px !important; min-width: 16px !important; min-height: 16px !important; max-width: 16px !important; max-height: 16px !important; flex: 0 0 16px !important; flex-shrink: 0 !important; display: inline-block !important;">
           <circle cx="12" cy="12" r="10"/>
           <polyline points="12 6 12 12 16 14"/>
         </svg>
         <span class="suggestion-text">${escapeHtml(item.title || item.name || item)}</span>
-        <svg class="suggestion-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;min-width:14px;min-height:14px;flex-shrink:0;">
+        <svg class="suggestion-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px !important; height: 14px !important; min-width: 14px !important; min-height: 14px !important; max-width: 14px !important; max-height: 14px !important; flex: 0 0 14px !important; flex-shrink: 0 !important; display: inline-block !important;">
           <polyline points="9 18 15 12 9 6"/>
         </svg>
       </div>
@@ -3034,12 +3010,12 @@
 
     elements.searchAutocompleteDropdown.innerHTML = suggestions.map(item => `
       <div class="search-suggestion-item" data-query="${escapeHtml(item.text)}">
-        <svg class="suggestion-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;min-width:16px;min-height:16px;flex-shrink:0;">
+        <svg class="suggestion-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px !important; height: 16px !important; min-width: 16px !important; min-height: 16px !important; max-width: 16px !important; max-height: 16px !important; flex: 0 0 16px !important; flex-shrink: 0 !important; display: inline-block !important;">
           <circle cx="11" cy="11" r="8"/>
           <line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
         <span class="suggestion-text">${escapeHtml(item.label)}</span>
-        <svg class="suggestion-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;min-width:14px;min-height:14px;flex-shrink:0;">
+        <svg class="suggestion-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px !important; height: 14px !important; min-width: 14px !important; min-height: 14px !important; max-width: 14px !important; max-height: 14px !important; flex: 0 0 14px !important; flex-shrink: 0 !important; display: inline-block !important;">
           <polyline points="9 18 15 12 9 6"/>
         </svg>
       </div>
@@ -3483,7 +3459,7 @@
           </div>
         </div>
       </td>
-      <td class="col-album">${escapeHtml(track.album || 'Single')}</td>
+      <td class="col-album"><span class="col-album-text" title="${escapeHtml(track.album || 'Single')}">${escapeHtml(track.album || 'Single')}</span></td>
       <td class="col-date-added">${formatDateAdded(track.addedAt)}</td>
       <td class="col-duration">${track.durationStr || '3:30'}</td>
       <td class="col-actions">
@@ -4502,12 +4478,23 @@
     if (!elements.customPlaylistsList) return;
     elements.customPlaylistsList.innerHTML = '';
 
-    // Sort playlists: pinned playlists first, then unpinned by lastPlayedAt or creation
-    const sorted = [...(state.customPlaylists || [])].sort((a, b) => {
+    const sortMode = localStorage.getItem('musisurf_sidebar_lib_sort') || 'recents';
+    const searchQuery = (state.sidebarLibSearchQuery || '').trim().toLowerCase();
+
+    // Sort playlists: pinned playlists first, then unpinned by lastPlayedAt or alphabetical
+    let sorted = [...(state.customPlaylists || [])];
+    if (searchQuery) {
+      sorted = sorted.filter(pl => (pl.name || '').toLowerCase().includes(searchQuery));
+    }
+
+    sorted.sort((a, b) => {
       const aPinned = Boolean(a.isPinned);
       const bPinned = Boolean(b.isPinned);
       if (aPinned && !bPinned) return -1;
       if (!aPinned && bPinned) return 1;
+      if (sortMode === 'alphabetical') {
+        return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+      }
       return (b.lastPlayedAt || b.createdAt || 0) - (a.lastPlayedAt || a.createdAt || 0);
     });
 
@@ -4525,7 +4512,7 @@
         </div>
         <div class="library-item-info">
           <span class="library-item-title">${escapeHtml(pl.name)}</span>
-          <span class="library-item-meta">Playlist • ${pl.tracks?.length || 0} songs</span>
+          <span class="library-item-meta">${pl.isPinned ? '📌 ' : ''}Playlist • ${escapeHtml(pl.owner || 'Hritik Raj')}</span>
         </div>
         ${pl.isPinned ? '<span class="sidebar-pin-icon" title="Pinned">📌</span>' : ''}
       `;
@@ -5963,8 +5950,32 @@
     if (elements.winMaximizeBtn) {
       elements.winMaximizeBtn.addEventListener('click', toggleAppFullscreen);
     }
-    if (elements.winMinimizeBtn) {
-      elements.winMinimizeBtn.addEventListener('click', () => toggleMiniPlayer());
+
+    // Sidebar Library Search & Sort Controls
+    if (elements.sidebarLibSearchToggleBtn && elements.sidebarLibSearchBox) {
+      elements.sidebarLibSearchToggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        elements.sidebarLibSearchBox.classList.toggle('open');
+        if (elements.sidebarLibSearchBox.classList.contains('open') && elements.sidebarLibSearchInput) {
+          elements.sidebarLibSearchInput.focus();
+        }
+      });
+    }
+    if (elements.sidebarLibSearchInput) {
+      elements.sidebarLibSearchInput.addEventListener('input', (e) => {
+        state.sidebarLibSearchQuery = e.target.value;
+        renderSidebarPlaylists();
+      });
+    }
+    if (elements.sidebarLibSortBtn) {
+      elements.sidebarLibSortBtn.addEventListener('click', () => {
+        const cur = localStorage.getItem('musisurf_sidebar_lib_sort') || 'recents';
+        const next = cur === 'recents' ? 'alphabetical' : 'recents';
+        localStorage.setItem('musisurf_sidebar_lib_sort', next);
+        const label = elements.sidebarLibSortBtn.querySelector('.sort-text-label');
+        if (label) label.textContent = next === 'alphabetical' ? 'A-Z' : 'Recents';
+        renderSidebarPlaylists();
+      });
     }
 
     // Sidebar Expand / Collapse Toggle (Hover & State Persistence)
@@ -5994,9 +6005,6 @@
       elements.fullscreenBtn.addEventListener('click', toggleAppFullscreen);
     }
     document.addEventListener('fullscreenchange', updateFullscreenUI);
-
-    // Floating Miniplayer Controls & Dragging
-    setupFloatingMiniPlayer();
 
     // Navigation (Home button redirects to top of Home from anywhere)
     if (elements.navHome) elements.navHome.addEventListener('click', navigateToHomeTop);
@@ -6246,12 +6254,13 @@
       }
 
       function handleStart(e) {
+        const rect = barEl.getBoundingClientRect();
+        if (!rect || rect.width <= 0) return;
         isDragging = true;
         state.isDraggingProgress = true;
         barEl.classList.add('scrubbing');
-        const rect = barEl.getBoundingClientRect();
         const clientX = getClientX(e);
-        const pct = (clientX - rect.left) / rect.width;
+        const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
         updateScrubUI(pct);
         if (e.cancelable) e.preventDefault();
       }
@@ -6259,8 +6268,9 @@
       function handleMove(e) {
         if (!isDragging) return;
         const rect = barEl.getBoundingClientRect();
+        if (!rect || rect.width <= 0) return;
         const clientX = getClientX(e);
-        const pct = (clientX - rect.left) / rect.width;
+        const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
         updateScrubUI(pct);
         if (e.cancelable) e.preventDefault();
       }
@@ -6273,9 +6283,7 @@
         if (dur > 0 && Number.isFinite(dur)) {
           seekTo(dragPct * dur);
         }
-        setTimeout(() => {
-          state.isDraggingProgress = false;
-        }, 120);
+        state.isDraggingProgress = false;
       }
 
       // Mouse drag events

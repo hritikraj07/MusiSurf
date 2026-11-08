@@ -145,6 +145,172 @@ html, body {
   width: calc(100vw - 16px) !important;
   max-width: 100% !important;
   margin: 0 8px !important;
+  padding: 16px 24px 32px !important;
+}
+
+/* Fullscreen Mode: Library Header & Actions (Image 4) */
+.app-layout.sidebar-full-width .library-header {
+  padding: 4px 0 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.app-layout.sidebar-full-width .library-header-actions {
+  margin-left: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+.app-layout.sidebar-full-width #createPlaylistBtn {
+  background: #242424 !important;
+  color: #ffffff !important;
+  border-radius: 999px !important;
+  padding: 8px 18px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-weight: 600 !important;
+  font-size: 0.9rem !important;
+  cursor: pointer !important;
+  transition: background 0.2s, transform 0.15s !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.app-layout.sidebar-full-width #createPlaylistBtn:hover {
+  background: #333333 !important;
+  transform: scale(1.03) !important;
+}
+
+.app-layout.sidebar-full-width #createPlaylistBtn .create-playlist-btn-text {
+  display: inline !important;
+}
+
+/* Fullscreen Mode: Library Search & Sort Row (Image 4) */
+.app-layout.sidebar-full-width .sidebar-library-search-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 8px 0 20px !important;
+  margin-bottom: 8px !important;
+}
+
+.app-layout.sidebar-full-width .sidebar-lib-search-box {
+  background: #242424 !important;
+  border-radius: 8px !important;
+  padding: 8px 14px !important;
+  width: 300px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.app-layout.sidebar-full-width .sidebar-lib-search-input {
+  display: block !important;
+  width: 100% !important;
+  font-size: 0.9rem !important;
+}
+
+.app-layout.sidebar-full-width .sidebar-lib-sort-btn .sort-icon-list {
+  display: none !important;
+}
+
+.app-layout.sidebar-full-width .sidebar-lib-sort-btn .sort-icon-grid {
+  display: block !important;
+}
+
+/* Fullscreen Mode: Responsive Card Grid Layout (Image 2) */
+.app-layout.sidebar-full-width .library-content {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)) !important;
+  gap: 20px !important;
+  padding: 8px 0 40px !important;
+  overflow-y: auto !important;
+}
+
+.app-layout.sidebar-full-width .library-item,
+.app-layout.sidebar-full-width .playlist-list-item,
+.app-layout.sidebar-full-width .liked-songs-item {
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  background: #181818 !important;
+  border-radius: 8px !important;
+  padding: 16px !important;
+  gap: 12px !important;
+  transition: background 0.3s ease !important;
+  position: relative !important;
+  height: auto !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+  border: 1px solid transparent !important;
+}
+
+.app-layout.sidebar-full-width .library-item:hover,
+.app-layout.sidebar-full-width .playlist-list-item:hover,
+.app-layout.sidebar-full-width .liked-songs-item:hover {
+  background: #282828 !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.app-layout.sidebar-full-width .replay-cover-art-box,
+.app-layout.sidebar-full-width .liked-icon-box,
+.app-layout.sidebar-full-width .playlist-cover-mini,
+.app-layout.sidebar-full-width .item-cover {
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+  position: relative !important;
+}
+
+.app-layout.sidebar-full-width .playlist-cover-img,
+.app-layout.sidebar-full-width .item-cover-img,
+.app-layout.sidebar-full-width .replay-cover-art-img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 6px !important;
+}
+
+.app-layout.sidebar-full-width .library-item-info,
+.app-layout.sidebar-full-width .playlist-item-info {
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+.app-layout.sidebar-full-width .library-item-title,
+.app-layout.sidebar-full-width .playlist-title {
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.app-layout.sidebar-full-width .library-item-meta,
+.app-layout.sidebar-full-width .playlist-item-meta,
+.app-layout.sidebar-full-width .playlist-subtext {
+  font-size: 0.82rem !important;
+  color: #a7a7a7 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.app-layout.sidebar-full-width .playlist-cover-play-btn {
+  width: 44px !important;
+  height: 44px !important;
+  bottom: 8px !important;
+  right: 8px !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-radius: 50% !important;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4) !important;
 }
 
 /* ==========================================================================
@@ -1069,30 +1235,35 @@ html, body {
 /* Sidebar Library Header & Hover Collapse Button (Image 1 & 9) */
 .library-header {
   padding: 8px 8px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
   background: transparent !important;
   user-select: none !important;
   -webkit-user-select: none !important;
   outline: none !important;
+  white-space: nowrap !important;
+  gap: 8px !important;
 }
 
 .library-header-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
   background: transparent !important;
   user-select: none !important;
   -webkit-user-select: none !important;
   outline: none !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
 }
 
 .library-collapse-icon-btn,
 .library-nav-btn,
 .library-header-btn {
-  display: inline-flex;
-  align-items: center;
+  display: inline-flex !important;
+  align-items: center !important;
   background: transparent !important;
   border: none !important;
   outline: none !important;
@@ -1107,6 +1278,7 @@ html, body {
   -webkit-user-select: none !important;
   -webkit-appearance: none !important;
   appearance: none !important;
+  white-space: nowrap !important;
 }
 
 .library-collapse-icon-btn:hover,
@@ -1130,9 +1302,110 @@ html, body {
   font-weight: 700 !important;
   letter-spacing: -0.01em;
   color: inherit !important;
-  line-height: 1.2;
+  line-height: 1.2 !important;
   user-select: none !important;
   -webkit-user-select: none !important;
+  white-space: nowrap !important;
+  display: inline-block !important;
+}
+
+.library-header-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex-shrink: 0 !important;
+  margin-left: auto !important;
+}
+
+.library-header-actions .create-playlist-btn-text {
+  display: none;
+}
+
+/* Sidebar Library Filter & Sort Row (Upper of Replay - Image 3 & 4) */
+.sidebar-library-search-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 6px 12px;
+  gap: 8px;
+}
+
+.sidebar-lib-search-box {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border-radius: 6px;
+  padding: 2px 4px;
+  transition: all 0.2s ease;
+}
+
+.sidebar-lib-search-btn {
+  background: transparent;
+  border: none;
+  color: #b3b3b3;
+  cursor: pointer;
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.sidebar-lib-search-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-lib-search-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sidebar-lib-search-input {
+  display: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffffff;
+  font-size: 0.84rem;
+  font-family: inherit;
+  width: 130px;
+}
+
+.sidebar-lib-search-box.open {
+  background: #242424;
+  padding: 2px 8px 2px 4px;
+}
+
+.sidebar-lib-search-box.open .sidebar-lib-search-input {
+  display: block;
+}
+
+.sidebar-lib-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: #b3b3b3;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.sidebar-lib-sort-btn:hover {
+  color: #ffffff;
+}
+
+.sidebar-lib-sort-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
 .library-icon-morph {
@@ -1239,9 +1512,17 @@ html, body {
 .sidebar.collapsed .library-nav-btn,
 .sidebar.collapsed .library-heading,
 .sidebar.collapsed .library-header-right,
+.sidebar.collapsed .library-header-actions,
+.sidebar.collapsed #createPlaylistBtn,
+.sidebar.collapsed #expandLibraryFullBtn,
+.sidebar.collapsed .sidebar-library-search-row,
 #app.sidebar-collapsed .sidebar .library-nav-btn,
 #app.sidebar-collapsed .sidebar .library-heading,
-#app.sidebar-collapsed .sidebar .library-header-right {
+#app.sidebar-collapsed .sidebar .library-header-right,
+#app.sidebar-collapsed .sidebar .library-header-actions,
+#app.sidebar-collapsed .sidebar #createPlaylistBtn,
+#app.sidebar-collapsed .sidebar #expandLibraryFullBtn,
+#app.sidebar-collapsed .sidebar .sidebar-library-search-row {
   display: none !important;
 }
 
@@ -1314,7 +1595,17 @@ html, body {
 .sidebar.collapsed .library-heading,
 .sidebar.collapsed .library-item-info,
 .sidebar.collapsed .sidebar-pin-icon,
-.sidebar.collapsed #createPlaylistBtn {
+.sidebar.collapsed #createPlaylistBtn,
+.sidebar.collapsed #expandLibraryFullBtn,
+.sidebar.collapsed .library-header-actions,
+.sidebar.collapsed .sidebar-library-search-row,
+#app.sidebar-collapsed .sidebar .library-heading,
+#app.sidebar-collapsed .sidebar .library-item-info,
+#app.sidebar-collapsed .sidebar .sidebar-pin-icon,
+#app.sidebar-collapsed .sidebar #createPlaylistBtn,
+#app.sidebar-collapsed .sidebar #expandLibraryFullBtn,
+#app.sidebar-collapsed .sidebar .library-header-actions,
+#app.sidebar-collapsed .sidebar .sidebar-library-search-row {
   display: none !important;
 }
 
@@ -1341,22 +1632,9 @@ html, body {
    FLOATING MINIPLAYER CARD (Exact Match to User Reference Image 2)
    ========================================================================== */
 .floating-miniplayer-card {
-  position: fixed !important;
-  bottom: 100px !important;
-  right: 32px !important;
-  width: 310px !important;
-  background: #121316 !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 18px !important;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9) !important;
-  z-index: 2500 !important;
-  overflow: hidden !important;
-  display: flex !important;
-  flex-direction: column !important;
-  backdrop-filter: blur(24px) !important;
-  -webkit-backdrop-filter: blur(24px) !important;
-  animation: miniplayerCardSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  user-select: none !important;
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 @keyframes miniplayerCardSlideIn {
@@ -2732,12 +3010,12 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .tracks-table tbody tr.playing {
-  background: rgba(30, 215, 96, 0.08) !important;
-  border-left: 3px solid #1ed760 !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-left: 3px solid #ffffff !important;
 }
 
 .tracks-table tbody tr.playing:hover {
-  background: rgba(30, 215, 96, 0.14) !important;
+  background: rgba(255, 255, 255, 0.14) !important;
 }
 
 .tracks-table tbody tr.playing .track-num-text {
@@ -2749,13 +3027,13 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .tracks-table tbody tr.playing .col-num {
-  color: #1ed760 !important;
+  color: #ffffff !important;
   font-weight: 700 !important;
 }
 
 .tracks-table tbody tr.playing .table-title-main,
 .tracks-table tbody tr.playing .title-text-main {
-  color: #1ed760 !important;
+  color: #ffffff !important;
   font-weight: 700 !important;
 }
 
@@ -2772,7 +3050,8 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 
 .playing-equalizer-bars .eq-bar {
   width: 2px;
-  background-color: #1ed760;
+  background-color: #ffffff !important;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.6) !important;
   border-radius: 1px;
   animation: eqBarBounce 1.2s ease-in-out infinite alternate;
 }
@@ -2859,6 +3138,14 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   text-overflow: ellipsis !important;
   font-size: 0.82rem;
   padding: 8px 12px !important;
+}
+
+.col-album-text {
+  display: block !important;
+  max-width: 100% !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 
 .col-date-added,

@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=8.25">
+  <link rel="stylesheet" href="/styles.css?v=8.26">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -145,25 +145,58 @@
               <span class="library-heading">Your Library</span>
             </button>
           </div>
-          <button class="icon-action-btn" id="createPlaylistBtn" title="Create Playlist" aria-label="Create Playlist">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-              stroke-linejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
+          <div class="library-header-actions">
+            <button class="icon-action-btn create-playlist-btn" id="createPlaylistBtn" title="Create Playlist" aria-label="Create Playlist">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              <span class="create-playlist-btn-text">Create</span>
+            </button>
+            <button class="icon-action-btn expand-library-full-btn" id="expandLibraryFullBtn" title="Expand Library Full Width" aria-label="Expand Library Full Width">
+              <svg class="icon-lib-expand-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 3 21 3 21 9"/>
+                <polyline points="9 21 3 21 3 15"/>
+                <line x1="21" y1="3" x2="14" y2="10"/>
+                <line x1="3" y1="21" x2="10" y2="14"/>
+              </svg>
+              <svg class="icon-lib-collapse-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                <polyline points="4 14 10 14 10 20"/>
+                <polyline points="20 10 14 10 14 4"/>
+                <line x1="14" y1="10" x2="21" y2="3"/>
+                <line x1="10" y1="14" x2="3" y2="21"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Library Search & Recents Filter Bar (Upper of Replay - Image 3 & 4) -->
+        <div class="sidebar-library-search-row" id="sidebarLibSearchRow">
+          <div class="sidebar-lib-search-box" id="sidebarLibSearchBox">
+            <button class="sidebar-lib-search-btn" id="sidebarLibSearchToggleBtn" title="Search in Your Library" aria-label="Search in Your Library">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </button>
+            <input type="text" id="sidebarLibSearchInput" class="sidebar-lib-search-input" placeholder="Search in Your Library" autocomplete="off" spellcheck="false" />
+          </div>
+          <button class="sidebar-lib-sort-btn" id="sidebarLibSortBtn" title="Sort library" aria-label="Sort library">
+            <span class="sort-text-label">Recents</span>
+            <svg class="sort-icon-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6"/>
+              <line x1="8" y1="12" x2="21" y2="12"/>
+              <line x1="8" y1="18" x2="21" y2="18"/>
+              <line x1="3" y1="6" x2="3.01" y2="6"/>
+              <line x1="3" y1="12" x2="3.01" y2="12"/>
+              <line x1="3" y1="18" x2="3.01" y2="18"/>
             </svg>
-          </button>
-          <button class="icon-action-btn" id="expandLibraryFullBtn" title="Expand Library Full Width" aria-label="Expand Library Full Width">
-            <svg class="icon-lib-expand-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="15 3 21 3 21 9"/>
-              <polyline points="9 21 3 21 3 15"/>
-              <line x1="21" y1="3" x2="14" y2="10"/>
-              <line x1="3" y1="21" x2="10" y2="14"/>
-            </svg>
-            <svg class="icon-lib-collapse-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-              <polyline points="4 14 10 14 10 20"/>
-              <polyline points="20 10 14 10 14 4"/>
-              <line x1="14" y1="10" x2="21" y2="3"/>
-              <line x1="10" y1="14" x2="3" y2="21"/>
+            <svg class="sort-icon-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+              <rect x="3" y="3" width="7" height="7"/>
+              <rect x="14" y="3" width="7" height="7"/>
+              <rect x="14" y="14" width="7" height="7"/>
+              <rect x="3" y="14" width="7" height="7"/>
             </svg>
           </button>
         </div>
@@ -409,6 +442,54 @@
                     src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=300&auto=format&fit=crop&q=80"
                     alt="Workout" class="category-img"
                     onerror="this.src='https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=300&auto=format&fit=crop&q=80'">
+                </div>
+                <div class="category-card" style="--card-color: #ba5d07;" data-query="R&B Soul Classics">
+                  <span class="category-name">R&B & Soul</span>
+                  <img
+                    src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80"
+                    alt="R&B Soul" class="category-img">
+                </div>
+                <div class="category-card" style="--card-color: #608108;" data-query="Indie Pop Rock">
+                  <span class="category-name">Indie Vibes</span>
+                  <img
+                    src="https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=300&auto=format&fit=crop&q=80"
+                    alt="Indie" class="category-img">
+                </div>
+                <div class="category-card" style="--card-color: #503750;" data-query="Deep Focus Ambient">
+                  <span class="category-name">Focus & Study</span>
+                  <img
+                    src="https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=300&auto=format&fit=crop&q=80"
+                    alt="Focus" class="category-img">
+                </div>
+                <div class="category-card" style="--card-color: #1e3264;" data-query="Sleep Relaxing Music">
+                  <span class="category-name">Sleep & Relax</span>
+                  <img
+                    src="https://images.unsplash.com/photo-1511295742362-92c96b124e52?w=300&auto=format&fit=crop&q=80"
+                    alt="Sleep" class="category-img">
+                </div>
+                <div class="category-card" style="--card-color: #d84000;" data-query="Punjabi Hits">
+                  <span class="category-name">Punjabi Hits</span>
+                  <img
+                    src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&auto=format&fit=crop&q=80"
+                    alt="Punjabi" class="category-img">
+                </div>
+                <div class="category-card" style="--card-color: #7d4b32;" data-query="Jazz Classics Blues">
+                  <span class="category-name">Jazz & Blues</span>
+                  <img
+                    src="https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=300&auto=format&fit=crop&q=80"
+                    alt="Jazz" class="category-img">
+                </div>
+                <div class="category-card" style="--card-color: #006450;" data-query="Gaming Electronic Beats">
+                  <span class="category-name">Gaming Beats</span>
+                  <img
+                    src="https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=300&auto=format&fit=crop&q=80"
+                    alt="Gaming" class="category-img">
+                </div>
+                <div class="category-card" style="--card-color: #7358ff;" data-query="Classical Piano Essentials">
+                  <span class="category-name">Classical & Piano</span>
+                  <img
+                    src="https://images.unsplash.com/photo-1520523839898-507124cd537a?w=300&auto=format&fit=crop&q=80"
+                    alt="Classical" class="category-img">
                 </div>
               </div>
             </div>
@@ -1736,26 +1817,6 @@
               </div>
             </div>
 
-            <!-- Remove Dead Silence Card -->
-            <div class="settings-section-block">
-              <span class="settings-section-label">Dead Silence</span>
-              <div class="sound-card-item">
-                <div class="sound-card-left">
-                  <div class="sound-icon-box">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-                  </div>
-                  <div class="sound-meta">
-                    <h3 class="sound-title">Remove dead silence</h3>
-                    <p class="sound-desc">Automatically skip silent intro and outro segments in audio tracks</p>
-                  </div>
-                </div>
-                <label class="sound-toggle-switch">
-                  <input type="checkbox" id="deadSilenceToggleSwitch" checked>
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-            </div>
-
             <!-- Output Device Card -->
             <div class="settings-section-block">
               <span class="settings-section-label">Output</span>
@@ -2114,7 +2175,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=8.25"></script>
+  <script src="/app.js?v=8.26"></script>
 </body>
 
 </html>
