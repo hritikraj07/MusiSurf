@@ -91,6 +91,7 @@
     streakDaysCount: document.getElementById('streakDaysCount'),
     customPlaylistsList: document.getElementById('customPlaylistsList'),
     createPlaylistBtn: document.getElementById('createPlaylistBtn'),
+    expandLibraryFullBtn: document.getElementById('expandLibraryFullBtn'),
     likedCountMeta: document.getElementById('likedCountMeta'),
     downloadedCountMeta: document.getElementById('downloadedCountMeta'),
     localCountMeta: document.getElementById('localCountMeta'),
@@ -1752,6 +1753,13 @@
           }
         }
 
+        // Clear any lingering fadeout timer and restore playback volume immediately
+        if (crossfadeFadeOutTimer) {
+          clearInterval(crossfadeFadeOutTimer);
+          crossfadeFadeOutTimer = null;
+        }
+        elements.audio.volume = state.isMuted ? 0 : (state.volume || 0.8);
+
         if (resumeTime > 0) {
           try {
             if (Math.abs(elements.audio.currentTime - resumeTime) > 0.5) {
@@ -1763,6 +1771,7 @@
         const resumePromise = elements.audio.play();
         if (resumePromise !== undefined) {
           resumePromise.then(() => {
+            elements.audio.volume = state.isMuted ? 0 : (state.volume || 0.8);
             if (resumeTime > 0) {
               try { elements.audio.currentTime = resumeTime; } catch (e) {}
             }
@@ -2091,6 +2100,15 @@
   let isTrackEnding = false;
   function onTrackEnded() {
     if (isTrackEnding) return;
+    const cur = getCurrentPlaybackTime();
+    const knownDur = state.currentTrack?.duration || 0;
+    if (knownDur > 15 && cur < (knownDur - 8)) {
+      console.warn('Preventing premature onTrackEnded: cur=' + cur + ', knownDur=' + knownDur);
+      if (elements.audio && !elements.audio.seeking) {
+        elements.audio.play().catch(() => {});
+      }
+      return;
+    }
     isTrackEnding = true;
     setTimeout(() => { isTrackEnding = false; }, 600);
 
@@ -2183,8 +2201,19 @@
   }
 
   function getTotalDuration() {
-    // 1. If HTML5 audio has valid finite duration, prefer it
-    const audioDur = elements.audio.duration;
+    const metaDur = Number(state.currentTrack?.duration) || 0;
+    const audioDur = Number(elements.audio.duration) || 0;
+
+    // 1. If we have a known metadata duration, verify audioDur against it.
+    // Chunked WebM streams report buffered chunk length (e.g. 8s) as audio.duration.
+    // If audioDur is significantly smaller than metadata duration, metadata duration is truth.
+    if (metaDur > 0) {
+      if (Number.isFinite(audioDur) && audioDur >= (metaDur - 5)) {
+        return audioDur;
+      }
+      return metaDur;
+    }
+
     if (Number.isFinite(audioDur) && audioDur > 0) {
       return audioDur;
     }
@@ -2197,8 +2226,7 @@
       } catch (e) {}
     }
 
-    // 3. Fallback to track metadata duration
-    return state.currentTrack?.duration || 0;
+    return 0;
   }
 
   function seekTo(seconds) {
@@ -2330,7 +2358,8 @@
       }
 
       // Check Intelligent Dead Silence Removal (Start & Ending ONLY - Middle is untouched)
-      if (state.settings.removeDeadSilence && dur > 10 && !elements.audio.paused && !elements.audio.seeking) {
+      const expectedEnd = (state.currentTrack?.duration > 10) ? state.currentTrack.duration : dur;
+      if (state.settings.removeDeadSilence && expectedEnd > 10 && !elements.audio.paused && !elements.audio.seeking) {
         // 1. START SILENCE ONLY: Skip initial digital/encoder lead-in padding (0.6s) once
         if (!state.currentTrack._introTrimmed && cur < 0.6) {
           state.currentTrack._introTrimmed = true;
@@ -2338,7 +2367,7 @@
         }
 
         // 2. END SILENCE ONLY: Skip tail silence in the last 1.2 seconds of song
-        if (cur >= dur - 1.2) {
+        if (cur >= expectedEnd - 1.2) {
           onTrackEnded();
         }
       }
@@ -2878,6 +2907,43 @@
     return sectionEl;
   }
 
+  function renderSearchRecentDropdown() {
+    if (!elements.searchAutocompleteDropdown) return;
+    const recents = (state.recentlyPlayed || []).slice(0, 6);
+    if (recents.length === 0) {
+      elements.searchAutocompleteDropdown.style.display = 'none';
+      return;
+    }
+
+    elements.searchAutocompleteDropdown.innerHTML = recents.map(item => `
+      <div class="search-suggestion-item" data-query="${escapeHtml(item.title || item.name || item)}">
+        <svg class="suggestion-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;min-width:16px;min-height:16px;flex-shrink:0;">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+        <span class="suggestion-text">${escapeHtml(item.title || item.name || item)}</span>
+        <svg class="suggestion-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;min-width:14px;min-height:14px;flex-shrink:0;">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </div>
+    `).join('');
+
+    elements.searchAutocompleteDropdown.style.display = 'block';
+
+    elements.searchAutocompleteDropdown.querySelectorAll('.search-suggestion-item').forEach(el => {
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const selected = el.dataset.query;
+        if (selected) {
+          elements.globalSearchInput.value = selected;
+          elements.searchAutocompleteDropdown.style.display = 'none';
+          switchView('search');
+          performSearch(selected);
+        }
+      });
+    });
+  }
+
   // Autocomplete Search Suggestions Dropdown (Spotify Desktop Style)
   function handleSearchAutocomplete(query) {
     if (!elements.searchAutocompleteDropdown) return;
@@ -3326,6 +3392,19 @@
     return row;
   }
 
+  function formatDateAdded(ts) {
+    if (!ts) return 'Recently';
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return 'Recently';
+    const now = new Date();
+    const diffMs = now - d;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays <= 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
   function createTableRow(track, index, queueList) {
     const tr = document.createElement('tr');
     const isDownloaded = isTrackDownloaded(track.id);
@@ -3357,6 +3436,7 @@
         </div>
       </td>
       <td class="col-album">${escapeHtml(track.album || 'Single')}</td>
+      <td class="col-date-added">${formatDateAdded(track.addedAt)}</td>
       <td class="col-duration">${track.durationStr || '3:30'}</td>
       <td class="col-actions">
         <button class="song-action-btn song-more-trigger" title="More Options">
@@ -4360,12 +4440,17 @@
       return (b.lastPlayedAt || b.createdAt || 0) - (a.lastPlayedAt || a.createdAt || 0);
     });
 
-    sorted.forEach(pl => {
+    sorted.forEach((pl, idx) => {
       const div = document.createElement('div');
       div.className = `playlist-list-item library-item ${pl.isPinned ? 'is-pinned' : ''}`;
+      div.setAttribute('draggable', 'true');
+      div.dataset.playlistId = pl.id;
       div.innerHTML = `
         <div class="playlist-cover-mini">
           ${createPlaylistCollageHtml(pl.tracks)}
+          <button class="playlist-cover-play-btn" title="Play ${escapeHtml(pl.name)}" aria-label="Play">
+            <svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+          </button>
         </div>
         <div class="library-item-info">
           <span class="library-item-title">${escapeHtml(pl.name)}</span>
@@ -4373,7 +4458,76 @@
         </div>
         ${pl.isPinned ? '<span class="sidebar-pin-icon" title="Pinned">📌</span>' : ''}
       `;
-      div.addEventListener('click', () => {
+
+      // Hover Play Button on Playlist Cover (Starts playback & opens playlist)
+      const playCoverBtn = div.querySelector('.playlist-cover-play-btn');
+      if (playCoverBtn) {
+        playCoverBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          try {
+            if (elements.audio) { elements.audio.pause(); elements.audio.currentTime = 0; }
+            if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.stopVideo === 'function') {
+              state.ytPlayer.stopVideo();
+            }
+          } catch (err) {}
+
+          renderPlaylistView(pl.id);
+          if (pl.tracks && pl.tracks.length > 0) {
+            state.activePlaylistId = pl.id;
+            state.activePlaylistTracks = [...pl.tracks];
+            playTrack(pl.tracks[0], pl.tracks, true, 0);
+          } else {
+            showToast('Playlist is empty, add some songs first!', 'ℹ️');
+          }
+        });
+      }
+
+      // Drag-and-Drop Reordering on Sidebar Playlists
+      div.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', pl.id);
+        div.classList.add('is-dragging');
+      });
+
+      div.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        div.classList.add('drag-over-row');
+      });
+
+      div.addEventListener('dragleave', () => {
+        div.classList.remove('drag-over-row');
+      });
+
+      div.addEventListener('drop', (e) => {
+        e.preventDefault();
+        div.classList.remove('drag-over-row');
+        const fromId = e.dataTransfer.getData('text/plain');
+        const toId = pl.id;
+        if (fromId && toId && fromId !== toId) {
+          const fromIdx = state.customPlaylists.findIndex(p => p.id === fromId);
+          const toIdx = state.customPlaylists.findIndex(p => p.id === toId);
+          if (fromIdx !== -1 && toIdx !== -1) {
+            const [moved] = state.customPlaylists.splice(fromIdx, 1);
+            state.customPlaylists.splice(toIdx, 0, moved);
+            saveStoredPlaylists();
+            renderSidebarPlaylists();
+            if (elements.views.library && elements.views.library.classList.contains('active')) {
+              renderLibraryHub();
+            }
+            showToast(`Reordered "${moved.name}"`, '↕️');
+          }
+        }
+      });
+
+      div.addEventListener('dragend', () => {
+        div.classList.remove('is-dragging');
+        document.querySelectorAll('.playlist-list-item').forEach(el => el.classList.remove('drag-over-row'));
+      });
+
+      // Regular Row Click (Only opens playlist, doesn't auto-play)
+      div.addEventListener('click', (e) => {
+        if (e.target.closest('.playlist-cover-play-btn')) return;
         renderPlaylistView(pl.id);
       });
       elements.customPlaylistsList.appendChild(div);
@@ -4713,6 +4867,51 @@
             </div>
           `;
 
+          // Draggable reordering in Library Hub grid when sortMode is 'custom'
+          if (sortMode === 'custom') {
+            card.setAttribute('draggable', 'true');
+            card.dataset.playlistId = pl.id;
+
+            card.addEventListener('dragstart', (e) => {
+              e.dataTransfer.setData('text/plain', pl.id);
+              card.classList.add('is-dragging');
+            });
+
+            card.addEventListener('dragover', (e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+              card.classList.add('drag-over-row');
+            });
+
+            card.addEventListener('dragleave', () => {
+              card.classList.remove('drag-over-row');
+            });
+
+            card.addEventListener('drop', (e) => {
+              e.preventDefault();
+              card.classList.remove('drag-over-row');
+              const fromId = e.dataTransfer.getData('text/plain');
+              const toId = pl.id;
+              if (fromId && toId && fromId !== toId) {
+                const fromIdx = state.customPlaylists.findIndex(p => p.id === fromId);
+                const toIdx = state.customPlaylists.findIndex(p => p.id === toId);
+                if (fromIdx !== -1 && toIdx !== -1) {
+                  const [moved] = state.customPlaylists.splice(fromIdx, 1);
+                  state.customPlaylists.splice(toIdx, 0, moved);
+                  saveStoredPlaylists();
+                  updateLibraryUI();
+                  renderSidebarPlaylists();
+                  showToast(`Moved "${moved.name}"`, '↕️');
+                }
+              }
+            });
+
+            card.addEventListener('dragend', () => {
+              card.classList.remove('is-dragging');
+              elements.libCustomPlaylistsGrid.querySelectorAll('.custom-playlist-card').forEach(el => el.classList.remove('drag-over-row'));
+            });
+          }
+
           card.querySelector('.card-play-btn')?.addEventListener('click', (e) => {
             e.stopPropagation();
             if (pl.tracks && pl.tracks.length > 0) {
@@ -4720,6 +4919,13 @@
               if (isThisPlTrack) {
                 togglePlayPause();
               } else {
+                try {
+                  if (elements.audio) { elements.audio.pause(); elements.audio.currentTime = 0; }
+                  if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.stopVideo === 'function') {
+                    state.ytPlayer.stopVideo();
+                  }
+                } catch (err) {}
+
                 state.isPlaylistShuffle = false;
                 state.isShuffled = false;
                 saveShuffleState();
@@ -5648,7 +5854,7 @@
     }
     appHistory.updateButtons();
 
-    // Top Bar Compass / Explore Categories
+    // Top Bar Compass / Explore Categories (Shows browse categories, no recents)
     if (elements.topCompassBtn) {
       elements.topCompassBtn.addEventListener('click', () => {
         switchView('search');
@@ -5656,7 +5862,7 @@
         if (elements.clearSearchBtn) elements.clearSearchBtn.style.display = 'none';
         if (elements.searchResultsWrapper) elements.searchResultsWrapper.style.display = 'none';
         if (elements.searchEmptyState) elements.searchEmptyState.style.display = 'none';
-        if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'block';
+        if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'none';
         if (elements.searchBrowseSection) {
           elements.searchBrowseSection.style.display = 'block';
           setTimeout(() => {
@@ -5664,6 +5870,22 @@
           }, 60);
         }
         if (elements.searchAutocompleteDropdown) elements.searchAutocompleteDropdown.style.display = 'none';
+      });
+    }
+
+    // Expand Library Full Width Toggle
+    if (elements.expandLibraryFullBtn) {
+      elements.expandLibraryFullBtn.addEventListener('click', () => {
+        const app = document.getElementById('app') || document.querySelector('.app-layout');
+        if (!app) return;
+        const isFull = app.classList.toggle('sidebar-full-width');
+        const expIcon = elements.expandLibraryFullBtn.querySelector('.icon-lib-expand-full');
+        const colIcon = elements.expandLibraryFullBtn.querySelector('.icon-lib-collapse-full');
+        if (expIcon && colIcon) {
+          expIcon.style.display = isFull ? 'none' : 'block';
+          colIcon.style.display = isFull ? 'block' : 'none';
+        }
+        elements.expandLibraryFullBtn.title = isFull ? 'Collapse Library to Normal' : 'Expand Library Full Width';
       });
     }
 
@@ -5764,6 +5986,24 @@
     });
 
     // Header Search
+    elements.globalSearchInput.addEventListener('focus', () => {
+      if (elements.searchRecentSection) {
+        elements.searchRecentSection.style.display = 'block';
+      }
+      renderSearchRecentUI();
+      const val = elements.globalSearchInput.value.trim();
+      if (val) {
+        handleSearchAutocomplete(val);
+      } else {
+        renderSearchRecentDropdown();
+      }
+    });
+    elements.globalSearchInput.addEventListener('click', () => {
+      const val = elements.globalSearchInput.value.trim();
+      if (!val) {
+        renderSearchRecentDropdown();
+      }
+    });
     elements.globalSearchInput.addEventListener('input', handleSearchInput);
     elements.globalSearchInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {

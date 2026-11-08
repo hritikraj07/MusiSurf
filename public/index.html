@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=8.22">
+  <link rel="stylesheet" href="/styles.css?v=8.24">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -150,6 +150,20 @@
               stroke-linejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+          <button class="icon-action-btn" id="expandLibraryFullBtn" title="Expand Library Full Width" aria-label="Expand Library Full Width">
+            <svg class="icon-lib-expand-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 3 21 3 21 9"/>
+              <polyline points="9 21 3 21 3 15"/>
+              <line x1="21" y1="3" x2="14" y2="10"/>
+              <line x1="3" y1="21" x2="10" y2="14"/>
+            </svg>
+            <svg class="icon-lib-collapse-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+              <polyline points="4 14 10 14 10 20"/>
+              <polyline points="20 10 14 10 14 4"/>
+              <line x1="14" y1="10" x2="21" y2="3"/>
+              <line x1="10" y1="14" x2="3" y2="21"/>
             </svg>
           </button>
         </div>
@@ -613,6 +627,7 @@
                   <th class="col-num">#</th>
                   <th class="col-title">Title</th>
                   <th class="col-album">Album</th>
+                  <th class="col-date-added">Date added</th>
                   <th class="col-duration">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <circle cx="12" cy="12" r="10" />
@@ -791,6 +806,7 @@
                   <th class="col-num">#</th>
                   <th class="col-title">Title</th>
                   <th class="col-album">File Name</th>
+                  <th class="col-date-added">Date added</th>
                   <th class="col-duration">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <circle cx="12" cy="12" r="10" />
@@ -1984,7 +2000,7 @@
                 <div class="sound-card-left">
                   <div class="sound-meta">
                     <h3 class="sound-title">Pitch Black OLED Theme</h3>
-                    <p class="sound-desc">Deep blacks with Spotify emerald accents</p>
+                    <p class="sound-desc">Deep obsidian blacks with sleek platinum white accents</p>
                   </div>
                 </div>
                 <span class="feat-quality-badge">Enabled</span>
@@ -2041,7 +2057,7 @@
                 <div class="sound-card-left">
                   <div class="sound-meta">
                     <h3 class="sound-title">MusiSurf</h3>
-                    <p class="sound-desc">Version 7.6 • Pitch Black & Spotify Emerald Edition</p>
+                    <p class="sound-desc">Version 8.0 • Pitch Black & Platinum White Edition</p>
                   </div>
                 </div>
               </div>
@@ -2155,7 +2171,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=8.22"></script>
+  <script src="/app.js?v=8.24"></script>
 </body>
 
 </html>
