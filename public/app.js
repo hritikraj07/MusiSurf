@@ -3613,9 +3613,9 @@
     document.body.style.setProperty('--playlist-dynamic-gradient', gradient);
   }
 
-  function renderPlaylistView(playlistId) {
+  function renderPlaylistView(playlistId, options = {}) {
     state.viewingPlaylistId = playlistId;
-    switchView('playlist', { force: true });
+    switchView('playlist', { force: true, pushHistory: options.pushHistory !== false });
 
     try {
       localStorage.setItem('musisurf_current_view', JSON.stringify({
@@ -4304,8 +4304,63 @@
   }
 
   // ==========================================================================
-  // VIEW NAVIGATION CONTROLLER & HISTORY MANAGEMENT
+  // VIEW NAVIGATION CONTROLLER & HISTORY MANAGEMENT (Go Previous / Ahead)
   // ==========================================================================
+  const appHistory = {
+    stack: [{ view: 'home', playlistId: null }],
+    index: 0,
+    push(viewName, playlistId = null) {
+      const current = this.stack[this.index];
+      if (current && current.view === viewName && current.playlistId === playlistId) {
+        this.updateButtons();
+        return;
+      }
+      if (this.index < this.stack.length - 1) {
+        this.stack = this.stack.slice(0, this.index + 1);
+      }
+      this.stack.push({ view: viewName, playlistId });
+      this.index = this.stack.length - 1;
+      this.updateButtons();
+    },
+    back() {
+      if (this.index > 0) {
+        this.index--;
+        this.apply(this.stack[this.index]);
+      }
+    },
+    forward() {
+      if (this.index < this.stack.length - 1) {
+        this.index++;
+        this.apply(this.stack[this.index]);
+      }
+    },
+    apply(item) {
+      if (!item) return;
+      if (item.view === 'playlist' && item.playlistId) {
+        renderPlaylistView(item.playlistId, { pushHistory: false });
+      } else {
+        switchView(item.view, { pushHistory: false, force: true });
+      }
+      this.updateButtons();
+    },
+    updateButtons() {
+      const canGoBack = this.index > 0;
+      const canGoForward = this.index < this.stack.length - 1;
+      if (elements.historyBackBtn) {
+        elements.historyBackBtn.disabled = !canGoBack;
+        elements.historyBackBtn.style.opacity = canGoBack ? '1' : '0.4';
+        elements.historyBackBtn.style.cursor = canGoBack ? 'pointer' : 'default';
+        elements.historyBackBtn.title = canGoBack ? 'Go back (Previous)' : 'No previous page';
+      }
+      if (elements.historyForwardBtn) {
+        elements.historyForwardBtn.disabled = !canGoForward;
+        elements.historyForwardBtn.style.opacity = canGoForward ? '1' : '0.4';
+        elements.historyForwardBtn.style.cursor = canGoForward ? 'pointer' : 'default';
+        elements.historyForwardBtn.title = canGoForward ? 'Go forward (Ahead)' : 'No forward page';
+      }
+    }
+  };
+
   let navHistoryStack = ['home'];
 
   function switchView(viewName, options = {}) {
@@ -4331,6 +4386,8 @@
     } catch (e) {}
 
     if (pushHistory) {
+      const currentPlId = viewName === 'playlist' ? (state.viewingPlaylistId || state.activePlaylistId) : null;
+      appHistory.push(viewName, currentPlId);
       navHistoryStack.push(viewName);
       try {
         window.history.pushState({ view: viewName, depth: navHistoryStack.length }, '', window.location.pathname);
@@ -5401,21 +5458,20 @@
       elements.topHomeBtn.addEventListener('click', navigateToHomeTop);
     }
 
-    // Top Bar History Back & Forward
+    // Top Bar History Back & Forward (Previous & Ahead)
     if (elements.historyBackBtn) {
-      elements.historyBackBtn.addEventListener('click', () => {
-        if (window.history.length > 1) {
-          window.history.back();
-        } else {
-          navigateToHomeTop();
-        }
+      elements.historyBackBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        appHistory.back();
       });
     }
     if (elements.historyForwardBtn) {
-      elements.historyForwardBtn.addEventListener('click', () => {
-        window.history.forward();
+      elements.historyForwardBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        appHistory.forward();
       });
     }
+    appHistory.updateButtons();
 
     // Top Bar Compass / Explore Categories
     if (elements.topCompassBtn) {
@@ -6131,15 +6187,8 @@
     if (elements.closeSettingsModalBtn) elements.closeSettingsModalBtn.addEventListener('click', closeSettingsModal);
     if (elements.libHubSettingsBtn) elements.libHubSettingsBtn.addEventListener('click', openSettingsModal);
 
-    // Desktop History Navigation Controls
-    if (elements.historyBackBtn) {
-      elements.historyBackBtn.removeAttribute('disabled');
-      elements.historyBackBtn.addEventListener('click', () => window.history.back());
-    }
-    if (elements.historyForwardBtn) {
-      elements.historyForwardBtn.removeAttribute('disabled');
-      elements.historyForwardBtn.addEventListener('click', () => window.history.forward());
-    }
+    // Initialize History Buttons State
+    appHistory.updateButtons();
 
     // Mobile Playlist Back Button
     if (elements.playlistBackBtn) {

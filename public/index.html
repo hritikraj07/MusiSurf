@@ -29,12 +29,12 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=8.00">
+  <link rel="stylesheet" href="/styles.css?v=8.10">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
         for (var name of names) {
-          if (name !== 'musisurf-v8.00') caches.delete(name);
+          if (name !== 'musisurf-v8.10') caches.delete(name);
         }
       });
     }
@@ -381,6 +381,20 @@
                     src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80"
                     alt="Bollywood" class="category-img">
                 </div>
+                <div class="category-card" style="--card-color: #af2896;" data-query="Party Dance Songs">
+                  <span class="category-name">Party Anthems</span>
+                  <img
+                    src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=300&auto=format&fit=crop&q=80"
+                    alt="Party" class="category-img"
+                    onerror="this.src='https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=300&auto=format&fit=crop&q=80'">
+                </div>
+                <div class="category-card" style="--card-color: #27856a;" data-query="Workout Motivation Music">
+                  <span class="category-name">Workout Energy</span>
+                  <img
+                    src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=300&auto=format&fit=crop&q=80"
+                    alt="Workout" class="category-img"
+                    onerror="this.src='https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=300&auto=format&fit=crop&q=80'">
+                </div>
               </div>
             </div>
 
@@ -657,25 +671,39 @@
         <!-- REPLAY VIEW (Redesigned Compact Listening Dashboard) -->
         <section class="view-section" id="replayView">
           <div class="replay-container">
-            <!-- Replay Header -->
+            <!-- Replay Header (Clean banner title) -->
             <div class="replay-header">
               <div class="replay-title-wrap">
                 <h1 class="replay-title">Replay</h1>
-                <p class="replay-subtitle" id="replayPeriodLabel">November 2026</p>
-              </div>
-              <div class="replay-time-pills" id="replayTimePills">
-                <button class="replay-pill" data-period="week">This week</button>
-                <button class="replay-pill active" data-period="month">This month</button>
-                <button class="replay-pill" data-period="last-month">Last month</button>
-                <button class="replay-pill" data-period="year">This year</button>
-                <button class="replay-pill" data-period="all">All time</button>
               </div>
             </div>
 
-            <!-- Sleek Compact Replay Dashboard: Sound Capsule & Top Song ONLY -->
+            <!-- Sleek Compact Replay Dashboard: Most Played on Top, Sound Capsule Below (Matching User Grey Layout) -->
             <div class="replay-compact-dashboard">
               
-              <!-- Card 1: Sound Capsule (Minutes Listened with Real-Time Updates) -->
+              <!-- Section 1: Most Played (Top Song) -->
+              <div class="replay-top-song-card">
+                <div class="replay-card-top">
+                  <span class="replay-card-badge">TOP SONG</span>
+                  <span class="replay-card-hint">Most Played</span>
+                </div>
+
+                <div class="replay-top-song-content">
+                  <div class="replay-song-artwork-wrap">
+                    <img src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=240&auto=format&fit=crop&q=80" id="replayTopSongImg" class="replay-top-song-artwork" alt="Top Song Art">
+                    <button class="replay-song-play-overlay-btn" id="playTopSongBtn" title="Play Top Song">
+                      <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+                    </button>
+                  </div>
+                  <div class="replay-song-details">
+                    <h3 class="replay-song-title" id="replayTopSongTitle">Starboy</h3>
+                    <p class="replay-song-artist" id="replayTopSongArtist">The Weeknd</p>
+                    <div class="replay-song-meta-pill" id="replayTopSongPlays">14 plays • 3:50</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Section 2: Sound Capsule (Minutes Listened with Real-Time Live Tracking) -->
               <div class="replay-capsule-card">
                 <div class="replay-capsule-top">
                   <span class="replay-card-badge">SOUND CAPSULE</span>
@@ -702,28 +730,6 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                     <span>Share</span>
                   </button>
-                </div>
-              </div>
-
-              <!-- Card 2: Top Song (Most Played Song - Compact, Sleek Art + Details) -->
-              <div class="replay-top-song-card">
-                <div class="replay-card-top">
-                  <span class="replay-card-badge">TOP SONG</span>
-                  <span class="replay-card-hint">Most Played</span>
-                </div>
-
-                <div class="replay-top-song-content">
-                  <div class="replay-song-artwork-wrap">
-                    <img src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=240&auto=format&fit=crop&q=80" id="replayTopSongImg" class="replay-top-song-artwork" alt="Top Song Art">
-                    <button class="replay-song-play-overlay-btn" id="playTopSongBtn" title="Play Top Song">
-                      <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
-                    </button>
-                  </div>
-                  <div class="replay-song-details">
-                    <h3 class="replay-song-title" id="replayTopSongTitle">Starboy</h3>
-                    <p class="replay-song-artist" id="replayTopSongArtist">The Weeknd</p>
-                    <div class="replay-song-meta-pill" id="replayTopSongPlays">14 plays • 3:50</div>
-                  </div>
                 </div>
               </div>
 
@@ -776,16 +782,6 @@
               title="Remove all local files from list">
               Clear All
             </button>
-          </div>
-
-          <!-- Drag and drop zone -->
-          <div class="local-dropzone" id="localDropZone">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-            <p>Drag & drop audio files here, or click <strong>Add Local Music</strong></p>
           </div>
 
           <!-- Local Tracks Table -->
@@ -1883,18 +1879,42 @@
             <div class="desktop-controls-group">
               <h3 class="settings-group-title">Desktop Keyboard Shortcuts</h3>
               <div class="settings-card-item keyboard-controls-card">
-                <div class="controls-columns-grid">
-                  <div class="controls-col">
-                    <div class="control-shortcut-row"><kbd class="ctrl-key-badge">Space</kbd><span class="shortcut-action-desc">Play / pause</span></div>
-                    <div class="control-shortcut-row"><kbd class="ctrl-key-badge">↑</kbd><kbd class="ctrl-key-badge">↓</kbd><span class="shortcut-action-desc">Volume</span></div>
-                    <div class="control-shortcut-row"><kbd class="ctrl-key-badge">R</kbd><span class="shortcut-action-desc">Repeat</span></div>
-                    <div class="control-shortcut-row"><kbd class="ctrl-key-badge">L</kbd><span class="shortcut-action-desc">Lyrics</span></div>
+                <div class="keyboard-controls-grid">
+                  <div class="kbd-shortcut-col">
+                    <div class="kbd-shortcut-row">
+                      <div class="kbd-keys"><kbd class="ctrl-key-badge">Space</kbd></div>
+                      <span class="kbd-action-label">Play / pause</span>
+                    </div>
+                    <div class="kbd-shortcut-row">
+                      <div class="kbd-keys"><kbd class="ctrl-key-badge">↑</kbd><kbd class="ctrl-key-badge">↓</kbd></div>
+                      <span class="kbd-action-label">Volume</span>
+                    </div>
+                    <div class="kbd-shortcut-row">
+                      <div class="kbd-keys"><kbd class="ctrl-key-badge">R</kbd></div>
+                      <span class="kbd-action-label">Repeat</span>
+                    </div>
+                    <div class="kbd-shortcut-row">
+                      <div class="kbd-keys"><kbd class="ctrl-key-badge">L</kbd></div>
+                      <span class="kbd-action-label">Lyrics</span>
+                    </div>
                   </div>
-                  <div class="controls-col">
-                    <div class="control-shortcut-row"><kbd class="ctrl-key-badge">←</kbd><kbd class="ctrl-key-badge">→</kbd><span class="shortcut-action-desc">Seek 5 s</span></div>
-                    <div class="control-shortcut-row"><kbd class="ctrl-key-badge">S</kbd><span class="shortcut-action-desc">Shuffle</span></div>
-                    <div class="control-shortcut-row"><kbd class="ctrl-key-badge">Q</kbd><span class="shortcut-action-desc">Queue</span></div>
-                    <div class="control-shortcut-row"><kbd class="ctrl-key-badge">/</kbd><span class="shortcut-action-desc">Search</span></div>
+                  <div class="kbd-shortcut-col">
+                    <div class="kbd-shortcut-row">
+                      <div class="kbd-keys"><kbd class="ctrl-key-badge">←</kbd><kbd class="ctrl-key-badge">→</kbd></div>
+                      <span class="kbd-action-label">Seek 5 s</span>
+                    </div>
+                    <div class="kbd-shortcut-row">
+                      <div class="kbd-keys"><kbd class="ctrl-key-badge">S</kbd></div>
+                      <span class="kbd-action-label">Shuffle</span>
+                    </div>
+                    <div class="kbd-shortcut-row">
+                      <div class="kbd-keys"><kbd class="ctrl-key-badge">Q</kbd></div>
+                      <span class="kbd-action-label">Queue</span>
+                    </div>
+                    <div class="kbd-shortcut-row">
+                      <div class="kbd-keys"><kbd class="ctrl-key-badge">/</kbd></div>
+                      <span class="kbd-action-label">Search</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2075,7 +2095,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=8.00"></script>
+  <script src="/app.js?v=8.10"></script>
 </body>
 
 </html>

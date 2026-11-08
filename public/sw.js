@@ -3,7 +3,7 @@
  * Network-First Strategy for Instant Updates + Offline Fallback Support
  */
 
-const CACHE_NAME = 'musisurf-v8.00';
+const CACHE_NAME = 'musisurf-v8.10';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
