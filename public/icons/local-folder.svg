@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="100%" height="100%">
+  <defs>
+    <!-- Primary Folder Body Gradient (#3B7DAF to #4A88BA) -->
+    <linearGradient id="folderBody" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4A88BA"/>
+      <stop offset="100%" stop-color="#3B7DAF"/>
+    </linearGradient>
+
+    <!-- Folder Tab / Interior Paper Gradient (#CDE7EE to #DDF0F4) -->
+    <linearGradient id="folderInterior" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#DDF0F4"/>
+      <stop offset="100%" stop-color="#CDE7EE"/>
+    </linearGradient>
+
+    <!-- Folder Back Interior Gradient with Inset Dark Accent (#2D5E85) -->
+    <linearGradient id="folderBack" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3874A3"/>
+      <stop offset="100%" stop-color="#2D5E85"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Frame: Pale Icy Tint / Off-White (#F5F9FA) with Soft Black Outline (#1A1A1A) -->
+  <rect x="6" y="6" width="116" height="116" rx="24" fill="#F5F9FA" stroke="#1A1A1A" stroke-width="4.5"/>
+
+  <!-- Back Folder Tab & Shell -->
+  <path d="M25 36 C25 31, 29 27, 34 27 L53 27 C57 27, 60 29.5, 62 33 L67 40 L94 40 C99 40, 103 44, 103 49 L103 91 C103 96, 99 100, 94 100 L34 100 C29 100, 25 96, 25 91 Z" 
+        fill="url(#folderBack)" stroke="#1A1A1A" stroke-width="4.5" stroke-linejoin="round"/>
+
+  <!-- Folder Tab / Interior Documents (#CDE7EE to #DDF0F4) -->
+  <rect x="33" y="35" width="62" height="46" rx="5" fill="url(#folderInterior)" stroke="#1A1A1A" stroke-width="3.5"/>
+  <!-- Interior Details / Document Lines (#2D5E85) -->
+  <line x1="42" y1="46" x2="68" y2="46" stroke="#2D5E85" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="42" y1="54" x2="82" y2="54" stroke="#2D5E85" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="42" y1="62" x2="74" y2="62" stroke="#2D5E85" stroke-width="3.5" stroke-linecap="round"/>
+
+  <!-- Shadow / Inset Accent (#2D5E85) -->
+  <path d="M22 55 L106 55 L102 96 C102 98, 100 100, 97 100 L31 100 C28 100, 26 98, 26 96 Z" fill="#2D5E85" opacity="0.32"/>
+
+  <!-- Primary Folder Body Front Flap (#3B7DAF to #4A88BA) with Soft Black Outline (#1A1A1A) -->
+  <path d="M21 52 C21 47.5, 24.5 44, 29 44 L99 44 C103.5 44, 107 47.5, 107 52 L103 93 C102.5 97.5, 99 101, 94.5 101 L33.5 101 C29 101, 25.5 97.5, 25 93 Z" 
+        fill="url(#folderBody)" stroke="#1A1A1A" stroke-width="4.5" stroke-linejoin="round"/>
+
+  <!-- Folder Body Front Highlight Line -->
+  <path d="M30 50 L98 50" stroke="rgba(255, 255, 255, 0.45)" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

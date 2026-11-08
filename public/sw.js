@@ -3,7 +3,7 @@
  * Network-First Strategy for Instant Updates + Offline Fallback Support
  */
 
-const CACHE_NAME = 'musisurf-v8.27';
+const CACHE_NAME = 'musisurf-v8.28';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -13,7 +13,9 @@ const STATIC_ASSETS = [
   '/icons/icon.svg',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
-  '/icons/apple-touch-icon.png'
+  '/icons/apple-touch-icon.png',
+  '/icons/replay-cover.svg',
+  '/icons/local-folder.svg'
 ];
 
 self.addEventListener('install', (event) => {

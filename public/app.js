@@ -19,6 +19,7 @@
     volume: 0.8,
     isMuted: false,
     currentView: 'home', // 'home', 'search', 'explore', 'liked', 'playlist', 'lyrics', 'localMusic'
+    isExploreMode: localStorage.getItem('musisurf_explore_mode') === 'true',
     previousView: 'home',
     searchSource: 'all',
     likedSongs: [],
@@ -2255,22 +2256,39 @@
   }
 
   function getTotalDuration() {
+    // 1. Metadata duration stored on state.currentTrack
     const metaDur = parseDurationToSeconds(state.currentTrack?.duration) || parseDurationToSeconds(state.currentTrack?.durationStr) || 0;
     if (metaDur > 0) {
       return metaDur;
     }
 
+    // 2. Fallback to total duration displayed in label if available
+    const labelDur = parseDurationToSeconds(elements.totalDurationLabel?.textContent) || parseDurationToSeconds(elements.mobTotalDuration?.textContent) || 0;
+    if (labelDur > 0) {
+      if (state.currentTrack) {
+        state.currentTrack.duration = labelDur;
+        state.currentTrack.durationStr = formatTime(labelDur);
+      }
+      return labelDur;
+    }
+
+    // 3. Audio element duration - protect against partial streamed chunk durations (e.g. 8s from ytdl)
     const audioDur = Number(elements.audio?.duration) || 0;
-    if (Number.isFinite(audioDur) && audioDur > 0 && audioDur !== Infinity) {
+    if (Number.isFinite(audioDur) && audioDur > 15 && audioDur !== Infinity) {
       return audioDur;
     }
 
-    // 2. If YouTube player has duration
+    // 4. If YouTube player has duration
     if (state.ytPlayer && typeof state.ytPlayer.getDuration === 'function') {
       try {
         const dur = state.ytPlayer.getDuration();
         if (Number.isFinite(dur) && dur > 0) return dur;
       } catch (e) {}
+    }
+
+    // 5. Final fallback to audioDur if finite and > 0
+    if (Number.isFinite(audioDur) && audioDur > 0 && audioDur !== Infinity) {
+      return audioDur;
     }
 
     return 0;
@@ -3336,7 +3354,6 @@
           <th class="col-num">#</th>
           <th class="col-title">Title</th>
           <th class="col-album">Album</th>
-          <th class="col-date-added">Date added</th>
           <th class="col-duration">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"/>
@@ -3351,7 +3368,7 @@
 
     const tbody = table.querySelector('tbody');
     results.forEach((track, idx) => {
-      const tr = createTableRow(track, idx + 1, results);
+      const tr = createTableRow(track, idx + 1, results, false);
       tbody.appendChild(tr);
     });
 
@@ -3508,7 +3525,7 @@
     return `${day}/${month}/${year}`;
   }
 
-  function createTableRow(track, index, queueList) {
+  function createTableRow(track, index, queueList, isPlaylistTable = false) {
     const tr = document.createElement('tr');
     const isDownloaded = isTrackDownloaded(track.id);
     tr.className = `${state.currentTrack?.id === track.id ? 'playing' : ''} ${isDownloaded ? 'is-downloaded' : ''}`;
@@ -3518,6 +3535,7 @@
     const tickHtml = getPlaylistTickBadgeHtml(track.id);
     const formattedTitle = escapeHtml(track.title);
     const formattedArtist = escapeHtml(track.artist);
+    const dateAddedCellHtml = isPlaylistTable ? `<td class="col-date-added">${formatDateAdded(track.addedAt)}</td>` : '';
 
     tr.innerHTML = `
       <td class="col-num">
@@ -3539,7 +3557,7 @@
         </div>
       </td>
       <td class="col-album"><span class="col-album-text" title="${escapeHtml(track.album || 'Single')}">${escapeHtml(track.album || 'Single')}</span></td>
-      <td class="col-date-added">${formatDateAdded(track.addedAt)}</td>
+      ${dateAddedCellHtml}
       <td class="col-duration">${track.durationStr || '3:30'}</td>
       <td class="col-actions">
         <button class="song-action-btn song-more-trigger" title="More Options">
@@ -4102,7 +4120,7 @@
     } else {
       elements.playlistEmptyState.style.display = 'none';
       sortedTracks.forEach((track, idx) => {
-        const tr = createTableRow(track, idx + 1, sortedTracks);
+        const tr = createTableRow(track, idx + 1, sortedTracks, true);
         elements.playlistTracksBody.appendChild(tr);
       });
 
@@ -4874,7 +4892,11 @@
     }
     if (viewName === 'search') {
       if (!elements.globalSearchInput || !elements.globalSearchInput.value.trim()) {
-        if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'block';
+        if (state.isExploreMode) {
+          if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'none';
+        } else {
+          if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'block';
+        }
         if (elements.searchBrowseSection) elements.searchBrowseSection.style.display = 'block';
       }
       renderSearchRecentUI();
@@ -5374,7 +5396,7 @@
     }
   }
 
-  const DEFAULT_LOCAL_COVER = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%231a1b24"/><stop offset="100%" stop-color="%230d0e14"/></linearGradient><linearGradient id="acc" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23ffffff"/><stop offset="100%" stop-color="%23cbd5e1"/></linearGradient></defs><rect width="300" height="300" rx="16" fill="url(%23bg)"/><rect x="1" y="1" width="298" height="298" rx="15" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2"/><circle cx="150" cy="150" r="64" fill="rgba(255,255,255,0.06)"/><path d="M130 190V110l55-12v82M130 148l55-12" stroke="url(%23acc)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="114" cy="190" r="16" fill="url(%23acc)"/><circle cx="169" cy="178" r="16" fill="url(%23acc)"/></svg>';
+  const DEFAULT_LOCAL_COVER = '/icons/local-folder.svg';
 
   function updateLocalMusicUI() {
     const count = state.localTracks.length;
@@ -5423,7 +5445,6 @@
             </div>
           </td>
           <td class="col-album">${escapeHtml(track.fileName || track.album || 'Device Storage')}</td>
-          <td class="col-date-added">${formatDateAdded(track.addedAt)}</td>
           <td class="col-duration">${track.durationStr || '--:--'}</td>
           <td class="col-actions">
             <button class="song-action-btn add-to-queue-trigger" title="Add to Queue">
@@ -5985,6 +6006,8 @@
     // Top Bar Compass / Explore Categories (Shows browse categories, no recents)
     if (elements.topCompassBtn) {
       elements.topCompassBtn.addEventListener('click', () => {
+        state.isExploreMode = true;
+        try { localStorage.setItem('musisurf_explore_mode', 'true'); } catch (e) {}
         switchView('search');
         elements.globalSearchInput.value = '';
         if (elements.clearSearchBtn) elements.clearSearchBtn.style.display = 'none';
@@ -6136,6 +6159,8 @@
 
     // Header Search
     elements.globalSearchInput.addEventListener('focus', () => {
+      state.isExploreMode = false;
+      try { localStorage.setItem('musisurf_explore_mode', 'false'); } catch (e) {}
       if (elements.searchRecentSection) {
         elements.searchRecentSection.style.display = 'block';
       }
@@ -7842,10 +7867,10 @@
       if (e.code === 'Space' || e.key === ' ' || e.keyCode === 32) {
         e.preventDefault();
         togglePlayPause();
-      } else if (e.key === 'ArrowRight' && e.ctrlKey) {
+      } else if ((e.key === 'ArrowRight' && (e.ctrlKey || e.shiftKey)) || (e.key.toLowerCase() === 'n' && (e.shiftKey || !e.ctrlKey))) {
         e.preventDefault();
         nextTrack();
-      } else if (e.key === 'ArrowLeft' && e.ctrlKey) {
+      } else if ((e.key === 'ArrowLeft' && (e.ctrlKey || e.shiftKey)) || (e.key.toLowerCase() === 'p' && (e.shiftKey || !e.ctrlKey))) {
         e.preventDefault();
         prevTrack();
       } else if (e.key === 'ArrowRight') {

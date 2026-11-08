@@ -29,12 +29,12 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=8.27">
+  <link rel="stylesheet" href="/styles.css?v=8.28">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
         for (var name of names) {
-          if (name !== 'musisurf-v8.10') caches.delete(name);
+          if (name !== 'musisurf-v8.28') caches.delete(name);
         }
       });
     }
@@ -230,12 +230,7 @@
           <!-- Local Music (Device Storage - Directly below Liked Songs) -->
           <div class="library-item local-music-item" id="navLocalMusicBtn" data-view="localMusic" title="Local Music">
             <div class="local-icon-box">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <circle cx="12" cy="12" r="3"/>
-                <circle cx="12" cy="12" r="1" fill="currentColor"/>
-                <path d="M12 2a10 10 0 0 1 10 10"/>
-              </svg>
+              <img src="/icons/local-folder.svg" alt="Local Files" class="local-folder-icon-img" />
             </div>
             <div class="library-item-info">
               <span class="library-item-title">Local Music</span>
@@ -464,8 +459,9 @@
                 <div class="category-card" style="--card-color: #1e3264;" data-query="Sleep Relaxing Music">
                   <span class="category-name">Sleep & Relax</span>
                   <img
-                    src="https://images.unsplash.com/photo-1511295742362-92c96b124e52?w=300&auto=format&fit=crop&q=80"
-                    alt="Sleep" class="category-img">
+                    src="https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?w=300&auto=format&fit=crop&q=80"
+                    alt="Sleep & Relax" class="category-img"
+                    onerror="this.src='https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=300&auto=format&fit=crop&q=80'">
                 </div>
                 <div class="category-card" style="--card-color: #d84000;" data-query="Punjabi Hits">
                   <span class="category-name">Punjabi Hits</span>
@@ -485,11 +481,33 @@
                     src="https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=300&auto=format&fit=crop&q=80"
                     alt="Gaming" class="category-img">
                 </div>
-                <div class="category-card" style="--card-color: #7358ff;" data-query="Classical Piano Essentials">
-                  <span class="category-name">Classical & Piano</span>
+                <div class="category-card" style="--card-color: #7358ff;" data-query="Classical Symphony Orchestra">
+                  <span class="category-name">Classical</span>
                   <img
-                    src="https://images.unsplash.com/photo-1520523839898-507124cd537a?w=300&auto=format&fit=crop&q=80"
-                    alt="Classical" class="category-img">
+                    src="https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=300&auto=format&fit=crop&q=80"
+                    alt="Classical" class="category-img"
+                    onerror="this.src='https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80'">
+                </div>
+                <div class="category-card" style="--card-color: #4a5568;" data-query="Piano Solo Instrumental">
+                  <span class="category-name">Piano</span>
+                  <img
+                    src="https://images.unsplash.com/photo-1513883049090-d0b7439799bf?w=300&auto=format&fit=crop&q=80"
+                    alt="Piano" class="category-img"
+                    onerror="this.src='https://images.unsplash.com/photo-1520523839898-507124cd537a?w=300&auto=format&fit=crop&q=80'">
+                </div>
+                <div class="category-card" style="--card-color: #e67e22;" data-query="Bhakti Devotional Spiritual">
+                  <span class="category-name">Devotional & Spiritual</span>
+                  <img
+                    src="https://images.unsplash.com/photo-1609605983166-4198305cbe0d?w=300&auto=format&fit=crop&q=80"
+                    alt="Devotional" class="category-img"
+                    onerror="this.src='https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80'">
+                </div>
+                <div class="category-card" style="--card-color: #8e44ad;" data-query="Synthwave Retro Electro Cyberpunk">
+                  <span class="category-name">Gaming & Cyberpunk</span>
+                  <img
+                    src="https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=300&auto=format&fit=crop&q=80"
+                    alt="Cyberpunk" class="category-img"
+                    onerror="this.src='https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80'">
                 </div>
               </div>
             </div>
@@ -844,12 +862,7 @@
         <section class="view-section" id="localMusicView">
           <div class="playlist-hero local-files-hero">
             <div class="playlist-cover-art local-cover-art">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <circle cx="12" cy="12" r="3.5"/>
-                <circle cx="12" cy="12" r="1.2" fill="currentColor"/>
-                <path d="M12 2a10 10 0 0 1 10 10"/>
-              </svg>
+              <img src="/icons/local-folder.svg" alt="Local Files" class="local-hero-cover-img" />
             </div>
             <div class="playlist-info-meta">
               <h1 class="playlist-title">Local Files</h1>
@@ -895,7 +908,6 @@
                   <th class="col-num">#</th>
                   <th class="col-title">Title</th>
                   <th class="col-album">File Name</th>
-                  <th class="col-date-added">Date added</th>
                   <th class="col-duration">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <circle cx="12" cy="12" r="10" />
@@ -959,12 +971,7 @@
               <!-- Local Files Card (Short name, sits nicely beside Liked in Row 1) -->
               <div class="library-hub-card lib-hub-local" id="libHubLocalBtn">
                 <div class="lib-hub-icon local-icon-box">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"/>
-                    <circle cx="12" cy="12" r="3"/>
-                    <circle cx="12" cy="12" r="1" fill="currentColor"/>
-                    <path d="M12 2a10 10 0 0 1 10 10"/>
-                  </svg>
+                  <img src="/icons/local-folder.svg" alt="Local Files" class="local-folder-icon-img" />
                 </div>
                 <div class="lib-hub-details">
                   <h3 class="lib-hub-name">Local Files</h3>
@@ -1725,9 +1732,6 @@
         <aside class="settings-sidebar">
           <div class="settings-sidebar-header">
             <h2 class="settings-brand-title">Settings</h2>
-            <button class="settings-close-circle-btn" id="closeSettingsModalBtn" title="Close Settings">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
           </div>
 
           <div class="settings-search-pill-box">
@@ -1972,6 +1976,14 @@
                     <div class="kbd-shortcut-row">
                       <div class="kbd-keys"><kbd class="ctrl-key-badge">Space</kbd></div>
                       <span class="kbd-action-label">Play / pause</span>
+                    </div>
+                    <div class="kbd-shortcut-row">
+                      <div class="kbd-keys"><kbd class="ctrl-key-badge">Shift</kbd><kbd class="ctrl-key-badge">N</kbd></div>
+                      <span class="kbd-action-label">Next track</span>
+                    </div>
+                    <div class="kbd-shortcut-row">
+                      <div class="kbd-keys"><kbd class="ctrl-key-badge">Shift</kbd><kbd class="ctrl-key-badge">P</kbd></div>
+                      <span class="kbd-action-label">Previous track</span>
                     </div>
                     <div class="kbd-shortcut-row">
                       <div class="kbd-keys"><kbd class="ctrl-key-badge">↑</kbd><kbd class="ctrl-key-badge">↓</kbd></div>
