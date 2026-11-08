@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=6.3">
+  <link rel="stylesheet" href="/styles.css?v=6.4">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -1460,108 +1460,143 @@
       </div>
     </div>
 
-    <!-- Settings & Keyboard Shortcuts Modal -->
-    <div class="modal-backdrop" id="settingsModal" style="display: none;">
-      <div class="modal-card settings-card">
-        <div class="modal-header">
-          <div class="modal-title-with-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="settings-modal-icon">
-              <circle cx="12" cy="12" r="3" />
-              <path
-                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-            <h3>Settings</h3>
+    <!-- Full-Screen Settings View -->
+    <div class="fullscreen-settings-modal" id="settingsModal" style="display: none;">
+      <div class="settings-fullscreen-header">
+        <button class="settings-back-btn" id="closeSettingsModalBtn" title="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          <span>Back</span>
+        </button>
+        <h2 class="settings-nav-title">Settings</h2>
+      </div>
+
+      <div class="settings-fullscreen-content">
+        <!-- Section: Audio Playback -->
+        <div class="settings-group">
+          <h3 class="settings-group-title">Audio Playback</h3>
+
+          <!-- Remove Dead Silence -->
+          <div class="settings-card-item">
+            <div class="settings-item-header">
+              <span class="settings-item-title">Remove Dead Silence</span>
+              <p class="settings-item-desc">Automatically trim silent delay from the start and ending of songs. Section pauses in the middle of a song are NEVER removed.</p>
+            </div>
+            <div class="settings-radio-list">
+              <label class="settings-radio-row">
+                <input type="radio" name="deadSilenceRadio" id="deadSilenceOnRadio" value="on" checked>
+                <span class="radio-custom"></span>
+                <div class="radio-label-content">
+                  <span class="radio-label-title">Enabled (Recommended)</span>
+                  <span class="radio-label-desc">Skip leading and trailing dead silence only for instant playback</span>
+                </div>
+              </label>
+              <label class="settings-radio-row">
+                <input type="radio" name="deadSilenceRadio" id="deadSilenceOffRadio" value="off">
+                <span class="radio-custom"></span>
+                <div class="radio-label-content">
+                  <span class="radio-label-title">Disabled</span>
+                  <span class="radio-label-desc">Play tracks with untouched original intro and outro silence</span>
+                </div>
+              </label>
+            </div>
           </div>
-          <button class="modal-close-btn" id="closeSettingsModalBtn" title="Close Settings">
+
+          <!-- Crossfade Feature -->
+          <div class="settings-card-item">
+            <div class="settings-item-header">
+              <div class="settings-title-row">
+                <span class="settings-item-title">Crossfade</span>
+                <span class="settings-value-pill" id="crossfadeValueLabel">Off</span>
+              </div>
+              <p class="settings-item-desc">Allows tracks to seamlessly fade into each other. As the song ends, its volume decreases while the next upcoming song volume increases.</p>
+            </div>
+            <div class="crossfade-slider-wrap">
+              <input type="range" class="crossfade-range" id="crossfadeSlider" min="0" max="10" step="2" value="0">
+              <div class="crossfade-steps-labels">
+                <span class="step-label active" data-val="0">Off</span>
+                <span class="step-label" data-val="2">2s</span>
+                <span class="step-label" data-val="4">4s</span>
+                <span class="step-label" data-val="6">6s</span>
+                <span class="step-label" data-val="8">8s</span>
+                <span class="step-label" data-val="10">10s</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Playlist Management -->
+        <div class="settings-group">
+          <h3 class="settings-group-title">Playlists</h3>
+
+          <!-- Import Playlist -->
+          <div class="settings-card-item">
+            <div class="settings-item-header">
+              <span class="settings-item-title">Import Playlist</span>
+              <p class="settings-item-desc">Import playlists from your device. Automatically detects whether your file is in JSON or CSV format and adds it directly to your playlists section.</p>
+            </div>
+            <div class="import-playlist-actions">
+              <label class="import-file-dropzone" id="importDropzone">
+                <input type="file" id="playlistFileInput" accept=".json,.csv,.txt" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="import-icon">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <div class="import-text-block">
+                  <span class="import-main-btn">Choose JSON or CSV File</span>
+                  <span class="import-subtext">or drag and drop your file here</span>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export Playlist Format Chooser Modal -->
+    <div class="modal-backdrop" id="exportFormatModal" style="display: none;">
+      <div class="modal-card export-format-card">
+        <div class="modal-header">
+          <h3>Export Playlist</h3>
+          <button class="modal-close-btn" id="closeExportFormatModalBtn" title="Close">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
-
-        <div class="settings-modal-body">
-          <!-- SECTION 1: Playback & Audio -->
-          <div class="settings-section">
-            <div class="settings-section-header">
-              <span class="settings-section-title">Playback & Audio</span>
-            </div>
-
-            <div class="settings-option-card">
-              <div class="settings-option-info">
-                <span class="settings-option-label">Remove Dead Silence</span>
-                <span class="settings-option-desc">Automatically trim silent delay from the start and ending of songs.
-                  Section pauses in the middle of a song are NEVER removed.</span>
+        <div class="export-format-body">
+          <p class="export-format-desc">Choose a format to export your playlist:</p>
+          <div class="export-format-options">
+            <button type="button" class="export-format-btn" id="exportAsJsonBtn">
+              <div class="export-format-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
               </div>
-              <div class="settings-radio-list">
-                <label class="settings-radio-row">
-                  <input type="radio" name="deadSilenceRadio" id="deadSilenceOnRadio" value="on" checked>
-                  <span class="radio-custom"></span>
-                  <div class="radio-label-content">
-                    <span class="radio-label-title">Enabled (Recommended)</span>
-                    <span class="radio-label-desc">Skip leading and trailing dead silence only for instant
-                      playback</span>
-                  </div>
-                </label>
-                <label class="settings-radio-row">
-                  <input type="radio" name="deadSilenceRadio" id="deadSilenceOffRadio" value="off">
-                  <span class="radio-custom"></span>
-                  <div class="radio-label-content">
-                    <span class="radio-label-title">Disabled</span>
-                    <span class="radio-label-desc">Play tracks with untouched original intro and outro silence</span>
-                  </div>
-                </label>
+              <div class="export-format-info">
+                <span class="export-format-title">JSON (.json)</span>
+                <span class="export-format-sub">Complete MusiSurf playlist metadata and song details</span>
               </div>
-            </div>
-          </div>
-
-          <!-- SECTION 2: Keyboard Shortcuts -->
-          <div class="settings-section">
-            <div class="settings-section-header">
-              <span class="settings-section-title">Keyboard Shortcuts</span>
-            </div>
-            <div class="shortcuts-grid">
-              <div class="shortcut-row">
-                <span class="shortcut-desc">Play / Pause</span>
-                <kbd class="shortcut-key">Space</kbd>
+            </button>
+            <button type="button" class="export-format-btn" id="exportAsCsvBtn">
+              <div class="export-format-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="8" y1="13" x2="16" y2="13"/>
+                  <line x1="8" y1="17" x2="16" y2="17"/>
+                </svg>
               </div>
-              <div class="shortcut-row">
-                <span class="shortcut-desc">Next Track</span>
-                <kbd class="shortcut-key">Ctrl + →</kbd>
+              <div class="export-format-info">
+                <span class="export-format-title">CSV (.csv)</span>
+                <span class="export-format-sub">Spreadsheet format compatible with Excel and Google Sheets</span>
               </div>
-              <div class="shortcut-row">
-                <span class="shortcut-desc">Previous Track</span>
-                <kbd class="shortcut-key">Ctrl + ←</kbd>
-              </div>
-              <div class="shortcut-row">
-                <span class="shortcut-desc">Seek 5s Forward / Back</span>
-                <kbd class="shortcut-key">← / →</kbd>
-              </div>
-              <div class="shortcut-row">
-                <span class="shortcut-desc">Volume Up / Down</span>
-                <kbd class="shortcut-key">↑ / ↓</kbd>
-              </div>
-              <div class="shortcut-row">
-                <span class="shortcut-desc">Mute / Unmute</span>
-                <kbd class="shortcut-key">M</kbd>
-              </div>
-              <div class="shortcut-row">
-                <span class="shortcut-desc">Toggle Synced Lyrics</span>
-                <kbd class="shortcut-key">L</kbd>
-              </div>
-              <div class="shortcut-row">
-                <span class="shortcut-desc">Toggle Queue Drawer</span>
-                <kbd class="shortcut-key">Q</kbd>
-              </div>
-              <div class="shortcut-row">
-                <span class="shortcut-desc">Focus Search Input</span>
-                <kbd class="shortcut-key">/</kbd>
-              </div>
-              <div class="shortcut-row">
-                <span class="shortcut-desc">Open Settings & Shortcuts</span>
-                <kbd class="shortcut-key">?</kbd>
-              </div>
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -1575,7 +1610,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.35"></script>
+  <script src="/app.js?v=2.36"></script>
 </body>
 
 </html>

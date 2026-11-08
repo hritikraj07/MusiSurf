@@ -35,7 +35,8 @@
     ytPlayer: null,
     ytReady: false,
     settings: {
-      removeDeadSilence: true
+      removeDeadSilence: true,
+      crossfade: 0
     },
     userQueuedCount: 0,
     localTracks: [],
@@ -269,6 +270,14 @@
     closeSettingsModalBtn: document.getElementById('closeSettingsModalBtn'),
     deadSilenceOnRadio: document.getElementById('deadSilenceOnRadio'),
     deadSilenceOffRadio: document.getElementById('deadSilenceOffRadio'),
+    crossfadeSlider: document.getElementById('crossfadeSlider'),
+    crossfadeValueLabel: document.getElementById('crossfadeValueLabel'),
+    playlistFileInput: document.getElementById('playlistFileInput'),
+    importDropzone: document.getElementById('importDropzone'),
+    exportFormatModal: document.getElementById('exportFormatModal'),
+    closeExportFormatModalBtn: document.getElementById('closeExportFormatModalBtn'),
+    exportAsJsonBtn: document.getElementById('exportAsJsonBtn'),
+    exportAsCsvBtn: document.getElementById('exportAsCsvBtn'),
 
     // Local Music View
     localTrackCount: document.getElementById('localTrackCount'),
@@ -532,6 +541,7 @@
   function recordRecentlyPlayed(track) {
     if (!track || !track.id) return;
     const cleanTrack = {
+      type: 'track',
       id: track.id,
       title: track.title,
       artist: track.artist,
@@ -544,7 +554,28 @@
       ytId: track.ytId || '',
       source: track.source || 'jiosaavn'
     };
-    state.recentlyPlayed = [cleanTrack, ...state.recentlyPlayed.filter(t => t.id !== track.id)].slice(0, 16);
+    state.recentlyPlayed = [cleanTrack, ...state.recentlyPlayed.filter(t => t.id !== track.id)].slice(0, 20);
+    try {
+      localStorage.setItem('musisurf_recently_played', JSON.stringify(state.recentlyPlayed));
+    } catch (e) {}
+    renderSearchRecentUI();
+  }
+
+  // Record recently played playlist & persist to localStorage
+  function recordRecentlyPlayedPlaylist(playlist) {
+    if (!playlist || !playlist.id) return;
+    const count = (playlist.tracks && playlist.tracks.length) || 0;
+    const plCover = playlist.image || (playlist.tracks && playlist.tracks[0]?.image) || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80';
+    const cleanItem = {
+      type: 'playlist',
+      id: `pl_rec_${playlist.id}`,
+      playlistId: playlist.id,
+      title: playlist.name || playlist.title || 'Playlist',
+      artist: `${count} songs • Playlist`,
+      image: plCover,
+      tracks: playlist.tracks || []
+    };
+    state.recentlyPlayed = [cleanItem, ...state.recentlyPlayed.filter(t => t.id !== cleanItem.id && t.playlistId !== playlist.id)].slice(0, 20);
     try {
       localStorage.setItem('musisurf_recently_played', JSON.stringify(state.recentlyPlayed));
     } catch (e) {}
@@ -568,23 +599,31 @@
     if (elements.searchRecentGrid) {
       elements.searchRecentGrid.style.display = 'grid';
       elements.searchRecentGrid.innerHTML = '';
-      state.recentlyPlayed.slice(0, 8).forEach(t => {
+      state.recentlyPlayed.slice(0, 8).forEach(item => {
         const card = document.createElement('div');
         card.className = 'search-recent-card';
+        const isPl = item.type === 'playlist';
         card.innerHTML = `
-          <img src="${t.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80'}" alt="${escapeHtml(t.title)}" class="search-recent-cover" loading="lazy">
+          <img src="${item.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80'}" alt="${escapeHtml(item.title)}" class="search-recent-cover" loading="lazy">
           <div class="search-recent-info">
-            <div class="search-recent-title" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</div>
-            <div class="search-recent-artist" title="${escapeHtml(t.artist)}">${escapeHtml(t.artist)}</div>
+            <div class="search-recent-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
+            <div class="search-recent-artist" title="${escapeHtml(item.artist)}">${escapeHtml(item.artist)}</div>
           </div>
-          <div class="search-recent-play-icon" title="Play Now">
+          <div class="search-recent-play-icon" title="${isPl ? 'Play Playlist' : 'Play Now'}">
             <svg viewBox="0 0 24 24" fill="currentColor">
               <polygon points="5 3 19 12 5 21 5 3"/>
             </svg>
           </div>
         `;
         card.addEventListener('click', () => {
-          playTrack(t, state.recentlyPlayed);
+          if (isPl) {
+            renderPlaylistView(item.playlistId);
+            if (item.tracks && item.tracks.length > 0) {
+              playTrack(item.tracks[0], item.tracks);
+            }
+          } else {
+            playTrack(item, state.recentlyPlayed.filter(t => t.type !== 'playlist'));
+          }
         });
         elements.searchRecentGrid.appendChild(card);
       });
@@ -1021,6 +1060,37 @@
   // ==========================================================================
   // PLAYBACK CONTROLLER
   // ==========================================================================
+  let crossfadeFadeInTimer = null;
+  function applyCrossfadeIn() {
+    if (crossfadeFadeInTimer) {
+      clearInterval(crossfadeFadeInTimer);
+      crossfadeFadeInTimer = null;
+    }
+    const cf = state.settings.crossfade;
+    if (!cf || cf <= 0) {
+      elements.audio.volume = state.isMuted ? 0 : state.volume;
+      return;
+    }
+    const targetVol = state.isMuted ? 0 : state.volume;
+    if (targetVol <= 0) {
+      elements.audio.volume = 0;
+      return;
+    }
+
+    elements.audio.volume = 0;
+    const startTime = Date.now();
+    const rampDurationMs = Math.min(3000, (cf / 2) * 1000);
+    crossfadeFadeInTimer = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(1, elapsed / rampDurationMs);
+      elements.audio.volume = targetVol * progress;
+      if (progress >= 1) {
+        clearInterval(crossfadeFadeInTimer);
+        crossfadeFadeInTimer = null;
+      }
+    }, 40);
+  }
+
   async function playTrack(track, queueList = null, addToHistory = true) {
     if (!track) return;
 
@@ -1158,6 +1228,7 @@
       elements.audio.src = blobUrl;
       elements.audio.volume = state.isMuted ? 0 : state.volume;
       elements.audio.load();
+      applyCrossfadeIn();
       elements.audio.play().catch(err => {
         console.warn('Local storage audio play error:', err);
       });
@@ -1210,6 +1281,7 @@
         elements.audio.addEventListener('loadedmetadata', onLoadedMeta, { once: true });
 
         elements.audio.load();
+        applyCrossfadeIn();
         elements.audio.play().catch(err => {
           console.warn('Offline playback error:', err);
         });
@@ -1231,6 +1303,7 @@
         const audioSrc = track.audioUrl || streamUrl;
         elements.audio.src = audioSrc;
         elements.audio.load();
+        applyCrossfadeIn();
         const playPromise = elements.audio.play();
         if (playPromise !== undefined) {
           playPromise.catch(err => {
@@ -1646,6 +1719,9 @@
     } else {
       try {
         elements.audio.currentTime = targetSeconds;
+        if (state.settings.crossfade > 0 && total > 0 && (total - targetSeconds) > state.settings.crossfade) {
+          elements.audio.volume = state.isMuted ? 0 : state.volume;
+        }
       } catch (e) {
         console.warn('Seek error:', e);
       }
@@ -1663,6 +1739,10 @@
   }
 
   function setVolume(pct) {
+    if (crossfadeFadeInTimer) {
+      clearInterval(crossfadeFadeInTimer);
+      crossfadeFadeInTimer = null;
+    }
     state.volume = Math.max(0, Math.min(1, pct));
     state.isMuted = state.volume === 0;
     localStorage.setItem('musisurf_volume', state.volume.toString());
@@ -1734,6 +1814,16 @@
         // 2. END SILENCE ONLY: Skip tail silence in the last 1.2 seconds of song
         if (cur >= dur - 1.2) {
           onTrackEnded();
+        }
+      }
+
+      // Crossfade Fade-Out: As song ends, decrease volume smoothly
+      if (state.settings.crossfade > 0 && dur > 10 && !elements.audio.paused && !elements.audio.seeking && !crossfadeFadeInTimer) {
+        const timeLeft = dur - cur;
+        if (timeLeft <= state.settings.crossfade && timeLeft > 0.2) {
+          const targetVol = state.isMuted ? 0 : state.volume;
+          const ratio = Math.max(0, Math.min(1, timeLeft / state.settings.crossfade));
+          elements.audio.volume = targetVol * ratio;
         }
       }
 
@@ -2985,6 +3075,7 @@
         state.isPlaylistShuffle = false;
         state.isShuffled = false;
         if (elements.shufflePlaylistBtn) elements.shufflePlaylistBtn.classList.remove('active');
+        recordRecentlyPlayedPlaylist({ id: playlistId, name: title, image: coverUrl, tracks: tracks });
         playTrack(tracks[0], tracks);
       }
     };
@@ -3005,6 +3096,7 @@
 
       state.activePlaylistTracks = [...tracks];
       state.activePlaylistId = playlistId;
+      recordRecentlyPlayedPlaylist({ id: playlistId, name: title, image: coverUrl, tracks: tracks });
 
       if (state.isPlaylistShuffle) {
         elements.shufflePlaylistBtn.title = "Mode: Random (No Repeats) • Click for In-Order";
@@ -3040,7 +3132,7 @@
 
     // Export playlist action
     if (elements.exportPlaylistBtn) {
-      elements.exportPlaylistBtn.onclick = () => exportCurrentPlaylist();
+      elements.exportPlaylistBtn.onclick = () => openExportPlaylistModal();
     }
 
     // Delete custom playlist (kept solely inside playlist view)
@@ -3090,8 +3182,33 @@
     showToast(`Playlist renamed to "${pl.name}"`, '✏️');
   }
 
-  // Export Playlist as JSON
-  function exportCurrentPlaylist() {
+  // Open Export Playlist Format Chooser Modal
+  function openExportPlaylistModal() {
+    let tracks = [];
+    if (state.activePlaylistId === 'liked') {
+      tracks = state.likedSongs || [];
+    } else if (state.activePlaylistId === 'downloaded') {
+      tracks = state.offlineTracks || [];
+    } else {
+      const pl = state.customPlaylists.find(p => p.id === state.activePlaylistId);
+      if (pl) tracks = pl.tracks || [];
+    }
+
+    if (!tracks || tracks.length === 0) {
+      showToast('Playlist is empty, nothing to export', 'ℹ️');
+      return;
+    }
+
+    if (elements.exportFormatModal) {
+      elements.exportFormatModal.style.display = 'flex';
+      try { window.history.pushState({ modal: 'exportFormat' }, '', window.location.pathname); } catch (e) {}
+    } else {
+      exportCurrentPlaylist('json');
+    }
+  }
+
+  // Export Playlist in selected format ('json' or 'csv')
+  function exportCurrentPlaylist(format = 'json') {
     let title = 'Playlist';
     let desc = '';
     let tracks = [];
@@ -3117,41 +3234,231 @@
       return;
     }
 
-    const exportPayload = {
-      app: 'MusiSurf',
-      version: '1.0',
-      playlistName: title,
-      description: desc,
-      exportedAt: new Date().toISOString(),
-      trackCount: tracks.length,
-      tracks: tracks.map((t, idx) => ({
-        index: idx + 1,
-        title: t.title,
-        artist: t.artist,
-        album: t.album || '',
-        duration: t.duration || 0,
-        durationStr: t.durationStr || '',
-        image: t.image || '',
-        source: t.source || 'jiosaavn',
-        id: t.id
-      }))
-    };
+    const safeName = title.toLowerCase().replace(/[^a-z0-9_-]/gi, '_') || 'playlist';
 
-    const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const safeName = title.toLowerCase().replace(/[^a-z0-9_-]/gi, '_');
-    a.download = `${safeName}_playlist.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    if (format === 'csv') {
+      const escapeCsv = (str) => `"${(str || '').toString().replace(/"/g, '""')}"`;
+      const headerRow = ['Title', 'Artist', 'Album', 'Duration'];
+      const rows = tracks.map(t => [
+        escapeCsv(t.title),
+        escapeCsv(t.artist),
+        escapeCsv(t.album || 'Single'),
+        escapeCsv(t.durationStr || formatTime(t.duration || 0))
+      ].join(','));
+      const csvContent = '\uFEFF' + [headerRow.join(','), ...rows].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${safeName}_playlist.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`✓ Exported "${title}" as CSV file`, '📊');
+    } else {
+      const exportPayload = {
+        app: 'MusiSurf',
+        version: '1.0',
+        playlistName: title,
+        description: desc,
+        exportedAt: new Date().toISOString(),
+        trackCount: tracks.length,
+        tracks: tracks.map((t, idx) => ({
+          index: idx + 1,
+          title: t.title,
+          artist: t.artist,
+          album: t.album || '',
+          duration: t.duration || 0,
+          durationStr: t.durationStr || '',
+          image: t.image || '',
+          source: t.source || 'jiosaavn',
+          id: t.id
+        }))
+      };
 
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${safeName}_playlist.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`✓ Exported "${title}" as JSON file`, '💾');
+    }
+
+    if (elements.exportFormatModal) {
+      elements.exportFormatModal.style.display = 'none';
+    }
     if (elements.mobilePlaylistOptionsModal) {
       elements.mobilePlaylistOptionsModal.style.display = 'none';
     }
-    showToast(`Exported "${title}" (${tracks.length} songs)`, '📥');
+  }
+
+  // Smart Playlist Import Parser (Auto-detects JSON or CSV / Tabular formats)
+  function parseImportedPlaylist(fileText, fileName) {
+    const trimmed = (fileText || '').trim();
+    let playlistName = fileName.replace(/\.[^/.]+$/, '').replace(/[_|-]/g, ' ').trim();
+    playlistName = playlistName.replace(/\b\w/g, l => l.toUpperCase()) || 'Imported Playlist';
+
+    let tracks = [];
+
+    // Attempt 1: JSON Parsing
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed.playlistName) playlistName = parsed.playlistName;
+        else if (parsed.name) playlistName = parsed.name;
+
+        const rawList = Array.isArray(parsed) ? parsed : (parsed.tracks || parsed.items || parsed.songs || []);
+        if (Array.isArray(rawList)) {
+          tracks = rawList.map((item, idx) => {
+            const t = item.track ? item.track : item;
+            const title = t.title || t.name || t.song || t.trackName || `Track ${idx + 1}`;
+            let artist = t.artist || '';
+            if (!artist && Array.isArray(t.artists)) {
+              artist = t.artists.map(a => (typeof a === 'string' ? a : (a.name || ''))).filter(Boolean).join(', ');
+            }
+            if (!artist) artist = 'Unknown Artist';
+            const album = t.album?.name || t.album || 'Imported Album';
+            const dur = Number(t.duration) || 210;
+            const durStr = t.durationStr || formatTime(dur);
+            const image = t.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80';
+            return {
+              id: t.id || `imp_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
+              title: title.trim(),
+              artist: artist.trim(),
+              album: album.trim(),
+              image,
+              duration: dur,
+              durationStr: durStr,
+              source: t.source || 'jiosaavn'
+            };
+          }).filter(t => t.title);
+        }
+      } catch (err) {
+        console.warn('JSON parse attempt failed, trying CSV parsing:', err);
+      }
+    }
+
+    // Attempt 2: CSV / Delimited Parsing (Fallback if JSON produced 0 tracks)
+    if (tracks.length === 0) {
+      const lines = trimmed.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      if (lines.length > 0) {
+        const firstLine = lines[0];
+        const delimiter = firstLine.includes('\t') ? '\t' : (firstLine.includes(';') ? ';' : ',');
+
+        const parseCsvLine = (line) => {
+          const res = [];
+          let current = '';
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i++) {
+            const c = line[i];
+            if (c === '"') {
+              inQuotes = !inQuotes;
+            } else if (c === delimiter && !inQuotes) {
+              res.push(current.trim());
+              current = '';
+            } else {
+              current += c;
+            }
+          }
+          res.push(current.trim());
+          return res.map(v => v.replace(/^"|"$/g, '').trim());
+        };
+
+        let titleIdx = 0;
+        let artistIdx = 1;
+        let albumIdx = 2;
+        let durIdx = 3;
+
+        const headerCols = parseCsvLine(firstLine).map(h => h.toLowerCase());
+        const hasHeader = headerCols.some(h => ['title', 'name', 'song', 'artist', 'track'].includes(h));
+        const dataLines = hasHeader ? lines.slice(1) : lines;
+
+        if (hasHeader) {
+          headerCols.forEach((h, idx) => {
+            if (h.includes('title') || h.includes('name') || h.includes('song')) titleIdx = idx;
+            else if (h.includes('artist')) artistIdx = idx;
+            else if (h.includes('album')) albumIdx = idx;
+            else if (h.includes('dur') || h.includes('time') || h.includes('length')) durIdx = idx;
+          });
+        }
+
+        tracks = dataLines.map((line, idx) => {
+          const cols = parseCsvLine(line);
+          let title = cols[titleIdx] || '';
+          let artist = cols[artistIdx] || 'Unknown Artist';
+          let album = cols[albumIdx] || 'Imported Album';
+          let durStr = cols[durIdx] || '3:30';
+
+          if (cols.length === 1 && line.includes(' - ')) {
+            const parts = line.split(' - ');
+            artist = parts[0].trim();
+            title = parts.slice(1).join(' - ').trim();
+          } else if (!title) {
+            title = line.trim();
+          }
+
+          return {
+            id: `imp_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
+            title: title.trim(),
+            artist: artist.trim(),
+            album: album.trim(),
+            image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80',
+            duration: 210,
+            durationStr: durStr,
+            source: 'jiosaavn'
+          };
+        }).filter(t => t.title && t.title.toLowerCase() !== 'title');
+      }
+    }
+
+    return { playlistName, tracks };
+  }
+
+  function handlePlaylistFileImport(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        const { playlistName, tracks } = parseImportedPlaylist(text, file.name);
+        if (!tracks || tracks.length === 0) {
+          showToast('Could not find any tracks in file. Please ensure it has song titles and artists.', '⚠️');
+          return;
+        }
+
+        const newPlaylist = {
+          id: `pl_${Date.now()}`,
+          name: playlistName,
+          description: `Imported from ${file.name} • ${tracks.length} tracks`,
+          createdAt: Date.now(),
+          tracks: tracks,
+          image: tracks[0]?.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80'
+        };
+
+        state.customPlaylists.push(newPlaylist);
+        saveStoredPlaylists();
+        renderSidebarPlaylists();
+        updateLibraryUI();
+
+        if (elements.settingsModal) elements.settingsModal.style.display = 'none';
+        document.body.style.overflow = '';
+
+        renderPlaylistView(newPlaylist.id);
+        showToast(`✓ Imported playlist "${playlistName}" (${tracks.length} tracks)!`, '🎉');
+      } catch (err) {
+        console.error('Import error:', err);
+        showToast('Error importing file: ' + err.message, '⚠️');
+      }
+    };
+    reader.onerror = () => {
+      showToast('Error reading file from disk', '⚠️');
+    };
+    reader.readAsText(file);
   }
 
   function renderSidebarPlaylists() {
@@ -3473,6 +3780,7 @@
             if (pl.tracks && pl.tracks.length > 0) {
               state.activePlaylistId = pl.id;
               state.activePlaylistTracks = [...pl.tracks];
+              recordRecentlyPlayedPlaylist(pl);
               playTrack(pl.tracks[0], pl.tracks);
             }
           });
@@ -3633,6 +3941,15 @@
       } else {
         elements.deadSilenceOffRadio.checked = true;
       }
+    }
+
+    if (elements.crossfadeSlider && elements.crossfadeValueLabel) {
+      const cf = typeof state.settings.crossfade === 'number' ? state.settings.crossfade : 0;
+      elements.crossfadeSlider.value = cf;
+      elements.crossfadeValueLabel.textContent = cf === 0 ? 'Off' : `${cf}s`;
+      document.querySelectorAll('.crossfade-steps-labels .step-label').forEach(lbl => {
+        lbl.classList.toggle('active', parseInt(lbl.dataset.val, 10) === cf);
+      });
     }
   }
 
@@ -4525,6 +4842,99 @@
       });
     }
 
+    // Crossfade Slider & Steps Listeners
+    if (elements.crossfadeSlider) {
+      elements.crossfadeSlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10) || 0;
+        state.settings.crossfade = val;
+        if (elements.crossfadeValueLabel) {
+          elements.crossfadeValueLabel.textContent = val === 0 ? 'Off' : `${val}s`;
+        }
+        document.querySelectorAll('.crossfade-steps-labels .step-label').forEach(lbl => {
+          lbl.classList.toggle('active', parseInt(lbl.dataset.val, 10) === val);
+        });
+      });
+      elements.crossfadeSlider.addEventListener('change', () => {
+        saveSettings();
+        showToast(state.settings.crossfade === 0 ? 'Crossfade turned off' : `Crossfade set to ${state.settings.crossfade}s`, '🎚️');
+      });
+    }
+
+    // Step labels direct tap/click support
+    document.querySelectorAll('.crossfade-steps-labels .step-label').forEach(lbl => {
+      lbl.addEventListener('click', () => {
+        const val = parseInt(lbl.dataset.val, 10) || 0;
+        state.settings.crossfade = val;
+        if (elements.crossfadeSlider) elements.crossfadeSlider.value = val;
+        if (elements.crossfadeValueLabel) {
+          elements.crossfadeValueLabel.textContent = val === 0 ? 'Off' : `${val}s`;
+        }
+        document.querySelectorAll('.crossfade-steps-labels .step-label').forEach(l => {
+          l.classList.toggle('active', parseInt(l.dataset.val, 10) === val);
+        });
+        saveSettings();
+        showToast(val === 0 ? 'Crossfade turned off' : `Crossfade set to ${val}s`, '🎚️');
+      });
+    });
+
+    // Playlist File Import Event Listeners (File picker + Drag & Drop)
+    if (elements.playlistFileInput) {
+      elements.playlistFileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) {
+          handlePlaylistFileImport(file);
+          e.target.value = '';
+        }
+      });
+    }
+
+    if (elements.importDropzone) {
+      ['dragenter', 'dragover'].forEach(name => {
+        elements.importDropzone.addEventListener(name, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          elements.importDropzone.classList.add('drag-over');
+        });
+      });
+      ['dragleave', 'drop'].forEach(name => {
+        elements.importDropzone.addEventListener(name, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          elements.importDropzone.classList.remove('drag-over');
+        });
+      });
+      elements.importDropzone.addEventListener('drop', (e) => {
+        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file) {
+          handlePlaylistFileImport(file);
+        }
+      });
+    }
+
+    // Export Format Modal Listeners
+    if (elements.closeExportFormatModalBtn) {
+      elements.closeExportFormatModalBtn.addEventListener('click', () => {
+        if (elements.exportFormatModal) elements.exportFormatModal.style.display = 'none';
+      });
+    }
+    if (elements.exportFormatModal) {
+      elements.exportFormatModal.addEventListener('click', (e) => {
+        if (e.target === elements.exportFormatModal) {
+          elements.exportFormatModal.style.display = 'none';
+        }
+      });
+    }
+    if (elements.exportAsJsonBtn) {
+      elements.exportAsJsonBtn.addEventListener('click', () => {
+        exportCurrentPlaylist('json');
+      });
+    }
+    if (elements.exportAsCsvBtn) {
+      elements.exportAsCsvBtn.addEventListener('click', () => {
+        exportCurrentPlaylist('csv');
+      });
+    }
+
     // Local Files Event Listeners
     if (elements.navLocalMusic) {
       elements.navLocalMusic.addEventListener('click', () => switchView('localMusic'));
@@ -5080,7 +5490,10 @@
 
     if (elements.mobOptExportPlaylistBtn) {
       elements.mobOptExportPlaylistBtn.addEventListener('click', () => {
-        exportCurrentPlaylist();
+        if (elements.mobilePlaylistOptionsModal) {
+          elements.mobilePlaylistOptionsModal.style.display = 'none';
+        }
+        openExportPlaylistModal();
       });
     }
 
@@ -5170,6 +5583,10 @@
       }
       if (elements.settingsModal && elements.settingsModal.style.display !== 'none') {
         elements.settingsModal.style.display = 'none';
+        return;
+      }
+      if (elements.exportFormatModal && elements.exportFormatModal.style.display !== 'none') {
+        elements.exportFormatModal.style.display = 'none';
         return;
       }
       if (elements.addToPlaylistModal && elements.addToPlaylistModal.style.display !== 'none') {
@@ -5337,6 +5754,7 @@
         elements.createPlaylistModal.style.display = 'none';
         elements.addToPlaylistModal.style.display = 'none';
         if (elements.settingsModal) elements.settingsModal.style.display = 'none';
+        if (elements.exportFormatModal) elements.exportFormatModal.style.display = 'none';
         if (elements.mobilePlayerModal) elements.mobilePlayerModal.style.display = 'none';
       }
     });

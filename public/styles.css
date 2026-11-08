@@ -4932,85 +4932,336 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 /* ==========================================================================
-   SETTINGS MODAL & DEAD SILENCE CONTROLS
+   FULLSCREEN SETTINGS VIEW & DEAD SILENCE / CROSSFADE / IMPORT CONTROLS
    ========================================================================== */
-.settings-card {
-  width: 580px;
-  max-width: 95vw;
-  max-height: 85vh;
-  display: flex;
-  flex-direction: column;
-  background: #181920;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
-  overflow: hidden;
+.fullscreen-settings-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 3000 !important;
+  background: #0d0f15 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  animation: modalFadeIn 0.2s ease forwards !important;
+  box-sizing: border-box !important;
 }
 
-.modal-title-with-icon {
+.settings-fullscreen-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 16px;
+  padding: 16px 28px;
+  background: rgba(13, 15, 21, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.modal-title-with-icon h3 {
-  font-size: 1.25rem;
-  font-weight: 700;
+.settings-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 500px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.settings-back-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateX(-2px);
+}
+
+.settings-back-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-nav-title {
+  font-size: 1.4rem;
+  font-weight: 800;
   color: #fff;
   margin: 0;
 }
 
-.settings-modal-icon {
-  width: 22px;
-  height: 22px;
-  color: var(--accent-primary);
-}
-
-.settings-modal-body {
-  padding: 20px 24px;
-  overflow-y: auto;
+.settings-fullscreen-content {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 20px 80px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 32px;
+  box-sizing: border-box;
 }
 
-.settings-section-header {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  padding-bottom: 8px;
-  margin-bottom: 14px;
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.settings-section-title {
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 1.2px;
+.settings-group-title {
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 1.4px;
   text-transform: uppercase;
-  color: var(--accent-primary);
+  color: var(--accent-primary, #00f260);
+  margin: 0 0 4px 4px;
 }
 
-.settings-option-card {
+.settings-card-item {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  padding: 16px;
+  border-radius: 14px;
+  padding: 20px 22px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
+  transition: border-color var(--transition-fast);
 }
 
-.settings-option-label {
-  font-size: 0.95rem;
-  font-weight: 600;
+.settings-card-item:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.settings-item-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-item-title {
+  font-size: 1.05rem;
+  font-weight: 700;
   color: #fff;
-  display: block;
-  margin-bottom: 4px;
 }
 
-.settings-option-desc {
-  font-size: 0.82rem;
+.settings-item-desc {
+  font-size: 0.88rem;
   color: var(--text-secondary);
-  line-height: 1.4;
-  display: block;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.settings-value-pill {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent-primary, #00f260);
+  background: rgba(0, 242, 96, 0.12);
+  border: 1px solid rgba(0, 242, 96, 0.3);
+  padding: 3px 10px;
+  border-radius: 500px;
+}
+
+/* Crossfade Range Slider */
+.crossfade-slider-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 4px;
+}
+
+.crossfade-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+  outline: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.crossfade-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent-primary, #00f260);
+  box-shadow: 0 0 10px rgba(0, 242, 96, 0.6);
+  cursor: grab;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.crossfade-range::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.2);
+}
+
+.crossfade-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent-primary, #00f260);
+  box-shadow: 0 0 10px rgba(0, 242, 96, 0.6);
+  cursor: grab;
+}
+
+.crossfade-steps-labels {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.step-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.step-label.active,
+.step-label:hover {
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Import Playlist Dropzone */
+.import-file-dropzone {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 22px;
+  border: 2px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.import-file-dropzone:hover,
+.import-file-dropzone.drag-over {
+  border-color: var(--accent-primary, #00f260);
+  background: rgba(0, 242, 96, 0.05);
+}
+
+.import-icon {
+  width: 32px;
+  height: 32px;
+  color: var(--accent-primary, #00f260);
+  flex-shrink: 0;
+}
+
+.import-text-block {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.import-main-btn {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.import-subtext {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Export Choice Modal */
+.export-format-card {
+  width: 440px;
+  max-width: 92vw;
+}
+
+.export-format-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.export-format-desc {
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.export-format-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.export-format-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition-fast);
+}
+
+.export-format-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent-primary, #00f260);
+  transform: translateY(-1px);
+}
+
+.export-format-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: rgba(0, 242, 96, 0.12);
+  color: var(--accent-primary, #00f260);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.export-format-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.export-format-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.export-format-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.export-format-sub {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
 }
 
 .settings-radio-list {
@@ -5949,11 +6200,15 @@ body.is-offline .queue-card:not(.is-downloaded) {
   cursor: not-allowed !important;
 }
 
-/* Offline State: Library non-downloaded playlists/cards fade out */
-body.is-offline .library-hub-card:not(.lib-hub-downloaded),
-body.is-offline .custom-playlist-card:not(.is-downloaded) {
-  opacity: 0.35 !important;
-  filter: grayscale(0.5) !important;
+/* When offline: DO NOT fade playlist outside covers/albums (only fade inside non-downloaded songs) */
+body.is-offline .playlist-hero,
+body.is-offline .playlist-cover-art,
+body.is-offline .custom-playlist-card,
+body.is-offline .library-hub-card,
+body.is-offline .playlist-card,
+body.is-offline .category-card {
+  opacity: 1 !important;
+  filter: none !important;
 }
 
 body.is-offline .lib-hub-downloaded {
