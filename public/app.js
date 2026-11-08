@@ -49,6 +49,7 @@
       targetTime: null,
       durationMinutes: 0
     },
+    recentlyPlayed: [],
     contextTrack: null
   };
 
@@ -108,6 +109,11 @@
     shelvesContainer: document.getElementById('shelvesContainer'),
 
     // Search View
+    searchRecentSection: document.getElementById('searchRecentSection'),
+    searchRecentWrap: document.getElementById('searchRecentWrap'),
+    searchRecentGrid: document.getElementById('searchRecentGrid'),
+    searchFreshBanner: document.getElementById('searchFreshBanner'),
+    clearRecentBtn: document.getElementById('clearRecentBtn'),
     searchBrowseSection: document.getElementById('searchBrowseSection'),
     searchLoading: document.getElementById('searchLoading'),
     searchResultsWrapper: document.getElementById('searchResultsWrapper'),
@@ -309,10 +315,10 @@
     return state.offlineTracks.some(t => t.id === trackId);
   }
 
-  // Generate downloaded badge HTML indicator (Spotify-grade offline check)
+  // Generate downloaded badge HTML indicator (Crisp Spotify-grade solid disc offline badge)
   function getDownloadedBadgeHtml(trackId) {
     if (isTrackDownloaded(trackId)) {
-      return `<span class="downloaded-badge" title="Downloaded • 100% Offline Ready" aria-label="Downloaded"><svg viewBox="0 0 16 16"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm3.2 7.2-2.5 2.5a1 1 0 0 1-1.4 0L4.8 8.2a.7.7 0 0 1 1-1l1.5 1.5V4.7a.7.7 0 0 1 1.4 0v4l1.5-1.5a.7.7 0 0 1 1 1z"/></svg></span>`;
+      return `<span class="downloaded-badge" title="Downloaded • 100% Offline Ready" aria-label="Downloaded"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="8" fill="var(--accent-primary, #00f260)"/><path d="M8 3.8v6.2m0 0l-2.4-2.4m2.4 2.4l2.4-2.4M4.8 12.2h6.4" stroke="#040e08" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
     }
     return '';
   }
@@ -345,14 +351,6 @@
     }
   }
 
-  // Middle ellipsis for long song titles and artist names (e.g. "PARESH PAHUJA...na Mishra")
-  function truncateMiddle(str, maxLength = 28, frontChars = 15, backChars = 10) {
-    if (!str || typeof str !== 'string') return '';
-    const trimmed = str.trim();
-    if (trimmed.length <= maxLength) return trimmed;
-    return `${trimmed.slice(0, frontChars).trim()}...${trimmed.slice(-backChars).trim()}`;
-  }
-
   // Check if track is saved in any playlist (Liked songs, Downloads, or Custom playlists)
   function isTrackInAnyPlaylist(trackId) {
     if (!trackId) return false;
@@ -378,10 +376,10 @@
     const tickHtml = inPlaylist ? getPlaylistTickBadgeHtml(track.id) : '';
     const dlHtml = getDownloadedBadgeHtml(track.id);
     if (elements.playerTitle) {
-      elements.playerTitle.innerHTML = `<span class="title-text-main">${escapeHtml(truncateMiddle(track.title, 34, 18, 12))}</span>${tickHtml}${dlHtml}`;
+      elements.playerTitle.innerHTML = `<span class="title-text-main" title="${escapeHtml(track.title)}">${escapeHtml(track.title)}</span>${tickHtml}${dlHtml}`;
     }
     if (elements.mobPlayerTitle) {
-      elements.mobPlayerTitle.innerHTML = `<span class="title-text-main">${escapeHtml(truncateMiddle(track.title, 30, 16, 10))}</span>${tickHtml}${dlHtml}`;
+      elements.mobPlayerTitle.innerHTML = `<span class="title-text-main" title="${escapeHtml(track.title)}">${escapeHtml(track.title)}</span>${tickHtml}${dlHtml}`;
     }
   }
 
@@ -470,6 +468,14 @@
         } catch (e) {}
       }
 
+      const storedRecent = localStorage.getItem('musisurf_recently_played');
+      if (storedRecent) {
+        try {
+          const parsed = JSON.parse(storedRecent);
+          if (Array.isArray(parsed)) state.recentlyPlayed = parsed;
+        } catch (e) {}
+      }
+
       const storedVol = localStorage.getItem('musisurf_volume');
       if (storedVol !== null) {
         const v = parseFloat(storedVol);
@@ -519,6 +525,67 @@
       updateLibraryUI();
     } catch (e) {
       console.warn('Error saving custom playlists:', e);
+    }
+  }
+
+  // Record recently played tracks & persist to localStorage
+  function recordRecentlyPlayed(track) {
+    if (!track || !track.id) return;
+    const cleanTrack = {
+      id: track.id,
+      title: track.title,
+      artist: track.artist,
+      album: track.album || '',
+      image: track.image || '',
+      duration: track.duration || 0,
+      durationStr: track.durationStr || '3:30',
+      audioUrl: track.audioUrl || '',
+      streamUrl: track.streamUrl || '',
+      ytId: track.ytId || '',
+      source: track.source || 'jiosaavn'
+    };
+    state.recentlyPlayed = [cleanTrack, ...state.recentlyPlayed.filter(t => t.id !== track.id)].slice(0, 16);
+    try {
+      localStorage.setItem('musisurf_recently_played', JSON.stringify(state.recentlyPlayed));
+    } catch (e) {}
+    renderSearchRecentUI();
+  }
+
+  // Render Recently Played section & fresh browser welcome state in Search View
+  function renderSearchRecentUI() {
+    if (!elements.searchRecentWrap || !elements.searchFreshBanner) return;
+
+    if (!state.recentlyPlayed || state.recentlyPlayed.length === 0) {
+      elements.searchRecentWrap.style.display = 'none';
+      elements.searchFreshBanner.style.display = 'flex';
+      return;
+    }
+
+    elements.searchFreshBanner.style.display = 'none';
+    elements.searchRecentWrap.style.display = 'block';
+
+    if (elements.searchRecentGrid) {
+      elements.searchRecentGrid.innerHTML = '';
+      state.recentlyPlayed.slice(0, 8).forEach(t => {
+        const card = document.createElement('div');
+        card.className = 'search-recent-card';
+        card.innerHTML = `
+          <img src="${t.image}" alt="${escapeHtml(t.title)}" class="search-recent-cover" loading="lazy">
+          <div class="search-recent-info">
+            <div class="search-recent-title">${escapeHtml(t.title)}</div>
+            <div class="search-recent-artist">${escapeHtml(t.artist)}</div>
+          </div>
+          <div class="search-recent-play-icon" title="Play Now">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+          </div>
+        `;
+        card.addEventListener('click', () => {
+          playTrack(t, state.recentlyPlayed);
+        });
+        elements.searchRecentGrid.appendChild(card);
+      });
     }
   }
 
@@ -936,6 +1003,8 @@
   // ==========================================================================
   async function playTrack(track, queueList = null, addToHistory = true) {
     if (!track) return;
+
+    recordRecentlyPlayed(track);
 
     // Track playback history for previous song button navigation
     if (addToHistory && state.currentTrack && state.currentTrack.id !== track.id) {
@@ -1623,6 +1692,28 @@
     state.hasSyncedLyrics = false;
     state.activeLyricIndex = -1;
 
+    if (!navigator.onLine) {
+      elements.lyricsLoading.style.display = 'none';
+      elements.lyricsLinesContainer.innerHTML = `
+        <div class="lyrics-offline-state" style="text-align: center; color: var(--text-secondary); padding: 80px 20px;">
+          <div style="width: 64px; height: 64px; margin: 0 auto 20px; border-radius: 50%; background: rgba(0, 242, 96, 0.12); border: 1px solid rgba(0, 242, 96, 0.3); display: flex; align-items: center; justify-content: center; color: var(--accent-primary, #00f260);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 32px; height: 32px;">
+              <line x1="1" y1="1" x2="23" y2="23" />
+              <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
+              <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
+              <path d="M10.71 5.05A16 16 0 0 1 22.56 9" />
+              <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" />
+              <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+              <line x1="12" y1="20" x2="12.01" y2="20" />
+            </svg>
+          </div>
+          <h3 style="font-size: 1.35rem; font-weight: 700; color: #fff; margin-bottom: 8px;">Connect to internet to view lyrics</h3>
+          <p style="font-size: 0.92rem; color: var(--text-secondary); max-width: 380px; margin: 0 auto;">Live karaoke lyrics stream from the internet. Connect to the internet to sing along in real time.</p>
+        </div>
+      `;
+      return;
+    }
+
     try {
       const res = await fetch(`/api/lyrics?track=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`);
       const data = await res.json();
@@ -1656,6 +1747,25 @@
     } catch (err) {
       console.warn('Lyrics fetch failed:', err);
       elements.lyricsLoading.style.display = 'none';
+      if (!navigator.onLine) {
+        elements.lyricsLinesContainer.innerHTML = `
+          <div class="lyrics-offline-state" style="text-align: center; color: var(--text-secondary); padding: 80px 20px;">
+            <div style="width: 64px; height: 64px; margin: 0 auto 20px; border-radius: 50%; background: rgba(0, 242, 96, 0.12); border: 1px solid rgba(0, 242, 96, 0.3); display: flex; align-items: center; justify-content: center; color: var(--accent-primary, #00f260);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 32px; height: 32px;">
+                <line x1="1" y1="1" x2="23" y2="23" />
+                <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
+                <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
+                <path d="M10.71 5.05A16 16 0 0 1 22.56 9" />
+                <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" />
+                <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                <line x1="12" y1="20" x2="12.01" y2="20" />
+              </svg>
+            </div>
+            <h3 style="font-size: 1.35rem; font-weight: 700; color: #fff; margin-bottom: 8px;">Connect to internet to view lyrics</h3>
+            <p style="font-size: 0.92rem; color: var(--text-secondary); max-width: 380px; margin: 0 auto;">Live karaoke lyrics stream from the internet. Connect to the internet to sing along in real time.</p>
+          </div>
+        `;
+      }
     }
   }
 
@@ -2045,6 +2155,7 @@
 
     if (query.length > 0) {
       elements.clearSearchBtn.style.display = 'flex';
+      if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'none';
       switchView('search');
 
       clearTimeout(searchDebounceTimer);
@@ -2055,13 +2166,16 @@
       elements.clearSearchBtn.style.display = 'none';
       elements.searchResultsWrapper.style.display = 'none';
       elements.searchEmptyState.style.display = 'none';
+      if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'block';
       elements.searchBrowseSection.style.display = 'block';
+      renderSearchRecentUI();
     }
   }
 
   async function performSearch(query) {
     if (!query) return;
     switchView('search');
+    if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'none';
     elements.searchBrowseSection.style.display = 'none';
     elements.searchResultsWrapper.style.display = 'none';
     elements.searchEmptyState.style.display = 'none';
@@ -2297,8 +2411,8 @@
 
     const badgeHtml = getDownloadedBadgeHtml(track.id);
     const tickHtml = getPlaylistTickBadgeHtml(track.id);
-    const formattedTitle = escapeHtml(truncateMiddle(track.title, 32, 16, 12));
-    const formattedArtist = escapeHtml(truncateMiddle(track.artist, 28, 14, 10));
+    const formattedTitle = escapeHtml(track.title);
+    const formattedArtist = escapeHtml(track.artist);
 
     row.innerHTML = `
       <img src="${track.image}" alt="${escapeHtml(track.title)}" class="song-thumb">
@@ -2349,8 +2463,8 @@
 
     const badgeHtml = getDownloadedBadgeHtml(track.id);
     const tickHtml = getPlaylistTickBadgeHtml(track.id);
-    const formattedTitle = escapeHtml(truncateMiddle(track.title, 34, 18, 12));
-    const formattedArtist = escapeHtml(truncateMiddle(track.artist, 30, 15, 11));
+    const formattedTitle = escapeHtml(track.title);
+    const formattedArtist = escapeHtml(track.artist);
 
     tr.innerHTML = `
       <td class="col-num">${index}</td>
@@ -2363,7 +2477,7 @@
           </div>
         </div>
       </td>
-      <td class="col-album">${escapeHtml(truncateMiddle(track.album || 'Single', 24, 12, 8))}</td>
+      <td class="col-album">${escapeHtml(track.album || 'Single')}</td>
       <td class="col-duration">${track.durationStr || '3:30'}</td>
       <td class="col-actions">
         <button class="song-action-btn song-more-trigger" title="More Options">
@@ -3123,6 +3237,13 @@
     if (viewName === 'library') {
       updateLibraryUI();
     }
+    if (viewName === 'search') {
+      if (!elements.globalSearchInput || !elements.globalSearchInput.value.trim()) {
+        if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'block';
+        if (elements.searchBrowseSection) elements.searchBrowseSection.style.display = 'block';
+      }
+      renderSearchRecentUI();
+    }
     if (!navigator.onLine && typeof updateOfflineModeUI === 'function') {
       updateOfflineModeUI(false);
     }
@@ -3581,8 +3702,8 @@
         tr.className = `${state.currentTrack?.id === track.id ? 'playing' : ''} ${isDownloaded ? 'is-downloaded' : ''}`;
         tr.dataset.trackId = track.id;
 
-        const formattedTitle = escapeHtml(truncateMiddle(track.title, 34, 18, 12));
-        const formattedArtist = escapeHtml(truncateMiddle(track.artist || 'Local File', 30, 15, 11));
+        const formattedTitle = escapeHtml(track.title);
+        const formattedArtist = escapeHtml(track.artist || 'Local File');
 
         tr.innerHTML = `
           <td class="col-num">${idx + 1}</td>
@@ -3595,7 +3716,7 @@
               </div>
             </div>
           </td>
-          <td class="col-album">${escapeHtml(truncateMiddle(track.fileName || track.album || 'Device Storage', 24, 12, 8))}</td>
+          <td class="col-album">${escapeHtml(track.fileName || track.album || 'Device Storage')}</td>
           <td class="col-duration">${track.durationStr || '--:--'}</td>
           <td class="col-actions">
             <button class="song-action-btn add-to-queue-trigger" title="Add to Queue">
@@ -3708,7 +3829,21 @@
         document.querySelectorAll('.custom-sort-dropdown.open').forEach(d => {
           if (d !== dropdown) d.classList.remove('open');
         });
-        dropdown.classList.toggle('open', !isOpen);
+        const willOpen = !isOpen;
+        dropdown.classList.toggle('open', willOpen);
+        if (willOpen) {
+          const menu = dropdown.querySelector('.custom-sort-menu');
+          if (menu) {
+            const rect = trigger.getBoundingClientRect();
+            if (rect.left < 110) {
+              menu.style.left = '0px';
+              menu.style.right = 'auto';
+            } else if (window.innerWidth - rect.right < 110) {
+              menu.style.left = 'auto';
+              menu.style.right = '0px';
+            }
+          }
+        }
       });
     }
 
@@ -3841,9 +3976,22 @@
       elements.clearSearchBtn.style.display = 'none';
       elements.searchResultsWrapper.style.display = 'none';
       elements.searchEmptyState.style.display = 'none';
+      if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'block';
       elements.searchBrowseSection.style.display = 'block';
+      renderSearchRecentUI();
       elements.globalSearchInput.focus();
     });
+
+    if (elements.clearRecentBtn) {
+      elements.clearRecentBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.recentlyPlayed = [];
+        try {
+          localStorage.removeItem('musisurf_recently_played');
+        } catch (err) {}
+        renderSearchRecentUI();
+      });
+    }
 
     // Category / Mood Cards in Search View
     document.querySelectorAll('.category-card').forEach(card => {
@@ -4188,6 +4336,9 @@
     };
 
     const toggleLyricsView = () => {
+      if (!navigator.onLine) {
+        showToast('Connect to internet to view lyrics', '⚡');
+      }
       if (state.currentView === 'lyrics') {
         handleCloseLyrics();
       } else {
@@ -4708,6 +4859,9 @@
 
     if (elements.mobPlayerLyricsBtn) {
       elements.mobPlayerLyricsBtn.addEventListener('click', () => {
+        if (!navigator.onLine) {
+          showToast('Connect to internet to view lyrics', '⚡');
+        }
         state.openedLyricsFromMobilePlayer = true;
         if (elements.mobilePlayerModal) elements.mobilePlayerModal.style.display = 'none';
         switchView('lyrics');
@@ -5192,6 +5346,7 @@
     renderSidebarPlaylists();
     setupEventListeners();
     loadTrendingShelves();
+    renderSearchRecentUI();
     restoreLastPlayedState();
     updateProgress();
 

@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=6.1">
+  <link rel="stylesheet" href="/styles.css?v=6.2">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -346,6 +346,33 @@
         <!-- SEARCH VIEW -->
         <section class="view-section" id="searchView">
           <div class="search-view-container">
+            <!-- Recently Played Section / Fresh Browser Welcome -->
+            <div class="search-recent-section" id="searchRecentSection">
+              <div class="search-recent-wrap" id="searchRecentWrap" style="display: none;">
+                <div class="search-recent-header">
+                  <h2 class="section-title">Recently Played</h2>
+                  <button type="button" class="clear-recent-btn" id="clearRecentBtn" title="Clear Recently Played">Clear all</button>
+                </div>
+                <div class="search-recent-grid" id="searchRecentGrid">
+                  <!-- Populated dynamically by JS -->
+                </div>
+              </div>
+
+              <div class="search-fresh-banner" id="searchFreshBanner">
+                <div class="fresh-banner-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
+                  </svg>
+                </div>
+                <div class="fresh-banner-content">
+                  <h3 class="fresh-banner-title">Welcome to MusiSurf! Ready to dive in? 🌊</h3>
+                  <p class="fresh-banner-desc">No recently played songs yet — every legendary playlist starts with a single search. Type your favorite artist, viral hit, or mood above and surf through millions of full-length, 100% ad-free tracks!</p>
+                </div>
+              </div>
+            </div>
+
             <!-- Search Quick Suggestions / Genres when search is empty -->
             <div class="search-browse-categories" id="searchBrowseSection">
               <h2 class="section-title">Explore Categories & Moods</h2>
@@ -1561,7 +1588,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.33"></script>
+  <script src="/app.js?v=2.34"></script>
 </body>
 
 </html>

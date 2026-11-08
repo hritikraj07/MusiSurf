@@ -1,8 +1,6 @@
 <div align="center">
 
-<img src="public/icons/icon-192.png" alt="MusiSurf Logo" width="96" />
-
-# MusiSurf
+# <img src="public/icons/icon-192.png" alt="MusiSurf Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px;" /> MusiSurf
 
 <br/>
 
