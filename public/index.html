@@ -1010,7 +1010,6 @@
               <polyline points="7 23 3 19 7 15" />
               <path d="M21 13v2a4 4 0 0 1-4 4H3" />
             </svg>
-            <span class="repeat-one-indicator" style="display: none;">1</span>
           </button>
         </div>
 
@@ -1185,7 +1184,6 @@
             <polyline points="7 23 3 19 7 15" />
             <path d="M21 13v2a4 4 0 0 1-4 4H3" />
           </svg>
-          <span class="repeat-one-indicator" style="display: none;">1</span>
         </button>
       </div>
 
@@ -1389,6 +1387,31 @@
           <div class="modal-footer">
             <button type="button" class="btn-secondary" id="cancelPlaylistBtn">Cancel</button>
             <button type="submit" class="btn-primary">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Rename Playlist Modal (MusiSurf Dark Theme) -->
+    <div class="modal-backdrop" id="renamePlaylistModal" style="display: none;">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Rename Playlist</h3>
+          <button class="modal-close-btn" id="closeRenamePlaylistModalBtn" title="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <form id="renamePlaylistForm">
+          <div class="form-group">
+            <label for="renamePlaylistInput">Playlist Name</label>
+            <input type="text" id="renamePlaylistInput" placeholder="Enter new playlist name..." required maxlength="50" autocomplete="off">
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn-secondary" id="cancelRenamePlaylistBtn">Cancel</button>
+            <button type="submit" class="btn-primary">Save Name</button>
           </div>
         </form>
       </div>
@@ -1610,7 +1633,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.36"></script>
+  <script src="/app.js?v=2.37"></script>
 </body>
 
 </html>

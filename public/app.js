@@ -254,6 +254,12 @@
     closePlaylistModalBtn: document.getElementById('closePlaylistModalBtn'),
     cancelPlaylistBtn: document.getElementById('cancelPlaylistBtn'),
 
+    renamePlaylistModal: document.getElementById('renamePlaylistModal'),
+    closeRenamePlaylistModalBtn: document.getElementById('closeRenamePlaylistModalBtn'),
+    renamePlaylistForm: document.getElementById('renamePlaylistForm'),
+    renamePlaylistInput: document.getElementById('renamePlaylistInput'),
+    cancelRenamePlaylistBtn: document.getElementById('cancelRenamePlaylistBtn'),
+
     addToPlaylistModal: document.getElementById('addToPlaylistModal'),
     modalPlaylistPickerList: document.getElementById('modalPlaylistPickerList'),
     closeAddToPlaylistBtn: document.getElementById('closeAddToPlaylistBtn'),
@@ -1094,6 +1100,28 @@
   async function playTrack(track, queueList = null, addToHistory = true) {
     if (!track) return;
 
+    // Immediately stop any existing playback on both engines to prevent 2 songs playing
+    try {
+      elements.audio.pause();
+      elements.audio.currentTime = 0;
+    } catch (e) {}
+    if (state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
+      try {
+        state.ytPlayer.pauseVideo();
+        if (typeof state.ytPlayer.stopVideo === 'function') state.ytPlayer.stopVideo();
+      } catch (e) {}
+    }
+    stopBackgroundKeepAlive();
+
+    // Reset progress freeze safeguard for new track
+    state.restoredResumeTime = 0;
+    if (elements.currentTimeLabel) elements.currentTimeLabel.textContent = '0:00';
+    if (elements.progressFill) elements.progressFill.style.width = '0%';
+    if (elements.mobCurrentTime) elements.mobCurrentTime.textContent = '0:00';
+    if (elements.mobProgressFill) elements.mobProgressFill.style.width = '0%';
+    if (elements.miniPlayerFill) elements.miniPlayerFill.style.width = '0%';
+    if (elements.progressBuffer) elements.progressBuffer.style.width = '0%';
+
     recordRecentlyPlayed(track);
 
     // Track playback history for previous song button navigation
@@ -1267,30 +1295,27 @@
         const blobUrl = URL.createObjectURL(audioBlob);
         elements.audio.src = blobUrl;
         elements.audio.volume = state.isMuted ? 0 : state.volume;
-
-        // Chromium mobile duration calculation workaround for blobs
-        const onLoadedMeta = () => {
-          if (elements.audio.duration === Infinity) {
-            elements.audio.currentTime = 1e101;
-            elements.audio.ontimeupdate = function () {
-              this.ontimeupdate = null;
-              elements.audio.currentTime = 0;
-            };
-          }
-        };
-        elements.audio.addEventListener('loadedmetadata', onLoadedMeta, { once: true });
-
         elements.audio.load();
         applyCrossfadeIn();
         elements.audio.play().catch(err => {
           console.warn('Offline playback error:', err);
         });
-      } else if (track.audioUrl || track.streamUrl) {
-        // High quality full-length direct audio streaming
+      } else {
+        // Universal Direct Audio Engine (JioSaavn & YouTube direct audio streaming)
         if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.stopVideo === 'function') {
           try { state.ytPlayer.stopVideo(); } catch (e) {}
         }
-        track.source = 'saavn';
+
+        // Auto-assign direct streaming URL for YouTube tracks (enables 100% background playback & MediaSession)
+        const isYtTrack = track.source === 'youtube' || track.ytId || (track.id && track.id.startsWith('yt_'));
+        if (isYtTrack) {
+          const ytId = track.ytId || (track.id ? track.id.replace('yt_', '') : '');
+          if (ytId && !track.streamUrl) {
+            track.streamUrl = `/api/yt-stream?id=${encodeURIComponent(ytId)}`;
+            track.audioUrl = track.audioUrl || track.streamUrl;
+            track.hasDirectAudio = true;
+          }
+        }
 
         // Ensure volume is audible and unmuted
         if (state.isMuted || state.volume <= 0.05) {
@@ -1299,40 +1324,47 @@
           elements.audio.volume = state.volume;
         }
 
-        const streamUrl = track.streamUrl || `/api/stream?url=${encodeURIComponent(track.audioUrl)}`;
+        const streamUrl = track.streamUrl || (track.audioUrl ? `/api/stream?url=${encodeURIComponent(track.audioUrl)}` : null);
         const audioSrc = track.audioUrl || streamUrl;
-        elements.audio.src = audioSrc;
-        elements.audio.load();
-        applyCrossfadeIn();
-        const playPromise = elements.audio.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(err => {
-            console.warn('Direct stream playback error, trying stream proxy fallback:', err);
-            if (streamUrl && elements.audio.src !== streamUrl) {
-              elements.audio.src = streamUrl;
-              elements.audio.load();
-              elements.audio.play().catch(directErr => console.warn('Stream fallback failed:', directErr));
-            }
-          });
-        }
-      } else if (track.source === 'youtube' && track.ytId) {
-        // Universal YouTube Engine only when explicitly YouTube source with valid ytId
-        try { elements.audio.pause(); elements.audio.currentTime = 0; } catch (e) {}
-        let retries = 0;
-        const playYt = () => {
-          if (!state.isPlaying || state.currentTrack?.id !== track.id) return;
-          if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
-            state.ytPlayer.loadVideoById(track.ytId);
+
+        if (audioSrc) {
+          elements.audio.src = audioSrc;
+          elements.audio.load();
+          applyCrossfadeIn();
+          const playPromise = elements.audio.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(err => {
+              console.warn('Direct stream playback error, checking fallbacks:', err);
+              if (streamUrl && elements.audio.src !== streamUrl) {
+                elements.audio.src = streamUrl;
+                elements.audio.load();
+                elements.audio.play().catch(directErr => console.warn('Stream proxy fallback failed:', directErr));
+              } else if (isYtTrack) {
+                // Secondary fallback to YouTube iframe if direct audio extraction fails
+                const ytId = track.ytId || (track.id ? track.id.replace('yt_', '') : '');
+                if (ytId && state.ytReady && state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
+                  try {
+                    state.ytPlayer.loadVideoById(ytId);
+                    state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
+                    state.ytPlayer.playVideo();
+                  } catch (e) {
+                    console.warn('YouTube fallback playback error:', e);
+                  }
+                }
+              }
+            });
+          }
+        } else if (isYtTrack) {
+          // Fallback directly to YouTube iframe player if no audioSrc
+          const ytId = track.ytId || (track.id ? track.id.replace('yt_', '') : '');
+          if (ytId && state.ytReady && state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
+            state.ytPlayer.loadVideoById(ytId);
             state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
             state.ytPlayer.playVideo();
-          } else if (retries < 15) {
-            retries++;
-            setTimeout(playYt, 200);
           }
-        };
-        playYt();
-      } else {
-        showToast('Audio stream unavailable for this track', '⚠️');
+        } else {
+          showToast('Audio stream unavailable for this track', '⚠️');
+        }
       }
     }
 
@@ -1592,7 +1624,7 @@
     let nextIdx = state.queueIndex + 1;
     if (nextIdx >= state.queue.length) {
       if (state.activePlaylistTracks && state.activePlaylistTracks.length > 0) {
-        // If playing from playlist, stay strictly within playlist tracks without pulling outside songs
+        // If playing from playlist, seamlessly loop within playlist tracks using selected shuffle mode
         if (state.isPlaylistShuffle) {
           const pool = [...state.activePlaylistTracks];
           for (let i = pool.length - 1; i > 0; i--) {
@@ -1607,7 +1639,11 @@
           playTrack(state.queue[0]);
           return;
         } else {
-          nextIdx = 0;
+          // Loop sequential playlist seamlessly from index 0
+          state.queue = [...state.activePlaylistTracks];
+          state.queueIndex = 0;
+          playTrack(state.queue[0]);
+          return;
         }
       } else {
         // AUTOPLAY: Don't stop! Keep music flowing by picking unplayed songs from home/trending
@@ -1677,7 +1713,11 @@
   function onTrackEnded() {
     if (state.repeatMode === 'one' && state.currentTrack) {
       if (state.currentTrack._introTrimmed) state.currentTrack._introTrimmed = false;
-      playTrack(state.currentTrack, state.queue, false);
+      seekTo(0);
+      applyCrossfadeIn();
+      if (elements.audio) {
+        elements.audio.play().catch(e => console.warn('Repeat play error:', e));
+      }
       return;
     }
     nextTrack();
@@ -1718,7 +1758,11 @@
       }
     } else {
       try {
-        elements.audio.currentTime = targetSeconds;
+        if (typeof elements.audio.fastSeek === 'function') {
+          elements.audio.fastSeek(targetSeconds);
+        } else {
+          elements.audio.currentTime = targetSeconds;
+        }
         if (state.settings.crossfade > 0 && total > 0 && (total - targetSeconds) > state.settings.crossfade) {
           elements.audio.volume = state.isMuted ? 0 : state.volume;
         }
@@ -2988,6 +3032,20 @@
         </svg>`,
         'linear-gradient(135deg, #10559b 0%, #0d3866 100%)'
       );
+    } else if (playlistId === 'local') {
+      title = 'Local Files';
+      desc = 'Songs from your device storage. Play offline anytime without consuming data!';
+      tracks = state.localTracks || [];
+      elements.deletePlaylistBtn.style.display = 'none';
+      if (elements.renamePlaylistBtn) elements.renamePlaylistBtn.style.display = 'none';
+      if (elements.mobilePlaylistMoreBtn) elements.mobilePlaylistMoreBtn.style.display = 'none';
+      elements.playlistCoverArt.innerHTML = createPlaylistCollageHtml(
+        state.localTracks || [],
+        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 75px; height: 75px; color: #fff;">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+        </svg>`,
+        'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)'
+      );
     } else {
       const pl = state.customPlaylists.find(p => p.id === playlistId);
       if (pl) {
@@ -3163,23 +3221,25 @@
     }
   }
 
-  // Rename Custom Playlist Action
+  // Rename Custom Playlist Action (MusiSurf Dark Themed Modal)
   function promptRenameCurrentPlaylist() {
     const playlistId = state.activePlaylistId;
     if (!playlistId || playlistId === 'liked' || playlistId === 'downloaded' || playlistId === 'local') return;
     const pl = state.customPlaylists.find(p => p.id === playlistId);
     if (!pl) return;
-    const currentName = pl.name || 'My Playlist';
-    const newName = prompt('Enter new playlist name:', currentName);
-    if (!newName || !newName.trim() || newName.trim() === currentName) return;
-    pl.name = newName.trim();
-    saveStoredPlaylists();
-    renderSidebarPlaylists();
-    updateLibraryUI();
-    if (elements.playlistTitle) elements.playlistTitle.textContent = pl.name;
-    const titleEl = document.getElementById('mobPlaylistOptionsTitle');
-    if (titleEl) titleEl.textContent = pl.name;
-    showToast(`Playlist renamed to "${pl.name}"`, '✏️');
+    state._editingPlaylistId = playlistId;
+    if (elements.renamePlaylistInput) {
+      elements.renamePlaylistInput.value = pl.name || 'My Playlist';
+    }
+    if (elements.renamePlaylistModal) {
+      elements.renamePlaylistModal.style.display = 'flex';
+      setTimeout(() => {
+        try {
+          elements.renamePlaylistInput?.focus();
+          elements.renamePlaylistInput?.select();
+        } catch (e) {}
+      }, 60);
+    }
   }
 
   // Open Export Playlist Format Chooser Modal
@@ -4140,11 +4200,19 @@
     }
   }
 
-  function handleLocalAudioFiles(fileList) {
+  async function handleLocalAudioFiles(fileList) {
     if (!fileList || fileList.length === 0) return;
-    Array.from(fileList).forEach(file => {
+    for (const file of Array.from(fileList)) {
       const isAudio = file.type.startsWith('audio/') || /\.(mp3|m4a|wav|flac|ogg|aac)$/i.test(file.name);
-      if (!isAudio) return;
+      if (!isAudio) continue;
+
+      let cleanBlob = file;
+      try {
+        const buffer = await file.arrayBuffer();
+        cleanBlob = new Blob([buffer], { type: file.type || 'audio/mpeg' });
+      } catch (err) {
+        cleanBlob = file.slice(0, file.size, file.type || 'audio/mpeg');
+      }
 
       const cleanTitle = file.name.replace(/\.[^/.]+$/, "");
       const track = {
@@ -4158,13 +4226,25 @@
         durationStr: '--:--',
         image: DEFAULT_LOCAL_COVER,
         isLocal: true,
-        fileBlob: file,
+        fileBlob: cleanBlob,
         hasDirectAudio: true,
         addedAt: Date.now()
       };
 
+      // Immediately add to in-memory state and UI
+      const existingIdx = state.localTracks.findIndex(t => t.fileName === track.fileName && t.fileSize === track.fileSize);
+      if (existingIdx !== -1) {
+        state.localTracks[existingIdx] = track;
+      } else {
+        state.localTracks.unshift(track);
+      }
+      updateLocalMusicUI();
+      if (state.activePlaylistId === 'local') {
+        renderPlaylistView('local');
+      }
+
       const tempAudio = new Audio();
-      const objectUrl = URL.createObjectURL(file);
+      const objectUrl = URL.createObjectURL(cleanBlob);
       tempAudio.src = objectUrl;
       tempAudio.onloadedmetadata = () => {
         if (tempAudio.duration && isFinite(tempAudio.duration)) {
@@ -4178,7 +4258,7 @@
         URL.revokeObjectURL(objectUrl);
         saveLocalTrackToDB(track);
       };
-    });
+    }
   }
 
   // ==========================================================================
@@ -4272,6 +4352,7 @@
     if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
     if (elements.mobilePlaylistOptionsModal) elements.mobilePlaylistOptionsModal.style.display = 'none';
     if (elements.createPlaylistModal) elements.createPlaylistModal.style.display = 'none';
+    if (elements.renamePlaylistModal) elements.renamePlaylistModal.style.display = 'none';
     if (elements.addToPlaylistModal) elements.addToPlaylistModal.style.display = 'none';
     if (elements.sleepTimerModal) elements.sleepTimerModal.style.display = 'none';
     document.body.style.overflow = '';
@@ -4438,26 +4519,22 @@
       if (state.currentTrack) toggleLikeSong(state.currentTrack);
     });
 
-    // Repeat Mode: strictly repeats the currently playing track only (per user specification)
+    // Repeat Mode: strictly repeats the currently playing track only (no loop interference or number 1 indicator)
     function updateRepeatUI() {
       const isRepeatOne = state.repeatMode === 'one';
-
-      if (elements.audio) {
-        elements.audio.loop = isRepeatOne;
-      }
 
       [elements.repeatBtn, elements.mobRepeatBtn].forEach(btn => {
         if (!btn) return;
         btn.classList.toggle('active', isRepeatOne);
         btn.title = isRepeatOne ? 'Repeat Track: On' : 'Repeat Track: Off';
-        const indicator = btn.querySelector('.repeat-one-indicator');
-        if (indicator) {
-          indicator.style.display = isRepeatOne ? 'flex' : 'none';
-        }
       });
     }
 
-    function toggleRepeatMode() {
+    function toggleRepeatMode(e) {
+      if (e) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
       state.repeatMode = state.repeatMode === 'one' ? 'off' : 'one';
       showToast(state.repeatMode === 'one' ? 'Repeat Track: On' : 'Repeat Track: Off', state.repeatMode === 'one' ? '🔂' : '🔁');
       updateRepeatUI();
@@ -4776,6 +4853,39 @@
       renderPlaylistView(newPl.id);
     });
 
+    // Rename Playlist Modal Handlers
+    if (elements.renamePlaylistForm) {
+      elements.renamePlaylistForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const playlistId = state._editingPlaylistId || state.activePlaylistId;
+        const pl = state.customPlaylists.find(p => p.id === playlistId);
+        const newName = (elements.renamePlaylistInput?.value || '').trim();
+        if (pl && newName) {
+          pl.name = newName;
+          saveStoredPlaylists();
+          renderSidebarPlaylists();
+          updateLibraryUI();
+          if (elements.playlistTitle && state.activePlaylistId === playlistId) elements.playlistTitle.textContent = pl.name;
+          const titleEl = document.getElementById('mobPlaylistOptionsTitle');
+          if (titleEl) titleEl.textContent = pl.name;
+          showToast(`Playlist renamed to "${pl.name}"`, '✏️');
+        }
+        if (elements.renamePlaylistModal) elements.renamePlaylistModal.style.display = 'none';
+      });
+    }
+
+    if (elements.closeRenamePlaylistModalBtn) {
+      elements.closeRenamePlaylistModalBtn.addEventListener('click', () => {
+        if (elements.renamePlaylistModal) elements.renamePlaylistModal.style.display = 'none';
+      });
+    }
+
+    if (elements.cancelRenamePlaylistBtn) {
+      elements.cancelRenamePlaylistBtn.addEventListener('click', () => {
+        if (elements.renamePlaylistModal) elements.renamePlaylistModal.style.display = 'none';
+      });
+    }
+
     // Add to Playlist Modal Close & Done
     if (elements.closeAddToPlaylistBtn) {
       elements.closeAddToPlaylistBtn.addEventListener('click', () => {
@@ -4990,7 +5100,7 @@
     }
 
     // Close Modals on Backdrop Click
-    [elements.createPlaylistModal, elements.addToPlaylistModal, elements.settingsModal].forEach(modal => {
+    [elements.createPlaylistModal, elements.renamePlaylistModal, elements.addToPlaylistModal, elements.settingsModal].forEach(modal => {
       if (modal) {
         modal.addEventListener('click', (e) => {
           if (e.target === modal) modal.style.display = 'none';
@@ -5184,7 +5294,7 @@
         } else if (filter === 'liked') {
           renderPlaylistView('liked');
         } else if (filter === 'local') {
-          switchView('localMusic');
+          renderPlaylistView('local');
         }
       });
     }
@@ -5195,7 +5305,7 @@
       elements.libHubDownloadedBtn.addEventListener('click', () => renderPlaylistView('downloaded'));
     }
     if (elements.libHubLocalBtn) {
-      elements.libHubLocalBtn.addEventListener('click', () => switchView('localMusic'));
+      elements.libHubLocalBtn.addEventListener('click', () => renderPlaylistView('local'));
     }
     const openCreatePlaylistModal = () => {
       elements.createPlaylistModal.style.display = 'flex';
@@ -5597,6 +5707,10 @@
         elements.createPlaylistModal.style.display = 'none';
         return;
       }
+      if (elements.renamePlaylistModal && elements.renamePlaylistModal.style.display !== 'none') {
+        elements.renamePlaylistModal.style.display = 'none';
+        return;
+      }
       if (elements.queueDrawer && elements.queueDrawer.classList.contains('open')) {
         elements.queueDrawer.classList.remove('open');
         if (elements.queueBtn) elements.queueBtn.classList.remove('active');
@@ -5752,6 +5866,7 @@
         if (elements.queueDrawerBackdrop) elements.queueDrawerBackdrop.classList.remove('active');
         if (elements.queueBtn) elements.queueBtn.classList.remove('active');
         elements.createPlaylistModal.style.display = 'none';
+        if (elements.renamePlaylistModal) elements.renamePlaylistModal.style.display = 'none';
         elements.addToPlaylistModal.style.display = 'none';
         if (elements.settingsModal) elements.settingsModal.style.display = 'none';
         if (elements.exportFormatModal) elements.exportFormatModal.style.display = 'none';

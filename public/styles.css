@@ -2102,36 +2102,37 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .playlist-shuffle-btn {
-  background: transparent;
-  border: 1px solid transparent;
+  background: transparent !important;
+  border: none !important;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 8px;
-  border-radius: 50%;
+  padding: 6px;
+  border-radius: 0 !important;
   transition: all var(--transition-fast);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   position: relative;
+  box-shadow: none !important;
 }
 
 .playlist-shuffle-btn:hover {
   color: #fff;
   transform: scale(1.1);
-  background: rgba(255, 255, 255, 0.08);
+  background: transparent !important;
 }
 
 .playlist-shuffle-btn.active {
   color: var(--accent-primary) !important;
-  background: rgba(29, 185, 84, 0.16) !important;
-  border-color: rgba(29, 185, 84, 0.35) !important;
-  box-shadow: 0 0 16px rgba(29, 185, 84, 0.25);
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .playlist-shuffle-btn.active::after {
   content: '';
   position: absolute;
-  bottom: 2px;
+  bottom: -4px;
   left: 50%;
   transform: translateX(-50%);
   width: 4px;
@@ -2991,19 +2992,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .repeat-one-indicator {
-  position: absolute;
-  font-size: 0.6rem;
-  font-weight: 800;
-  top: 2px;
-  right: -4px;
-  background-color: var(--accent-primary);
-  color: #000;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: none !important;
 }
 
 .play-pause-btn {
@@ -4131,6 +4120,17 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 
 /* Smart Phones (< 768px) */
 @media (max-width: 768px) {
+  /* Completely hide desktop-style vertical scrollbars on mobile viewport */
+  ::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+  * {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
   .app-layout {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr;
@@ -5757,12 +5757,19 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 @media (max-width: 768px) {
-  /* Prevent dropdown menu clipping on mobile inside and outside playlist */
+  /* Prevent dropdown menu clipping and bottom collision on mobile inside and outside playlist */
   .custom-sort-menu {
     left: 0 !important;
     right: auto !important;
     min-width: 175px !important;
     max-width: calc(100vw - 28px) !important;
+    max-height: 220px !important;
+    overflow-y: auto !important;
+    z-index: 1500 !important;
+  }
+
+  #playlistView {
+    padding-bottom: 140px !important;
   }
 
   .playlist-sort-row,

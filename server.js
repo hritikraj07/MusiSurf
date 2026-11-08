@@ -399,13 +399,14 @@ async function searchYouTube(query, limit = 30) {
               album: album,
               year: '',
               image: thumb,
-              audioUrl: null, // Full-length stream managed by YouTube engine
+              audioUrl: `/api/yt-stream?id=${videoId}`,
+              streamUrl: `/api/yt-stream?id=${videoId}`,
               duration: durationSec,
               durationStr: durationStr,
               playCount: playCount,
               isVerified: isVerified,
               source: 'youtube',
-              hasDirectAudio: false
+              hasDirectAudio: true
             });
 
             if (results.length >= limit) break;
@@ -471,13 +472,14 @@ async function searchYouTube(query, limit = 30) {
                 album: album,
                 year: '',
                 image: thumb,
-                audioUrl: null,
+                audioUrl: `/api/yt-stream?id=${videoId}`,
+                streamUrl: `/api/yt-stream?id=${videoId}`,
                 duration: durationSec,
                 durationStr: durationStr,
                 playCount: playCount,
                 isVerified: isVerified,
                 source: 'youtube',
-                hasDirectAudio: false
+                hasDirectAudio: true
               });
 
               if (results.length >= limit) break;
@@ -779,6 +781,37 @@ app.get('/api/stream', async (req, res) => {
   } catch (err) {
     console.error('Stream proxy error:', err.message);
     res.status(500).send('Stream error');
+  }
+});
+
+// YouTube Direct Audio Streaming Endpoint (Ad-Free Background Audio Stream)
+app.get('/api/yt-stream', async (req, res) => {
+  const ytId = (req.query.id || '').trim();
+  if (!ytId) return res.status(400).send('Missing id');
+
+  try {
+    const ytdl = await getYtdl();
+    if (!ytdl) return res.status(500).send('Audio extractor unavailable');
+
+    const stream = await ytdl.download(ytId, {
+      filter: { hasAudio: true, hasVideo: false },
+      highWaterMark: 1 << 22
+    });
+
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Content-Type', 'audio/webm; codecs="opus"');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+
+    stream.on('error', (err) => {
+      console.warn('YT audio stream pipe note:', err.message);
+      if (!res.headersSent) res.status(500).send('Audio stream error');
+    });
+
+    stream.pipe(res);
+  } catch (err) {
+    console.error('YT stream error:', err.message);
+    if (!res.headersSent) res.status(500).send('Failed to stream audio');
   }
 });
 
