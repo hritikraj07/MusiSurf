@@ -1,10 +1,10 @@
 <div align="center">
 
-# <img src="public/icons/icon-192.png" alt="MusiSurf Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px;" /> MusiSurf
+# <img src="public/icons/icon.svg" alt="MusiSurf Logo" width="40" height="40" style="vertical-align: middle; margin-right: 10px; border-radius: 8px;" /> MusiSurf
 
 <br/>
 
-<img src="public/preview.png" alt="MusiSurf Interface Preview" width="100%" />
+<img src="public/preview.jpg" alt="MusiSurf Interface Preview" width="100%" />
 
 </div>
 

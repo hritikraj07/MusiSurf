@@ -278,8 +278,6 @@
     deadSilenceOffRadio: document.getElementById('deadSilenceOffRadio'),
     crossfadeSlider: document.getElementById('crossfadeSlider'),
     crossfadeValueLabel: document.getElementById('crossfadeValueLabel'),
-    playlistFileInput: document.getElementById('playlistFileInput'),
-    importDropzone: document.getElementById('importDropzone'),
     exportFormatModal: document.getElementById('exportFormatModal'),
     closeExportFormatModalBtn: document.getElementById('closeExportFormatModalBtn'),
     exportAsJsonBtn: document.getElementById('exportAsJsonBtn'),
@@ -1380,8 +1378,10 @@
 
   function togglePlayPause() {
     if (!state.currentTrack) {
-      // If nothing is playing, play first song from queue or quick picks or shelves
-      if (state.queue.length > 0) {
+      // If nothing is playing, play first song from queue or active playlist or shelves
+      if (state.activePlaylistTracks && state.activePlaylistTracks.length > 0) {
+        playTrack(state.activePlaylistTracks[0], state.activePlaylistTracks);
+      } else if (state.queue && state.queue.length > 0) {
         playTrack(state.queue[0]);
       } else {
         const firstSong = document.querySelector('.quick-pick-tile')?._trackData || document.querySelector('.track-card')?._trackData;
@@ -1399,9 +1399,12 @@
       if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
         try { state.ytPlayer.pauseVideo(); } catch (e) {}
       }
+      updatePlayPauseButton();
     } else {
       // Resume playback
       state.isPlaying = true;
+      updatePlayPauseButton();
+
       if (state.restoredResumeTime > 0) {
         try {
           if (elements.audio.currentTime < state.restoredResumeTime - 0.5) {
@@ -1409,27 +1412,35 @@
           }
         } catch (e) {}
       }
-      if (state.currentTrack.source === 'youtube') {
+
+      if (isYouTubeActive()) {
         if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.playVideo === 'function') {
           try { state.ytPlayer.playVideo(); } catch (e) {}
         }
       } else {
-        if (elements.audio.paused) {
-          const resumePromise = elements.audio.play();
-          if (resumePromise !== undefined) {
-            resumePromise.catch(err => {
-              if (state.currentTrack?.streamUrl) {
-                elements.audio.src = state.currentTrack.streamUrl;
-                elements.audio.volume = state.isMuted ? 0 : state.volume;
-                elements.audio.play().catch(e => console.warn('Proxy resume error:', e));
-              }
-            });
-          }
+        // Ensure direct streamUrl exists for YouTube tracks
+        const isYtTrack = state.currentTrack.source === 'youtube' || state.currentTrack.ytId || (state.currentTrack.id && state.currentTrack.id.startsWith('yt_'));
+        if (isYtTrack && !state.currentTrack.streamUrl) {
+          const ytId = state.currentTrack.ytId || state.currentTrack.id.replace('yt_', '');
+          state.currentTrack.streamUrl = `/api/yt-stream?id=${encodeURIComponent(ytId)}`;
+          state.currentTrack.audioUrl = state.currentTrack.audioUrl || state.currentTrack.streamUrl;
+          state.currentTrack.hasDirectAudio = true;
+        }
+
+        if (!elements.audio.src || elements.audio.src === '' || elements.audio.src.endsWith('/')) {
+          playTrack(state.currentTrack, state.queue, false);
+          return;
+        }
+
+        const resumePromise = elements.audio.play();
+        if (resumePromise !== undefined) {
+          resumePromise.catch(err => {
+            console.warn('Audio resume error, attempting full playTrack:', err);
+            playTrack(state.currentTrack, state.queue, false);
+          });
         }
       }
     }
-
-    updatePlayPauseButton();
   }
 
   function updatePlayPauseButton() {
@@ -1457,13 +1468,23 @@
     if (elements.playAllPlaylistBtn) {
       const plPlay = elements.playAllPlaylistBtn.querySelector('.play-icon');
       const plPause = elements.playAllPlaylistBtn.querySelector('.pause-icon');
-      const isCurrentPlaylistPlaying = state.isPlaying && state.currentTrack && state.activePlaylistTracks && state.activePlaylistTracks.some(t => t.id === state.currentTrack.id);
+      const isCurrentPlaylistPlaying = state.isPlaying && state.currentTrack && state.activePlaylistId && state.activePlaylistId === state.viewingPlaylistId;
       if (plPlay && plPause) {
         plPlay.style.display = isCurrentPlaylistPlaying ? 'none' : 'block';
         plPause.style.display = isCurrentPlaylistPlaying ? 'block' : 'none';
       }
       elements.playAllPlaylistBtn.title = isCurrentPlaylistPlaying ? 'Pause Playlist' : 'Play All';
     }
+
+    // Sync Library Playlist Cards Play/Pause Buttons
+    document.querySelectorAll('.card-play-btn[data-playlist-id]').forEach(btn => {
+      const plId = btn.dataset.playlistId;
+      const isThisPlPlaying = state.isPlaying && state.activePlaylistId === plId;
+      btn.innerHTML = isThisPlPlaying
+        ? `<svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>`
+        : `<svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+      btn.title = isThisPlPlaying ? 'Pause Playlist' : 'Play Playlist';
+    });
 
     // Sync Top Result Card Play/Pause Button
     const topPlayBtn = document.getElementById('topResultPlayBtn') || elements.topResultCard?.querySelector('.top-result-play-btn');
@@ -1725,8 +1746,11 @@
 
   function isYouTubeActive() {
     return !!(
-      (state.currentTrack && (state.currentTrack.source === 'youtube' || !state.currentTrack.hasDirectAudio)) ||
-      (state.ytPlayer && typeof state.ytPlayer.getPlayerState === 'function' && state.ytPlayer.getPlayerState() === 1)
+      state.currentTrack &&
+      state.currentTrack.source === 'youtube' &&
+      !state.currentTrack.hasDirectAudio &&
+      state.ytPlayer &&
+      typeof state.ytPlayer.getPlayerState === 'function'
     );
   }
 
@@ -3119,22 +3143,30 @@
 
     // Sync playlist tracking
     state.activePlaylistTracks = [...sortedTracks];
-    state.activePlaylistId = playlistId;
+    state.viewingPlaylistId = playlistId;
 
     // Play All Click (plays playlist in sequential order, or toggles pause if already playing)
-    elements.playAllPlaylistBtn.onclick = () => {
-      if (!tracks || tracks.length === 0) return;
-      const isCurrentTrackInThisPlaylist = state.currentTrack && tracks.some(t => t.id === state.currentTrack.id);
-      if (isCurrentTrackInThisPlaylist) {
+    elements.playAllPlaylistBtn.onclick = (e) => {
+      if (e) e.stopPropagation();
+      const listToPlay = (sortedTracks && sortedTracks.length > 0) ? sortedTracks : tracks;
+      if (!listToPlay || listToPlay.length === 0) {
+        showToast('Playlist is empty, add some songs first!', 'ℹ️');
+        return;
+      }
+
+      const isCurrentPlaylist = state.activePlaylistId === playlistId;
+      const isCurrentTrackInPlaylist = state.currentTrack && listToPlay.some(t => t.id === state.currentTrack.id);
+
+      if (isCurrentPlaylist && isCurrentTrackInPlaylist && state.currentTrack) {
         togglePlayPause();
       } else {
-        state.activePlaylistTracks = [...tracks];
+        state.activePlaylistTracks = [...listToPlay];
         state.activePlaylistId = playlistId;
         state.isPlaylistShuffle = false;
         state.isShuffled = false;
         if (elements.shufflePlaylistBtn) elements.shufflePlaylistBtn.classList.remove('active');
-        recordRecentlyPlayedPlaylist({ id: playlistId, name: title, image: coverUrl, tracks: tracks });
-        playTrack(tracks[0], tracks);
+        recordRecentlyPlayedPlaylist({ id: playlistId, name: title, image: coverUrl, tracks: listToPlay });
+        playTrack(listToPlay[0], listToPlay);
       }
     };
 
@@ -3355,170 +3387,6 @@
     if (elements.mobilePlaylistOptionsModal) {
       elements.mobilePlaylistOptionsModal.style.display = 'none';
     }
-  }
-
-  // Smart Playlist Import Parser (Auto-detects JSON or CSV / Tabular formats)
-  function parseImportedPlaylist(fileText, fileName) {
-    const trimmed = (fileText || '').trim();
-    let playlistName = fileName.replace(/\.[^/.]+$/, '').replace(/[_|-]/g, ' ').trim();
-    playlistName = playlistName.replace(/\b\w/g, l => l.toUpperCase()) || 'Imported Playlist';
-
-    let tracks = [];
-
-    // Attempt 1: JSON Parsing
-    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (parsed.playlistName) playlistName = parsed.playlistName;
-        else if (parsed.name) playlistName = parsed.name;
-
-        const rawList = Array.isArray(parsed) ? parsed : (parsed.tracks || parsed.items || parsed.songs || []);
-        if (Array.isArray(rawList)) {
-          tracks = rawList.map((item, idx) => {
-            const t = item.track ? item.track : item;
-            const title = t.title || t.name || t.song || t.trackName || `Track ${idx + 1}`;
-            let artist = t.artist || '';
-            if (!artist && Array.isArray(t.artists)) {
-              artist = t.artists.map(a => (typeof a === 'string' ? a : (a.name || ''))).filter(Boolean).join(', ');
-            }
-            if (!artist) artist = 'Unknown Artist';
-            const album = t.album?.name || t.album || 'Imported Album';
-            const dur = Number(t.duration) || 210;
-            const durStr = t.durationStr || formatTime(dur);
-            const image = t.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80';
-            return {
-              id: t.id || `imp_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
-              title: title.trim(),
-              artist: artist.trim(),
-              album: album.trim(),
-              image,
-              duration: dur,
-              durationStr: durStr,
-              source: t.source || 'jiosaavn'
-            };
-          }).filter(t => t.title);
-        }
-      } catch (err) {
-        console.warn('JSON parse attempt failed, trying CSV parsing:', err);
-      }
-    }
-
-    // Attempt 2: CSV / Delimited Parsing (Fallback if JSON produced 0 tracks)
-    if (tracks.length === 0) {
-      const lines = trimmed.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-      if (lines.length > 0) {
-        const firstLine = lines[0];
-        const delimiter = firstLine.includes('\t') ? '\t' : (firstLine.includes(';') ? ';' : ',');
-
-        const parseCsvLine = (line) => {
-          const res = [];
-          let current = '';
-          let inQuotes = false;
-          for (let i = 0; i < line.length; i++) {
-            const c = line[i];
-            if (c === '"') {
-              inQuotes = !inQuotes;
-            } else if (c === delimiter && !inQuotes) {
-              res.push(current.trim());
-              current = '';
-            } else {
-              current += c;
-            }
-          }
-          res.push(current.trim());
-          return res.map(v => v.replace(/^"|"$/g, '').trim());
-        };
-
-        let titleIdx = 0;
-        let artistIdx = 1;
-        let albumIdx = 2;
-        let durIdx = 3;
-
-        const headerCols = parseCsvLine(firstLine).map(h => h.toLowerCase());
-        const hasHeader = headerCols.some(h => ['title', 'name', 'song', 'artist', 'track'].includes(h));
-        const dataLines = hasHeader ? lines.slice(1) : lines;
-
-        if (hasHeader) {
-          headerCols.forEach((h, idx) => {
-            if (h.includes('title') || h.includes('name') || h.includes('song')) titleIdx = idx;
-            else if (h.includes('artist')) artistIdx = idx;
-            else if (h.includes('album')) albumIdx = idx;
-            else if (h.includes('dur') || h.includes('time') || h.includes('length')) durIdx = idx;
-          });
-        }
-
-        tracks = dataLines.map((line, idx) => {
-          const cols = parseCsvLine(line);
-          let title = cols[titleIdx] || '';
-          let artist = cols[artistIdx] || 'Unknown Artist';
-          let album = cols[albumIdx] || 'Imported Album';
-          let durStr = cols[durIdx] || '3:30';
-
-          if (cols.length === 1 && line.includes(' - ')) {
-            const parts = line.split(' - ');
-            artist = parts[0].trim();
-            title = parts.slice(1).join(' - ').trim();
-          } else if (!title) {
-            title = line.trim();
-          }
-
-          return {
-            id: `imp_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
-            title: title.trim(),
-            artist: artist.trim(),
-            album: album.trim(),
-            image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80',
-            duration: 210,
-            durationStr: durStr,
-            source: 'jiosaavn'
-          };
-        }).filter(t => t.title && t.title.toLowerCase() !== 'title');
-      }
-    }
-
-    return { playlistName, tracks };
-  }
-
-  function handlePlaylistFileImport(file) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const text = e.target.result;
-        const { playlistName, tracks } = parseImportedPlaylist(text, file.name);
-        if (!tracks || tracks.length === 0) {
-          showToast('Could not find any tracks in file. Please ensure it has song titles and artists.', '⚠️');
-          return;
-        }
-
-        const newPlaylist = {
-          id: `pl_${Date.now()}`,
-          name: playlistName,
-          description: `Imported from ${file.name} • ${tracks.length} tracks`,
-          createdAt: Date.now(),
-          tracks: tracks,
-          image: tracks[0]?.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80'
-        };
-
-        state.customPlaylists.push(newPlaylist);
-        saveStoredPlaylists();
-        renderSidebarPlaylists();
-        updateLibraryUI();
-
-        if (elements.settingsModal) elements.settingsModal.style.display = 'none';
-        document.body.style.overflow = '';
-
-        renderPlaylistView(newPlaylist.id);
-        showToast(`✓ Imported playlist "${playlistName}" (${tracks.length} tracks)!`, '🎉');
-      } catch (err) {
-        console.error('Import error:', err);
-        showToast('Error importing file: ' + err.message, '⚠️');
-      }
-    };
-    reader.onerror = () => {
-      showToast('Error reading file from disk', '⚠️');
-    };
-    reader.readAsText(file);
   }
 
   function renderSidebarPlaylists() {
@@ -3797,11 +3665,16 @@
             `;
           }
 
+          const isThisPlPlaying = state.isPlaying && state.activePlaylistId === pl.id && state.currentTrack && (pl.tracks || []).some(t => t.id === state.currentTrack.id);
+          const playPauseIconSvg = isThisPlPlaying
+            ? `<svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>`
+            : `<svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+
           card.innerHTML = `
             <div class="card-img-wrapper">
               ${createPlaylistCollageHtml(pl.tracks)}
-              <button class="card-play-btn" title="Play Playlist">
-                <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <button class="card-play-btn" data-playlist-id="${pl.id}" title="${isThisPlPlaying ? 'Pause Playlist' : 'Play Playlist'}">
+                ${playPauseIconSvg}
               </button>
             </div>
             <div class="card-info">
@@ -3841,10 +3714,17 @@
           card.querySelector('.card-play-btn')?.addEventListener('click', (e) => {
             e.stopPropagation();
             if (pl.tracks && pl.tracks.length > 0) {
-              state.activePlaylistId = pl.id;
-              state.activePlaylistTracks = [...pl.tracks];
-              recordRecentlyPlayedPlaylist(pl);
-              playTrack(pl.tracks[0], pl.tracks);
+              const isPlayingNow = state.isPlaying && state.activePlaylistId === pl.id && state.currentTrack && pl.tracks.some(t => t.id === state.currentTrack.id);
+              if (isPlayingNow) {
+                togglePlayPause();
+              } else {
+                state.activePlaylistId = pl.id;
+                state.activePlaylistTracks = [...pl.tracks];
+                recordRecentlyPlayedPlaylist(pl);
+                playTrack(pl.tracks[0], pl.tracks);
+              }
+            } else {
+              showToast('Playlist is empty, add some songs first!', 'ℹ️');
             }
           });
           card.addEventListener('click', () => {
@@ -4989,40 +4869,6 @@
         showToast(val === 0 ? 'Crossfade turned off' : `Crossfade set to ${val}s`, '🎚️');
       });
     });
-
-    // Playlist File Import Event Listeners (File picker + Drag & Drop)
-    if (elements.playlistFileInput) {
-      elements.playlistFileInput.addEventListener('change', (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (file) {
-          handlePlaylistFileImport(file);
-          e.target.value = '';
-        }
-      });
-    }
-
-    if (elements.importDropzone) {
-      ['dragenter', 'dragover'].forEach(name => {
-        elements.importDropzone.addEventListener(name, (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          elements.importDropzone.classList.add('drag-over');
-        });
-      });
-      ['dragleave', 'drop'].forEach(name => {
-        elements.importDropzone.addEventListener(name, (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          elements.importDropzone.classList.remove('drag-over');
-        });
-      });
-      elements.importDropzone.addEventListener('drop', (e) => {
-        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-        if (file) {
-          handlePlaylistFileImport(file);
-        }
-      });
-    }
 
     // Export Format Modal Listeners
     if (elements.closeExportFormatModalBtn) {

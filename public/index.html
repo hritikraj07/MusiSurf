@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=6.4">
+  <link rel="stylesheet" href="/styles.css?v=6.5">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -1550,33 +1550,6 @@
           </div>
         </div>
 
-        <!-- Section: Playlist Management -->
-        <div class="settings-group">
-          <h3 class="settings-group-title">Playlists</h3>
-
-          <!-- Import Playlist -->
-          <div class="settings-card-item">
-            <div class="settings-item-header">
-              <span class="settings-item-title">Import Playlist</span>
-              <p class="settings-item-desc">Import playlists from your device. Automatically detects whether your file is in JSON or CSV format and adds it directly to your playlists section.</p>
-            </div>
-            <div class="import-playlist-actions">
-              <label class="import-file-dropzone" id="importDropzone">
-                <input type="file" id="playlistFileInput" accept=".json,.csv,.txt" style="display: none;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="import-icon">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="17 8 12 3 7 8"/>
-                  <line x1="12" y1="3" x2="12" y2="15"/>
-                </svg>
-                <div class="import-text-block">
-                  <span class="import-main-btn">Choose JSON or CSV File</span>
-                  <span class="import-subtext">or drag and drop your file here</span>
-                </div>
-              </label>
-            </div>
-          </div>
-        </div>
-
         <!-- Section: Controls (Web / Desktop Only) -->
         <div class="settings-group desktop-controls-group">
           <h3 class="settings-group-title">Controls</h3>
@@ -1691,7 +1664,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=2.38"></script>
+  <script src="/app.js?v=2.39"></script>
 </body>
 
 </html>

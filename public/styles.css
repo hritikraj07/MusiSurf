@@ -1854,37 +1854,32 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   filter: drop-shadow(0 0 3px rgba(0, 242, 96, 0.45)) !important;
 }
 
-/* Desktop: In-playlist tick badge only visible on hover */
-@media (min-width: 769px) {
-  .song-row .in-playlist-tick-badge,
-  .tracks-table tbody tr .in-playlist-tick-badge,
-  .quick-pick-tile .in-playlist-tick-badge,
-  .top-result-card .in-playlist-tick-badge,
-  .queue-card .in-playlist-tick-badge {
-    opacity: 0 !important;
-  }
-
-  .song-row:hover .in-playlist-tick-badge,
-  .tracks-table tbody tr:hover .in-playlist-tick-badge,
-  .quick-pick-tile:hover .in-playlist-tick-badge,
-  .top-result-card:hover .in-playlist-tick-badge,
-  .queue-card:hover .in-playlist-tick-badge {
-    opacity: 1 !important;
-  }
-
-  /* Player bar and mobile player stay visible */
-  .player-title-text .in-playlist-tick-badge,
-  #playerTitle .in-playlist-tick-badge,
-  #mobPlayerTitle .in-playlist-tick-badge {
-    opacity: 1 !important;
-  }
+/* In-playlist tick badge: only visible on hover / active, except in now playing bars */
+.song-row .in-playlist-tick-badge,
+.tracks-table tbody tr .in-playlist-tick-badge,
+.quick-pick-tile .in-playlist-tick-badge,
+.top-result-card .in-playlist-tick-badge,
+.queue-card .in-playlist-tick-badge {
+  opacity: 0 !important;
+  transition: opacity 0.2s ease !important;
 }
 
-/* Mobile: In-playlist tick badge always visible */
-@media (max-width: 768px) {
-  .in-playlist-tick-badge {
-    opacity: 1 !important;
-  }
+.song-row:hover .in-playlist-tick-badge,
+.song-row:active .in-playlist-tick-badge,
+.tracks-table tbody tr:hover .in-playlist-tick-badge,
+.tracks-table tbody tr:active .in-playlist-tick-badge,
+.quick-pick-tile:hover .in-playlist-tick-badge,
+.top-result-card:hover .in-playlist-tick-badge,
+.queue-card:hover .in-playlist-tick-badge {
+  opacity: 1 !important;
+}
+
+/* Player bar and mobile player header stay always visible */
+.player-title-text .in-playlist-tick-badge,
+#playerTitle .in-playlist-tick-badge,
+#mobPlayerTitle .in-playlist-tick-badge,
+.queue-now-playing-title .in-playlist-tick-badge {
+  opacity: 1 !important;
 }
 
 .song-info-col {
@@ -5167,49 +5162,6 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 .step-label:hover {
   color: #fff;
   font-weight: 700;
-}
-
-/* Import Playlist Dropzone */
-.import-file-dropzone {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 18px 22px;
-  border: 2px dashed rgba(255, 255, 255, 0.18);
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.import-file-dropzone:hover,
-.import-file-dropzone.drag-over {
-  border-color: var(--accent-primary, #00f260);
-  background: rgba(0, 242, 96, 0.05);
-}
-
-.import-icon {
-  width: 32px;
-  height: 32px;
-  color: var(--accent-primary, #00f260);
-  flex-shrink: 0;
-}
-
-.import-text-block {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.import-main-btn {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #fff;
-}
-
-.import-subtext {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
 }
 
 /* Export Choice Modal */
