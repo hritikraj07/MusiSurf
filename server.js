@@ -117,18 +117,20 @@ function transformSaavnSong(item) {
   };
 }
 
-// Search JioSaavn (Queries general & dedicated song engines in parallel for 100% catalog coverage)
+// Search JioSaavn (Prioritizes dedicated song-search engine & general engine in parallel)
 async function searchSaavn(query, limit = 25) {
+  if (!query) return [];
   try {
     const urls = [
-      `https://www.jiosaavn.com/api.php?__call=search.getResults&q=${encodeURIComponent(query)}&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=${limit}&p=1`,
-      `https://www.jiosaavn.com/api.php?__call=search.getSongSearchResults&q=${encodeURIComponent(query)}&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=${limit}&p=1`
+      `https://www.jiosaavn.com/api.php?__call=search.getMoreResults&params=${encodeURIComponent(JSON.stringify({ type: 'songs' }))}&query=${encodeURIComponent(query)}&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=${limit}&p=1`,
+      `https://www.jiosaavn.com/api.php?__call=search.getResults&q=${encodeURIComponent(query)}&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=${limit}&p=1`
     ];
 
     const responses = await Promise.allSettled(urls.map(u => fetch(u, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      }
+      },
+      signal: AbortSignal.timeout(6000)
     })));
 
     const allItems = [];
@@ -146,10 +148,15 @@ async function searchSaavn(query, limit = 25) {
     const seenIds = new Set();
     const uniqueSongs = [];
     for (const item of allItems) {
-      if (item && item.id && !seenIds.has(item.id)) {
-        seenIds.add(item.id);
-        const transformed = transformSaavnSong(item);
-        if (transformed && transformed.audioUrl) {
+      if (!item || !item.id || seenIds.has(item.id)) continue;
+      // Filter out non-song results (e.g. albums, playlists without direct tracks)
+      if (item.type && item.type !== 'song') continue;
+
+      seenIds.add(item.id);
+      const transformed = transformSaavnSong(item);
+      if (transformed && transformed.audioUrl) {
+        const validation = validateMusicContent(transformed);
+        if (validation.isMusic) {
           uniqueSongs.push(transformed);
         }
       }
@@ -309,6 +316,13 @@ function calculateRelevanceScore(track, query) {
     score -= 40000;
   }
 
+  // Penalize long compilations / extended looped versions unless specifically requested
+  const isLongTrack = (track.duration || 0) > 900; // > 15 mins
+  const wantsLong = /1\s*hour|extended|full album|loop|playlist|jukebox/i.test(query);
+  if (isLongTrack && !wantsLong) {
+    score -= 30000;
+  }
+
   // Bonus for direct 320kbps studio audio when scores are competitive
   if (track.hasDirectAudio) {
     score += 3000;
@@ -335,204 +349,531 @@ function getDedupeKey(title, artist) {
   return `${normTitle}__${artistTokens}`;
 }
 
-// Strict Content Filter: Strictly return only pure Music (Zero gaming, vlogs, reactions, podcasts, etc.)
-function validateStrictMusicOrPodcast(rawTitle, rawChannel) {
-  const t = (rawTitle || '').toLowerCase();
-  const c = (rawChannel || '').toLowerCase();
+// ==========================================================================
+// STRICT MUSIC-ONLY VALIDATION ENGINE (Reusable across all endpoints)
+// Evaluates category, title, channel, description, duration, and music signals
+// Does NOT rely exclusively on keyword blacklists
+// Does NOT classify as music merely due to lack of banned words
+// Rejects when metadata is missing or insufficient to establish content is music
+// ==========================================================================
 
-  // Podcasts and episodes are completely blocked per user requirement
-  const isPodcast = t.includes('podcast') || t.includes('episode') || c.includes('podcast') || /\b(ep\s*\d+|ep\.\s*\d+)\b/i.test(t);
-  if (isPodcast) {
-    return { allowed: false, categoryId: '0', isPodcast: true };
+function validateMusicContent(track) {
+  if (!track) return { isMusic: false, reason: 'Empty track data' };
+
+  // 1. JioSaavn tracks: verified studio releases
+  if (track.source === 'saavn' || track.source === 'jiosaavn') {
+    if (!track.title || !track.audioUrl) {
+      return { isMusic: false, reason: 'Incomplete JioSaavn track metadata' };
+    }
+    return { isMusic: true, categoryId: '10', source: 'saavn' };
   }
 
-  // Blacklist standard non-music YouTube content (gaming, vlogs, reactions, tech, unboxing, tutorials, etc.)
-  const isBlocked = /\b(gameplay|walkthrough|playthrough|let'?s play|gaming|gamer|fortnite|minecraft|roblox|gta\s*[v5]?|valorant|cod|warzone|apex legends|pubg|speedrun|vlog|daily vlog|prank|reaction to|reacting to|reacts to|unboxing|tech review|phone review|tutorial|how to fix|news live|breaking news|mukbang|haul|storytime|makeup tutorial|grwm|tiktok compilation|fails compilation)\b/i.test(t) ||
-                    /\b(gaming|gamer|walkthrough|playthrough|vlogs|vlogger|news live)\b/i.test(c);
-
-  if (isBlocked) {
-    return { allowed: false, categoryId: '0', isPodcast: false };
+  // 2. Local device uploads
+  if (track.isLocal) {
+    return { isMusic: true, categoryId: '10', source: 'local' };
   }
 
-  // Allowed Music (YouTube Music Category 10)
-  return { allowed: true, categoryId: '10', isPodcast: false };
+  const rawTitle = (track.title || '').trim();
+  const rawArtist = (track.artist || '').trim();
+  const lowerTitle = rawTitle.toLowerCase();
+  const lowerArtist = rawArtist.toLowerCase();
+
+  // 3. Disqualify podcasts and episodic series
+  if (track.isPodcast ||
+      /\b(podcast|full episode|episode\s*\d+|ep\s*\d+|ep\.\s*\d+)\b/i.test(lowerTitle) ||
+      /\b(podcast|episode)\b/i.test(lowerArtist)) {
+    return { isMusic: false, reason: 'Podcast/Episode content' };
+  }
+
+  // 4. Disqualify non-music content signatures in title
+  const NON_MUSIC_TITLE_REGEX = /\b(gameplay|walkthrough|playthrough|let'?s play|gaming|gamer|speedrun|minecraft|roblox|fortnite|gta\s*v?|grand theft auto|valorant|call of duty|cod|warzone|apex legends|pubg|genshin|clash royale|brawl stars|clash of clans|smp|hardcore world|survival mode|world #?\d+|episode #?\d+|unboxing|tech review|phone review|pc build|tutorial|how to (fix|code|build|make|install|play game|draw|use)|guide for|coding in|python|javascript|java|c\+\+|html|css|react|programming|full course|course for|learn \w+ in \d+|lecture|lesson \d+|class \d+|study with me|quantum physics|physics and|particle physics|cognitive science|audiobook|chapter\s*\d+|kapitel\s*\d+|news live|breaking news|daily news|headline news|mukbang|daily vlog|vlog \d+|prank|reaction to|reacting to|reacts to|interviews? with|press conference|speech at|court hearing|highlights? (hd|4k)?|match highlights|cricket highlights|football highlights|tiktok compilation|fails compilation|meme compilation|trailer \d|official trailer|teaser)\b/i;
+
+  if (NON_MUSIC_TITLE_REGEX.test(lowerTitle)) {
+    return { isMusic: false, reason: 'Non-music content signature in title' };
+  }
+
+  // 5. Disqualify non-music channel signatures
+  const NON_MUSIC_CHANNEL_REGEX = /\b(gaming|gamer|walkthroughs?|playthroughs?|vlogs?|vlogger|tech news|breaking news|news live|tutorials?|academy|university|lectures?|course|coding|software|sports live|freecodecamp|tedx|ted talk)\b/i;
+  if (NON_MUSIC_CHANNEL_REGEX.test(lowerArtist)) {
+    return { isMusic: false, reason: 'Non-music channel profile' };
+  }
+
+  // 6. Duration bounds check:
+  // Songs are typically 40s to 18m. Under 40s is too short for a song release.
+  const dur = track.duration || 0;
+  if (dur > 0 && dur < 40) {
+    return { isMusic: false, reason: 'Duration too short for full song' };
+  }
+  // Videos longer than 20 mins are typically podcasts, full livestreams, or compilations
+  if (dur > 1200) {
+    const isAllowedLongForm = /\b(symphony|orchestra|concerto|dj mix|continuous mix|live concert|full concert|full album)\b/i.test(lowerTitle);
+    if (!isAllowedLongForm) {
+      return { isMusic: false, reason: 'Duration exceeds 20 minutes without symphonic/mix indicators' };
+    }
+  }
+
+  // 7. Positive Music Evidence Requirement:
+  // Must NOT classify as music merely due to absence of banned keywords.
+  // Must have concrete positive music indicators:
+  const hasPositiveMusicToken = /\b(official (music )?video|music video|official audio|audio|song|lyric video|lyrics|audio track|soundtrack|original soundtrack|ost|score|remix|lofi|slowed|reverb|cover|instrumental|acoustic|unplugged|piano|guitar|orchestra|feat\.?|ft\.?|prod\.? by|album|single|ep)\b/i.test(lowerTitle);
+  const isVerifiedArtistChannel = Boolean(track.isVerified) ||
+    /(- topic|vevo|records|music|entertainment)$/i.test(lowerArtist) ||
+    FAMOUS_SUPERSTARS_REGEX.test(lowerArtist) ||
+    MAJOR_LABELS_REGEX.test(lowerArtist) ||
+    Boolean(track.isMusicArtist);
+  const hasMusicCategoryConfirmed = track.isVerifiedMusicCategory || String(track.categoryId) === '10';
+  const hasArtistAndAlbum = Boolean(track.isMusicAlbum && track.album && track.album !== 'Single' && track.artist && track.artist !== 'Universal Artist');
+
+  if (!hasPositiveMusicToken && !isVerifiedArtistChannel && !hasMusicCategoryConfirmed && !hasArtistAndAlbum) {
+    return { isMusic: false, reason: 'Insufficient music metadata' };
+  }
+
+  return { isMusic: true, categoryId: '10' };
 }
 
-// Universal Multi-Source YouTube Search Engine (Innertube JSON API + Cookie Scraper Fallback)
-async function searchYouTube(query, limit = 30) {
-  if (!query) return [];
+// In-Memory Validation Cache for YouTube video categories (24h TTL)
+const videoMetadataCache = new Map();
 
-  // Strategy 1: YouTube Innertube API (Official internal pure JSON API - ultra fast, zero HTML parsing)
+async function validateYouTubeVideoMetadata(videoId, rawTitle = '', rawChannel = '') {
+  if (!videoId) return { allowed: false, reason: 'Missing videoId' };
+
+  const cached = videoMetadataCache.get(videoId);
+  if (cached && Date.now() - cached.timestamp < 1000 * 60 * 60 * 24) {
+    return cached;
+  }
+
   try {
-    const res = await fetch('https://www.youtube.com/youtubei/v1/search', {
+    const res = await fetch('https://www.youtube.com/youtubei/v1/player', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'X-YouTube-Client-Name': '1',
-        'X-YouTube-Client-Version': '2.20240301.00.00'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       },
       body: JSON.stringify({
-        context: {
-          client: {
-            clientName: 'WEB',
-            clientVersion: '2.20240301.00.00',
-            hl: 'en',
-            gl: 'US'
-          }
-        },
-        query: query
-      })
+        context: { client: { clientName: 'WEB', clientVersion: '2.20240301.00.00', hl: 'en', gl: 'US' } },
+        videoId: videoId
+      }),
+      signal: AbortSignal.timeout(6000)
+    });
+
+    if (!res.ok) {
+      return { allowed: false, reason: 'Player metadata fetch failed' };
+    }
+
+    const d = await res.json();
+    const details = d.videoDetails;
+    const micro = d.microformat?.playerMicroformatRenderer;
+    if (!details || !micro) {
+      return { allowed: false, reason: 'Missing video details or microformat' };
+    }
+
+    const category = (micro.category || '').trim();
+    const isCategoryMusic = category.toLowerCase() === 'music';
+    if (!isCategoryMusic) {
+      const result = { allowed: false, category, reason: `Non-music category: ${category}` };
+      videoMetadataCache.set(videoId, { ...result, timestamp: Date.now() });
+      return result;
+    }
+
+    const titleToCheck = details.title || rawTitle;
+    const authorToCheck = details.author || rawChannel;
+    const validation = validateMusicContent({
+      title: titleToCheck,
+      artist: authorToCheck,
+      duration: parseInt(details.lengthSeconds || '210', 10),
+      categoryId: '10',
+      isVerifiedMusicCategory: true
+    });
+
+    const result = {
+      allowed: validation.isMusic,
+      category: 'Music',
+      categoryId: '10',
+      title: details.title,
+      author: details.author,
+      reason: validation.reason || 'Verified Music'
+    };
+    videoMetadataCache.set(videoId, { ...result, timestamp: Date.now() });
+    return result;
+  } catch (err) {
+    // When metadata retrieval or validation fails, REJECT per user instruction
+    return { allowed: false, reason: `Validation error: ${err.message}` };
+  }
+}
+
+function parseDurationToSec(durStr) {
+  if (!durStr) return 210;
+  if (typeof durStr === 'number') return durStr;
+  const parts = String(durStr).split(':').map(Number);
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  const parsed = parseInt(durStr, 10);
+  return isNaN(parsed) ? 210 : parsed;
+}
+
+// Parse structured YouTube Music items
+function parseYouTubeMusicListItem(r) {
+  if (!r) return null;
+  const flexCols = r.flexColumns || [];
+  if (flexCols.length === 0) return null;
+
+  const col0Runs = flexCols[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs || [];
+  const rawTitle = col0Runs.map(x => x.text).join('').trim();
+  if (!rawTitle) return null;
+
+  const videoId = r.playlistItemData?.videoId ||
+    r.overlay?.musicItemThumbnailOverlayRenderer?.content?.musicPlayButtonRenderer?.playNavigationEndpoint?.watchEndpoint?.videoId ||
+    col0Runs[0]?.navigationEndpoint?.watchEndpoint?.videoId ||
+    r.doubleTapCommand?.watchEndpoint?.videoId;
+  if (!videoId) return null;
+
+  const col1Runs = flexCols[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs || [];
+  const fullCol1 = col1Runs.map(x => x.text.trim()).filter(Boolean).join(' ');
+
+  // Immediate podcast/episode rejection
+  if (/podcast|episode/i.test(fullCol1) || /podcast|episode/i.test(rawTitle)) {
+    return null;
+  }
+
+  let artist = '';
+  let album = 'Single';
+  let isMusicArtist = false;
+  let isMusicAlbum = false;
+  let durationStr = '3:30';
+  let playCount = 0;
+
+  const artistsList = [];
+  for (const run of col1Runs) {
+    const text = run.text.trim();
+    if (!text || text === '•') continue;
+    const pageType = run.navigationEndpoint?.browseEndpoint?.browseEndpointContextSupportedConfigs?.browseEndpointContextMusicConfig?.pageType;
+    if (pageType === 'MUSIC_PAGE_TYPE_ARTIST') {
+      artistsList.push(text);
+      isMusicArtist = true;
+    } else if (pageType === 'MUSIC_PAGE_TYPE_ALBUM') {
+      album = text;
+      isMusicAlbum = true;
+    } else if (/^\d+:\d+(:\d+)?$/.test(text)) {
+      durationStr = text;
+    } else if (/views?|plays?/i.test(text)) {
+      playCount = parseViewCount(text);
+    }
+  }
+
+  if (artistsList.length > 0) {
+    artist = artistsList.join(', ');
+  } else {
+    const parts = fullCol1.split('•').map(p => p.trim()).filter(Boolean);
+    const nonMetaParts = parts.filter(p => !/^\d+:\d+(:\d+)?$/.test(p) && !/views?|plays?|song|video/i.test(p));
+    if (nonMetaParts.length > 0) artist = nonMetaParts[0];
+    const durPart = parts.find(p => /^\d+:\d+(:\d+)?$/.test(p));
+    if (durPart) durationStr = durPart;
+    const playPart = parts.find(p => /views?|plays?/i.test(p));
+    if (playPart) playCount = parseViewCount(playPart);
+  }
+
+  if (!artist) artist = 'Universal Artist';
+
+  let thumb = r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails?.slice(-1)[0]?.url ||
+    ('https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg');
+  if (thumb.includes('=w') && thumb.includes('-h')) {
+    thumb = thumb.replace(/=w\d+-h\d+/, '=w544-h544');
+  }
+
+  const durationSec = parseDurationToSec(durationStr);
+  const isVerifiedMusic = Boolean(isMusicArtist || isMusicAlbum);
+
+  return {
+    id: 'yt_' + videoId,
+    ytId: videoId,
+    title: rawTitle,
+    artist: artist,
+    album: album,
+    isMusicArtist: isMusicArtist,
+    isMusicAlbum: isMusicAlbum,
+    duration: durationSec,
+    durationStr: durationStr,
+    playCount: playCount,
+    image: thumb,
+    audioUrl: '/api/yt-stream?id=' + videoId,
+    streamUrl: '/api/yt-stream?id=' + videoId,
+    source: 'youtube',
+    categoryId: isVerifiedMusic ? '10' : null,
+    isVerifiedMusicCategory: isVerifiedMusic,
+    hasDirectAudio: true
+  };
+}
+
+function parseYouTubeMusicCardShelf(card) {
+  if (!card) return null;
+  const rawTitle = card.title?.runs?.map(r => r.text).join('').trim();
+  if (!rawTitle) return null;
+
+  const videoId = card.onTap?.watchEndpoint?.videoId ||
+    card.buttons?.[0]?.buttonRenderer?.command?.watchEndpoint?.videoId;
+  if (!videoId) return null;
+
+  const subRuns = card.subtitle?.runs || [];
+  const fullSub = subRuns.map(r => r.text).join('').trim();
+  if (/podcast|episode/i.test(fullSub) || /podcast|episode/i.test(rawTitle)) return null;
+
+  const parts = fullSub.split('•').map(p => p.trim()).filter(Boolean);
+  let artist = 'Universal Artist';
+  let durationStr = '3:30';
+  let playCount = 0;
+
+  for (const p of parts) {
+    if (/^\d+:\d+(:\d+)?$/.test(p)) durationStr = p;
+    else if (/views?|plays?/i.test(p)) playCount = parseViewCount(p);
+    else if (!/song|video|artist/i.test(p)) artist = p;
+  }
+
+  let thumb = card.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails?.slice(-1)[0]?.url ||
+    ('https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg');
+  if (thumb.includes('=w') && thumb.includes('-h')) {
+    thumb = thumb.replace(/=w\d+-h\d+/, '=w544-h544');
+  }
+
+  const durationSec = parseDurationToSec(durationStr);
+  const isExplicitSong = /song|artist|album|single/i.test(fullSub);
+
+  return {
+    id: 'yt_' + videoId,
+    ytId: videoId,
+    title: rawTitle,
+    artist: artist,
+    album: 'Single',
+    duration: durationSec,
+    durationStr: durationStr,
+    playCount: playCount,
+    image: thumb,
+    audioUrl: '/api/yt-stream?id=' + videoId,
+    streamUrl: '/api/yt-stream?id=' + videoId,
+    source: 'youtube',
+    categoryId: isExplicitSong ? '10' : null,
+    isVerifiedMusicCategory: isExplicitSong,
+    hasDirectAudio: true
+  };
+}
+
+// Universal Multi-Source YouTube Search Engine
+// Uses YouTube Music category filter wherever supported
+// Retrieves & validates video metadata before accepting results
+// Never falls back to unrestricted general YouTube search
+async function searchYouTube(query, limit = 30) {
+  if (!query) return [];
+
+  const results = [];
+  const seenIds = new Set();
+
+  // Strategy 1: YouTube Music Songs API (WEB_REMIX client with Songs category filter)
+  try {
+    const res = await fetch('https://music.youtube.com/youtubei/v1/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'X-YouTube-Client-Name': '67',
+        'X-YouTube-Client-Version': '1.20240301.01.00',
+        'Origin': 'https://music.youtube.com'
+      },
+      body: JSON.stringify({
+        context: { client: { clientName: 'WEB_REMIX', clientVersion: '1.20240301.01.00', hl: 'en', gl: 'US' } },
+        query: query,
+        params: 'Eg-KAQwIARAQEAMQBBAJEAo%3D' // Strictly filtered to Songs
+      }),
+      signal: AbortSignal.timeout(6000)
     });
 
     if (res.ok) {
       const data = await res.json();
-      const contents = data.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
-      const results = [];
+      const sections = data.contents?.tabbedSearchResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents || [];
 
-      for (const section of contents) {
-        const items = section?.itemSectionRenderer?.contents || [];
-        for (const item of items) {
-          if (item.videoRenderer) {
+      for (const section of sections) {
+        const isrItems = section.itemSectionRenderer?.contents || [];
+        const shelfItems = section.musicShelfRenderer?.contents || [];
+        const allCandidateItems = [...isrItems, ...shelfItems];
+
+        for (const item of allCandidateItems) {
+          const r = item.musicResponsiveListItemRenderer;
+          if (!r) continue;
+
+          const parsed = parseYouTubeMusicListItem(r);
+          if (!parsed || !parsed.ytId || seenIds.has(parsed.ytId)) continue;
+
+          let check = validateMusicContent(parsed);
+          if (!check.isMusic && check.reason === 'Insufficient music metadata') {
+            const meta = await validateYouTubeVideoMetadata(parsed.ytId, parsed.title, parsed.artist);
+            if (meta.allowed) {
+              parsed.categoryId = '10';
+              parsed.isVerifiedMusicCategory = true;
+              check = validateMusicContent(parsed);
+            }
+          }
+          if (!check.isMusic) continue;
+
+          seenIds.add(parsed.ytId);
+          results.push(parsed);
+          if (results.length >= limit) break;
+        }
+        if (results.length >= limit) break;
+      }
+    }
+  } catch (err) {
+    console.warn('YouTube Music Songs search note:', err.message);
+  }
+
+  // Strategy 2: Query YouTube Music without params for official music videos, covers & remixes
+  if (results.length < limit) {
+    try {
+      const res = await fetch('https://music.youtube.com/youtubei/v1/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'X-YouTube-Client-Name': '67',
+          'X-YouTube-Client-Version': '1.20240301.01.00',
+          'Origin': 'https://music.youtube.com'
+        },
+        body: JSON.stringify({
+          context: { client: { clientName: 'WEB_REMIX', clientVersion: '1.20240301.01.00', hl: 'en', gl: 'US' } },
+          query: query
+        }),
+        signal: AbortSignal.timeout(6000)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const sections = data.contents?.tabbedSearchResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents || [];
+
+        for (const section of sections) {
+          // Check top card shelf if present
+          const card = section.musicCardShelfRenderer;
+          if (card) {
+            const cardItem = parseYouTubeMusicCardShelf(card);
+            if (cardItem && cardItem.ytId && !seenIds.has(cardItem.ytId)) {
+              let check = validateMusicContent(cardItem);
+              if (!check.isMusic && check.reason === 'Insufficient music metadata') {
+                const meta = await validateYouTubeVideoMetadata(cardItem.ytId, cardItem.title, cardItem.artist);
+                if (meta.allowed) {
+                  cardItem.categoryId = '10';
+                  cardItem.isVerifiedMusicCategory = true;
+                  check = validateMusicContent(cardItem);
+                }
+              }
+              if (check.isMusic) {
+                seenIds.add(cardItem.ytId);
+                results.push(cardItem);
+              }
+            }
+          }
+
+          const isrItems = section.itemSectionRenderer?.contents || [];
+          const shelfItems = section.musicShelfRenderer?.contents || [];
+          for (const item of [...isrItems, ...shelfItems]) {
+            const r = item.musicResponsiveListItemRenderer;
+            if (!r) continue;
+            const parsed = parseYouTubeMusicListItem(r);
+            if (!parsed || !parsed.ytId || seenIds.has(parsed.ytId)) continue;
+            let check = validateMusicContent(parsed);
+            if (!check.isMusic && check.reason === 'Insufficient music metadata') {
+              const meta = await validateYouTubeVideoMetadata(parsed.ytId, parsed.title, parsed.artist);
+              if (meta.allowed) {
+                parsed.categoryId = '10';
+                parsed.isVerifiedMusicCategory = true;
+                check = validateMusicContent(parsed);
+              }
+            }
+            if (!check.isMusic) continue;
+            seenIds.add(parsed.ytId);
+            results.push(parsed);
+            if (results.length >= limit) break;
+          }
+          if (results.length >= limit) break;
+        }
+      }
+    } catch (err) {
+      console.warn('YouTube Music video search note:', err.message);
+    }
+  }
+
+  // Strategy 3 (Fallback with Strict Music Category Validation):
+  // When YouTube Music is unavailable, query YouTube Innertube with music intent
+  // and validate every candidate's metadata to verify Category 10 (Music)
+  if (results.length === 0) {
+    try {
+      const res = await fetch('https://www.youtube.com/youtubei/v1/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'X-YouTube-Client-Name': '1',
+          'X-YouTube-Client-Version': '2.20240301.00.00'
+        },
+        body: JSON.stringify({
+          context: { client: { clientName: 'WEB', clientVersion: '2.20240301.00.00', hl: 'en', gl: 'US' } },
+          query: `${query} official audio song`
+        }),
+        signal: AbortSignal.timeout(6000)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const contents = data.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
+
+        for (const section of contents) {
+          const items = section?.itemSectionRenderer?.contents || [];
+          for (const item of items) {
+            if (!item.videoRenderer) continue;
             const v = item.videoRenderer;
             const videoId = v.videoId;
-            if (!videoId) continue;
+            if (!videoId || seenIds.has(videoId)) continue;
 
-            const rawTitle = v.title?.runs?.[0]?.text || 'Unknown Title';
-            const rawChannel = v.ownerText?.runs?.[0]?.text || 'Universal Audio';
-
-            // Strict Content Filter check: Zero gaming, vlogs, reactions allowed
-            const filterCheck = validateStrictMusicOrPodcast(rawTitle, rawChannel);
-            if (!filterCheck.allowed) continue;
-
+            const rawTitle = v.title?.runs?.[0]?.text || '';
+            const rawChannel = v.ownerText?.runs?.[0]?.text || '';
             const durationStr = v.lengthText?.simpleText || '3:30';
-            const thumb = v.thumbnail?.thumbnails?.slice(-1)[0]?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-            const viewStr = v.viewCountText?.simpleText || v.shortViewCountText?.simpleText || '';
-            const playCount = parseViewCount(viewStr);
-            const isVerified = Boolean(v.ownerBadges && v.ownerBadges.length > 0) ||
-              /official|tips|t-series|sony|zee|yrf|speed|saregama|vevo/i.test(rawChannel);
-
-            const parts = durationStr.split(':').map(Number);
-            let durationSec = 210;
-            if (parts.length === 2) durationSec = parts[0] * 60 + parts[1];
-            else if (parts.length === 3) durationSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
 
             const { title, artist, album } = parseYouTubeMusicTitle(rawTitle, rawChannel);
-
-            results.push({
+            const candidate = {
               id: 'yt_' + videoId,
               ytId: videoId,
               title: title,
               artist: artist,
               album: album,
-              year: '',
-              image: thumb,
+              durationStr: durationStr,
+              duration: parseDurationToSec(durationStr),
+              source: 'youtube'
+            };
+
+            const initialCheck = validateMusicContent(candidate);
+            if (!initialCheck.isMusic) continue;
+
+            // Verify Category 10 via player metadata (never approve blindly)
+            const catCheck = await validateYouTubeVideoMetadata(videoId, rawTitle, rawChannel);
+            if (!catCheck.allowed) continue;
+
+            seenIds.add(videoId);
+            results.push({
+              ...candidate,
+              image: v.thumbnail?.thumbnails?.slice(-1)[0]?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
               audioUrl: `/api/yt-stream?id=${videoId}`,
               streamUrl: `/api/yt-stream?id=${videoId}`,
-              duration: durationSec,
-              durationStr: durationStr,
-              playCount: playCount,
-              isVerified: isVerified,
-              source: 'youtube',
-              categoryId: filterCheck.categoryId,
-              isPodcast: filterCheck.isPodcast,
+              playCount: parseViewCount(v.viewCountText?.simpleText || ''),
+              isVerified: Boolean(v.ownerBadges && v.ownerBadges.length > 0),
+              categoryId: '10',
               hasDirectAudio: true
             });
-
             if (results.length >= limit) break;
-          }
-        }
-        if (results.length >= limit) break;
-      }
-
-      if (results.length > 0) return results;
-    }
-  } catch (err) {
-    console.warn('Innertube search note:', err.message);
-  }
-
-  // Strategy 2: Web Scraper with Consent & Cookie Bypass
-  try {
-    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Cookie': 'CONSENT=YES+cb.20210328-17-p0.en+FX+478; SOCS=CAESEwgDEgk0ODE3Nzk3MjQaAmVuIAEaBgiA_LyaBg;'
-      }
-    });
-
-    if (res.ok) {
-      const html = await res.text();
-      const match = html.match(/var ytInitialData = ({.*?});<\/script>/s) || html.match(/ytInitialData\s*=\s*({.+?});/);
-      if (match) {
-        const data = JSON.parse(match[1]);
-        const contents = data.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
-        const results = [];
-
-        for (const section of contents) {
-          const items = section?.itemSectionRenderer?.contents || [];
-          for (const item of items) {
-            if (item.videoRenderer) {
-              const v = item.videoRenderer;
-              const videoId = v.videoId;
-              if (!videoId) continue;
-
-              const rawTitle = v.title?.runs?.[0]?.text || 'Unknown Title';
-              const rawChannel = v.ownerText?.runs?.[0]?.text || 'Universal Audio';
-
-              // Strict Content Filter check: Zero gaming, vlogs, reactions allowed
-              const filterCheck = validateStrictMusicOrPodcast(rawTitle, rawChannel);
-              if (!filterCheck.allowed) continue;
-
-              const durationStr = v.lengthText?.simpleText || '3:30';
-              const thumb = v.thumbnail?.thumbnails?.slice(-1)[0]?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-              const viewStr = v.viewCountText?.simpleText || v.shortViewCountText?.simpleText || '';
-              const playCount = parseViewCount(viewStr);
-              const isVerified = Boolean(v.ownerBadges && v.ownerBadges.length > 0) ||
-                /official|tips|t-series|sony|zee|yrf|speed|saregama|vevo/i.test(rawChannel);
-
-              const parts = durationStr.split(':').map(Number);
-              let durationSec = 210;
-              if (parts.length === 2) durationSec = parts[0] * 60 + parts[1];
-              else if (parts.length === 3) durationSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
-
-              const { title, artist, album } = parseYouTubeMusicTitle(rawTitle, rawChannel);
-
-              results.push({
-                id: 'yt_' + videoId,
-                ytId: videoId,
-                title: title,
-                artist: artist,
-                album: album,
-                year: '',
-                image: thumb,
-                audioUrl: `/api/yt-stream?id=${videoId}`,
-                streamUrl: `/api/yt-stream?id=${videoId}`,
-                duration: durationSec,
-                durationStr: durationStr,
-                playCount: playCount,
-                isVerified: isVerified,
-                source: 'youtube',
-                categoryId: filterCheck.categoryId,
-                isPodcast: filterCheck.isPodcast,
-                hasDirectAudio: true
-              });
-
-              if (results.length >= limit) break;
-            }
           }
           if (results.length >= limit) break;
         }
-
-        if (results.length > 0) return results;
       }
+    } catch (err) {
+      console.warn('Fallback YouTube search note:', err.message);
     }
-  } catch (err) {
-    console.warn('YouTube scraper note:', err.message);
   }
 
-  return [];
+  return results;
 }
 
 // Unified Search Route with Spotify-grade Famous Song First Ranking
@@ -824,35 +1165,19 @@ app.get('/api/stream', async (req, res) => {
 // YouTube Content Validation (Strictly permits pure Music - Category 10; rejects podcasts & non-music)
 app.get('/api/validate-content', async (req, res) => {
   const ytId = (req.query.id || '').trim();
-  const title = (req.query.title || '').trim().toLowerCase();
+  const title = (req.query.title || '').trim();
+  const channel = (req.query.channel || req.query.artist || '').trim();
 
   if (!ytId) return res.status(400).json({ allowed: false, error: 'Missing id' });
 
-  // If title indicates podcast or episode or non-music, block it
-  if (title.includes('podcast') || title.includes('episode') || /\b(gameplay|walkthrough|vlog|prank|reaction|unboxing)\b/i.test(title)) {
-    return res.json({ allowed: false, categoryId: '0', isPodcast: true });
-  }
-
-  try {
-    const resp = await fetch(`https://www.youtube.com/watch?v=${ytId}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-      }
-    });
-    const html = await resp.text();
-    const catMatch = html.match(/"categoryId":\s*"(\d+)"/);
-    const categoryId = catMatch ? catMatch[1] : '10';
-
-    const isMusic = categoryId === '10';
-    return res.json({
-      allowed: isMusic,
-      categoryId: categoryId,
-      isPodcast: false
-    });
-  } catch (err) {
-    // Fail-safe to avoid false blocking on network hiccups
-    return res.json({ allowed: true, categoryId: '10' });
-  }
+  const result = await validateYouTubeVideoMetadata(ytId, title, channel);
+  res.json({
+    allowed: Boolean(result.allowed),
+    categoryId: result.categoryId || '0',
+    category: result.category || 'Unknown',
+    isPodcast: Boolean(result.reason && result.reason.includes('Podcast')),
+    reason: result.reason || (result.allowed ? 'Verified Music Content' : 'Non-Music Content')
+  });
 });
 
 // YouTube Direct Audio Streaming Endpoint (Ad-Free Background Audio Stream)
@@ -1089,5 +1414,15 @@ if (require.main === module || !process.env.VERCEL) {
   });
 }
 
+app.searchSaavn = searchSaavn;
+app.searchYouTube = searchYouTube;
+app.validateMusicContent = validateMusicContent;
+app.validateYouTubeVideoMetadata = validateYouTubeVideoMetadata;
+
 module.exports = app;
+module.exports.searchSaavn = searchSaavn;
+module.exports.searchYouTube = searchYouTube;
+module.exports.validateMusicContent = validateMusicContent;
+module.exports.validateYouTubeVideoMetadata = validateYouTubeVideoMetadata;
+
 

@@ -1224,29 +1224,42 @@
   // Strict Content Filter: Strictly Pure Music Only (Zero podcasts, zero gaming, vlogs, reactions)
   function isContentFilterAllowed(t) {
     if (!t) return false;
-    // Local device and JioSaavn tracks are 100% pure music
+    // Local device and JioSaavn tracks are 100% verified pure studio music
     if (t.isLocal || t.source === 'saavn' || t.source === 'jiosaavn') return true;
 
     const title = (t.title || '').toLowerCase();
     const artist = (t.artist || '').toLowerCase();
 
-    // Podcasts and episodes are completely blocked
+    // 1. Podcasts and episodes are completely blocked
     const isPodcast = title.includes('podcast') || title.includes('episode') ||
                       artist.includes('podcast') || artist.includes('episode') ||
-                      Boolean(t.isPodcast);
+                      Boolean(t.isPodcast) || /\b(full episode|ep\s*\d+|ep\.\s*\d+)\b/i.test(title);
     if (isPodcast) return false;
 
-    // Gaming, vlogs, reactions, unboxing, etc. are completely blocked
-    const isBlocked = /\b(gameplay|walkthrough|playthrough|let'?s play|gaming|gamer|fortnite|minecraft|roblox|gta|valorant|cod|apex legends|pubg|vlog|prank|reaction|unboxing|mukbang|tutorial)\b/i.test(title) ||
-                      /\b(gaming|gamer|vlogs|vlogger|news live)\b/i.test(artist);
-    if (isBlocked) return false;
+    // 2. Non-music video content signatures in title are strictly blocked
+    const NON_MUSIC_REGEX = /\b(gameplay|walkthrough|playthrough|let'?s play|gaming|gamer|speedrun|minecraft|roblox|fortnite|gta\s*v?|grand theft auto|valorant|call of duty|cod|warzone|apex legends|pubg|genshin|clash royale|brawl stars|clash of clans|smp|hardcore world|survival mode|world #?\d+|episode #?\d+|unboxing|tech review|phone review|pc build|tutorial|how to (fix|code|build|make|install|play game|draw|use)|guide for|coding in|python|javascript|java|c\+\+|html|css|react|programming|full course|course for|learn \w+ in \d+|lecture|lesson \d+|class \d+|study with me|news live|breaking news|daily news|headline news|mukbang|daily vlog|vlog \d+|prank|reaction to|reacting to|reacts to|interviews? with|press conference|speech at|court hearing|highlights? (hd|4k)?|match highlights|cricket highlights|football highlights|tiktok compilation|fails compilation|meme compilation|trailer \d|official trailer|teaser)\b/i;
+    if (NON_MUSIC_REGEX.test(title)) return false;
 
-    // Category check: if categoryId is present and not '10', block it
+    // 3. Non-music creator channels are strictly blocked
+    const NON_MUSIC_CHANNEL_REGEX = /\b(gaming|gamer|walkthroughs?|playthroughs?|vlogs?|vlogger|tech news|breaking news|news live|tutorials?|academy|university|lectures?|course|coding|software|sports live|freecodecamp|tedx|ted talk)\b/i;
+    if (NON_MUSIC_CHANNEL_REGEX.test(artist)) return false;
+
+    // 4. Category check: if categoryId is present and not '10', block it
     if (t.categoryId && String(t.categoryId) !== '10' && String(t.categoryId) !== '0') {
       return false;
     }
 
-    // Default: allow pure music track
+    // 5. Positive music validation requirement:
+    // Must possess positive music evidence (not just absence of banned words)
+    const hasPositiveMusicToken = /\b(official (music )?video|music video|official audio|audio|song|lyric video|lyrics|audio track|soundtrack|original soundtrack|ost|score|remix|lofi|slowed|reverb|cover|instrumental|acoustic|unplugged|piano|guitar|orchestra|feat\.?|ft\.?|prod\.? by|album|single|ep)\b/i.test(title);
+    const isVerifiedArtist = Boolean(t.isVerified) || /(- topic|vevo|records|music|entertainment)$/i.test(artist);
+    const hasArtistAndAlbum = Boolean(t.album && t.album !== 'Single' && t.artist && t.artist !== 'Universal Artist');
+    const isCategoryTen = String(t.categoryId) === '10';
+
+    if (!hasPositiveMusicToken && !isVerifiedArtist && !hasArtistAndAlbum && !isCategoryTen) {
+      return false;
+    }
+
     return true;
   }
 
