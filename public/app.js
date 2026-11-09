@@ -4636,16 +4636,8 @@
     sorted.forEach((pl, idx) => {
       const div = document.createElement('div');
       div.className = `playlist-list-item library-item ${pl.isPinned ? 'is-pinned' : ''}`;
-      div.setAttribute('draggable', 'true');
       div.dataset.playlistId = pl.id;
       div.innerHTML = `
-        <button class="drag-handle-btn" title="Drag to reorder" aria-label="Drag to reorder">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
-            <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
-            <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
-          </svg>
-        </button>
         <div class="playlist-cover-mini">
           ${createPlaylistCollageHtml(pl.tracks)}
           <button class="playlist-cover-play-btn" title="Play ${escapeHtml(pl.name)}" aria-label="Play">
@@ -4658,58 +4650,6 @@
         </div>
         ${pl.isPinned ? '<span class="sidebar-pin-icon" title="Pinned">📌</span>' : ''}
       `;
-
-      // Touch drag reordering for mobile & desktop touchscreens
-      const dragHandle = div.querySelector('.drag-handle-btn');
-      if (dragHandle) {
-        let isTouchDragging = false;
-        let draggedId = null;
-
-        dragHandle.addEventListener('touchstart', (e) => {
-          if (!e.touches || e.touches.length === 0) return;
-          isTouchDragging = true;
-          draggedId = pl.id;
-          div.classList.add('is-dragging');
-        }, { passive: true });
-
-        dragHandle.addEventListener('touchmove', (e) => {
-          if (!isTouchDragging || !e.touches || e.touches.length === 0) return;
-          const curY = e.touches[0].clientY;
-          const curX = e.touches[0].clientX;
-          const targetEl = document.elementFromPoint(curX, curY)?.closest('.playlist-list-item');
-          document.querySelectorAll('.playlist-list-item').forEach(el => el.classList.remove('drag-over-row'));
-          if (targetEl && targetEl !== div) {
-            targetEl.classList.add('drag-over-row');
-          }
-        }, { passive: true });
-
-        dragHandle.addEventListener('touchend', (e) => {
-          if (!isTouchDragging) return;
-          isTouchDragging = false;
-          div.classList.remove('is-dragging');
-          const lastTouch = e.changedTouches && e.changedTouches[0];
-          if (lastTouch) {
-            const targetEl = document.elementFromPoint(lastTouch.clientX, lastTouch.clientY)?.closest('.playlist-list-item');
-            if (targetEl && targetEl.dataset.playlistId && targetEl.dataset.playlistId !== draggedId) {
-              const fromId = draggedId;
-              const toId = targetEl.dataset.playlistId;
-              const fromIdx = state.customPlaylists.findIndex(p => p.id === fromId);
-              const toIdx = state.customPlaylists.findIndex(p => p.id === toId);
-              if (fromIdx !== -1 && toIdx !== -1) {
-                const [moved] = state.customPlaylists.splice(fromIdx, 1);
-                state.customPlaylists.splice(toIdx, 0, moved);
-                saveStoredPlaylists();
-                renderSidebarPlaylists();
-                if (elements.views.library && elements.views.library.classList.contains('active')) {
-                  updateLibraryUI();
-                }
-                showToast(`Reordered "${moved.name}"`, '↕️');
-              }
-            }
-          }
-          document.querySelectorAll('.playlist-list-item').forEach(el => el.classList.remove('drag-over-row'));
-        });
-      }
 
       // Hover Play Button on Playlist Cover (Starts playback & opens playlist)
       const playCoverBtn = div.querySelector('.playlist-cover-play-btn');
@@ -4734,48 +4674,6 @@
           }
         });
       }
-
-      // Drag-and-Drop Reordering on Sidebar Playlists
-      div.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('text/plain', pl.id);
-        div.classList.add('is-dragging');
-      });
-
-      div.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        div.classList.add('drag-over-row');
-      });
-
-      div.addEventListener('dragleave', () => {
-        div.classList.remove('drag-over-row');
-      });
-
-      div.addEventListener('drop', (e) => {
-        e.preventDefault();
-        div.classList.remove('drag-over-row');
-        const fromId = e.dataTransfer.getData('text/plain');
-        const toId = pl.id;
-        if (fromId && toId && fromId !== toId) {
-          const fromIdx = state.customPlaylists.findIndex(p => p.id === fromId);
-          const toIdx = state.customPlaylists.findIndex(p => p.id === toId);
-          if (fromIdx !== -1 && toIdx !== -1) {
-            const [moved] = state.customPlaylists.splice(fromIdx, 1);
-            state.customPlaylists.splice(toIdx, 0, moved);
-            saveStoredPlaylists();
-            renderSidebarPlaylists();
-            if (elements.views.library && elements.views.library.classList.contains('active')) {
-              renderLibraryHub();
-            }
-            showToast(`Reordered "${moved.name}"`, '↕️');
-          }
-        }
-      });
-
-      div.addEventListener('dragend', () => {
-        div.classList.remove('is-dragging');
-        document.querySelectorAll('.playlist-list-item').forEach(el => el.classList.remove('drag-over-row'));
-      });
 
       // Regular Row Click (Only opens playlist, doesn't auto-play)
       div.addEventListener('click', (e) => {
@@ -5116,109 +5014,147 @@
             <div class="card-info">
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; width: 100%;">
                 <span class="card-title">${escapeHtml(pl.name)}</span>
-                ${sortMode === 'custom' ? `
-                  <button class="drag-handle-btn" title="Drag to reorder" aria-label="Drag to reorder">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
-                  </button>
-                ` : ''}
+                <button class="drag-handle-btn" title="Drag to reorder" aria-label="Drag to reorder">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+                </button>
               </div>
               <span class="card-artist">${(pl.tracks || []).length} songs</span>
             </div>
           `;
 
-          // Draggable reordering in Library Hub grid when sortMode is 'custom'
-          if (sortMode === 'custom') {
-            card.setAttribute('draggable', 'true');
-            card.dataset.playlistId = pl.id;
+          // Draggable reordering in Library Hub grid with intuitive midpoint insertion helper
+          const getDropPosition = (clientX, clientY, rect) => {
+            if (clientY < rect.top + rect.height * 0.35) return false;
+            if (clientY > rect.top + rect.height * 0.65) return true;
+            return clientX > rect.left + rect.width / 2;
+          };
 
-            card.addEventListener('dragstart', (e) => {
-              e.dataTransfer.setData('text/plain', pl.id);
-              card.classList.add('is-dragging');
-            });
+          const clearDragIndicators = () => {
+            if (elements.libCustomPlaylistsGrid) {
+              elements.libCustomPlaylistsGrid.querySelectorAll('.custom-playlist-card').forEach(el => {
+                el.classList.remove('drag-insert-before', 'drag-insert-after', 'drag-over-row');
+              });
+            }
+          };
 
-            card.addEventListener('dragover', (e) => {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = 'move';
-              card.classList.add('drag-over-row');
-            });
+          card.setAttribute('draggable', 'true');
+          card.dataset.playlistId = pl.id;
 
-            card.addEventListener('dragleave', () => {
-              card.classList.remove('drag-over-row');
-            });
+          card.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', pl.id);
+            card.classList.add('is-dragging');
+          });
 
-            card.addEventListener('drop', (e) => {
-              e.preventDefault();
-              card.classList.remove('drag-over-row');
-              const fromId = e.dataTransfer.getData('text/plain');
-              const toId = pl.id;
-              if (fromId && toId && fromId !== toId) {
-                const fromIdx = state.customPlaylists.findIndex(p => p.id === fromId);
-                const toIdx = state.customPlaylists.findIndex(p => p.id === toId);
-                if (fromIdx !== -1 && toIdx !== -1) {
+          card.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const rect = card.getBoundingClientRect();
+            const isAfter = getDropPosition(e.clientX, e.clientY, rect);
+            clearDragIndicators();
+            card.classList.toggle('drag-insert-after', isAfter);
+            card.classList.toggle('drag-insert-before', !isAfter);
+          });
+
+          card.addEventListener('dragleave', () => {
+            card.classList.remove('drag-insert-before', 'drag-insert-after', 'drag-over-row');
+          });
+
+          card.addEventListener('drop', (e) => {
+            e.preventDefault();
+            clearDragIndicators();
+            const fromId = e.dataTransfer.getData('text/plain');
+            const toId = pl.id;
+            if (fromId && toId && fromId !== toId) {
+              const rect = card.getBoundingClientRect();
+              const isAfter = getDropPosition(e.clientX, e.clientY, rect);
+              const fromIdx = state.customPlaylists.findIndex(p => p.id === fromId);
+              const targetIdx = state.customPlaylists.findIndex(p => p.id === toId);
+              if (fromIdx !== -1 && targetIdx !== -1) {
+                let newIdx = isAfter
+                  ? (fromIdx < targetIdx ? targetIdx : targetIdx + 1)
+                  : (fromIdx < targetIdx ? targetIdx - 1 : targetIdx);
+                newIdx = Math.max(0, Math.min(newIdx, state.customPlaylists.length - 1));
+                if (newIdx !== fromIdx) {
                   const [moved] = state.customPlaylists.splice(fromIdx, 1);
-                  state.customPlaylists.splice(toIdx, 0, moved);
+                  state.customPlaylists.splice(newIdx, 0, moved);
+                  localStorage.setItem('musisurf_playlist_sort', 'custom');
+                  if (elements.libPlaylistSortSelect) elements.libPlaylistSortSelect.value = 'custom';
+                  syncCustomDropdown('libPlaylistSortDropdown', 'custom');
                   saveStoredPlaylists();
                   updateLibraryUI();
                   renderSidebarPlaylists();
-                  showToast(`Moved "${moved.name}"`, '↕️');
+                  showToast(`Reordered "${moved.name}" to position ${newIdx + 1}`, '↕️');
                 }
               }
-            });
+            }
+          });
 
-            card.addEventListener('dragend', () => {
-              card.classList.remove('is-dragging');
-              elements.libCustomPlaylistsGrid.querySelectorAll('.custom-playlist-card').forEach(el => el.classList.remove('drag-over-row'));
-            });
+          card.addEventListener('dragend', () => {
+            card.classList.remove('is-dragging');
+            clearDragIndicators();
+          });
 
-            // Touch drag support for mobile in Library Grid
-            const cardDragHandle = card.querySelector('.drag-handle-btn') || card;
-            let isTouchDraggingCard = false;
-            let cardDraggedId = null;
+          // Touch drag support for mobile in Library Grid
+          const cardDragHandle = card.querySelector('.drag-handle-btn') || card;
+          let isTouchDraggingCard = false;
+          let cardDraggedId = null;
 
-            cardDragHandle.addEventListener('touchstart', (e) => {
-              if (e.target.closest('.card-play-btn')) return;
-              if (!e.touches || e.touches.length === 0) return;
-              isTouchDraggingCard = true;
-              cardDraggedId = pl.id;
-              card.classList.add('is-dragging');
-            }, { passive: true });
+          cardDragHandle.addEventListener('touchstart', (e) => {
+            if (e.target.closest('.card-play-btn')) return;
+            if (!e.touches || e.touches.length === 0) return;
+            isTouchDraggingCard = true;
+            cardDraggedId = pl.id;
+            card.classList.add('is-dragging');
+          }, { passive: true });
 
-            cardDragHandle.addEventListener('touchmove', (e) => {
-              if (!isTouchDraggingCard || !e.touches || e.touches.length === 0) return;
-              const curX = e.touches[0].clientX;
-              const curY = e.touches[0].clientY;
-              const targetEl = document.elementFromPoint(curX, curY)?.closest('.custom-playlist-card');
-              elements.libCustomPlaylistsGrid.querySelectorAll('.custom-playlist-card').forEach(el => el.classList.remove('drag-over-row'));
-              if (targetEl && targetEl !== card) {
-                targetEl.classList.add('drag-over-row');
-              }
-            }, { passive: true });
+          cardDragHandle.addEventListener('touchmove', (e) => {
+            if (!isTouchDraggingCard || !e.touches || e.touches.length === 0) return;
+            const touch = e.touches[0];
+            const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.custom-playlist-card');
+            clearDragIndicators();
+            if (targetEl && targetEl !== card) {
+              const rect = targetEl.getBoundingClientRect();
+              const isAfter = getDropPosition(touch.clientX, touch.clientY, rect);
+              targetEl.classList.toggle('drag-insert-after', isAfter);
+              targetEl.classList.toggle('drag-insert-before', !isAfter);
+            }
+          }, { passive: true });
 
-            cardDragHandle.addEventListener('touchend', (e) => {
-              if (!isTouchDraggingCard) return;
-              isTouchDraggingCard = false;
-              card.classList.remove('is-dragging');
-              const lastTouch = e.changedTouches && e.changedTouches[0];
-              if (lastTouch) {
-                const targetEl = document.elementFromPoint(lastTouch.clientX, lastTouch.clientY)?.closest('.custom-playlist-card');
-                if (targetEl && targetEl.dataset.playlistId && targetEl.dataset.playlistId !== cardDraggedId) {
-                  const fromId = cardDraggedId;
-                  const toId = targetEl.dataset.playlistId;
-                  const fromIdx = state.customPlaylists.findIndex(p => p.id === fromId);
-                  const toIdx = state.customPlaylists.findIndex(p => p.id === toId);
-                  if (fromIdx !== -1 && toIdx !== -1) {
+          cardDragHandle.addEventListener('touchend', (e) => {
+            if (!isTouchDraggingCard) return;
+            isTouchDraggingCard = false;
+            card.classList.remove('is-dragging');
+            const lastTouch = e.changedTouches && e.changedTouches[0];
+            if (lastTouch) {
+              const targetEl = document.elementFromPoint(lastTouch.clientX, lastTouch.clientY)?.closest('.custom-playlist-card');
+              if (targetEl && targetEl.dataset.playlistId && targetEl.dataset.playlistId !== cardDraggedId) {
+                const rect = targetEl.getBoundingClientRect();
+                const isAfter = getDropPosition(lastTouch.clientX, lastTouch.clientY, rect);
+                const fromId = cardDraggedId;
+                const toId = targetEl.dataset.playlistId;
+                const fromIdx = state.customPlaylists.findIndex(p => p.id === fromId);
+                const targetIdx = state.customPlaylists.findIndex(p => p.id === toId);
+                if (fromIdx !== -1 && targetIdx !== -1) {
+                  let newIdx = isAfter
+                    ? (fromIdx < targetIdx ? targetIdx : targetIdx + 1)
+                    : (fromIdx < targetIdx ? targetIdx - 1 : targetIdx);
+                  newIdx = Math.max(0, Math.min(newIdx, state.customPlaylists.length - 1));
+                  if (newIdx !== fromIdx) {
                     const [moved] = state.customPlaylists.splice(fromIdx, 1);
-                    state.customPlaylists.splice(toIdx, 0, moved);
+                    state.customPlaylists.splice(newIdx, 0, moved);
+                    localStorage.setItem('musisurf_playlist_sort', 'custom');
+                    if (elements.libPlaylistSortSelect) elements.libPlaylistSortSelect.value = 'custom';
+                    syncCustomDropdown('libPlaylistSortDropdown', 'custom');
                     saveStoredPlaylists();
                     updateLibraryUI();
                     renderSidebarPlaylists();
-                    showToast(`Moved "${moved.name}"`, '↕️');
+                    showToast(`Reordered "${moved.name}" to position ${newIdx + 1}`, '↕️');
                   }
                 }
               }
-              elements.libCustomPlaylistsGrid.querySelectorAll('.custom-playlist-card').forEach(el => el.classList.remove('drag-over-row'));
-            });
-          }
+            }
+            clearDragIndicators();
+          });
 
           card.querySelector('.card-play-btn')?.addEventListener('click', (e) => {
             e.stopPropagation();

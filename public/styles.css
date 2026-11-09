@@ -6195,31 +6195,47 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 
   .top-header {
     height: 56px;
-    padding: 0 10px;
-    gap: 8px;
+    padding: 0 10px !important;
+    gap: 0 !important;
     border-radius: 0;
+    justify-content: flex-start !important;
+  }
+
+  .top-header-left {
+    display: none !important;
   }
 
   .top-header-left .top-nav-arrows {
     display: none !important;
   }
 
-  .top-header-left .top-home-btn {
-    width: 38px;
-    height: 38px;
+  .top-home-btn,
+  #topHomeBtn {
+    width: 38px !important;
+    height: 38px !important;
+    margin: 0 !important;
+    flex-shrink: 0 !important;
   }
 
   .top-header-center {
-    max-width: none;
-    gap: 8px;
+    width: 100% !important;
+    max-width: none !important;
+    flex: 1 !important;
+    margin: 0 !important;
+    gap: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    position: static !important;
+    transform: none !important;
   }
 
   .top-search-pill {
-    height: 40px;
-    padding: 0 12px;
-    gap: 8px;
-    flex: 1;
-    min-width: 0;
+    height: 40px !important;
+    padding: 0 12px !important;
+    gap: 8px !important;
+    flex: 1 !important;
+    width: auto !important;
+    min-width: 0 !important;
   }
 
   /* Mobile: keep ONLY Home and search bar, hide explore compass and divider from search pill */
@@ -6278,17 +6294,24 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     display: none !important;
   }
 
-  /* Keep top bar settings gear button always visible on top nav across all devices */
+  /* Mobile: remove settings button from top nav, move to top right of Library view */
   .top-header-right,
-  .header-right {
-    display: flex !important;
-    align-items: center !important;
-    flex-shrink: 0 !important;
-    margin-left: auto !important;
-  }
-
+  .header-right,
   .header-settings-btn,
   #headerSettingsBtn {
+    display: none !important;
+  }
+
+  .library-view-topbar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    margin-bottom: 16px !important;
+    padding-top: 4px !important;
+  }
+
+  .library-settings-btn {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -6300,16 +6323,17 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     color: #f3f4f6 !important;
     cursor: pointer !important;
     flex-shrink: 0 !important;
+    transition: transform 0.15s ease, background 0.15s ease;
   }
 
-  .header-settings-btn:active {
+  .library-settings-btn:active {
     transform: scale(0.92);
     background: rgba(255, 255, 255, 0.18);
   }
 
-  .header-settings-btn svg {
-    width: 19px;
-    height: 19px;
+  .library-settings-btn svg {
+    width: 20px;
+    height: 20px;
   }
 
   .ad-free-pill {
@@ -8990,6 +9014,29 @@ body[data-active-view="lyrics"] .content-scroll {
 .drag-handle-btn svg {
   width: 16px;
   height: 16px;
+}
+
+.custom-playlist-card.is-dragging {
+  opacity: 0.45 !important;
+  transform: scale(0.96) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.custom-playlist-card.drag-insert-before {
+  box-shadow: -5px 0 0 #ffffff, -10px 0 20px rgba(255, 255, 255, 0.4) !important;
+  transform: translateX(4px) !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.custom-playlist-card.drag-insert-after {
+  box-shadow: 5px 0 0 #ffffff, 10px 0 20px rgba(255, 255, 255, 0.4) !important;
+  transform: translateX(-4px) !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.library-settings-btn {
+  display: none;
 }
 
 /* ==========================================================================
