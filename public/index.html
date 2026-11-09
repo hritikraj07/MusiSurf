@@ -29,19 +29,19 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=8.40">
+  <link rel="stylesheet" href="/styles.css?v=8.41">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
         for (var name of names) {
-          if (name !== 'musisurf-v8.31') caches.delete(name);
+          if (name !== 'musisurf-v8.41') caches.delete(name);
         }
       });
     }
   </script>
 </head>
 
-<body class="theme-dark">
+<body class="theme-dark" data-active-view="home">
   <div id="app" class="app-layout">
 
     <!-- Top Navigation & Global Search Header (Modern Spotify Style) -->
@@ -2166,7 +2166,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=8.40"></script>
+  <script src="/app.js?v=8.41"></script>
 </body>
 
 </html>

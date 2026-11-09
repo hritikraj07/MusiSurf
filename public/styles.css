@@ -4,12 +4,12 @@
 
 :root {
   /* Core Color Palette — Dark Charcoal & Deep Slate (Matches Reference UI) */
-  --bg-base: #0e0f12;
-  --bg-surface: #141519;
-  --bg-surface-elevated: #1a1b20;
-  --bg-card: #16171b;
+  --bg-base: #121212;
+  --bg-surface: #121212;
+  --bg-surface-elevated: #18191e;
+  --bg-card: #18191e;
   --bg-card-hover: #222329;
-  --bg-glass: rgba(20, 21, 25, 0.88);
+  --bg-glass: rgba(18, 18, 18, 0.88);
   
   /* Brand Accent Colors */
   --accent-primary: #ffffff;
@@ -374,7 +374,7 @@ html, body {
    ========================================================================== */
 .sidebar {
   grid-area: sidebar;
-  background-color: #121212;
+  background-color: #121212 !important;
   border-radius: 8px;
   margin: 0 0 0 8px;
   display: flex;
@@ -530,13 +530,13 @@ html, body {
 /* Library Section */
 .sidebar-library {
   flex: 1;
-  background-color: var(--bg-surface);
+  background-color: #121212 !important;
   border-radius: 12px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   padding: 14px 10px;
-  border: 1px solid var(--border-subtle);
+  border: none !important;
 }
 
 .library-header {
@@ -891,9 +891,9 @@ html, body {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  background-color: #141519 !important;
+  background-color: #121212 !important;
   z-index: 50;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   box-sizing: border-box !important;
   width: 100% !important;
   position: relative !important;
@@ -6310,6 +6310,8 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     display: flex !important;
     align-items: center !important;
     justify-content: flex-start !important;
+    background-color: #121212 !important;
+    border-bottom: none !important;
   }
 
   .top-header-left {
@@ -6325,8 +6327,14 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     display: none !important;
   }
 
+  /* By default on mobile (including Home page), do NOT show search bar; only show at search section */
   .top-header-center {
-    width: auto !important;
+    display: none !important;
+  }
+
+  /* On mobile search section: show search bar, taking full width */
+  body[data-active-view="search"] .top-header-center {
+    width: 100% !important;
     max-width: none !important;
     flex: 1 !important;
     margin: 0 !important;
@@ -6403,11 +6411,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     display: none !important;
   }
 
-  /* Mobile: Move Login Profile circle to far left (Spotify Mobile layout) */
-  #topHomeBtn {
-    display: none !important;
-  }
-
+  /* Mobile: Show Login Profile circle on non-search views (e.g. Home page) */
   .top-header-right {
     display: flex !important;
     align-items: center !important;
@@ -6415,6 +6419,12 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     order: -1 !important;
     margin: 0 !important;
     flex-shrink: 0 !important;
+  }
+
+  /* Mobile: in Search section, do NOT show user icon, only show search bar */
+  body[data-active-view="search"] .top-header-right,
+  body[data-active-view="search"] #headerLoginMobBtn {
+    display: none !important;
   }
 
   .top-login-btn {
@@ -8883,11 +8893,24 @@ body[data-active-view="lyrics"] .search-box-wrapper {
   display: none !important;
 }
 
-/* Keep Top Header Visible in Lyrics View */
-body[data-active-view="lyrics"] .top-header {
-  display: flex !important;
-  visibility: visible !important;
-  opacity: 1 !important;
+/* Web & Mobile: Hide Top Header completely at Lyrics Section */
+body[data-active-view="lyrics"] .top-header,
+body[data-active-view="lyrics"] #topHeader {
+  display: none !important;
+}
+
+body[data-active-view="lyrics"] .app-layout {
+  grid-template-rows: 1fr var(--player-height) !important;
+  grid-template-areas:
+    "sidebar main"
+    "player  player" !important;
+}
+
+@media (max-width: 768px) {
+  body[data-active-view="lyrics"] .app-layout {
+    grid-template-rows: 1fr !important;
+    grid-template-areas: "main" !important;
+  }
 }
 
 body[data-active-view="lyrics"] .main-wrapper,
@@ -8896,13 +8919,20 @@ body[data-active-view="lyrics"] .content-scroll {
   overflow-x: hidden !important;
   overflow-y: hidden !important;
   padding: 0 !important;
+  height: 100% !important;
 }
 
 #lyricsView {
   height: 100% !important;
-  max-height: calc(100vh - var(--top-header-height) - var(--player-height)) !important;
+  max-height: calc(100vh - var(--player-height)) !important;
   overflow: hidden !important;
   overflow-x: hidden !important;
+}
+
+@media (max-width: 768px) {
+  #lyricsView {
+    max-height: 100vh !important;
+  }
 }
 
 .lyrics-view-container {
