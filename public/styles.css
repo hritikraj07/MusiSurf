@@ -32,7 +32,7 @@
   --border-active: rgba(255, 255, 255, 0.25);
 
   /* Layout Constants */
-  --sidebar-width: 280px;
+  --sidebar-width: 295px;
   --player-height: 80px;
   --top-header-height: 54px;
 
@@ -976,8 +976,11 @@ html, body {
     left: 50% !important;
     transform: translateX(-50%) !important;
     width: 100% !important;
-    max-width: 520px !important;
+    max-width: 580px !important;
     margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
   }
 }
 
@@ -988,7 +991,7 @@ html, body {
   border-radius: 500px;
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  padding: 0 12px 0 16px;
   gap: 10px;
   color: #fff;
   border: 1px solid transparent;
@@ -1024,10 +1027,59 @@ html, body {
   font-weight: 400 !important;
 }
 
+/* Divider inside Search Pill: x / | 🧭 */
+.search-pill-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.22);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* Explore Compass Button Inside Search Pill */
+.search-explore-btn,
+.top-search-pill #topCompassBtn {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  border-radius: 50%;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  color: #b3b3b3 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  flex-shrink: 0 !important;
+  transition: all 0.2s ease !important;
+}
+
+.search-explore-btn:hover,
+.top-search-pill #topCompassBtn:hover {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.14) !important;
+  transform: scale(1.08) !important;
+}
+
+.search-explore-btn.active,
+.top-search-pill #topCompassBtn.active {
+  color: var(--accent-primary, #1ed760) !important;
+}
+
+.top-search-pill #topCompassBtn svg,
+.search-explore-btn svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
 .top-compass-btn {
-  width: 44px;
-  height: 44px;
-  background: #1f1f1f;
+  width: 32px;
+  height: 32px;
+  background: transparent;
   color: #b3b3b3;
   flex-shrink: 0;
 }
@@ -1044,8 +1096,8 @@ html, body {
 }
 
 .top-compass-btn svg {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
 }
 
 .top-header-right {
@@ -1155,9 +1207,10 @@ html, body {
 /* Autocomplete Floating Dropdown (Image 5 & 6) */
 .search-autocomplete-dropdown {
   position: absolute;
-  top: 52px;
+  top: calc(100% + 6px);
   left: 0;
-  right: 56px;
+  right: 0;
+  width: 100%;
   background: #242424;
   border-radius: 12px;
   padding: 6px 0;
@@ -1278,7 +1331,7 @@ html, body {
   -webkit-user-select: none !important;
   outline: none !important;
   white-space: nowrap !important;
-  gap: 12px !important;
+  gap: 16px !important;
 }
 
 .library-header-left {
@@ -1388,6 +1441,7 @@ html, body {
   gap: 8px !important;
   flex-shrink: 0 !important;
   margin-left: auto !important;
+  padding-left: 10px !important;
 }
 
 .library-header-actions .create-playlist-btn-text {
@@ -1666,51 +1720,124 @@ html, body {
   flex-shrink: 0;
 }
 
-/* Collapsed Sidebar Mode */
-.sidebar.collapsed {
+/* Collapsed Sidebar Mode (Matching Reference Image 2 & Dynamic Song Colors) */
+.sidebar.collapsed,
+#app.sidebar-collapsed .sidebar {
   width: 86px !important;
   padding: 12px 0 16px !important;
+  background: linear-gradient(180deg, rgba(var(--lyrics-theme-rgb, 30, 35, 45), 0.32) 0%, #121212 100%) !important;
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s ease !important;
 }
 
-.sidebar.collapsed .sidebar-library > *:not(.library-header),
-#app.sidebar-collapsed .sidebar .sidebar-library > *:not(.library-header),
-.sidebar.collapsed .custom-playlists-container,
-#app.sidebar-collapsed .sidebar .custom-playlists-container,
-.sidebar.collapsed #customPlaylistsList,
-#app.sidebar-collapsed .sidebar #customPlaylistsList,
-.sidebar.collapsed .playlist-list-item,
-#app.sidebar-collapsed .sidebar .playlist-list-item,
-.sidebar.collapsed .library-item,
-#app.sidebar-collapsed .sidebar .library-item,
-.sidebar.collapsed #navReplayBtn,
-#app.sidebar-collapsed .sidebar #navReplayBtn,
-.sidebar.collapsed #navLikedBtn,
-#app.sidebar-collapsed .sidebar #navLikedBtn,
-.sidebar.collapsed #navLocalMusicBtn,
-#app.sidebar-collapsed .sidebar #navLocalMusicBtn,
-.sidebar.collapsed #navDownloadedBtn,
-#app.sidebar-collapsed .sidebar #navDownloadedBtn,
+/* Hide text labels, subtitle, search/create row and actions in collapsed mode */
 .sidebar.collapsed .library-heading,
 .sidebar.collapsed .library-item-info,
+.sidebar.collapsed .playlist-item-info,
 .sidebar.collapsed .sidebar-pin-icon,
 .sidebar.collapsed #createPlaylistBtn,
 .sidebar.collapsed #expandLibraryFullBtn,
 .sidebar.collapsed .library-header-actions,
 .sidebar.collapsed .sidebar-library-search-row,
-.sidebar.collapsed .library-content,
 .sidebar.collapsed .sidebar-footer,
-.sidebar.collapsed .library-pinned-item,
+.sidebar.collapsed .playlist-cover-play-btn,
+.sidebar.collapsed .playlist-item-play-btn,
+.sidebar.collapsed .playlist-item-actions,
 #app.sidebar-collapsed .sidebar .library-heading,
 #app.sidebar-collapsed .sidebar .library-item-info,
+#app.sidebar-collapsed .sidebar .playlist-item-info,
 #app.sidebar-collapsed .sidebar .sidebar-pin-icon,
 #app.sidebar-collapsed .sidebar #createPlaylistBtn,
 #app.sidebar-collapsed .sidebar #expandLibraryFullBtn,
 #app.sidebar-collapsed .sidebar .library-header-actions,
 #app.sidebar-collapsed .sidebar .sidebar-library-search-row,
-#app.sidebar-collapsed .sidebar .library-content,
 #app.sidebar-collapsed .sidebar .sidebar-footer,
-#app.sidebar-collapsed .sidebar .library-pinned-item {
+#app.sidebar-collapsed .sidebar .playlist-cover-play-btn,
+#app.sidebar-collapsed .sidebar .playlist-item-play-btn,
+#app.sidebar-collapsed .sidebar .playlist-item-actions {
   display: none !important;
+}
+
+/* Keep library content & album covers visible and centered */
+.sidebar.collapsed .library-content,
+#app.sidebar-collapsed .sidebar .library-content {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  width: 100% !important;
+  padding: 4px 0 !important;
+  gap: 10px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.sidebar.collapsed .custom-playlists-container,
+#app.sidebar-collapsed .sidebar .custom-playlists-container,
+.sidebar.collapsed #customPlaylistsList,
+#app.sidebar-collapsed .sidebar #customPlaylistsList {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  gap: 10px !important;
+}
+
+.sidebar.collapsed .library-item,
+#app.sidebar-collapsed .sidebar .library-item,
+.sidebar.collapsed .playlist-list-item,
+#app.sidebar-collapsed .sidebar .playlist-list-item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 56px !important;
+  height: 56px !important;
+  min-width: 56px !important;
+  min-height: 56px !important;
+  padding: 4px !important;
+  margin: 0 auto !important;
+  border-radius: 10px !important;
+  box-sizing: border-box !important;
+  cursor: pointer !important;
+  transition: transform 0.15s ease, background-color 0.15s ease !important;
+}
+
+.sidebar.collapsed .library-item:hover,
+#app.sidebar-collapsed .sidebar .library-item:hover,
+.sidebar.collapsed .playlist-list-item:hover,
+#app.sidebar-collapsed .sidebar .playlist-list-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  transform: scale(1.04);
+}
+
+/* Keep album covers at the exact same size as extended: 48px x 48px */
+.replay-cover-art-box,
+.liked-icon-box,
+.local-icon-box,
+.downloaded-icon-box,
+.playlist-cover-mini,
+.sidebar.collapsed .replay-cover-art-box,
+.sidebar.collapsed .liked-icon-box,
+.sidebar.collapsed .local-icon-box,
+.sidebar.collapsed .downloaded-icon-box,
+.sidebar.collapsed .playlist-cover-mini,
+.sidebar.collapsed .playlist-cover-placeholder,
+#app.sidebar-collapsed .sidebar .replay-cover-art-box,
+#app.sidebar-collapsed .sidebar .liked-icon-box,
+#app.sidebar-collapsed .sidebar .local-icon-box,
+#app.sidebar-collapsed .sidebar .downloaded-icon-box,
+#app.sidebar-collapsed .sidebar .playlist-cover-mini,
+#app.sidebar-collapsed .sidebar .playlist-cover-placeholder {
+  width: 48px !important;
+  height: 48px !important;
+  min-width: 48px !important;
+  min-height: 48px !important;
+  max-width: 48px !important;
+  max-height: 48px !important;
+  border-radius: 8px !important;
+  margin: 0 !important;
+  flex-shrink: 0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
 }
 
 .sidebar.collapsed .library-header,
@@ -9030,7 +9157,7 @@ body[data-active-view="lyrics"] .content-scroll {
    SYNCHRONIZED LYRICS VIEW (Image 2 & 9 - Dynamic Atmospheric Blur Backdrop)
    ========================================================================== */
 #lyricsView {
-  background: radial-gradient(circle at 35% 30%, var(--lyrics-theme-color, #701414) 0%, rgba(15, 10, 12, 0.95) 70%, #000000 100%) !important;
+  background: radial-gradient(circle at 45% 35%, rgba(var(--lyrics-theme-rgb, 60, 80, 120), 0.85) 0%, rgba(var(--lyrics-theme-rgb, 40, 50, 80), 0.55) 55%, #101216 100%), #101216 !important;
   width: 100%;
   height: 100%;
   position: relative;
@@ -9058,15 +9185,9 @@ body[data-active-view="lyrics"] .content-scroll {
   z-index: 25;
 }
 
-.lyrics-sync-controls {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 999px;
-  padding: 3px 6px;
+.lyrics-sync-controls,
+#lyricsSyncControls {
+  display: none !important;
 }
 
 .lyrics-sync-btn {

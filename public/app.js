@@ -3938,20 +3938,37 @@
 
   async function applyLyricsDynamicBackground(track) {
     const lyricsViewEl = document.getElementById('lyricsView');
-    if (!lyricsViewEl) return;
     const current = track || state.currentTrack;
     if (!current || !current.image) {
-      lyricsViewEl.style.setProperty('--lyrics-theme-color', '#181b22');
+      document.documentElement.style.setProperty('--lyrics-theme-color', '#2d3748');
+      document.documentElement.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
+      if (lyricsViewEl) {
+        lyricsViewEl.style.setProperty('--lyrics-theme-color', '#2d3748');
+        lyricsViewEl.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
+      }
       return;
     }
     try {
       const [r, g, b] = await extractDominantColor(current.image, current.id || current.title || 'lyrics');
-      const topR = Math.min(255, Math.floor(r * 0.72 + 10));
-      const topG = Math.min(255, Math.floor(g * 0.72 + 10));
-      const topB = Math.min(255, Math.floor(b * 0.72 + 14));
-      lyricsViewEl.style.setProperty('--lyrics-theme-color', `rgb(${topR}, ${topG}, ${topB})`);
+      // Rich vibrant tones that match the artwork without being dim/pitch-black
+      const topR = Math.min(255, Math.max(35, Math.floor(r * 0.95)));
+      const topG = Math.min(255, Math.max(35, Math.floor(g * 0.95)));
+      const topB = Math.min(255, Math.max(35, Math.floor(b * 0.95)));
+      const rgbStr = `${topR}, ${topG}, ${topB}`;
+
+      document.documentElement.style.setProperty('--lyrics-theme-rgb', rgbStr);
+      document.documentElement.style.setProperty('--lyrics-theme-color', `rgb(${rgbStr})`);
+      if (lyricsViewEl) {
+        lyricsViewEl.style.setProperty('--lyrics-theme-rgb', rgbStr);
+        lyricsViewEl.style.setProperty('--lyrics-theme-color', `rgb(${rgbStr})`);
+      }
     } catch (e) {
-      lyricsViewEl.style.setProperty('--lyrics-theme-color', '#181b22');
+      document.documentElement.style.setProperty('--lyrics-theme-color', '#2d3748');
+      document.documentElement.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
+      if (lyricsViewEl) {
+        lyricsViewEl.style.setProperty('--lyrics-theme-color', '#2d3748');
+        lyricsViewEl.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
+      }
     }
   }
 
@@ -6009,7 +6026,8 @@
 
     // Top Bar Compass / Explore Categories (Shows browse categories, no recents)
     if (elements.topCompassBtn) {
-      elements.topCompassBtn.addEventListener('click', () => {
+      elements.topCompassBtn.addEventListener('click', (e) => {
+        if (e) e.stopPropagation();
         state.isExploreMode = true;
         try { localStorage.setItem('musisurf_explore_mode', 'true'); } catch (e) {}
         switchView('search');
