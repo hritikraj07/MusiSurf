@@ -29,12 +29,12 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=8.30">
+  <link rel="stylesheet" href="/styles.css?v=8.31">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
         for (var name of names) {
-          if (name !== 'musisurf-v8.30') caches.delete(name);
+          if (name !== 'musisurf-v8.31') caches.delete(name);
         }
       });
     }
@@ -213,7 +213,18 @@
             </div>
           </div>
 
-          <!-- Liked Songs (Below Replay) -->
+          <!-- Local Music (Device Storage - Directly below Replay) -->
+          <div class="library-item local-music-item" id="navLocalMusicBtn" data-view="localMusic" title="Local Music">
+            <div class="local-icon-box">
+              <img src="/icons/local-folder.svg" alt="Local Files" class="local-folder-icon-img" />
+            </div>
+            <div class="library-item-info">
+              <span class="library-item-title">Local Music</span>
+              <span class="library-item-meta" id="localCountMeta">On this device</span>
+            </div>
+          </div>
+
+          <!-- Liked Songs (Directly below Local Music) -->
           <div class="library-item liked-songs-item" id="navLikedBtn" data-view="liked" title="Liked Songs">
             <div class="liked-icon-box">
               <svg viewBox="0 0 24 24" fill="currentColor">
@@ -227,18 +238,7 @@
             </div>
           </div>
 
-          <!-- Local Music (Device Storage - Directly below Liked Songs) -->
-          <div class="library-item local-music-item" id="navLocalMusicBtn" data-view="localMusic" title="Local Music">
-            <div class="local-icon-box">
-              <img src="/icons/local-folder.svg" alt="Local Files" class="local-folder-icon-img" />
-            </div>
-            <div class="library-item-info">
-              <span class="library-item-title">Local Music</span>
-              <span class="library-item-meta" id="localCountMeta">On this device</span>
-            </div>
-          </div>
-
-          <!-- User Created / Pinned Playlists (Injected dynamically here, right below Local Music) -->
+          <!-- User Created / Pinned Playlists (Injected dynamically here, right below Liked Songs) -->
           <div class="custom-playlists-container" id="customPlaylistsList">
             <!-- Dynamically populated: pinned playlists appear first with pin icon 📌 only -->
           </div>
@@ -475,12 +475,6 @@
                     src="https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=300&auto=format&fit=crop&q=80"
                     alt="Jazz" class="category-img">
                 </div>
-                <div class="category-card" style="--card-color: #006450;" data-query="Gaming Electronic Beats">
-                  <span class="category-name">Gaming Beats</span>
-                  <img
-                    src="https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=300&auto=format&fit=crop&q=80"
-                    alt="Gaming" class="category-img">
-                </div>
                 <div class="category-card" style="--card-color: #7358ff;" data-query="Classical Symphony Orchestra">
                   <span class="category-name">Classical</span>
                   <img
@@ -503,7 +497,7 @@
                     onerror="this.src='https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80'">
                 </div>
                 <div class="category-card" style="--card-color: #8e44ad;" data-query="Synthwave Retro Electro Cyberpunk">
-                  <span class="category-name">Gaming & Cyberpunk</span>
+                  <span class="category-name">Synthwave & Cyberpunk</span>
                   <img
                     src="https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=300&auto=format&fit=crop&q=80"
                     alt="Cyberpunk" class="category-img"
@@ -748,22 +742,22 @@
 
         <!-- SYNCHRONIZED LYRICS VIEW (Exact Match to Image 2 - Dynamic Atmospheric Backdrop) -->
         <section class="view-section" id="lyricsView">
-          <div class="lyrics-view-container" id="lyricsContainer">
-            <div class="lyrics-view-top-actions">
-              <div class="lyrics-sync-controls" id="lyricsSyncControls" title="Fine-tune audio lyrics synchronization" style="display: none !important;">
-                <button class="lyrics-sync-btn" id="lyricsSyncMinus" title="Delay lyrics by 0.5s">-0.5s</button>
-                <span class="lyrics-sync-label" id="lyricsSyncLabel">Sync: 0.0s</span>
-                <button class="lyrics-sync-btn" id="lyricsSyncPlus" title="Advance lyrics by 0.5s">+0.5s</button>
-                <button class="lyrics-sync-btn lyrics-sync-reset-btn" id="lyricsSyncReset" title="Reset sync offset">↺</button>
-              </div>
-              <button class="lyrics-view-close-btn" id="closeLyricsBtn" title="Close Lyrics">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
+          <div class="lyrics-view-top-actions">
+            <div class="lyrics-sync-controls" id="lyricsSyncControls" title="Fine-tune audio lyrics synchronization" style="display: none !important;">
+              <button class="lyrics-sync-btn" id="lyricsSyncMinus" title="Delay lyrics by 0.5s">-0.5s</button>
+              <span class="lyrics-sync-label" id="lyricsSyncLabel">Sync: 0.0s</span>
+              <button class="lyrics-sync-btn" id="lyricsSyncPlus" title="Advance lyrics by 0.5s">+0.5s</button>
+              <button class="lyrics-sync-btn lyrics-sync-reset-btn" id="lyricsSyncReset" title="Reset sync offset">↺</button>
             </div>
+            <button class="lyrics-view-close-btn" id="closeLyricsBtn" title="Close Lyrics">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
 
+          <div class="lyrics-view-container" id="lyricsContainer">
             <!-- Desktop & Mobile Two-Column Layout (Image 2) -->
             <div class="lyrics-main-grid">
               <!-- Left Column: Album Art + Titles -->
@@ -2195,7 +2189,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=8.30"></script>
+  <script src="/app.js?v=8.31"></script>
 </body>
 
 </html>

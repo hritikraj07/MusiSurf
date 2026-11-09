@@ -1,5 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="100%" height="100%">
   <defs>
+    <!-- Dark Replay / Obsidian Website Tile Background (#18191e to #0a0b0d) -->
+    <linearGradient id="folderTileBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#18191e"/>
+      <stop offset="50%" stop-color="#121316"/>
+      <stop offset="100%" stop-color="#0a0b0d"/>
+    </linearGradient>
+
     <!-- Primary Folder Body Gradient (#3B7DAF to #4A88BA) -->
     <linearGradient id="folderBody" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#4A88BA"/>
@@ -12,15 +19,15 @@
       <stop offset="100%" stop-color="#CDE7EE"/>
     </linearGradient>
 
-    <!-- Folder Back Interior Gradient with Inset Dark Accent (#2D5E85) -->
+    <!-- Folder Back Interior Gradient (#2D5E85 to #3874A3) -->
     <linearGradient id="folderBack" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#3874A3"/>
       <stop offset="100%" stop-color="#2D5E85"/>
     </linearGradient>
   </defs>
 
-  <!-- Background Frame: Pale Icy Tint / Off-White (#F5F9FA) with Soft Black Outline (#1A1A1A) -->
-  <rect x="6" y="6" width="116" height="116" rx="24" fill="#F5F9FA" stroke="#1A1A1A" stroke-width="4.5"/>
+  <!-- Dark Website / Replay Matching Background Tile (No white frame, no white border) -->
+  <rect width="128" height="128" rx="20" fill="url(#folderTileBg)"/>
 
   <!-- Back Folder Tab & Shell -->
   <path d="M25 36 C25 31, 29 27, 34 27 L53 27 C57 27, 60 29.5, 62 33 L67 40 L94 40 C99 40, 103 44, 103 49 L103 91 C103 96, 99 100, 94 100 L34 100 C29 100, 25 96, 25 91 Z" 
@@ -28,7 +35,6 @@
 
   <!-- Folder Tab / Interior Documents (#CDE7EE to #DDF0F4) -->
   <rect x="33" y="35" width="62" height="46" rx="5" fill="url(#folderInterior)" stroke="#1A1A1A" stroke-width="3.5"/>
-  <!-- Interior Details / Document Lines (#2D5E85) -->
   <line x1="42" y1="46" x2="68" y2="46" stroke="#2D5E85" stroke-width="3.5" stroke-linecap="round"/>
   <line x1="42" y1="54" x2="82" y2="54" stroke="#2D5E85" stroke-width="3.5" stroke-linecap="round"/>
   <line x1="42" y1="62" x2="74" y2="62" stroke="#2D5E85" stroke-width="3.5" stroke-linecap="round"/>
