@@ -1204,7 +1204,7 @@ app.get('/api/yt-stream', async (req, res) => {
 
       if (chosenFormat) {
         contentType = chosenFormat.mimeType ? chosenFormat.mimeType.split(';')[0] : (chosenFormat.container === 'mp4' ? 'audio/mp4' : 'audio/webm');
-        stream = await ytdl.downloadFromInfo(info, {
+        stream = await ytdl.download(info, {
           format: chosenFormat,
           highWaterMark: 1 << 22
         });
