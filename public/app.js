@@ -4768,18 +4768,22 @@
       elements.queueNowPlaying.innerHTML = '<span style="color: var(--text-muted); font-size: 0.85rem; padding: 12px 4px; display: block;">Nothing currently playing</span>';
     }
 
-    // Next up list
+    // Next up list (efficient DocumentFragment batch insertion)
     elements.queueList.innerHTML = '';
     const upcoming = state.queue.slice(state.queueIndex + 1);
 
     if (upcoming.length === 0) {
       elements.queueList.innerHTML = '<span style="color: var(--text-muted); font-size: 0.82rem; padding: 10px 0;">No upcoming songs in queue</span>';
     } else {
-      upcoming.forEach((t, i) => {
+      const fragment = document.createDocumentFragment();
+      // Render upcoming queue items efficiently
+      const limit = Math.min(upcoming.length, 100);
+      for (let i = 0; i < limit; i++) {
+        const t = upcoming[i];
         const card = document.createElement('div');
         card.className = 'queue-card';
         card.innerHTML = `
-          <img src="${t.image}" alt="${escapeHtml(t.title)}" class="queue-img">
+          <img src="${t.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80'}" alt="${escapeHtml(t.title)}" class="queue-img" loading="lazy">
           <div class="queue-card-info">
             <div class="queue-card-title">${escapeHtml(t.title)}${getPlaylistTickBadgeHtml(t.id)}${getDownloadedBadgeHtml(t.id)}</div>
             <div class="queue-card-artist">${escapeHtml(t.artist)}</div>
@@ -4803,8 +4807,9 @@
           playTrack(t);
         });
 
-        elements.queueList.appendChild(card);
-      });
+        fragment.appendChild(card);
+      }
+      elements.queueList.appendChild(fragment);
     }
   }
 
@@ -6646,6 +6651,7 @@
         elements.queueDrawer.classList.toggle('open', willOpen);
         elements.queueBtn.classList.toggle('active', willOpen);
         if (elements.queueDrawerBackdrop) elements.queueDrawerBackdrop.classList.toggle('active', willOpen);
+        if (willOpen) requestAnimationFrame(updateQueueDrawerUI);
       });
     }
 
@@ -7688,7 +7694,7 @@
           const willOpen = !elements.queueDrawer.classList.contains('open');
           elements.queueDrawer.classList.toggle('open', willOpen);
           if (elements.queueDrawerBackdrop) elements.queueDrawerBackdrop.classList.toggle('active', willOpen);
-          if (willOpen) updateQueueDrawerUI();
+          if (willOpen) requestAnimationFrame(updateQueueDrawerUI);
         }
       });
     }
@@ -8061,7 +8067,11 @@
       } else if (e.key.toLowerCase() === 'l') {
         toggleLyricsView();
       } else if (e.key.toLowerCase() === 'q') {
-        elements.queueDrawer.classList.toggle('open');
+        const willOpen = !elements.queueDrawer.classList.contains('open');
+        elements.queueDrawer.classList.toggle('open', willOpen);
+        if (elements.queueBtn) elements.queueBtn.classList.toggle('active', willOpen);
+        if (elements.queueDrawerBackdrop) elements.queueDrawerBackdrop.classList.toggle('active', willOpen);
+        if (willOpen) requestAnimationFrame(updateQueueDrawerUI);
       } else if (e.key === '/') {
         e.preventDefault();
         switchView('search');

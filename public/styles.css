@@ -2299,7 +2299,8 @@ html, body {
 }
 
 .miniplayer-artist {
-  color: #b3b3b3;
+  color: rgba(255, 255, 255, 0.8) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
@@ -2309,7 +2310,8 @@ html, body {
 .mini-heart-btn {
   background: transparent;
   border: none;
-  color: #b3b3b3;
+  color: rgba(255, 255, 255, 0.85) !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
   cursor: pointer;
   padding: 6px;
   display: flex;
@@ -4258,43 +4260,47 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 /* ==========================================================================
-   QUEUE DRAWER
+   QUEUE DRAWER (Butter-smooth 120fps GPU-composited slide)
    ========================================================================== */
 .queue-drawer {
   position: fixed;
   top: 0;
-  right: -380px;
+  right: 0;
   width: 360px;
   max-width: 90vw;
   height: calc(100vh - var(--player-height));
-  background: rgba(18, 19, 23, 0.96);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: #131418;
   border-left: 1px solid rgba(255, 255, 255, 0.08);
   z-index: 100;
   display: flex;
   flex-direction: column;
-  transition: right 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translate3d(100%, 0, 0);
+  visibility: hidden;
+  pointer-events: none;
+  will-change: transform;
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.28s ease;
   box-shadow: -12px 0 40px rgba(0, 0, 0, 0.7);
   padding: 22px;
   overflow-x: hidden !important;
   box-sizing: border-box;
+  contain: layout paint;
 }
 
 .queue-drawer.open {
-  right: 0;
+  transform: translate3d(0, 0, 0);
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .queue-backdrop {
   position: fixed;
   inset: 0;
   background-color: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
   z-index: 99;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.25s ease;
+  will-change: opacity;
+  transition: opacity 0.22s ease;
 }
 
 .queue-backdrop.active {
@@ -4726,7 +4732,8 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 
 .player-artist {
   font-size: 0.75rem;
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.78) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4735,29 +4742,31 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 
 .player-artist:hover {
   text-decoration: underline;
-  color: #fff;
+  color: #fff !important;
 }
 
 .player-heart-btn {
   background: transparent;
   border: none;
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.86) !important;
   cursor: pointer;
   padding: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all var(--transition-fast);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
 }
 
 .player-heart-btn:hover {
-  color: #fff;
+  color: #fff !important;
   transform: scale(1.15);
 }
 
 .player-heart-btn.liked {
   color: #ff3b5c !important;
   background: transparent !important;
+  filter: drop-shadow(0 1px 4px rgba(255, 59, 92, 0.5)) !important;
 }
 
 .player-heart-btn.liked svg {
@@ -4768,6 +4777,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 .player-heart-btn svg {
   width: 20px;
   height: 20px;
+  stroke-width: 2.2;
 }
 
 .player-share-btn {
@@ -5697,8 +5707,10 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .mobile-player-text p {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.8) !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6062,12 +6074,12 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     right: 8px;
     width: auto;
     height: 60px;
-    background-color: rgba(22, 25, 33, 0.96);
-    background: linear-gradient(90deg, rgba(var(--lyrics-theme-rgb, 22, 25, 33), 0.94) 0%, rgba(var(--lyrics-theme-rgb, 18, 20, 26), 0.98) 100%) !important;
+    background-color: #12141a !important;
+    background: linear-gradient(90deg, rgba(var(--lyrics-theme-rgb, 22, 25, 33), 0.42) 0%, rgba(18, 20, 26, 0.94) 100%), #12141a !important;
     backdrop-filter: blur(28px) saturate(180%);
     -webkit-backdrop-filter: blur(28px) saturate(180%);
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7), 0 0 1px rgba(255, 255, 255, 0.2);
     padding: 0 12px;
     cursor: pointer;
@@ -6191,8 +6203,10 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   }
 
   .player-artist {
-    font-size: 0.72rem;
-    color: var(--text-secondary);
+    font-size: 0.74rem;
+    color: rgba(255, 255, 255, 0.82) !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+    font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -6212,7 +6226,9 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     background: transparent;
     border: none;
     border-radius: 50%;
-    color: var(--text-secondary);
+    color: rgba(255, 255, 255, 0.88) !important;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+    transition: transform var(--transition-fast), color var(--transition-fast);
   }
 
   .player-heart-btn svg, #playerDownloadBtn svg {
@@ -6220,6 +6236,23 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     height: 20px;
     display: block;
     margin: auto;
+    stroke: currentColor;
+    stroke-width: 2.2;
+  }
+
+  .player-heart-btn:hover {
+    color: #ffffff !important;
+    transform: scale(1.15);
+  }
+
+  .player-heart-btn.liked {
+    color: #ff3b5c !important;
+    filter: drop-shadow(0 1px 4px rgba(255, 59, 92, 0.5)) !important;
+  }
+
+  .player-heart-btn.liked svg {
+    fill: #ff3b5c !important;
+    stroke: #ff3b5c !important;
   }
 
   /* Center controls in mini player */
@@ -6766,18 +6799,20 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     max-width: 100% !important;
   }
 
-  /* Fullscreen Queue Drawer on mobile */
+  /* Fullscreen Queue Drawer on mobile (Instant GPU slide) */
   .queue-drawer {
     width: 100% !important;
     max-width: 100% !important;
-    right: -100% !important;
+    right: 0 !important;
     height: 100dvh !important;
     z-index: 2400 !important;
     border-left: none !important;
     padding: calc(env(safe-area-inset-top, 12px) + 12px) 20px calc(env(safe-area-inset-bottom, 16px) + 16px) !important;
+    transform: translate3d(100%, 0, 0) !important;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.28s ease !important;
   }
   .queue-drawer.open {
-    right: 0 !important;
+    transform: translate3d(0, 0, 0) !important;
   }
   .queue-backdrop {
     z-index: 2390 !important;
