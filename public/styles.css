@@ -1674,17 +1674,19 @@ html, body {
 }
 
 /* Hover over library icon / header: morph books into collapse arrow */
-/* In expanded sidebar: hover over library icon / header keeps 4-bars icon crisp without turning into chevron */
-.library-collapse-icon-btn:hover .library-icon-morph .icon-books,
-.library-header-left:hover .library-collapse-icon-btn .library-icon-morph .icon-books {
-  opacity: 1 !important;
-  transform: scale(1) !important;
+/* In expanded sidebar: reveal collapse icon on header hover */
+.sidebar:not(.collapsed) .library-collapse-icon-btn .library-icon-morph .icon-books {
+  opacity: 0 !important;
+  transform: scale(0.8) !important;
 }
 
-.library-collapse-icon-btn:hover .library-icon-morph .icon-collapse,
-.library-header-left:hover .library-collapse-icon-btn .library-icon-morph .icon-collapse {
-  opacity: 0 !important;
-  pointer-events: none !important;
+.sidebar:not(.collapsed) .library-collapse-icon-btn .library-icon-morph .icon-collapse,
+.sidebar:not(.collapsed) .library-header:hover .library-collapse-icon-btn .library-icon-morph .icon-collapse,
+.sidebar:not(.collapsed) .library-header-left:hover .library-collapse-icon-btn .library-icon-morph .icon-collapse,
+.sidebar:not(.collapsed) .library-collapse-icon-btn:hover .library-icon-morph .icon-collapse {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: scale(1) !important;
 }
 
 /* When sidebar is collapsed */
@@ -6302,9 +6304,11 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 
   .top-header {
     height: 56px;
-    padding: 0 10px !important;
-    gap: 0 !important;
+    padding: 0 12px !important;
+    gap: 10px !important;
     border-radius: 0;
+    display: flex !important;
+    align-items: center !important;
     justify-content: flex-start !important;
   }
 
@@ -6318,22 +6322,20 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 
   .top-home-btn,
   #topHomeBtn {
-    width: 38px !important;
-    height: 38px !important;
-    margin: 0 !important;
-    flex-shrink: 0 !important;
+    display: none !important;
   }
 
   .top-header-center {
-    width: 100% !important;
+    width: auto !important;
     max-width: none !important;
     flex: 1 !important;
     margin: 0 !important;
-    gap: 8px !important;
+    gap: 0 !important;
     display: flex !important;
     align-items: center !important;
     position: static !important;
     transform: none !important;
+    order: 1 !important;
   }
 
   .top-search-pill {
@@ -6341,7 +6343,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     padding: 0 12px !important;
     gap: 8px !important;
     flex: 1 !important;
-    width: auto !important;
+    width: 100% !important;
     min-width: 0 !important;
   }
 
@@ -6401,7 +6403,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     display: none !important;
   }
 
-  /* Mobile: remove home icon from top nav, show circular login icon button */
+  /* Mobile: Move Login Profile circle to far left (Spotify Mobile layout) */
   #topHomeBtn {
     display: none !important;
   }
@@ -6409,8 +6411,10 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   .top-header-right {
     display: flex !important;
     align-items: center !important;
-    gap: 8px !important;
-    margin-left: auto !important;
+    gap: 0 !important;
+    order: -1 !important;
+    margin: 0 !important;
+    flex-shrink: 0 !important;
   }
 
   .top-login-btn {
@@ -6636,7 +6640,13 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   .tracks-table th.col-duration,
   .tracks-table td.col-duration,
   .tracks-table th.col-source,
-  .tracks-table td.col-source {
+  .tracks-table td.col-source,
+  #playlistView .tracks-table th.col-date-added,
+  #playlistView .tracks-table td.col-date-added,
+  #playlistView .tracks-table th.col-album,
+  #playlistView .tracks-table td.col-album,
+  #playlistView .tracks-table th.col-duration,
+  #playlistView .tracks-table td.col-duration {
     display: none !important;
   }
 
@@ -6650,6 +6660,17 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     width: 44px !important;
     height: 44px !important;
     border-radius: 6px !important;
+  }
+
+  /* On mobile: show in-playlist tick badge by default on all songs without requiring hover */
+  .in-playlist-tick-badge,
+  .tracks-table tbody tr .in-playlist-tick-badge,
+  #playlistView .tracks-table tbody tr .in-playlist-tick-badge,
+  .song-row .in-playlist-tick-badge,
+  .queue-card .in-playlist-tick-badge {
+    opacity: 1 !important;
+    display: inline-flex !important;
+    visibility: visible !important;
   }
   .table-title-main {
     font-size: 0.95rem !important;
@@ -9147,6 +9168,10 @@ body[data-active-view="lyrics"] .content-scroll {
   transition: color 0.15s ease, transform 0.15s ease;
 }
 
+.custom-playlist-card:not([draggable="true"]) .drag-handle-btn {
+  display: none !important;
+}
+
 .drag-handle-btn:hover,
 .drag-handle-btn:active {
   color: #ffffff;
@@ -11176,41 +11201,151 @@ body[data-active-view="lyrics"] .content-scroll {
   margin-top: 4px;
 }
 
-/* Settings Modal Responsive Breakpoint */
+/* Settings Modal Responsive Breakpoint (Image 2 Fix) */
 @media (max-width: 768px) {
+  .fullscreen-settings-modal,
+  #settingsModal {
+    position: fixed !important;
+    inset: 0 !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    height: 100dvh !important;
+    z-index: 3000 !important;
+    background: #0a0a0c !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box !important;
+  }
+
   .settings-modal-shell {
-    grid-template-columns: 1fr;
-    padding: 20px 14px;
-    gap: 20px;
-    overflow-y: auto;
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 100% !important;
+    padding: calc(env(safe-area-inset-top, 14px) + 10px) 16px calc(env(safe-area-inset-bottom, 20px) + 24px) !important;
+    gap: 16px !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
   }
+
   .settings-sidebar {
-    border-right: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    padding-right: 0;
-    padding-bottom: 16px;
+    width: 100% !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    padding-right: 0 !important;
+    padding-bottom: 14px !important;
+    position: relative !important;
   }
+
+  .settings-sidebar-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    margin-bottom: 12px !important;
+  }
+
+  .settings-brand-title {
+    font-size: 1.55rem !important;
+    font-weight: 800 !important;
+    margin: 0 !important;
+  }
+
+  .settings-shell-close-btn {
+    position: static !important;
+    margin-left: auto !important;
+    width: 36px !important;
+    height: 36px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .settings-search-pill-box {
+    margin-bottom: 12px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
   .settings-category-nav {
-    flex-direction: row;
-    overflow-x: auto;
-    padding-bottom: 6px;
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 8px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px !important;
+    scrollbar-width: none !important;
+    width: 100% !important;
   }
+
+  .settings-category-nav::-webkit-scrollbar {
+    display: none !important;
+  }
+
   .settings-cat-btn {
-    white-space: nowrap;
-    padding: 8px 12px;
+    white-space: nowrap !important;
+    padding: 8px 14px !important;
+    border-radius: 500px !important;
+    background: #181818 !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    font-size: 0.86rem !important;
+    flex-shrink: 0 !important;
   }
+
+  .settings-cat-btn.active {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border-color: #ffffff !important;
+  }
+
+  .settings-cat-btn.active svg {
+    color: #000000 !important;
+    stroke: #000000 !important;
+  }
+
+  .settings-main-panel {
+    width: 100% !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    flex: none !important;
+  }
+
+  .settings-tab-title {
+    font-size: 1.6rem !important;
+  }
+
+  .settings-tab-desc {
+    font-size: 0.85rem !important;
+  }
+
+  .playback-feature-card,
+  .playback-features-grid {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
   .sound-card-item {
     flex-direction: column;
     align-items: flex-start;
   }
+
   .sound-pills-group {
     width: 100%;
     justify-content: space-between;
   }
+
   .sound-pill-btn {
     flex: 1;
     text-align: center;
   }
+
   .sound-device-select {
     width: 100%;
     max-width: none;

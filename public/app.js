@@ -1045,6 +1045,26 @@
       updateQueueDrawerUI();
       highlightPlayingTrackInTables(track.id);
 
+      // Restore dynamic ambient background color immediately on app reload
+      applyLyricsDynamicBackground(track);
+      if (elements.mobilePlayerModal && track.image) {
+        extractDominantColor(track.image, track.id).then(([r, g, b]) => {
+          const darkR = Math.floor(r * 0.28);
+          const darkG = Math.floor(g * 0.28);
+          const darkB = Math.floor(b * 0.28);
+          const topR = Math.min(255, Math.floor(r * 0.72 + 10));
+          const topG = Math.min(255, Math.floor(g * 0.72 + 10));
+          const topB = Math.min(255, Math.floor(b * 0.72 + 14));
+          const midR = Math.min(255, Math.floor(darkR * 0.55 + 8));
+          const midG = Math.min(255, Math.floor(darkG * 0.55 + 9));
+          const midB = Math.min(255, Math.floor(darkB * 0.55 + 11));
+          elements.mobilePlayerModal.style.setProperty(
+            '--mob-player-bg',
+            `linear-gradient(180deg, rgb(${topR}, ${topG}, ${topB}) 0%, rgb(${midR}, ${midG}, ${midB}) 48%, #08090b 100%)`
+          );
+        }).catch(() => {});
+      }
+
       const resumeTime = parseFloat(saved.currentTime) || 0;
       state.restoredResumeTime = resumeTime;
       if (resumeTime > 0) {
@@ -5055,6 +5075,13 @@
           sortedPlaylists = [...state.customPlaylists];
         }
 
+        const isCustomSort = sortMode === 'custom';
+        const dragHandleBtnHtml = isCustomSort
+          ? `<button class="drag-handle-btn" title="Drag to reorder" aria-label="Drag to reorder">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+            </button>`
+          : '';
+
         sortedPlaylists.forEach((pl, idx) => {
           const card = document.createElement('div');
           card.className = 'track-card custom-playlist-card';
@@ -5075,31 +5102,30 @@
             <div class="card-info">
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; width: 100%;">
                 <span class="card-title">${escapeHtml(pl.name)}</span>
-                <button class="drag-handle-btn" title="Drag to reorder" aria-label="Drag to reorder">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
-                </button>
+                ${dragHandleBtnHtml}
               </div>
               <span class="card-artist">${(pl.tracks || []).length} songs</span>
             </div>
           `;
 
-          // Draggable reordering in Library Hub grid with intuitive midpoint insertion helper
-          const getDropPosition = (clientX, clientY, rect) => {
-            if (clientY < rect.top + rect.height * 0.35) return false;
-            if (clientY > rect.top + rect.height * 0.65) return true;
-            return clientX > rect.left + rect.width / 2;
-          };
+          // Draggable reordering in Library Hub grid: ONLY enabled when sort is 'custom'
+          if (isCustomSort) {
+            const getDropPosition = (clientX, clientY, rect) => {
+              if (clientY < rect.top + rect.height * 0.35) return false;
+              if (clientY > rect.top + rect.height * 0.65) return true;
+              return clientX > rect.left + rect.width / 2;
+            };
 
-          const clearDragIndicators = () => {
-            if (elements.libCustomPlaylistsGrid) {
-              elements.libCustomPlaylistsGrid.querySelectorAll('.custom-playlist-card').forEach(el => {
-                el.classList.remove('drag-insert-before', 'drag-insert-after', 'drag-over-row');
-              });
-            }
-          };
+            const clearDragIndicators = () => {
+              if (elements.libCustomPlaylistsGrid) {
+                elements.libCustomPlaylistsGrid.querySelectorAll('.custom-playlist-card').forEach(el => {
+                  el.classList.remove('drag-insert-before', 'drag-insert-after', 'drag-over-row');
+                });
+              }
+            };
 
-          card.setAttribute('draggable', 'true');
-          card.dataset.playlistId = pl.id;
+            card.setAttribute('draggable', 'true');
+            card.dataset.playlistId = pl.id;
 
           card.addEventListener('dragstart', (e) => {
             e.dataTransfer.setData('text/plain', pl.id);
@@ -5216,6 +5242,7 @@
             }
             clearDragIndicators();
           });
+        }
 
           card.querySelector('.card-play-btn')?.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -7395,24 +7422,34 @@
     // - Long-press / hold: immediately opens search and focuses search bar
     let searchHoldTimer = null;
     let isSearchHoldTriggered = false;
+    let lastSearchTapTime = 0;
 
     function triggerSearchFocus() {
+      state.isExploreMode = false;
+      try { localStorage.setItem('musisurf_explore_mode', 'false'); } catch (err) {}
       switchView('search');
       updateMobNav('mobNavSearch');
+      if (elements.searchBrowseSection) elements.searchBrowseSection.style.display = 'none';
+      if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'block';
+      if (elements.searchRecentGrid) elements.searchRecentGrid.style.display = 'grid';
+      if (elements.topCompassBtn) elements.topCompassBtn.classList.remove('active');
       setTimeout(() => {
-        if (elements.globalSearchInput) elements.globalSearchInput.focus();
-      }, 70);
+        if (elements.globalSearchInput) {
+          elements.globalSearchInput.focus();
+          try { elements.globalSearchInput.select(); } catch (e) {}
+        }
+      }, 50);
     }
 
     if (elements.mobNavSearch) {
-      // Touch long-press hold detection
+      // Touch long-press hold detection (holding directly focuses searchbar)
       elements.mobNavSearch.addEventListener('touchstart', () => {
         isSearchHoldTriggered = false;
         searchHoldTimer = setTimeout(() => {
           isSearchHoldTriggered = true;
           if (navigator.vibrate) navigator.vibrate(40);
           triggerSearchFocus();
-        }, 360);
+        }, 300);
       }, { passive: true });
 
       elements.mobNavSearch.addEventListener('touchend', () => {
@@ -7428,7 +7465,7 @@
         searchHoldTimer = setTimeout(() => {
           isSearchHoldTriggered = true;
           triggerSearchFocus();
-        }, 360);
+        }, 300);
       });
       elements.mobNavSearch.addEventListener('mouseup', () => {
         clearTimeout(searchHoldTimer);
@@ -7445,7 +7482,17 @@
         }
         clearTimeout(searchHoldTimer);
 
-        // On mobile bottom search click: Show ONLY categories, nothing else (no recents, no results)
+        const now = Date.now();
+        // Double-click / double-tap detection: directly redirects & focuses searchbar
+        if (now - lastSearchTapTime < 380) {
+          e.preventDefault();
+          lastSearchTapTime = 0;
+          triggerSearchFocus();
+          return;
+        }
+        lastSearchTapTime = now;
+
+        // On single tap: Show explore categories
         state.isExploreMode = true;
         try { localStorage.setItem('musisurf_explore_mode', 'true'); } catch (err) {}
         switchView('search');
