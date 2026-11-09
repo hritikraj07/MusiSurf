@@ -12,22 +12,25 @@
 
 ## ✨ Features
 
-- 🛡️ **100% Ad-Free Streaming**: No audio ads, no video prerolls, no banner commercials, and no sponsorship interruptions.
+- 🛡️ **100% Ad-Free Architecture**: Absolutely zero advertisements anywhere. No audio ads, no video prerolls, no banner commercials, no sponsored results, and no tracking pixels.
+- 🎵 **Strict Pure Music-Only Search**: Powered by YouTube Music (`WEB_REMIX` client with Songs category filter) and JioSaavn's dedicated song search API. Zero gaming videos, tutorials, vlogs, reactions, podcasts, or lectures.
 - ⚡ **Full-Length Song Playback**: Stream the complete duration of any song from the internet—zero 30-second preview restrictions.
-- 🎵 **High-Fidelity 320kbps Audio**: Direct AAC/MP4 streaming powered by high-speed content delivery networks with instant byte-range scrubbing.
+- 📱 **Uninterrupted Background & Lockscreen Playback**:
+  - Native background playback across mobile browsers (Android Chrome, iOS Safari) and background tabs.
+  - Full MediaSession API integration with lock-screen controls, notification center playback, and Bluetooth headphone buttons.
+  - Native AAC / MP4 direct audio streaming with instant byte-range scrubbing.
+- 🔀 **Persistent Playlist Shuffle**: Remembers random shuffle preferences per playlist permanently across tabs and visits.
 - 📱 **Mobile Responsive & Installable (PWA)**:
   - Works seamlessly on smartphones, tablets, and desktop displays.
-  - Installable as a native app on Android (Chrome) and iOS (Safari) with Progressive Web App (PWA) support.
-  - Spotify-inspired mobile bottom navigation bar and full-screen swipeable now-playing screen.
+  - Installable as a native app on Android and iOS with Progressive Web App (PWA) support.
+  - Clean mobile top bar with profile login icon, bottom navigation tabs, and full-screen now-playing sheet.
 - ⬇️ **Direct Mobile & Desktop Song Downloader**:
   - 1-click download button on every song row, card, and now-playing player bar.
   - Saves full-length, high-quality audio files directly into your device's Downloads folder for offline listening.
 - 🎤 **Synchronized Karaoke Lyrics**: Real-time line-by-line synced lyrics powered by `lrclib.net` with interactive click-to-seek.
 - 🎛️ **60 FPS Web Audio Visualizer**: Live hardware-accelerated canvas frequency visualizer featuring **Spectrum Bars**, **Neon Wave**, and **Radial Orbit** modes.
-- 🔍 **Intelligent Search Engine**: Real-time search across global catalogs with instant Top Result hero cards and genre discovery.
-- 💖 **Liked Songs & Custom Playlists**: Save tracks and organize your personal music library permanently (`localStorage`).
-- 🎧 **Media Session API**: Complete support for lock-screen controls, notification player, and Bluetooth headphone buttons.
-- ⌨️ **Keyboard Shortcuts**: Control playback with Space, Arrow keys, Mute (M), Lyrics (L), Visualizer (V), and Search (/).
+- 💖 **Liked Songs, Local Audio & Custom Playlists**: Save tracks, import local device MP3s, and organize your personal music library permanently (`localStorage` & IndexedDB).
+- ⌨️ **Keyboard Shortcuts**: Control playback with Space, Arrow keys, Next (Shift+N), Previous (Shift+P), Mute (M), Lyrics (L), and Search (/).
 
 ---
 
@@ -81,13 +84,14 @@
 | Key | Action |
 | :--- | :--- |
 | <kbd>Space</kbd> | Play / Pause |
-| <kbd>Ctrl</kbd> + <kbd>→</kbd> | Next Track |
-| <kbd>Ctrl</kbd> + <kbd>←</kbd> | Previous Track |
+| <kbd>Shift</kbd> + <kbd>N</kbd> | Next Track |
+| <kbd>Shift</kbd> + <kbd>P</kbd> | Previous Track |
 | <kbd>→</kbd> / <kbd>←</kbd> | Seek +5s / -5s |
 | <kbd>↑</kbd> / <kbd>↓</kbd> | Volume +5% / -5% |
 | <kbd>M</kbd> | Mute / Unmute |
+| <kbd>S</kbd> | Shuffle Toggle |
+| <kbd>R</kbd> | Repeat Mode Toggle |
 | <kbd>L</kbd> | Toggle Synced Lyrics View |
-| <kbd>V</kbd> | Toggle Audio Visualizer View |
 | <kbd>Q</kbd> | Toggle Play Queue Drawer |
 | <kbd>/</kbd> | Focus Global Search Bar |
 | <kbd>Esc</kbd> | Close Overlays & Modals |
@@ -98,7 +102,7 @@
 
 - **Frontend**: Vanilla HTML5, CSS3 (Modern Glassmorphism, CSS Custom Properties, Flexbox & Grid), JavaScript (ES6+), Web Audio API, Service Workers (PWA).
 - **Backend**: Node.js, Express, Crypto-JS (DES audio stream decryption), CORS, HTTP streaming.
-- **Data & Audio Sources**: High-speed CDN Audio, YouTube API fallback, LRCLIB Synced Lyrics API.
+- **Audio Engines**: JioSaavn Studio API (320kbps AAC), YouTube Music Innertube (`WEB_REMIX`), LRCLIB Synced Lyrics API.
 
 ---
 

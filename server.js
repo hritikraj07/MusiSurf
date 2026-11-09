@@ -1189,14 +1189,41 @@ app.get('/api/yt-stream', async (req, res) => {
     const ytdl = await getYtdl();
     if (!ytdl) return res.status(500).send('Audio extractor unavailable');
 
-    const stream = await ytdl.download(ytId, {
-      filter: { hasAudio: true, hasVideo: false },
-      highWaterMark: 1 << 22
-    });
+    // Fetch video info to select native AAC / MP4 format (vital for iOS/Android background tab playback)
+    let stream;
+    let contentType = 'audio/mp4';
+
+    try {
+      const info = await ytdl.getInfo(ytId);
+      const audioFormats = info.formats.filter(f => f.hasAudio && !f.hasVideo);
+      
+      // Prioritize mp4/aac format (itag 140 or similar) for 100% universal mobile lockscreen & background compatibility
+      const chosenFormat = audioFormats.find(f => f.container === 'mp4' && f.audioBitrate >= 120) ||
+                           audioFormats.find(f => f.container === 'mp4') ||
+                           audioFormats.sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0))[0];
+
+      if (chosenFormat) {
+        contentType = chosenFormat.mimeType ? chosenFormat.mimeType.split(';')[0] : (chosenFormat.container === 'mp4' ? 'audio/mp4' : 'audio/webm');
+        stream = await ytdl.downloadFromInfo(info, {
+          format: chosenFormat,
+          highWaterMark: 1 << 22
+        });
+      }
+    } catch (infoErr) {
+      console.warn('ytdl.getInfo note, using fallback download:', infoErr.message);
+    }
+
+    if (!stream) {
+      stream = await ytdl.download(ytId, {
+        filter: { hasAudio: true, hasVideo: false },
+        highWaterMark: 1 << 22
+      });
+      contentType = 'audio/mp4';
+    }
 
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Accept-Ranges', 'bytes');
-    res.setHeader('Content-Type', 'audio/webm; codecs="opus"');
+    res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=3600');
 
     stream.on('error', (err) => {

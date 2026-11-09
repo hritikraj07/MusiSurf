@@ -1130,6 +1130,40 @@ html, body {
   padding-right: 4px !important;
 }
 
+.top-login-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+  font-family: inherit !important;
+  font-size: 14.5px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  padding: 9px 22px !important;
+  border-radius: 9999px !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease !important;
+  letter-spacing: 0.01em !important;
+  white-space: nowrap !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+}
+
+.top-login-btn:hover {
+  background: #f0f0f0 !important;
+  transform: scale(1.04) !important;
+  box-shadow: 0 4px 14px rgba(255, 255, 255, 0.15) !important;
+}
+
+.top-login-btn:active {
+  transform: scale(0.98) !important;
+}
+
+.top-login-circle-btn {
+  display: none !important;
+}
+
 #headerSettingsBtn,
 .top-settings-btn {
   flex-shrink: 0 !important;
@@ -1597,6 +1631,46 @@ html, body {
   opacity: 0;
   pointer-events: none;
   transform: scale(0.8);
+}
+
+/* In expanded sidebar: "Your Library" starts at far left. On hover over header/left, slide in the collapse button */
+.sidebar:not(.collapsed) .library-header-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+}
+
+.sidebar:not(.collapsed) .library-collapse-icon-btn,
+.sidebar:not(.collapsed) #collapseSidebarBtn {
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  height: 36px !important;
+  opacity: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease, margin-right 0.22s cubic-bezier(0.4, 0, 0.2, 1), padding 0.22s ease !important;
+}
+
+.sidebar:not(.collapsed) .library-header:hover .library-collapse-icon-btn,
+.sidebar:not(.collapsed) .library-header-left:hover .library-collapse-icon-btn,
+.sidebar:not(.collapsed) .library-header:hover #collapseSidebarBtn,
+.sidebar:not(.collapsed) .library-header-left:hover #collapseSidebarBtn {
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  opacity: 1 !important;
+  margin-right: 6px !important;
+  padding: 6px !important;
+  pointer-events: auto !important;
+}
+
+.sidebar:not(.collapsed) .library-nav-btn,
+.sidebar:not(.collapsed) #navLibraryBtn {
+  padding-left: 0 !important;
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 /* Hover over library icon / header: morph books into collapse arrow */
@@ -6294,11 +6368,44 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     display: none !important;
   }
 
-  /* Mobile: remove settings button from top nav, move to top right of Library view */
-  .top-header-right,
-  .header-right,
-  .header-settings-btn,
-  #headerSettingsBtn {
+  /* Mobile: remove home icon from top nav, show circular login icon button */
+  #topHomeBtn {
+    display: none !important;
+  }
+
+  .top-header-right {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin-left: auto !important;
+  }
+
+  .top-login-btn {
+    display: none !important;
+  }
+
+  .top-login-circle-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    background: #181818 !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    color: #ffffff !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+    padding: 0 !important;
+  }
+
+  .top-login-circle-btn svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  #headerSettingsBtn,
+  .header-settings-btn {
     display: none !important;
   }
 
@@ -9036,7 +9143,33 @@ body[data-active-view="lyrics"] .content-scroll {
 }
 
 .library-settings-btn {
-  display: none;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #f3f4f6 !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease !important;
+}
+
+.library-settings-btn:hover {
+  background: rgba(255, 255, 255, 0.16) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  transform: scale(1.05) !important;
+}
+
+.library-settings-btn:active {
+  transform: scale(0.94) !important;
+}
+
+.library-settings-btn svg {
+  width: 20px !important;
+  height: 20px !important;
 }
 
 /* ==========================================================================
@@ -10807,15 +10940,10 @@ body[data-active-view="lyrics"] .content-scroll {
    ========================================================================== */
 .playback-features-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: 1fr;
   gap: 16px;
   margin-top: 10px;
-}
-
-@media (max-width: 900px) {
-  .playback-features-grid {
-    grid-template-columns: 1fr;
-  }
+  width: 100%;
 }
 
 .playback-feature-card {
@@ -10826,6 +10954,8 @@ body[data-active-view="lyrics"] .content-scroll {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .feat-card-header {

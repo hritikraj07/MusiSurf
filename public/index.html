@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=8.36">
+  <link rel="stylesheet" href="/styles.css?v=8.37">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -101,12 +101,13 @@
         </div>
       </div>
 
-      <!-- Right: Settings Gear Button (Matching Website UI) -->
+      <!-- Right: Login Button (Web) & Circle Icon (Mobile) -->
       <div class="top-header-right">
-        <button class="top-circle-btn top-settings-btn" id="headerSettingsBtn" title="Settings" aria-label="Settings">
+        <button class="top-login-btn" id="headerLoginBtn" type="button">Login</button>
+        <button class="top-circle-btn top-login-circle-btn" id="headerLoginMobBtn" type="button" title="Login" aria-label="Login">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
           </svg>
         </button>
       </div>
@@ -1568,8 +1569,8 @@
       </div>
     </div>
 
-    <!-- Native Audio Element for Direct 320kbps Streams -->
-    <audio id="audioPlayer" preload="auto"></audio>
+    <!-- Native Audio Element for Direct 320kbps Streams (Configured for background & mobile playback) -->
+    <audio id="audioPlayer" preload="auto" playsinline webkit-playsinline></audio>
     <!-- Dedicated Silent Audio Element for Browser Background Throttling Prevention (Never interferes with main audio) -->
     <audio id="keepAliveAudio" style="display: none;" preload="none"></audio>
 
@@ -1922,23 +1923,10 @@
               </div>
             </div>
 
-            <!-- 4 Playback Feature Cards Grid (Exact Image 3) -->
-            <div class="playback-features-grid">
-              
-              <!-- Card 1: Automix -->
-              <div class="playback-feature-card">
-                <div class="feat-card-header">
-                  <h4 class="feat-card-title">Automix</h4>
-                  <label class="sound-toggle-switch mini-toggle">
-                    <input type="checkbox" id="automixToggleSwitch" checked>
-                    <span class="toggle-slider"></span>
-                  </label>
-                </div>
-                <p class="feat-card-desc">Estimates the next track's tempo and lands the fade on a beat boundary.</p>
-              </div>
-
-              <!-- Card 2: Skip silence -->
-              <div class="playback-feature-card">
+            <!-- Playback Features: Skip Silence (Full Width) -->
+            <div class="playback-features-grid" style="grid-template-columns: 1fr;">
+              <!-- Skip silence (Full Width) -->
+              <div class="playback-feature-card" style="width: 100%; grid-column: 1 / -1;">
                 <div class="feat-card-header">
                   <h4 class="feat-card-title">Skip silence</h4>
                   <label class="sound-toggle-switch mini-toggle">
@@ -1948,31 +1936,6 @@
                 </div>
                 <p class="feat-card-desc">Scans the head and tail of a track at -42 dB and seeks past the dead air.</p>
               </div>
-
-              <!-- Card 3: Speed, pitch intact -->
-              <div class="playback-feature-card">
-                <div class="feat-card-header">
-                  <h4 class="feat-card-title">Speed, pitch intact</h4>
-                </div>
-                <p class="feat-card-desc">0.5 to 2 times playback with the pitch left alone. Good for podcasts and practice.</p>
-                <div class="feat-speed-pills-row" id="speedPillsRow">
-                  <button type="button" class="speed-pill-btn" data-speed="0.8">0.8x</button>
-                  <button type="button" class="speed-pill-btn active" data-speed="1.0">1.0x</button>
-                  <button type="button" class="speed-pill-btn" data-speed="1.2">1.2x</button>
-                  <button type="button" class="speed-pill-btn" data-speed="1.5">1.5x</button>
-                  <button type="button" class="speed-pill-btn" data-speed="2.0">2.0x</button>
-                </div>
-              </div>
-
-              <!-- Card 4: Quality tiers -->
-              <div class="playback-feature-card">
-                <div class="feat-card-header">
-                  <h4 class="feat-card-title">Quality tiers</h4>
-                  <span class="feat-quality-badge">256 kbps AAC Max</span>
-                </div>
-                <p class="feat-card-desc">Low, medium and high. Streams play at up to 256 kbps AAC, the best bitrate YouTube Music serves; local files keep their own.</p>
-              </div>
-
             </div>
 
             <!-- Keyboard Controls Table (Desktop convenience) -->
@@ -2203,7 +2166,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=8.36"></script>
+  <script src="/app.js?v=8.37"></script>
 </body>
 
 </html>

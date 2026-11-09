@@ -1197,13 +1197,16 @@
     }, 20);
   }
 
-  // Shuffle Mode Persistence Controller
+  // Shuffle Mode & Per-Playlist Shuffle Persistence Controller
   function saveShuffleState() {
     try {
       localStorage.setItem('musisurf_shuffle_mode', JSON.stringify({
         isShuffled: !!state.isShuffled,
         isPlaylistShuffle: !!state.isPlaylistShuffle
       }));
+      if (state.playlistShuffleMap) {
+        localStorage.setItem('musisurf_playlist_shuffle_map', JSON.stringify(state.playlistShuffleMap));
+      }
     } catch (e) {}
   }
 
@@ -1218,7 +1221,29 @@
         if (elements.mobShuffleBtn) elements.mobShuffleBtn.classList.toggle('active', state.isShuffled);
         if (elements.shufflePlaylistBtn) elements.shufflePlaylistBtn.classList.toggle('active', state.isPlaylistShuffle);
       }
+      const rawMap = localStorage.getItem('musisurf_playlist_shuffle_map');
+      if (rawMap) {
+        state.playlistShuffleMap = JSON.parse(rawMap);
+      } else {
+        state.playlistShuffleMap = {};
+      }
     } catch (e) {}
+  }
+
+  function isPlaylistShuffled(pId) {
+    if (!pId) return !!state.isPlaylistShuffle;
+    if (state.playlistShuffleMap && state.playlistShuffleMap[pId] !== undefined) {
+      return !!state.playlistShuffleMap[pId];
+    }
+    return !!state.isPlaylistShuffle;
+  }
+
+  function setPlaylistShuffled(pId, val) {
+    state.isPlaylistShuffle = !!val;
+    state.isShuffled = !!val;
+    if (!state.playlistShuffleMap) state.playlistShuffleMap = {};
+    if (pId) state.playlistShuffleMap[pId] = !!val;
+    saveShuffleState();
   }
 
   // Strict Content Filter: Strictly Pure Music Only (Zero podcasts, zero gaming, vlogs, reactions)
@@ -1923,6 +1948,18 @@
     const queueEq = document.querySelector('#queueNowPlaying .queue-playing-eq');
     if (queueEq) {
       queueEq.classList.toggle('playing', !!state.isPlaying);
+    }
+
+    // Sync MediaSession playbackState & background keep-alive for mobile & tab switching
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.playbackState = state.isPlaying ? 'playing' : 'paused';
+      } catch (e) {}
+    }
+    if (state.isPlaying) {
+      startBackgroundKeepAlive();
+    } else {
+      stopBackgroundKeepAlive();
     }
   }
 
@@ -4301,15 +4338,20 @@
       if (isCurrentPlaylistTrack) {
         togglePlayPause();
       } else {
-        // Play playlist strictly in order starting from track 1 (no random shuffle)
-        state.isPlaylistShuffle = false;
-        state.isShuffled = false;
-        saveShuffleState();
-        if (elements.shufflePlaylistBtn) elements.shufflePlaylistBtn.classList.remove('active');
-        if (elements.shuffleBtn) elements.shuffleBtn.classList.remove('active');
-        if (elements.mobShuffleBtn) elements.mobShuffleBtn.classList.remove('active');
+        const isShuf = isPlaylistShuffled(playlistId);
+        let queueList = [...listToPlay];
 
-        const queueList = [...listToPlay];
+        if (isShuf && queueList.length > 1) {
+          // Shuffle playlist tracks (keeping random first)
+          const first = queueList[Math.floor(Math.random() * queueList.length)];
+          const remaining = queueList.filter(t => t.id !== first.id);
+          for (let i = remaining.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+          }
+          queueList = [first, ...remaining];
+        }
+
         state.activePlaylistTracks = [...listToPlay];
         state.activePlaylistId = playlistId;
         state.viewingPlaylistId = playlistId;
@@ -4328,20 +4370,21 @@
       }
     };
 
-    // Shuffle Button (Single Button that changes between Random No-Repeats vs In-Order)
-    elements.shufflePlaylistBtn.classList.toggle('active', !!(state.isPlaylistShuffle && state.activePlaylistId === playlistId));
-    elements.shufflePlaylistBtn.title = (state.isPlaylistShuffle && state.activePlaylistId === playlistId)
+    // Shuffle Button (Persistently remembers shuffle state per playlist)
+    const isShufActive = isPlaylistShuffled(playlistId);
+    elements.shufflePlaylistBtn.classList.toggle('active', isShufActive);
+    elements.shufflePlaylistBtn.title = isShufActive
       ? "Mode: Random (No Repeats) • Click for In-Order"
       : "Mode: In-Order • Click to Shuffle (No Repeats)";
 
     elements.shufflePlaylistBtn.onclick = () => {
       if (!tracks || tracks.length === 0) return;
-      state.isPlaylistShuffle = !state.isPlaylistShuffle;
-      state.isShuffled = state.isPlaylistShuffle;
-      saveShuffleState();
-      elements.shufflePlaylistBtn.classList.toggle('active', state.isPlaylistShuffle);
-      if (elements.shuffleBtn) elements.shuffleBtn.classList.toggle('active', state.isShuffled);
-      if (elements.mobShuffleBtn) elements.mobShuffleBtn.classList.toggle('active', state.isShuffled);
+      const newShuf = !isPlaylistShuffled(playlistId);
+      setPlaylistShuffled(playlistId, newShuf);
+
+      elements.shufflePlaylistBtn.classList.toggle('active', newShuf);
+      if (elements.shuffleBtn) elements.shuffleBtn.classList.toggle('active', newShuf);
+      if (elements.mobShuffleBtn) elements.mobShuffleBtn.classList.toggle('active', newShuf);
 
       state.activePlaylistTracks = [...tracks];
       state.activePlaylistId = playlistId;
@@ -4350,7 +4393,7 @@
         recordRecentlyPlayedPlaylist({ id: playlistId, name: title, image: shuffleCover, tracks: tracks });
       } catch (e) {}
 
-      if (state.isPlaylistShuffle) {
+      if (newShuf) {
         elements.shufflePlaylistBtn.title = "Mode: Random (No Repeats) • Click for In-Order";
         showToast("Shuffle Mode: Random (No repeats)", "🔀");
         // If this playlist is currently playing, shuffle the upcoming queue without restarting current song
@@ -8091,16 +8134,52 @@
     window.addEventListener('offline', handleNetworkChange);
     updateOfflineModeUI(navigator.onLine);
 
-    // Uninterrupted Background Tab Playback Handler
+    // MediaSession Actions Registration for Lock Screen & Background Controls
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.setActionHandler('play', () => {
+          if (!state.isPlaying) togglePlayPause();
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+          if (state.isPlaying) togglePlayPause();
+        });
+        navigator.mediaSession.setActionHandler('previoustrack', () => {
+          prevTrack();
+        });
+        navigator.mediaSession.setActionHandler('nexttrack', () => {
+          nextTrack();
+        });
+        navigator.mediaSession.setActionHandler('seekto', (details) => {
+          if (details && details.seekTime !== undefined) {
+            seekTo(details.seekTime);
+          }
+        });
+      } catch (e) {}
+    }
+
+    // Top Login Button Click Handlers (Placeholder: does nothing as requested)
+    const headerLoginBtn = document.getElementById('headerLoginBtn');
+    const headerLoginMobBtn = document.getElementById('headerLoginMobBtn');
+    const onLoginBtnClick = () => {
+      console.log('Login button clicked (Guest session active)');
+    };
+    if (headerLoginBtn) headerLoginBtn.addEventListener('click', onLoginBtnClick);
+    if (headerLoginMobBtn) headerLoginMobBtn.addEventListener('click', onLoginBtnClick);
+
+    // Uninterrupted Background Tab & Mobile Lockscreen Playback Handler
     document.addEventListener('visibilitychange', () => {
       if (state.isPlaying) {
-        if (isYouTubeActive() && state.ytPlayer && typeof state.ytPlayer.playVideo === 'function') {
+        if ('mediaSession' in navigator) {
+          try { navigator.mediaSession.playbackState = 'playing'; } catch (e) {}
+        }
+        startBackgroundKeepAlive();
+        if (elements.audio && elements.audio.paused && state.currentTrack?.hasDirectAudio) {
+          elements.audio.play().catch(() => {});
+        } else if (isYouTubeActive() && state.ytPlayer && typeof state.ytPlayer.playVideo === 'function') {
           const pState = typeof state.ytPlayer.getPlayerState === 'function' ? state.ytPlayer.getPlayerState() : -1;
           if (pState === YT.PlayerState.PAUSED || pState === 2 || pState === -1) {
             try { state.ytPlayer.playVideo(); } catch (e) {}
           }
-        } else if (elements.audio && elements.audio.paused && state.currentTrack?.hasDirectAudio) {
-          elements.audio.play().catch(() => {});
         }
       }
     });
