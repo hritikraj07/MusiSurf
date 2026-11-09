@@ -904,23 +904,26 @@
   // Browsers throttle background iframes when tab loses focus unless an audio pipeline is active.
   const SILENT_AUDIO_URI = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
   function startBackgroundKeepAlive() {
-    if (elements.audio && elements.audio.paused && (!state.currentTrack || state.currentTrack.source === 'youtube' || !state.currentTrack.hasDirectAudio)) {
-      try {
-        if (!elements.audio.src || !elements.audio.src.startsWith('data:audio')) {
-          elements.audio.src = SILENT_AUDIO_URI;
-          elements.audio.loop = true;
-          elements.audio.volume = 0.001;
-        }
-        elements.audio.play().catch(() => {});
-      } catch (e) {}
-    }
+    const keepAlive = document.getElementById('keepAliveAudio');
+    if (!keepAlive) return;
+    try {
+      if (!keepAlive.src || !keepAlive.src.startsWith('data:audio')) {
+        keepAlive.src = SILENT_AUDIO_URI;
+        keepAlive.loop = true;
+        keepAlive.volume = 0.0001;
+      }
+      if (keepAlive.paused) {
+        keepAlive.play().catch(() => {});
+      }
+    } catch (e) {}
   }
 
   function stopBackgroundKeepAlive() {
-    if (elements.audio && elements.audio.src && elements.audio.src.startsWith('data:audio')) {
+    const keepAlive = document.getElementById('keepAliveAudio');
+    if (keepAlive) {
       try {
-        elements.audio.pause();
-        elements.audio.removeAttribute('src');
+        keepAlive.pause();
+        keepAlive.removeAttribute('src');
       } catch (e) {}
     }
   }
@@ -1028,7 +1031,10 @@
       updatePlayerTitlesWithTick(track);
       elements.playerArtist.textContent = track.artist;
       elements.playerCoverImg.src = track.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80';
-      const dur = saved.duration || track.duration || 0;
+      const strDur = parseDurationToSeconds(track.durationStr);
+      const metaDur = parseDurationToSeconds(track.duration);
+      const savedDur = parseDurationToSeconds(saved.duration);
+      const dur = (strDur > 15 ? strDur : null) || (metaDur > 15 ? metaDur : null) || (savedDur > 15 ? savedDur : null) || strDur || metaDur || savedDur || 0;
       elements.totalDurationLabel.textContent = track.durationStr || formatTime(dur);
 
       if (elements.mobPlayerArtist) elements.mobPlayerArtist.textContent = track.artist;
@@ -1763,10 +1769,10 @@
         }
 
         const desiredSrc = state.currentTrack.audioUrl || state.currentTrack.streamUrl;
-        if (!elements.audio.src || elements.audio.src === '' || elements.audio.src.endsWith('/')) {
+        if (!elements.audio.src || elements.audio.src === '' || elements.audio.src.startsWith('data:audio') || elements.audio.src.endsWith('/')) {
           if (desiredSrc) {
             elements.audio.src = desiredSrc;
-            elements.audio.volume = state.isMuted ? 0 : state.volume;
+            elements.audio.volume = state.isMuted ? 0 : (state.volume || 0.8);
             elements.audio.preload = 'auto';
             elements.audio.load();
           } else {
@@ -1827,6 +1833,21 @@
       if (mobPlay && mobPause) {
         mobPlay.style.display = state.isPlaying ? 'none' : 'block';
         mobPause.style.display = state.isPlaying ? 'block' : 'none';
+      }
+    }
+
+    // Toggle Play/Pause on Local Files Hero Play Button
+    if (elements.playAllLocalBtn) {
+      const isPlayingLocal = state.isPlaying && state.currentTrack && state.currentTrack.isLocal;
+      const localPlay = elements.playAllLocalBtn.querySelector('.play-icon');
+      const localPause = elements.playAllLocalBtn.querySelector('.pause-icon');
+      const localText = document.getElementById('playAllLocalBtnText');
+      if (localPlay && localPause) {
+        localPlay.style.display = isPlayingLocal ? 'none' : 'block';
+        localPause.style.display = isPlayingLocal ? 'block' : 'none';
+      }
+      if (localText) {
+        localText.textContent = isPlayingLocal ? 'Pause' : 'Play';
       }
     }
 
@@ -2246,40 +2267,39 @@
   }
 
   function getTotalDuration() {
-    // 1. Metadata duration stored on state.currentTrack
-    const metaDur = parseDurationToSeconds(state.currentTrack?.duration) || parseDurationToSeconds(state.currentTrack?.durationStr) || 0;
-    if (metaDur > 0) {
-      return metaDur;
-    }
+    // 1. Check all valid sources of duration
+    const strDur = parseDurationToSeconds(state.currentTrack?.durationStr);
+    const metaDur = parseDurationToSeconds(state.currentTrack?.duration);
+    const labelDur = parseDurationToSeconds(elements.totalDurationLabel?.textContent) || parseDurationToSeconds(elements.mobTotalDuration?.textContent);
 
-    // 2. Fallback to total duration displayed in label if available
-    const labelDur = parseDurationToSeconds(elements.totalDurationLabel?.textContent) || parseDurationToSeconds(elements.mobTotalDuration?.textContent) || 0;
-    if (labelDur > 0) {
-      if (state.currentTrack) {
-        state.currentTrack.duration = labelDur;
-        state.currentTrack.durationStr = formatTime(labelDur);
+    // Realistic track durations (>15s) always take absolute precedence over short streamed chunk durations (like 8s)
+    const validDurs = [strDur, metaDur, labelDur].filter(d => Number.isFinite(d) && d > 15);
+    if (validDurs.length > 0) {
+      const bestDur = Math.max(...validDurs);
+      if (state.currentTrack && state.currentTrack.duration !== bestDur) {
+        state.currentTrack.duration = bestDur;
+        state.currentTrack.durationStr = formatTime(bestDur);
       }
-      return labelDur;
+      return bestDur;
     }
 
-    // 3. Audio element duration - protect against partial streamed chunk durations (e.g. 8s from ytdl)
+    // 2. Audio element duration - protect against partial streamed chunk durations (e.g. 8s from ytdl)
     const audioDur = Number(elements.audio?.duration) || 0;
     if (Number.isFinite(audioDur) && audioDur > 15 && audioDur !== Infinity) {
       return audioDur;
     }
 
-    // 4. If YouTube player has duration
+    // 3. If YouTube player has duration
     if (state.ytPlayer && typeof state.ytPlayer.getDuration === 'function') {
       try {
         const dur = state.ytPlayer.getDuration();
-        if (Number.isFinite(dur) && dur > 0) return dur;
+        if (Number.isFinite(dur) && dur > 15) return dur;
       } catch (e) {}
     }
 
-    // 5. Final fallback to audioDur if finite and > 0
-    if (Number.isFinite(audioDur) && audioDur > 0 && audioDur !== Infinity) {
-      return audioDur;
-    }
+    // 4. Final fallback to any positive finite duration
+    const anyDur = [strDur, metaDur, labelDur, audioDur].find(d => Number.isFinite(d) && d > 0 && d !== Infinity);
+    if (anyDur) return anyDur;
 
     return 0;
   }
@@ -4619,6 +4639,13 @@
       div.setAttribute('draggable', 'true');
       div.dataset.playlistId = pl.id;
       div.innerHTML = `
+        <button class="drag-handle-btn" title="Drag to reorder" aria-label="Drag to reorder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+            <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+            <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+          </svg>
+        </button>
         <div class="playlist-cover-mini">
           ${createPlaylistCollageHtml(pl.tracks)}
           <button class="playlist-cover-play-btn" title="Play ${escapeHtml(pl.name)}" aria-label="Play">
@@ -4631,6 +4658,58 @@
         </div>
         ${pl.isPinned ? '<span class="sidebar-pin-icon" title="Pinned">📌</span>' : ''}
       `;
+
+      // Touch drag reordering for mobile & desktop touchscreens
+      const dragHandle = div.querySelector('.drag-handle-btn');
+      if (dragHandle) {
+        let isTouchDragging = false;
+        let draggedId = null;
+
+        dragHandle.addEventListener('touchstart', (e) => {
+          if (!e.touches || e.touches.length === 0) return;
+          isTouchDragging = true;
+          draggedId = pl.id;
+          div.classList.add('is-dragging');
+        }, { passive: true });
+
+        dragHandle.addEventListener('touchmove', (e) => {
+          if (!isTouchDragging || !e.touches || e.touches.length === 0) return;
+          const curY = e.touches[0].clientY;
+          const curX = e.touches[0].clientX;
+          const targetEl = document.elementFromPoint(curX, curY)?.closest('.playlist-list-item');
+          document.querySelectorAll('.playlist-list-item').forEach(el => el.classList.remove('drag-over-row'));
+          if (targetEl && targetEl !== div) {
+            targetEl.classList.add('drag-over-row');
+          }
+        }, { passive: true });
+
+        dragHandle.addEventListener('touchend', (e) => {
+          if (!isTouchDragging) return;
+          isTouchDragging = false;
+          div.classList.remove('is-dragging');
+          const lastTouch = e.changedTouches && e.changedTouches[0];
+          if (lastTouch) {
+            const targetEl = document.elementFromPoint(lastTouch.clientX, lastTouch.clientY)?.closest('.playlist-list-item');
+            if (targetEl && targetEl.dataset.playlistId && targetEl.dataset.playlistId !== draggedId) {
+              const fromId = draggedId;
+              const toId = targetEl.dataset.playlistId;
+              const fromIdx = state.customPlaylists.findIndex(p => p.id === fromId);
+              const toIdx = state.customPlaylists.findIndex(p => p.id === toId);
+              if (fromIdx !== -1 && toIdx !== -1) {
+                const [moved] = state.customPlaylists.splice(fromIdx, 1);
+                state.customPlaylists.splice(toIdx, 0, moved);
+                saveStoredPlaylists();
+                renderSidebarPlaylists();
+                if (elements.views.library && elements.views.library.classList.contains('active')) {
+                  updateLibraryUI();
+                }
+                showToast(`Reordered "${moved.name}"`, '↕️');
+              }
+            }
+          }
+          document.querySelectorAll('.playlist-list-item').forEach(el => el.classList.remove('drag-over-row'));
+        });
+      }
 
       // Hover Play Button on Playlist Cover (Starts playback & opens playlist)
       const playCoverBtn = div.querySelector('.playlist-cover-play-btn');
@@ -5035,7 +5114,14 @@
               </button>
             </div>
             <div class="card-info">
-              <span class="card-title">${escapeHtml(pl.name)}</span>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; width: 100%;">
+                <span class="card-title">${escapeHtml(pl.name)}</span>
+                ${sortMode === 'custom' ? `
+                  <button class="drag-handle-btn" title="Drag to reorder" aria-label="Drag to reorder">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+                  </button>
+                ` : ''}
+              </div>
               <span class="card-artist">${(pl.tracks || []).length} songs</span>
             </div>
           `;
@@ -5081,6 +5167,55 @@
 
             card.addEventListener('dragend', () => {
               card.classList.remove('is-dragging');
+              elements.libCustomPlaylistsGrid.querySelectorAll('.custom-playlist-card').forEach(el => el.classList.remove('drag-over-row'));
+            });
+
+            // Touch drag support for mobile in Library Grid
+            const cardDragHandle = card.querySelector('.drag-handle-btn') || card;
+            let isTouchDraggingCard = false;
+            let cardDraggedId = null;
+
+            cardDragHandle.addEventListener('touchstart', (e) => {
+              if (e.target.closest('.card-play-btn')) return;
+              if (!e.touches || e.touches.length === 0) return;
+              isTouchDraggingCard = true;
+              cardDraggedId = pl.id;
+              card.classList.add('is-dragging');
+            }, { passive: true });
+
+            cardDragHandle.addEventListener('touchmove', (e) => {
+              if (!isTouchDraggingCard || !e.touches || e.touches.length === 0) return;
+              const curX = e.touches[0].clientX;
+              const curY = e.touches[0].clientY;
+              const targetEl = document.elementFromPoint(curX, curY)?.closest('.custom-playlist-card');
+              elements.libCustomPlaylistsGrid.querySelectorAll('.custom-playlist-card').forEach(el => el.classList.remove('drag-over-row'));
+              if (targetEl && targetEl !== card) {
+                targetEl.classList.add('drag-over-row');
+              }
+            }, { passive: true });
+
+            cardDragHandle.addEventListener('touchend', (e) => {
+              if (!isTouchDraggingCard) return;
+              isTouchDraggingCard = false;
+              card.classList.remove('is-dragging');
+              const lastTouch = e.changedTouches && e.changedTouches[0];
+              if (lastTouch) {
+                const targetEl = document.elementFromPoint(lastTouch.clientX, lastTouch.clientY)?.closest('.custom-playlist-card');
+                if (targetEl && targetEl.dataset.playlistId && targetEl.dataset.playlistId !== cardDraggedId) {
+                  const fromId = cardDraggedId;
+                  const toId = targetEl.dataset.playlistId;
+                  const fromIdx = state.customPlaylists.findIndex(p => p.id === fromId);
+                  const toIdx = state.customPlaylists.findIndex(p => p.id === toId);
+                  if (fromIdx !== -1 && toIdx !== -1) {
+                    const [moved] = state.customPlaylists.splice(fromIdx, 1);
+                    state.customPlaylists.splice(toIdx, 0, moved);
+                    saveStoredPlaylists();
+                    updateLibraryUI();
+                    renderSidebarPlaylists();
+                    showToast(`Moved "${moved.name}"`, '↕️');
+                  }
+                }
+              }
               elements.libCustomPlaylistsGrid.querySelectorAll('.custom-playlist-card').forEach(el => el.classList.remove('drag-over-row'));
             });
           }
@@ -6448,7 +6583,7 @@
           const rect = barEl.getBoundingClientRect();
           const hoverX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
           const pct = hoverX / rect.width;
-          const dur = getTotalDuration();
+          const dur = getTotalDuration() || parseDurationToSeconds(elements.totalDurationLabel?.textContent) || 0;
           elements.progressHoverTime.style.left = `${hoverX}px`;
           elements.progressHoverTime.textContent = formatTime(pct * dur);
         });
@@ -7111,7 +7246,12 @@
     if (elements.playAllLocalBtn) {
       elements.playAllLocalBtn.addEventListener('click', () => {
         if (state.localTracks.length > 0) {
-          playTrack(state.localTracks[0], state.localTracks);
+          const isPlayingLocal = state.isPlaying && state.currentTrack && state.currentTrack.isLocal;
+          if (isPlayingLocal) {
+            togglePlayPause();
+          } else {
+            playTrack(state.localTracks[0], state.localTracks);
+          }
         }
       });
     }
@@ -7307,14 +7447,22 @@
         }
         clearTimeout(searchHoldTimer);
 
-        if (state.currentView !== 'search') {
-          // 1st click: redirect to search section without keyboard popup
-          switchView('search');
-          updateMobNav('mobNavSearch');
-        } else {
-          // 2nd click: already in search section, focus search bar
-          triggerSearchFocus();
+        // On mobile bottom search click: Show ONLY categories, nothing else (no recents, no results)
+        state.isExploreMode = true;
+        try { localStorage.setItem('musisurf_explore_mode', 'true'); } catch (err) {}
+        switchView('search');
+        if (elements.globalSearchInput) elements.globalSearchInput.value = '';
+        if (elements.clearSearchBtn) elements.clearSearchBtn.style.display = 'none';
+        if (elements.searchResultsWrapper) elements.searchResultsWrapper.style.display = 'none';
+        if (elements.searchEmptyState) elements.searchEmptyState.style.display = 'none';
+        if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'none';
+        if (elements.searchRecentGrid) elements.searchRecentGrid.style.display = 'none';
+        if (elements.searchBrowseSection) {
+          elements.searchBrowseSection.style.display = 'block';
         }
+        if (elements.searchAutocompleteDropdown) elements.searchAutocompleteDropdown.style.display = 'none';
+        if (elements.topCompassBtn) elements.topCompassBtn.classList.add('active');
+        updateMobNav('mobNavSearch');
       });
     }
 

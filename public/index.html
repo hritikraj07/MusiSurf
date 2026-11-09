@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=8.31">
+  <link rel="stylesheet" href="/styles.css?v=8.33">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -883,10 +883,14 @@
               style="display: none;">
 
             <button class="btn-secondary" id="playAllLocalBtn" style="display: none; white-space: nowrap !important;">
-              <svg viewBox="0 0 24 24" fill="currentColor">
+              <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor">
                 <polygon points="5 3 19 12 5 21 5 3" />
               </svg>
-              <span style="white-space: nowrap !important;">Play</span>
+              <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+                <rect x="6" y="4" width="4" height="16" />
+                <rect x="14" y="4" width="4" height="16" />
+              </svg>
+              <span id="playAllLocalBtnText" style="white-space: nowrap !important;">Play</span>
             </button>
             <button class="btn-secondary clear-local-music-btn" id="clearAllLocalBtn" style="display: none;"
               title="Remove all local files from list">
@@ -1558,6 +1562,8 @@
 
     <!-- Native Audio Element for Direct 320kbps Streams -->
     <audio id="audioPlayer" preload="auto"></audio>
+    <!-- Dedicated Silent Audio Element for Browser Background Throttling Prevention (Never interferes with main audio) -->
+    <audio id="keepAliveAudio" style="display: none;" preload="none"></audio>
 
     <!-- Hidden / Controlled YouTube Iframe Container for Universal Fallback -->
     <div id="youtubePlayerContainer" class="yt-hidden-player">
@@ -2189,7 +2195,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=8.31"></script>
+  <script src="/app.js?v=8.33"></script>
 </body>
 
 </html>

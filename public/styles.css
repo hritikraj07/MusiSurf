@@ -1435,6 +1435,10 @@ html, body {
   background-color: transparent !important;
   outline: none !important;
   border: none !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-shadow: none !important;
+  filter: none !important;
 }
 
 .library-header,
@@ -5985,6 +5989,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     width: auto;
     height: 60px;
     background-color: rgba(22, 25, 33, 0.96);
+    background: linear-gradient(90deg, rgba(var(--lyrics-theme-rgb, 22, 25, 33), 0.94) 0%, rgba(var(--lyrics-theme-rgb, 18, 20, 26), 0.98) 100%) !important;
     backdrop-filter: blur(28px) saturate(180%);
     -webkit-backdrop-filter: blur(28px) saturate(180%);
     border-radius: 12px;
@@ -5993,6 +5998,13 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     padding: 0 12px;
     cursor: pointer;
     overflow: hidden;
+  }
+
+  /* Hide Share button from mobile player bar */
+  #playerShareBtn,
+  .player-bar #playerShareBtn,
+  .player-left #playerShareBtn {
+    display: none !important;
   }
 
   /* Live Movable progress track on bottom edge of mobile mini player */
@@ -6035,8 +6047,8 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     left: 0;
     height: 3px;
     width: 0%;
-    background: linear-gradient(90deg, #1db954, #4ade80);
-    box-shadow: 0 0 8px rgba(29, 185, 84, 0.7);
+    background: #ffffff !important;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.7) !important;
     border-radius: 0 0 0 12px;
     transition: height 0.15s ease;
     pointer-events: none;
@@ -6058,7 +6070,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     height: 12px;
     border-radius: 50%;
     background: #ffffff;
-    box-shadow: 0 0 8px rgba(0, 0, 0, 0.8), 0 0 4px #1db954;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.8), 0 0 4px rgba(255, 255, 255, 0.8);
     transition: transform 0.15s ease;
   }
 
@@ -6206,6 +6218,16 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     height: 40px;
     padding: 0 12px;
     gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Mobile: keep ONLY Home and search bar, hide explore compass and divider from search pill */
+  .top-search-pill .search-pill-divider,
+  .top-search-pill .search-explore-btn,
+  .top-search-pill #topCompassBtn,
+  .top-search-pill .search-shortcut-badge {
+    display: none !important;
   }
 
   .top-compass-btn {
@@ -6456,21 +6478,25 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 
   .tracks-table th.col-title,
   .tracks-table td.col-title {
-    width: 100% !important;
+    width: calc(100% - 44px) !important;
     padding: 6px 8px !important;
   }
 
   .table-cover {
-    width: 40px;
-    height: 40px;
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 6px !important;
   }
   .table-title-main {
-    font-size: 0.9rem;
-    max-width: 220px;
+    font-size: 0.95rem !important;
+    font-weight: 700 !important;
+    color: #ffffff !important;
+    max-width: none !important;
   }
   .table-artist-sub {
-    font-size: 0.78rem;
-    max-width: 220px;
+    font-size: 0.8rem !important;
+    color: #a0a0a5 !important;
+    max-width: none !important;
   }
 
   .tracks-table th.col-actions,
@@ -6479,6 +6505,15 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     min-width: 44px !important;
     padding: 6px 4px !important;
     text-align: right !important;
+  }
+
+  /* Three dots visible by default on mobile - no hover needed */
+  .tracks-table tbody tr .song-more-trigger,
+  .song-row .song-more-trigger {
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: inline-flex !important;
+    color: #a7a7a7 !important;
   }
 
   .col-actions .song-action-btn {
@@ -6731,7 +6766,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .local-files-hero {
-  background: linear-gradient(180deg, rgba(59, 125, 175, 0.38) 0%, rgba(45, 94, 133, 0.12) 60%, transparent 100%) !important;
+  background: linear-gradient(180deg, rgba(30, 36, 48, 0.6) 0%, rgba(18, 19, 22, 0.3) 60%, transparent 100%) !important;
   border-radius: 12px;
   padding: 24px;
 }
@@ -6740,14 +6775,14 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   width: 192px;
   height: 192px;
   border-radius: 12px;
-  background: #F5F9FA !important;
+  background: #121316 !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6) !important;
   overflow: hidden;
-  padding: 8px;
+  padding: 16px;
 }
 
 .local-hero-cover-img {
@@ -7117,7 +7152,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 
 .export-format-btn:hover {
   background: rgba(255, 255, 255, 0.1);
-  border-color: var(--accent-primary, #00f260);
+  border-color: rgba(255, 255, 255, 0.35) !important;
   transform: translateY(-1px);
 }
 
@@ -7125,8 +7160,8 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   width: 40px;
   height: 40px;
   border-radius: 8px;
-  background: rgba(0, 242, 96, 0.12);
-  color: var(--accent-primary, #00f260);
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -7702,7 +7737,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .custom-sort-item.selected {
-  color: var(--accent-primary, #00f260);
+  color: #ffffff !important;
   font-weight: 700;
 }
 
@@ -8031,8 +8066,8 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--accent-primary, #00f260);
-  color: #000;
+  background: #ffffff !important;
+  color: #000000 !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -8040,7 +8075,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   opacity: 0;
   transform: scale(0.85);
   transition: all var(--transition-fast);
-  box-shadow: 0 4px 12px rgba(0, 242, 96, 0.35);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5) !important;
 }
 
 .search-recent-card:hover .search-recent-play-icon {
@@ -8913,13 +8948,13 @@ body[data-active-view="lyrics"] .content-scroll {
 .sortable-row:hover .col-num::after {
   content: ' ↕';
   font-size: 0.8rem;
-  color: var(--accent-primary, #00f260);
+  color: #ffffff;
   opacity: 0.8;
 }
 
 .sortable-row.is-dragging {
   opacity: 0.45 !important;
-  background: rgba(0, 242, 96, 0.12) !important;
+  background: rgba(255, 255, 255, 0.12) !important;
 }
 
 .sortable-row.is-dragging .col-num {
@@ -8927,28 +8962,43 @@ body[data-active-view="lyrics"] .content-scroll {
 }
 
 .sortable-row.drag-over-row {
-  border-top: 2px solid var(--accent-primary, #00f260) !important;
+  border-top: 2px solid #ffffff !important;
   background: rgba(255, 255, 255, 0.08) !important;
 }
 
+/* Draggable Handle Button for Library Playlists Outside Playlist */
+.drag-handle-btn {
+  background: transparent;
+  border: none;
+  color: #6a6a72;
+  cursor: grab;
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  flex-shrink: 0;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.drag-handle-btn:hover,
+.drag-handle-btn:active {
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+.drag-handle-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
 /* ==========================================================================
-   FLOATING MINIPLAYER WIDGET (Image 1 & 8 - Spotify Style Card)
+   FLOATING MINIPLAYER WIDGET (Completely Removed as Requested)
    ========================================================================== */
-.floating-miniplayer {
-  position: fixed;
-  bottom: calc(var(--player-height) + 16px);
-  right: 24px;
-  width: 310px;
-  background: #121214;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.85);
-  overflow: hidden;
-  z-index: 2500;
-  display: flex;
-  flex-direction: column;
-  animation: miniplayerSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  box-sizing: border-box;
+.floating-miniplayer,
+.miniplayer-art-wrap,
+.miniplayer-bottom-bar {
+  display: none !important;
 }
 
 .miniplayer-art-wrap {
