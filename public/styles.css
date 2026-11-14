@@ -11645,4 +11645,926 @@ body[data-active-view="lyrics"] .content-scroll {
   cursor: pointer;
 }
 
+/* ==========================================================================
+   MOBILE LEFT SLIDING DRAWER, MODERN AUTH MODAL & LYRICS STATUS
+   ========================================================================== */
+
+/* 1. Mobile Drawer Trigger Button in Top Header */
+.mobile-drawer-trigger-btn {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: background 0.2s ease;
+}
+
+.mobile-drawer-trigger-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mobile-drawer-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.mobile-drawer-brand-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+}
+
+.mobile-sign-in-btn {
+  display: none !important;
+}
+
+.header-user-profile {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 4px;
+  border-radius: 500px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.header-user-profile:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.header-user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #00f260, #0575e6);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-user-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+@media (max-width: 768px) {
+  .mobile-drawer-trigger-btn {
+    display: inline-flex !important;
+  }
+  .desktop-header-brand-wrap {
+    display: none !important;
+  }
+  .top-login-btn#headerLoginBtn {
+    display: none !important;
+  }
+  .top-login-btn.mobile-sign-in-btn {
+    display: inline-flex !important;
+    padding: 7px 16px !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    border-radius: 500px !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+  }
+}
+
+/* 2. Mobile Left Sliding Navigation & Settings Drawer (Reference Image 1) */
+.mobile-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 12000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.3s ease;
+}
+
+.mobile-drawer-backdrop.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.mobile-nav-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(85vw, 340px);
+  height: 100vh;
+  background: #111215;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.7);
+  z-index: 12001;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform 0.36s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mobile-nav-drawer.open {
+  transform: translateX(0);
+}
+
+.mobile-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.mobile-drawer-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-drawer-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.mobile-drawer-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+}
+
+.mobile-drawer-close-btn {
+  background: transparent;
+  border: none;
+  color: #a0a0a0;
+  padding: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.mobile-drawer-close-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.drawer-user-card {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.drawer-user-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1f2026, #2a2b34);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #e2e4e9;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.drawer-user-avatar svg {
+  width: 22px;
+  height: 22px;
+}
+
+.drawer-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.drawer-user-name {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+.drawer-user-status {
+  font-size: 0.78rem;
+  color: #8c8f99;
+  display: block;
+  margin-top: 2px;
+}
+
+.mobile-drawer-scroll-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 14px;
+}
+
+.drawer-section-heading {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #727580;
+  margin-bottom: 10px;
+  padding-left: 8px;
+}
+
+/* Accordion Headings inside Drawer */
+.drawer-accordion-item {
+  margin-bottom: 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+
+.drawer-accordion-item.active {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.drawer-accordion-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 14px;
+  background: transparent;
+  border: none;
+  color: #e2e4e9;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.drawer-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.drawer-header-left svg {
+  width: 19px;
+  height: 19px;
+  color: #8c8f99;
+  transition: color 0.2s ease;
+}
+
+.drawer-accordion-item.active .drawer-header-left svg {
+  color: #fff;
+}
+
+.drawer-chevron {
+  width: 16px;
+  height: 16px;
+  color: #727580;
+  transition: transform 0.25s ease;
+}
+
+.drawer-accordion-item.active .drawer-chevron {
+  transform: rotate(180deg);
+  color: #fff;
+}
+
+.drawer-accordion-content {
+  display: none;
+  padding: 0 14px 14px 14px;
+  animation: drawerFadeIn 0.2s ease forwards;
+}
+
+.drawer-accordion-item.active .drawer-accordion-content {
+  display: block;
+}
+
+@keyframes drawerFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.drawer-card-box {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.drawer-prop-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.drawer-prop-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.drawer-prop-val {
+  font-size: 0.82rem;
+  color: #8c8f99;
+}
+
+.drawer-prop-sub {
+  font-size: 0.78rem;
+  color: #727580;
+  margin: 4px 0 0 0;
+  line-height: 1.35;
+}
+
+.drawer-badge-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 500px;
+  background: rgba(0, 242, 96, 0.12);
+  color: #00f260;
+  border: 1px solid rgba(0, 242, 96, 0.25);
+}
+
+.drawer-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 10px 0;
+}
+
+.drawer-control-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.drawer-slider {
+  width: 100%;
+  margin-top: 8px;
+  accent-color: #00f260;
+}
+
+.drawer-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.drawer-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.drawer-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.drawer-slider-switch {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #2a2b33;
+  transition: 0.25s;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.drawer-slider-switch:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: 0.25s;
+  border-radius: 50%;
+}
+
+.drawer-switch input:checked + .drawer-slider-switch {
+  background-color: #00f260;
+  border-color: #00f260;
+}
+
+.drawer-switch input:checked + .drawer-slider-switch:before {
+  transform: translateX(20px);
+  background-color: #000;
+}
+
+.drawer-select {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #181920;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.drawer-action-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.drawer-action-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* Drawer Bottom Area */
+.mobile-drawer-bottom {
+  padding: 14px 20px 20px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.drawer-sign-out-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #ef4444;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.drawer-sign-out-btn:hover {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.drawer-sign-in-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 500px;
+  background: linear-gradient(135deg, #ffffff 0%, #e2e4e9 100%);
+  border: none;
+  color: #0a0b0d;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(255, 255, 255, 0.2);
+  transition: all 0.2s ease;
+}
+
+.drawer-sign-in-btn:hover {
+  background: #ffffff;
+  transform: scale(1.02);
+}
+
+/* 3. Modern Auth Modal (Web Split View & Mobile Single Card) */
+.auth-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  z-index: 13000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: modalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.auth-modal-card {
+  position: relative;
+  width: 100%;
+  max-width: 860px;
+  background: #14151a;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85);
+  display: flex;
+  overflow: hidden;
+}
+
+.auth-modal-close-btn {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 10;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #b3b3b3;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.auth-modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  transform: scale(1.05);
+}
+
+/* Desktop Split Art Column (Image 2) */
+.auth-art-column {
+  width: 44%;
+  position: relative;
+  background: radial-gradient(circle at top right, #1d2538 0%, #0d0f14 100%),
+              url('https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&auto=format&fit=crop&q=80') center/cover no-repeat;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 30px;
+}
+
+.auth-art-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(13, 15, 20, 0.4) 0%, rgba(13, 15, 20, 0.85) 100%);
+  pointer-events: none;
+}
+
+.auth-art-top-badge {
+  position: relative;
+  z-index: 2;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 500px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.auth-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #00f260;
+  box-shadow: 0 0 8px #00f260;
+}
+
+.auth-art-bottom-card {
+  position: relative;
+  z-index: 2;
+  background: rgba(20, 22, 28, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.auth-art-track-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #101115;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-art-track-thumb img {
+  width: 24px;
+  height: 24px;
+}
+
+.auth-art-track-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.auth-art-track-title {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #fff;
+  display: block;
+}
+
+.auth-art-track-artist {
+  font-size: 0.74rem;
+  color: #9ca3af;
+  display: block;
+}
+
+.auth-art-waveform {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 18px;
+}
+
+.auth-art-waveform span {
+  width: 3px;
+  background: #00f260;
+  border-radius: 3px;
+  animation: authWave 1.2s ease-in-out infinite alternate;
+}
+
+.auth-art-waveform span:nth-child(1) { height: 8px; animation-delay: 0.1s; }
+.auth-art-waveform span:nth-child(2) { height: 16px; animation-delay: 0.3s; }
+.auth-art-waveform span:nth-child(3) { height: 12px; animation-delay: 0.2s; }
+.auth-art-waveform span:nth-child(4) { height: 18px; animation-delay: 0.4s; }
+.auth-art-waveform span:nth-child(5) { height: 10px; animation-delay: 0.15s; }
+
+@keyframes authWave {
+  0% { transform: scaleY(0.4); }
+  100% { transform: scaleY(1); }
+}
+
+/* Right Form Column */
+.auth-form-column {
+  flex: 1;
+  padding: 42px 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.auth-brand-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.auth-brand-logo {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.auth-brand-name {
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.auth-main-title {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.03em;
+  margin: 0;
+}
+
+.auth-sub-title {
+  font-size: 0.92rem;
+  color: #8c8f99;
+  margin: 6px 0 24px 0;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auth-label {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #d1d5db;
+}
+
+.auth-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.auth-input-icon {
+  position: absolute;
+  left: 14px;
+  width: 18px;
+  height: 18px;
+  color: #727580;
+  pointer-events: none;
+}
+
+.auth-input {
+  width: 100%;
+  padding: 12px 14px 12px 42px;
+  background: #1a1c23;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 0.92rem;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.auth-input:focus {
+  border-color: #00f260;
+  background: #1e2029;
+  box-shadow: 0 0 0 3px rgba(0, 242, 96, 0.15);
+}
+
+.auth-eye-btn {
+  position: absolute;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: #727580;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-eye-btn:hover {
+  color: #fff;
+}
+
+.auth-row-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: -4px;
+}
+
+.auth-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  color: #9ca3af;
+  cursor: pointer;
+  user-select: none;
+}
+
+.auth-forgot-link {
+  font-size: 0.84rem;
+  color: #9ca3af;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.auth-forgot-link:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.auth-submit-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 500px;
+  background: linear-gradient(135deg, #00f260 0%, #0575e6 100%);
+  border: none;
+  color: #000000;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(0, 242, 96, 0.3);
+  transition: all 0.2s ease;
+  margin-top: 6px;
+}
+
+.auth-submit-btn:hover {
+  transform: scale(1.02);
+  box-shadow: 0 6px 24px rgba(0, 242, 96, 0.45);
+}
+
+.auth-switch-mode {
+  text-align: center;
+  font-size: 0.88rem;
+  color: #8c8f99;
+  margin-top: 10px;
+}
+
+.auth-switch-btn {
+  background: transparent;
+  border: none;
+  color: #00f260;
+  font-weight: 700;
+  cursor: pointer;
+  margin-left: 4px;
+}
+
+.auth-switch-btn:hover {
+  text-decoration: underline;
+}
+
+/* Responsive Auth Card for Mobile (Image 3 - 2nd layout) */
+@media (max-width: 768px) {
+  .auth-art-column {
+    display: none !important;
+  }
+  .auth-modal-card {
+    max-width: 380px !important;
+    border-radius: 20px !important;
+  }
+  .auth-form-column {
+    padding: 36px 24px !important;
+    align-items: center !important;
+    text-align: center !important;
+  }
+  .auth-brand-header {
+    justify-content: center !important;
+  }
+  .auth-form {
+    width: 100% !important;
+    text-align: left !important;
+  }
+  .auth-submit-btn {
+    background: #111318 !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5) !important;
+  }
+  .auth-submit-btn:hover {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+}
+
+/* 4. Lyrics Verification Badge in Lyrics View */
+.lyrics-status-badge {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 500px;
+  letter-spacing: 0.02em;
+}
+
+.lyrics-status-badge.badge-verified {
+  background: rgba(0, 242, 96, 0.12);
+  color: #00f260;
+  border: 1px solid rgba(0, 242, 96, 0.3);
+}
+
+.lyrics-status-badge.badge-ai {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e4e9;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+
 

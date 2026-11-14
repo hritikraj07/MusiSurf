@@ -8,6 +8,7 @@
 
   // State Management
   const state = {
+    currentUser: null,
     currentTrack: null,
     isPlaying: false,
     queue: [],
@@ -226,6 +227,7 @@
     lyricsAlbumCover: document.getElementById('lyricsAlbumCover'),
     lyricsTrackTitle: document.getElementById('lyricsTrackTitle'),
     lyricsTrackArtist: document.getElementById('lyricsTrackArtist'),
+    lyricsStatusBadge: document.getElementById('lyricsStatusBadge'),
     lyricsLoading: document.getElementById('lyricsLoading'),
     lyricsLinesContainer: document.getElementById('lyricsLinesContainer'),
     lyricsScrollBody: document.getElementById('lyricsScrollBody'),
@@ -564,6 +566,13 @@
 
   // Local Storage Helpers
   function loadStoredData() {
+    try {
+      const storedUser = localStorage.getItem('musisurf_user');
+      if (storedUser) {
+        state.currentUser = JSON.parse(storedUser);
+      }
+    } catch (e) {}
+
     try {
       const storedLikes = localStorage.getItem('musisurf_liked');
       if (storedLikes) {
@@ -2891,10 +2900,28 @@
     state.hasSyncedLyrics = false;
     state.activeLyricIndex = -1;
 
+    // Reset status badge
+    if (elements.lyricsStatusBadge) {
+      elements.lyricsStatusBadge.style.display = 'none';
+      elements.lyricsStatusBadge.className = 'lyrics-status-badge';
+      elements.lyricsStatusBadge.innerHTML = '';
+    }
+
     const cacheKey = `${(title || '').toLowerCase().trim()}___${(artist || '').toLowerCase().trim()}`;
     if (state.lyricsCache && state.lyricsCache[cacheKey]) {
       const cached = state.lyricsCache[cacheKey];
       elements.lyricsLoading.style.display = 'none';
+      if (elements.lyricsStatusBadge) {
+        if (cached.isAiGenerated) {
+          elements.lyricsStatusBadge.className = 'lyrics-status-badge badge-ai';
+          elements.lyricsStatusBadge.innerHTML = '<span>✨ AI-Created Alternative Lyrics</span>';
+          elements.lyricsStatusBadge.style.display = 'inline-flex';
+        } else {
+          elements.lyricsStatusBadge.className = 'lyrics-status-badge badge-verified';
+          elements.lyricsStatusBadge.innerHTML = '<span>✓ Verified Lyrics</span>';
+          elements.lyricsStatusBadge.style.display = 'inline-flex';
+        }
+      }
       if (cached.parsed && cached.parsed.length > 0) {
         state.rawSyncedLyrics = cached.syncedLyrics || '';
         state.lyrics = cached.parsed;
@@ -2970,6 +2997,11 @@
         // Parse LRC format [mm:ss.xx] line with combined offset
         const parsed = parseLrc(data.syncedLyrics, autoIntroOffset + manualOffset);
         if (parsed.length > 0) {
+          if (elements.lyricsStatusBadge) {
+            elements.lyricsStatusBadge.className = 'lyrics-status-badge badge-verified';
+            elements.lyricsStatusBadge.innerHTML = '<span>✓ Verified Lyrics</span>';
+            elements.lyricsStatusBadge.style.display = 'inline-flex';
+          }
           state.lyrics = parsed;
           state.hasSyncedLyrics = true;
           if (!state.lyricsCache) state.lyricsCache = {};
@@ -2984,6 +3016,11 @@
         const trackDur = Math.round(getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || parseDurationToSeconds(state.currentTrack?.durationStr) || 180);
         const parsed = convertPlainLyricsToSynced(data.plainLyrics, trackDur);
         if (parsed.length > 0) {
+          if (elements.lyricsStatusBadge) {
+            elements.lyricsStatusBadge.className = 'lyrics-status-badge badge-verified';
+            elements.lyricsStatusBadge.innerHTML = '<span>✓ Verified Lyrics</span>';
+            elements.lyricsStatusBadge.style.display = 'inline-flex';
+          }
           state.lyrics = parsed;
           state.hasSyncedLyrics = true;
           if (!state.lyricsCache) state.lyricsCache = {};
@@ -3148,6 +3185,11 @@
       elements.lyricsLoading.style.display = 'none';
 
       if (aiData && aiData.success && aiData.plainLyrics) {
+        if (elements.lyricsStatusBadge) {
+          elements.lyricsStatusBadge.className = 'lyrics-status-badge badge-ai';
+          elements.lyricsStatusBadge.innerHTML = '<span>✨ AI-Created Alternative Lyrics</span>';
+          elements.lyricsStatusBadge.style.display = 'inline-flex';
+        }
         const trackDur = Math.round(durSec || getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || 180);
         const parsed = convertPlainLyricsToSynced(aiData.plainLyrics, trackDur);
         state.hasSyncedLyrics = true;
@@ -3165,6 +3207,9 @@
       console.warn('AI lyrics generation error:', err);
     }
 
+    if (elements.lyricsStatusBadge) {
+      elements.lyricsStatusBadge.style.display = 'none';
+    }
     elements.lyricsLoading.style.display = 'none';
     elements.lyricsLinesContainer.innerHTML = `
       <div style="text-align: center; color: var(--text-secondary); padding: 60px 0;">
@@ -6006,6 +6051,17 @@
       elements.equalizerToggleSwitch.checked = !!state.settings.equalizerEnabled;
       elements.equalizerSlidersWrap.style.display = state.settings.equalizerEnabled ? 'block' : 'none';
     }
+
+    // Sync Mobile Drawer Controls
+    const drawerCfSlider = document.getElementById('drawerCrossfadeSlider');
+    const drawerCfVal = document.getElementById('drawerCrossfadeValue');
+    const drawerSkipSilToggle = document.getElementById('drawerSkipSilenceToggle');
+    const drawerQualitySelect = document.getElementById('drawerAudioQualitySelect');
+
+    if (drawerCfSlider) drawerCfSlider.value = cf;
+    if (drawerCfVal) drawerCfVal.textContent = formatCrossfadeLabel(cf);
+    if (drawerSkipSilToggle) drawerSkipSilToggle.checked = state.settings.removeDeadSilence !== false;
+    if (drawerQualitySelect) drawerQualitySelect.value = state.settings.streamingQuality || state.settings.audioQuality || 'high';
   }
 
   function saveSettings() {
@@ -7523,6 +7579,10 @@
     // Settings Modal
     const openSettingsModal = () => {
       loadSettings();
+      if (window.innerWidth <= 768) {
+        if (typeof openMobileDrawer === 'function') openMobileDrawer();
+        return;
+      }
       if (elements.settingsModal) {
         elements.settingsModal.style.display = 'flex';
         // Select Account tab by default as requested
@@ -8514,6 +8574,16 @@
     // Mobile System Back & Popstate History Navigation (Prevents app from closing on single back)
     window.addEventListener('popstate', (e) => {
       // 1. If any modal or drawer is open, close it first
+      const authModal = document.getElementById('authModal');
+      if (authModal && authModal.style.display !== 'none') {
+        authModal.style.display = 'none';
+        return;
+      }
+      const mobileNavDrawer = document.getElementById('mobileNavDrawer');
+      if (mobileNavDrawer && mobileNavDrawer.classList.contains('open')) {
+        closeMobileDrawer();
+        return;
+      }
       if (elements.sleepTimerModal && elements.sleepTimerModal.style.display !== 'none') {
         elements.sleepTimerModal.style.display = 'none';
         return;
@@ -8713,6 +8783,9 @@
         e.preventDefault();
         if (typeof openSettingsModal === 'function') openSettingsModal();
       } else if (e.key === 'Escape') {
+        const authModal = document.getElementById('authModal');
+        if (authModal) authModal.style.display = 'none';
+        if (typeof closeMobileDrawer === 'function') closeMobileDrawer();
         elements.queueDrawer.classList.remove('open');
         if (elements.queueDrawerBackdrop) elements.queueDrawerBackdrop.classList.remove('active');
         if (elements.queueBtn) elements.queueBtn.classList.remove('active');
@@ -8800,14 +8873,9 @@
       } catch (e) {}
     }
 
-    // Top Login Button Click Handlers (Placeholder: does nothing as requested)
-    const headerLoginBtn = document.getElementById('headerLoginBtn');
-    const headerLoginMobBtn = document.getElementById('headerLoginMobBtn');
-    const onLoginBtnClick = () => {
-      console.log('Login button clicked (Guest session active)');
-    };
-    if (headerLoginBtn) headerLoginBtn.addEventListener('click', onLoginBtnClick);
-    if (headerLoginMobBtn) headerLoginMobBtn.addEventListener('click', onLoginBtnClick);
+    // Initialize MusiSurf Auth & Mobile Left Sliding Navigation Drawer
+    initAuthSystem();
+    initMobileDrawerSystem();
 
     // Uninterrupted Background Tab & Mobile Lockscreen Playback Handler
     document.addEventListener('visibilitychange', () => {
@@ -8826,6 +8894,348 @@
         }
       }
     });
+  }
+
+  // ==========================================================================
+  // MOBILE NAVIGATION & SETTINGS DRAWER
+  // ==========================================================================
+  function openMobileDrawer() {
+    const backdrop = document.getElementById('mobileDrawerBackdrop');
+    const drawer = document.getElementById('mobileNavDrawer');
+    if (backdrop) backdrop.style.display = 'block';
+    if (drawer) drawer.classList.add('open');
+    try {
+      window.history.pushState({ drawer: 'mobileNav' }, '', window.location.pathname);
+    } catch (e) {}
+  }
+
+  function closeMobileDrawer() {
+    const backdrop = document.getElementById('mobileDrawerBackdrop');
+    const drawer = document.getElementById('mobileNavDrawer');
+    if (drawer) drawer.classList.remove('open');
+    if (backdrop) backdrop.style.display = 'none';
+  }
+
+  function exportAllPlaylistsJson() {
+    const backupData = {
+      app: 'MusiSurf',
+      version: '8.45',
+      exportDate: new Date().toISOString(),
+      likedSongs: state.likedSongs || [],
+      customPlaylists: state.customPlaylists || [],
+      settings: state.settings || {}
+    };
+    const jsonStr = JSON.stringify(backupData, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `MusiSurf_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Library backup exported successfully', '✓');
+  }
+
+  function initMobileDrawerSystem() {
+    const trigger = document.getElementById('mobileDrawerTrigger');
+    const closeBtn = document.getElementById('closeMobileDrawerBtn');
+    const backdrop = document.getElementById('mobileDrawerBackdrop');
+
+    if (trigger) {
+      trigger.addEventListener('click', openMobileDrawer);
+    }
+    if (closeBtn) {
+      closeBtn.addEventListener('click', closeMobileDrawer);
+    }
+    if (backdrop) {
+      backdrop.addEventListener('click', closeMobileDrawer);
+    }
+
+    // Accordion Headers (Account, Playback, Sound & Audio Quality, Lyrics, Backup & Cloud Sync)
+    document.querySelectorAll('.drawer-accordion-header').forEach(header => {
+      header.addEventListener('click', () => {
+        const parent = header.closest('.drawer-accordion-item');
+        if (!parent) return;
+        const wasActive = parent.classList.contains('active');
+        parent.classList.toggle('active', !wasActive);
+      });
+    });
+
+    // Drawer Crossfade Slider (0 to 12s)
+    const drawerCfSlider = document.getElementById('drawerCrossfadeSlider');
+    const drawerCfVal = document.getElementById('drawerCrossfadeValue');
+    if (drawerCfSlider) {
+      drawerCfSlider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        state.settings.crossfade = val;
+        if (drawerCfVal) drawerCfVal.textContent = formatCrossfadeLabel(val);
+        if (elements.crossfadeSlider) elements.crossfadeSlider.value = val;
+        if (elements.liveCrossfadeSeconds) elements.liveCrossfadeSeconds.textContent = formatCrossfadeLabel(val);
+        if (elements.crossfadeValueLabel) elements.crossfadeValueLabel.textContent = formatCrossfadeLabel(val);
+        saveSettings();
+      });
+    }
+
+    // Drawer Skip Silence Switch
+    const drawerSkipToggle = document.getElementById('drawerSkipSilenceToggle');
+    if (drawerSkipToggle) {
+      drawerSkipToggle.addEventListener('change', (e) => {
+        const val = e.target.checked;
+        state.settings.removeDeadSilence = val;
+        if (elements.deadSilenceToggleSwitch) elements.deadSilenceToggleSwitch.checked = val;
+        if (elements.skipSilenceToggleSwitch) elements.skipSilenceToggleSwitch.checked = val;
+        saveSettings();
+        showToast(val ? 'Skip silence enabled' : 'Skip silence disabled', '⏭');
+      });
+    }
+
+    // Drawer Audio Quality Select
+    const drawerQualitySelect = document.getElementById('drawerAudioQualitySelect');
+    if (drawerQualitySelect) {
+      drawerQualitySelect.addEventListener('change', (e) => {
+        const val = e.target.value;
+        state.settings.streamingQuality = val;
+        state.settings.audioQuality = val;
+        saveSettings();
+        showToast(`Streaming quality set to ${val.toUpperCase()}`, '🎧');
+      });
+    }
+
+    // Drawer Export Playlists Button
+    const drawerExportBtn = document.getElementById('drawerExportPlaylistsBtn');
+    if (drawerExportBtn) {
+      drawerExportBtn.addEventListener('click', () => {
+        closeMobileDrawer();
+        if (state.viewingPlaylistId) {
+          openExportPlaylistModal();
+        } else {
+          exportAllPlaylistsJson();
+        }
+      });
+    }
+  }
+
+  // ==========================================================================
+  // MUSISURF AUTHENTICATION SYSTEM (Desktop Split & Mobile Card)
+  // ==========================================================================
+  function initAuthSystem() {
+    const authModal = document.getElementById('authModal');
+    const closeAuthModalBtn = document.getElementById('closeAuthModalBtn');
+    const authForm = document.getElementById('authForm');
+    const authNameGroup = document.getElementById('authNameGroup');
+    const authNameInput = document.getElementById('authNameInput');
+    const authEmailInput = document.getElementById('authEmailInput');
+    const authPasswordInput = document.getElementById('authPasswordInput');
+    const togglePasswordBtn = document.getElementById('togglePasswordBtn');
+    const authSubmitBtn = document.getElementById('authSubmitBtn');
+    const authMainTitle = document.getElementById('authMainTitle');
+    const authSubTitle = document.getElementById('authSubTitle');
+    const authSwitchBtn = document.getElementById('authSwitchBtn');
+    const authSwitchPrompt = document.getElementById('authSwitchPrompt');
+    const authForgotLink = document.getElementById('authForgotLink');
+
+    const headerLoginBtn = document.getElementById('headerLoginBtn');
+    const headerLoginMobBtn = document.getElementById('headerLoginMobBtn');
+    const headerUserProfile = document.getElementById('headerUserProfile');
+    const headerUserAvatar = document.getElementById('headerUserAvatar');
+    const headerUserName = document.getElementById('headerUserName');
+
+    const drawerSignInBtn = document.getElementById('drawerSignInBtn');
+    const drawerSignOutBtn = document.getElementById('drawerSignOutBtn');
+    const drawerUserAvatar = document.getElementById('drawerUserAvatar');
+    const drawerUserName = document.getElementById('drawerUserName');
+    const drawerUserEmail = document.getElementById('drawerUserEmail');
+
+    let authMode = 'signin';
+
+    function updateAuthUI() {
+      const user = state.currentUser;
+      if (user && user.email) {
+        // Logged In State
+        if (headerLoginBtn) headerLoginBtn.style.display = 'none';
+        if (headerLoginMobBtn) headerLoginMobBtn.style.display = 'none';
+        if (headerUserProfile) {
+          headerUserProfile.style.display = 'flex';
+          const initial = (user.name || user.email || 'U')[0].toUpperCase();
+          if (headerUserAvatar) headerUserAvatar.textContent = initial;
+          if (headerUserName) headerUserName.textContent = user.name || user.email.split('@')[0];
+        }
+
+        // Drawer User Card
+        if (drawerUserAvatar) drawerUserAvatar.textContent = (user.name || user.email || 'U')[0].toUpperCase();
+        if (drawerUserName) drawerUserName.textContent = user.name || user.email.split('@')[0];
+        if (drawerUserEmail) drawerUserEmail.textContent = user.email;
+
+        // Drawer Bottom Sign Out (only shown when signed in)
+        if (drawerSignInBtn) drawerSignInBtn.style.display = 'none';
+        if (drawerSignOutBtn) drawerSignOutBtn.style.display = 'flex';
+      } else {
+        // Guest State
+        if (headerLoginBtn) headerLoginBtn.style.display = 'inline-flex';
+        if (headerLoginMobBtn) headerLoginMobBtn.style.display = 'inline-flex';
+        if (headerUserProfile) headerUserProfile.style.display = 'none';
+
+        // Drawer User Card
+        if (drawerUserAvatar) drawerUserAvatar.textContent = 'G';
+        if (drawerUserName) drawerUserName.textContent = 'Guest User';
+        if (drawerUserEmail) drawerUserEmail.textContent = 'Sign in to sync your library';
+
+        // Drawer Bottom Sign In
+        if (drawerSignInBtn) drawerSignInBtn.style.display = 'flex';
+        if (drawerSignOutBtn) drawerSignOutBtn.style.display = 'none';
+      }
+    }
+
+    function openAuthModal(mode = 'signin') {
+      authMode = mode;
+      if (authMode === 'signup') {
+        if (authMainTitle) authMainTitle.textContent = 'Join MusiSurf';
+        if (authSubTitle) authSubTitle.textContent = 'Create your free account for high fidelity music';
+        if (authNameGroup) authNameGroup.style.display = 'block';
+        if (authSubmitBtn) {
+          const span = authSubmitBtn.querySelector('span');
+          if (span) span.textContent = 'Create Account';
+        }
+        if (authSwitchPrompt) authSwitchPrompt.textContent = 'Already have an account?';
+        if (authSwitchBtn) authSwitchBtn.textContent = 'Sign in';
+      } else {
+        if (authMainTitle) authMainTitle.textContent = 'Hi Music Lover';
+        if (authSubTitle) authSubTitle.textContent = 'Welcome to MusiSurf — An all-access experience';
+        if (authNameGroup) authNameGroup.style.display = 'none';
+        if (authSubmitBtn) {
+          const span = authSubmitBtn.querySelector('span');
+          if (span) span.textContent = 'Sign In';
+        }
+        if (authSwitchPrompt) authSwitchPrompt.textContent = "Don't have an account?";
+        if (authSwitchBtn) authSwitchBtn.textContent = 'Sign up';
+      }
+      if (authModal) authModal.style.display = 'flex';
+      try {
+        window.history.pushState({ modal: 'auth' }, '', window.location.pathname);
+      } catch (e) {}
+    }
+
+    function closeAuthModal() {
+      if (authModal) authModal.style.display = 'none';
+    }
+
+    // Header buttons
+    if (headerLoginBtn) {
+      headerLoginBtn.addEventListener('click', () => openAuthModal('signin'));
+    }
+    if (headerLoginMobBtn) {
+      headerLoginMobBtn.addEventListener('click', () => openAuthModal('signin'));
+    }
+    if (headerUserProfile) {
+      headerUserProfile.addEventListener('click', () => {
+        if (window.innerWidth <= 768) {
+          openMobileDrawer();
+        } else {
+          openSettingsModal();
+        }
+      });
+    }
+
+    // Mobile Drawer Auth buttons
+    if (drawerSignInBtn) {
+      drawerSignInBtn.addEventListener('click', () => {
+        closeMobileDrawer();
+        openAuthModal('signin');
+      });
+    }
+
+    if (drawerSignOutBtn) {
+      drawerSignOutBtn.addEventListener('click', () => {
+        state.currentUser = null;
+        try {
+          localStorage.removeItem('musisurf_user');
+        } catch (e) {}
+        updateAuthUI();
+        showToast('Signed out successfully', '👋');
+        closeMobileDrawer();
+      });
+    }
+
+    // Close Modal
+    if (closeAuthModalBtn) {
+      closeAuthModalBtn.addEventListener('click', closeAuthModal);
+    }
+    if (authModal) {
+      authModal.addEventListener('click', (e) => {
+        if (e.target === authModal) closeAuthModal();
+      });
+    }
+
+    // Switch between Sign In and Sign Up
+    if (authSwitchBtn) {
+      authSwitchBtn.addEventListener('click', () => {
+        authMode = authMode === 'signin' ? 'signup' : 'signin';
+        openAuthModal(authMode);
+      });
+    }
+
+    // Toggle Password Visibility
+    if (togglePasswordBtn && authPasswordInput) {
+      togglePasswordBtn.addEventListener('click', () => {
+        const isPw = authPasswordInput.getAttribute('type') === 'password';
+        authPasswordInput.setAttribute('type', isPw ? 'text' : 'password');
+        togglePasswordBtn.innerHTML = isPw
+          ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`
+          : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+      });
+    }
+
+    // Forgot password
+    if (authForgotLink) {
+      authForgotLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        const email = authEmailInput ? authEmailInput.value.trim() : '';
+        if (email) {
+          showToast(`Password reset instructions sent to ${email}`, '✉️');
+        } else {
+          showToast('Please enter your email address first', 'ℹ️');
+        }
+      });
+    }
+
+    // Auth Form Submit
+    if (authForm) {
+      authForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const email = authEmailInput ? authEmailInput.value.trim() : '';
+        const password = authPasswordInput ? authPasswordInput.value.trim() : '';
+        const name = (authNameInput && authNameInput.value.trim()) || email.split('@')[0] || 'User';
+
+        if (!email) {
+          showToast('Please enter your email or username', '⚠️');
+          return;
+        }
+        if (!password || password.length < 4) {
+          showToast('Password must be at least 4 characters long', '⚠️');
+          return;
+        }
+
+        const user = {
+          name: name,
+          email: email,
+          signedInAt: Date.now()
+        };
+
+        state.currentUser = user;
+        try {
+          localStorage.setItem('musisurf_user', JSON.stringify(user));
+        } catch (err) {}
+
+        updateAuthUI();
+        closeAuthModal();
+        showToast(authMode === 'signup' ? `Welcome to MusiSurf, ${name}!` : `Welcome back, ${name}!`, '✓');
+      });
+    }
+
+    // Initial Auth UI state
+    updateAuthUI();
   }
 
   // ==========================================================================

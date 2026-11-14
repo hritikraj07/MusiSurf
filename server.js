@@ -1243,17 +1243,116 @@ const lyricsCache = new Map();
 const LYRICS_CACHE_MAX = 1500;
 const LYRICS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+function normalizeLyricsText(str) {
+  return (str || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\(\[](?:feat\.?|ft\.?|featuring).*?[\)\]]/gi, '')
+    .replace(/\b(?:feat\.?|ft\.?|featuring)\b.*$/gi, '')
+    .replace(/[\(\[](?:official\s*(?:music\s*)?video|official\s*audio|video|audio|lyric\s*video|lyrics|visualizer|hd|4k|remastered|full\s*song|clip)[\)\]]/gi, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractSongVersion(str) {
+  const s = (str || '').toLowerCase();
+  if (/\b(remix|club mix|extended mix|vip|dub|mashup)\b/.test(s)) return 'remix';
+  if (/\b(acoustic|unplugged|piano version|stripped)\b/.test(s)) return 'acoustic';
+  if (/\b(live|concert|in concert|at the \w+)\b/.test(s)) return 'live';
+  if (/\b(instrumental|karaoke|backing track)\b/.test(s)) return 'instrumental';
+  if (/\b(cover|tribute)\b/.test(s)) return 'cover';
+  if (/\b(slowed|reverb)\b/.test(s)) return 'slowed';
+  return 'standard';
+}
+
 function cleanTrackTitle(title) {
   if (!title) return '';
   return title
-    .replace(/[\(\[](?:official\s*(?:music\s*)?video|official\s*audio|video|audio|lyric\s*video|lyrics|visualizer|hd|4k|remastered|live|full\s*song|clip)[\)\]]/gi, '')
+    .replace(/[\(\[](?:official\s*(?:music\s*)?video|official\s*audio|video|audio|lyric\s*video|lyrics|visualizer|hd|4k|remastered|full\s*song|clip)[\)\]]/gi, '')
     .replace(/\s*-\s*(?:official\s*video|video|audio|lyrics?|visualizer).*$/gi, '')
     .replace(/\s+(?:ft\.?|feat\.?)\s+.*$/gi, '')
     .replace(/[\(\[]\s*[\)\]]/g, '')
     .trim();
 }
 
-// Synced & Plain Lyrics from Multi-Provider Waterfall (LRCLIB + JioSaavn + Cache)
+function computeLyricsMatchScore(candidate, target) {
+  if (!candidate || !target) return 0;
+  const targetTitle = normalizeLyricsText(target.title);
+  const candTitle = normalizeLyricsText(candidate.title || candidate.trackName);
+  const targetArtist = normalizeLyricsText(target.artist);
+  const candArtist = normalizeLyricsText(candidate.artist || candidate.artistName);
+
+  if (!targetTitle || !candTitle) return 0;
+
+  let score = 0;
+
+  // 1. Title Similarity (up to 50 pts)
+  if (candTitle === targetTitle) {
+    score += 50;
+  } else {
+    const targetTokens = targetTitle.split(' ').filter(Boolean);
+    const candTokens = candTitle.split(' ').filter(Boolean);
+    if (targetTokens.length === 0 || candTokens.length === 0) return 0;
+
+    const common = targetTokens.filter(t => candTokens.includes(t));
+    const tokenOverlap = common.length / Math.max(targetTokens.length, candTokens.length);
+
+    // Hard reject if title similarity is too low
+    if (tokenOverlap < 0.45 && !candTitle.includes(targetTitle) && !targetTitle.includes(candTitle)) {
+      return 0; // Hard reject: mismatched song title
+    }
+    score += Math.round(tokenOverlap * 45);
+  }
+
+  // 2. Artist Similarity (up to 35 pts)
+  if (candArtist && targetArtist) {
+    if (candArtist === targetArtist || candArtist.includes(targetArtist) || targetArtist.includes(candArtist)) {
+      score += 35;
+    } else {
+      const targetTokens = targetArtist.split(' ').filter(Boolean);
+      const candTokens = candArtist.split(' ').filter(Boolean);
+      const common = targetTokens.filter(t => candTokens.includes(t));
+      if (common.length === 0) {
+        // Different artist: Reject! Never display lyrics from a different artist
+        return 0;
+      }
+      score += Math.round((common.length / Math.max(targetTokens.length, 1)) * 30);
+    }
+  } else {
+    // If candidate artist is missing, partial credit
+    score += 15;
+  }
+
+  // 3. Version Compatibility (up to 10 pts, or heavy penalty)
+  const normVer = v => (!v || v === 'original' ? 'standard' : v);
+  const targetVersion = normVer(target.version || extractSongVersion(target.rawTitle || target.title));
+  const candVersion = normVer(candidate.version || extractSongVersion(candidate.title || candidate.trackName));
+  if (targetVersion === candVersion) {
+    score += 10;
+  } else {
+    // Mismatched version (e.g. remix vs original, or live vs studio)
+    score -= 35;
+  }
+
+  // 4. Duration Compatibility (up to 15 pts)
+  if (target.duration && candidate.duration && candidate.duration > 0 && target.duration > 0) {
+    const diff = Math.abs(target.duration - candidate.duration);
+    if (diff <= 4) score += 15;
+    else if (diff <= 12) score += 10;
+    else if (diff <= 22) score += 4;
+    else if (diff > 35) score -= 30; // Severe duration difference penalty
+  }
+
+  // 5. Album match bonus (up to 5 pts)
+  if (target.album && candidate.albumName && normalizeLyricsText(target.album) === normalizeLyricsText(candidate.albumName)) {
+    score += 5;
+  }
+
+  return Math.max(0, Math.min(100, score));
+}
+
+// Synced & Plain Lyrics from Multi-Provider Waterfall with Strict Verification (LRCLIB + JioSaavn + Cache)
 app.get('/api/lyrics', async (req, res) => {
   const track = (req.query.track || '').trim();
   const artist = (req.query.artist || '').trim();
@@ -1264,16 +1363,26 @@ app.get('/api/lyrics', async (req, res) => {
     return res.json({ success: false, message: 'Track name is required' });
   }
 
-  const cacheKey = `${track.toLowerCase()}_${artist.toLowerCase()}_${duration || 0}`;
+  const cleanTrack = cleanTrackTitle(track) || track;
+  const cleanArtist = artist.split(',')[0].replace(/\s+(?:ft\.?|feat\.?).*$/i, '').trim();
+  const targetVersion = extractSongVersion(track);
+
+  const targetMeta = {
+    title: cleanTrack,
+    rawTitle: track,
+    artist: cleanArtist,
+    album: album || '',
+    duration: duration && duration > 0 ? duration : null,
+    version: targetVersion
+  };
+
+  const cacheKey = `${cleanTrack.toLowerCase()}__${cleanArtist.toLowerCase()}__${targetVersion}__${Math.round(duration || 0)}`;
   const cached = lyricsCache.get(cacheKey);
   if (cached && (Date.now() - cached.timestamp < LYRICS_CACHE_TTL_MS)) {
     return res.json(cached.data);
   }
 
   try {
-    const cleanTrack = cleanTrackTitle(track) || track;
-    const cleanArtist = artist.split(',')[0].replace(/\s+(?:ft\.?|feat\.?).*$/i, '').trim();
-
     // Provider 1: LRCLIB Exact Match
     let lrcUrl = `https://lrclib.net/api/get?track_name=${encodeURIComponent(cleanTrack)}&artist_name=${encodeURIComponent(cleanArtist)}`;
     if (album) {
@@ -1292,28 +1401,42 @@ app.get('/api/lyrics', async (req, res) => {
       if (response.ok) {
         const data = await response.json();
         if (data && (data.syncedLyrics || data.plainLyrics)) {
-          const result = {
-            success: true,
-            trackName: data.trackName || track,
-            artistName: data.artistName || artist,
-            syncedLyrics: data.syncedLyrics || null,
-            plainLyrics: data.plainLyrics || null,
-            duration: data.duration || null,
-            provider: 'lrclib'
-          };
-          if (lyricsCache.size >= LYRICS_CACHE_MAX) {
-            const firstKey = lyricsCache.keys().next().value;
-            lyricsCache.delete(firstKey);
+          const matchScore = computeLyricsMatchScore({
+            title: data.trackName,
+            artist: data.artistName,
+            albumName: data.albumName,
+            duration: data.duration
+          }, targetMeta);
+
+          // Verify that returned lyrics meet threshold
+          if (matchScore >= 68) {
+            const result = {
+              success: true,
+              verified: true,
+              matchScore,
+              confidence: matchScore >= 85 ? 'high' : 'medium',
+              trackName: data.trackName || track,
+              artistName: data.artistName || artist,
+              syncedLyrics: data.syncedLyrics || null,
+              plainLyrics: data.plainLyrics || null,
+              duration: data.duration || null,
+              version: targetVersion,
+              provider: 'lrclib'
+            };
+            if (lyricsCache.size >= LYRICS_CACHE_MAX) {
+              const firstKey = lyricsCache.keys().next().value;
+              lyricsCache.delete(firstKey);
+            }
+            lyricsCache.set(cacheKey, { data: result, timestamp: Date.now() });
+            return res.json(result);
           }
-          lyricsCache.set(cacheKey, { data: result, timestamp: Date.now() });
-          return res.json(result);
         }
       }
     } catch (e) {
-      // Proceed to fallback
+      // Proceed to fallback search
     }
 
-    // Provider 2: LRCLIB Search Query Fallback
+    // Provider 2: LRCLIB Scored Search Query Fallback
     try {
       const searchUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(cleanTrack + ' ' + cleanArtist)}`;
       const searchRes = await fetch(searchUrl, {
@@ -1324,25 +1447,42 @@ app.get('/api/lyrics', async (req, res) => {
       if (searchRes.ok) {
         const list = await searchRes.json();
         if (Array.isArray(list) && list.length > 0) {
-          let item = null;
-          if (duration && duration > 0) {
-            const syncedList = list.filter(l => l.syncedLyrics);
-            if (syncedList.length > 0) {
-              syncedList.sort((a, b) => Math.abs((a.duration || 0) - duration) - Math.abs((b.duration || 0) - duration));
-              item = syncedList[0];
-            }
-          }
-          if (!item) {
-            item = list.find(l => l.syncedLyrics) || list.find(l => l.plainLyrics);
-          }
-          if (item && (item.syncedLyrics || item.plainLyrics)) {
+          // Score and rank all candidate lyrics strictly
+          const scoredList = list
+            .filter(l => Boolean(l.syncedLyrics || l.plainLyrics))
+            .map(candidate => ({
+              candidate,
+              score: computeLyricsMatchScore({
+                title: candidate.trackName,
+                artist: candidate.artistName,
+                albumName: candidate.albumName,
+                duration: candidate.duration
+              }, targetMeta)
+            }))
+            .filter(item => item.score >= 75); // Reject low confidence matches
+
+          if (scoredList.length > 0) {
+            // Sort by score descending, then prefer synced lyrics
+            scoredList.sort((a, b) => {
+              if (b.score !== a.score) return b.score - a.score;
+              if (b.candidate.syncedLyrics && !a.candidate.syncedLyrics) return 1;
+              if (a.candidate.syncedLyrics && !b.candidate.syncedLyrics) return -1;
+              return 0;
+            });
+
+            const best = scoredList[0];
+            const item = best.candidate;
             const result = {
               success: true,
+              verified: true,
+              matchScore: best.score,
+              confidence: best.score >= 85 ? 'high' : 'medium',
               trackName: item.trackName || track,
               artistName: item.artistName || artist,
               syncedLyrics: item.syncedLyrics || null,
               plainLyrics: item.plainLyrics || null,
               duration: item.duration || null,
+              version: targetVersion,
               provider: 'lrclib_search'
             };
             lyricsCache.set(cacheKey, { data: result, timestamp: Date.now() });
@@ -1354,9 +1494,9 @@ app.get('/api/lyrics', async (req, res) => {
       // Proceed to next provider
     }
 
-    // Provider 3: JioSaavn Lyrics API (Especially rich for Bollywood, Punjabi, and Indian tracks)
+    // Provider 3: JioSaavn Lyrics API with Strict Song Scoring (Especially rich for Bollywood, Punjabi, and Indian tracks)
     try {
-      const saavnSearchUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=5&p=1&q=${encodeURIComponent(cleanTrack + ' ' + cleanArtist)}`;
+      const saavnSearchUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=8&p=1&q=${encodeURIComponent(cleanTrack + ' ' + cleanArtist)}`;
       const sRes = await fetch(saavnSearchUrl, {
         headers: { 'User-Agent': 'Mozilla/5.0' },
         signal: AbortSignal.timeout(4500)
@@ -1364,8 +1504,22 @@ app.get('/api/lyrics', async (req, res) => {
       if (sRes.ok) {
         const sData = await sRes.json();
         const results = sData?.results || [];
-        const matchingSong = results.find(s => s.more_info?.has_lyrics === 'true') || results[0];
-        if (matchingSong) {
+        const scoredSaavn = results
+          .filter(s => s.more_info?.has_lyrics === 'true')
+          .map(s => ({
+            song: s,
+            score: computeLyricsMatchScore({
+              title: s.title,
+              artist: s.more_info?.primary_artists || s.more_info?.singers,
+              duration: parseInt(s.more_info?.duration, 10) || null
+            }, targetMeta)
+          }))
+          .filter(item => item.score >= 70);
+
+        if (scoredSaavn.length > 0) {
+          scoredSaavn.sort((a, b) => b.score - a.score);
+          const best = scoredSaavn[0];
+          const matchingSong = best.song;
           const lyricsId = matchingSong.more_info?.lyrics_id || matchingSong.id;
           if (lyricsId) {
             const lRes = await fetch(`https://www.jiosaavn.com/api.php?__call=lyrics.getLyrics&ctx=web6dot0&api_version=4&_format=json&lyrics_id=${encodeURIComponent(lyricsId)}`, {
@@ -1376,15 +1530,18 @@ app.get('/api/lyrics', async (req, res) => {
               const lData = await lRes.json();
               let rawLyrics = lData?.lyrics || '';
               if (rawLyrics) {
-                // Decode HTML breaks and entities to plain text
                 const formattedLyrics = decodeHtmlEntities(rawLyrics.replace(/<br\s*[\/]?>/gi, '\n'));
                 const result = {
                   success: true,
+                  verified: true,
+                  matchScore: best.score,
+                  confidence: best.score >= 85 ? 'high' : 'medium',
                   trackName: matchingSong.title || track,
                   artistName: matchingSong.more_info?.primary_artists || artist,
-                  syncedLyrics: null, // Saavn delivers plain lyrics
+                  syncedLyrics: null,
                   plainLyrics: formattedLyrics,
                   duration: parseInt(matchingSong.more_info?.duration, 10) || null,
+                  version: targetVersion,
                   provider: 'jiosaavn'
                 };
                 lyricsCache.set(cacheKey, { data: result, timestamp: Date.now() });
@@ -1398,12 +1555,12 @@ app.get('/api/lyrics', async (req, res) => {
       // Saavn error fallback
     }
 
-    const notFoundResult = { success: false, message: 'Lyrics not found across available providers' };
+    const notFoundResult = { success: false, verified: false, message: 'Verified genuine lyrics not found across available providers' };
     lyricsCache.set(cacheKey, { data: notFoundResult, timestamp: Date.now() - (LYRICS_CACHE_TTL_MS - 300000) }); // Cache negative for 5 min
     res.json(notFoundResult);
   } catch (err) {
     console.error('Lyrics error:', err.message);
-    res.json({ success: false, message: 'Lyrics lookup error' });
+    res.json({ success: false, verified: false, message: 'Lyrics lookup error' });
   }
 });
 

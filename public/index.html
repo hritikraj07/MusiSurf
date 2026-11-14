@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=8.43">
+  <link rel="stylesheet" href="/styles.css?v=8.45">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -46,8 +46,15 @@
 
     <!-- Top Navigation & Global Search Header (Modern Spotify Style) -->
     <header class="top-header" id="topHeader">
-      <!-- Left: Brand Logo & Name (Web/Desktop Only) + Navigation Arrows + Home Button -->
+      <!-- Left: Mobile Drawer Trigger + Brand Logo & Name + Navigation Arrows -->
       <div class="top-header-left">
+        <!-- Mobile Left Sliding Drawer Toggle (Icon + Name on Far Left for Mobile) -->
+        <button class="mobile-drawer-trigger-btn" id="mobileDrawerTrigger" type="button" title="Menu & Settings" aria-label="Open menu and settings">
+          <img src="/icons/icon.svg" class="mobile-drawer-icon" alt="MusiSurf" />
+          <span class="mobile-drawer-brand-name">MusiSurf</span>
+        </button>
+
+        <!-- Desktop Brand Wrap -->
         <div class="desktop-header-brand-wrap" id="desktopHeaderBrand" title="MusiSurf">
           <img src="/icons/icon.svg" class="desktop-brand-logo" alt="MusiSurf" />
           <span class="desktop-brand-name">MusiSurf</span>
@@ -101,15 +108,14 @@
         </div>
       </div>
 
-      <!-- Right: Login Button (Web) & Circle Icon (Mobile) -->
+      <!-- Right: Sign In Button (Web) & Sign In Button (Mobile) -->
       <div class="top-header-right">
-        <button class="top-login-btn" id="headerLoginBtn" type="button">Login</button>
-        <button class="top-circle-btn top-login-circle-btn" id="headerLoginMobBtn" type="button" title="Login" aria-label="Login">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-        </button>
+        <button class="top-login-btn" id="headerLoginBtn" type="button">Sign In</button>
+        <button class="top-login-btn mobile-sign-in-btn" id="headerLoginMobBtn" type="button">Sign In</button>
+        <div class="header-user-profile" id="headerUserProfile" style="display: none;" title="Your Account">
+          <div class="header-user-avatar" id="headerUserAvatar">U</div>
+          <span class="header-user-name" id="headerUserName">User</span>
+        </div>
       </div>
     </header>
 
@@ -769,6 +775,7 @@
                 <div class="lyrics-hero-meta">
                   <h2 class="lyrics-hero-title" id="lyricsTrackTitle">Self Aware</h2>
                   <p class="lyrics-hero-artist" id="lyricsTrackArtist">Temper City</p>
+                  <div class="lyrics-status-badge" id="lyricsStatusBadge" style="display: none;"></div>
                 </div>
               </div>
 
@@ -939,14 +946,6 @@
             <div class="library-view-topbar">
               <div class="library-header-text">
                 <h1 class="page-title">Library</h1>
-              </div>
-              <div class="library-topbar-actions">
-                <button class="top-circle-btn library-settings-btn" id="libSettingsBtn" title="Settings" aria-label="Settings">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="3" />
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                  </svg>
-                </button>
               </div>
             </div>
 
@@ -1756,6 +1755,306 @@
       </div>
     </div>
 
+    <!-- Mobile Left Sliding Navigation & Settings Drawer (Exact match to Reference Image 1) -->
+    <div class="mobile-drawer-backdrop" id="mobileDrawerBackdrop" style="display: none;"></div>
+    <aside class="mobile-nav-drawer" id="mobileNavDrawer" aria-label="Mobile Navigation and Settings">
+      <!-- Drawer Top Header: Icon + MusiSurf Name (Far left) + Close button -->
+      <div class="mobile-drawer-header">
+        <div class="mobile-drawer-brand">
+          <img src="/icons/icon.svg" class="mobile-drawer-logo" alt="MusiSurf" />
+          <span class="mobile-drawer-title">MusiSurf</span>
+        </div>
+        <button class="mobile-drawer-close-btn" id="closeMobileDrawerBtn" aria-label="Close menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- User Profile Header Card inside Drawer -->
+      <div class="drawer-user-card" id="drawerUserCard">
+        <div class="drawer-user-avatar-wrap">
+          <div class="drawer-user-avatar" id="drawerUserAvatar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+        </div>
+        <div class="drawer-user-info">
+          <h3 class="drawer-user-name" id="drawerUserName">Guest Listener</h3>
+          <span class="drawer-user-status" id="drawerUserStatus">Sign in to sync your music</span>
+        </div>
+      </div>
+
+      <!-- Drawer Scrollable Body: Settings Headings with Expandable Respective Content -->
+      <div class="mobile-drawer-scroll-body">
+        <div class="drawer-section-heading">Settings & Preferences</div>
+
+        <!-- Section 1: Account -->
+        <div class="drawer-accordion-item" data-accordion="account">
+          <button class="drawer-accordion-header" type="button">
+            <div class="drawer-header-left">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <span>Account</span>
+            </div>
+            <svg class="drawer-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="drawer-accordion-content">
+            <div class="drawer-card-box">
+              <div class="drawer-prop-row">
+                <span class="drawer-prop-label">Streaming Tier</span>
+                <span class="drawer-badge-pill">Free • Active</span>
+              </div>
+              <p class="drawer-prop-sub">Unlimited high fidelity music, zero ads, synchronized lyrics.</p>
+              <div class="drawer-prop-row" style="margin-top: 10px;">
+                <span class="drawer-prop-label">User Status</span>
+                <span class="drawer-prop-val" id="drawerAccountStatusVal">Guest</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Playback -->
+        <div class="drawer-accordion-item" data-accordion="playback">
+          <button class="drawer-accordion-header" type="button">
+            <div class="drawer-header-left">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <span>Playback</span>
+            </div>
+            <svg class="drawer-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="drawer-accordion-content">
+            <div class="drawer-card-box">
+              <div class="drawer-control-header">
+                <span class="drawer-prop-label">Crossfade Songs</span>
+                <span class="drawer-badge-pill" id="drawerCrossfadeVal">0s (Off)</span>
+              </div>
+              <p class="drawer-prop-sub">Spotify-style seamless overlap between tracks.</p>
+              <input type="range" class="drawer-slider" id="drawerCrossfadeSlider" min="0" max="12" step="1" value="0" />
+
+              <div class="drawer-divider"></div>
+
+              <div class="drawer-toggle-row">
+                <div>
+                  <span class="drawer-prop-label">Skip Silence</span>
+                  <p class="drawer-prop-sub">Real-time silence detection to skip dead air.</p>
+                </div>
+                <label class="drawer-switch">
+                  <input type="checkbox" id="drawerSkipSilenceToggle" />
+                  <span class="drawer-slider-switch"></span>
+                </label>
+              </div>
+
+              <div class="drawer-divider"></div>
+
+              <div class="drawer-toggle-row">
+                <div>
+                  <span class="drawer-prop-label">Autoplay Next</span>
+                  <p class="drawer-prop-sub">Keep music playing when playlist ends.</p>
+                </div>
+                <label class="drawer-switch">
+                  <input type="checkbox" id="drawerAutoplayToggle" checked />
+                  <span class="drawer-slider-switch"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Sound & Audio Quality -->
+        <div class="drawer-accordion-item" data-accordion="sound">
+          <button class="drawer-accordion-header" type="button">
+            <div class="drawer-header-left">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="22"/><line x1="6" y1="6" x2="6" y2="18"/><line x1="18" y1="8" x2="18" y2="16"/><line x1="2" y1="10" x2="2" y2="14"/><line x1="22" y1="10" x2="22" y2="14"/></svg>
+              <span>Sound & Audio Quality</span>
+            </div>
+            <svg class="drawer-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="drawer-accordion-content">
+            <div class="drawer-card-box">
+              <span class="drawer-prop-label">Audio Quality</span>
+              <p class="drawer-prop-sub">Set your mobile streaming bitrate.</p>
+              <select class="drawer-select" id="drawerAudioQualitySelect">
+                <option value="auto">Automatic (Recommended)</option>
+                <option value="high" selected>High (320 kbps)</option>
+                <option value="medium">Normal (160 kbps)</option>
+                <option value="low">Data Saver (96 kbps)</option>
+              </select>
+
+              <div class="drawer-divider"></div>
+
+              <div class="drawer-toggle-row">
+                <div>
+                  <span class="drawer-prop-label">Normalize Volume</span>
+                  <p class="drawer-prop-sub">Sets the same volume level for all tracks.</p>
+                </div>
+                <label class="drawer-switch">
+                  <input type="checkbox" id="drawerNormalizeToggle" checked />
+                  <span class="drawer-slider-switch"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: Lyrics -->
+        <div class="drawer-accordion-item" data-accordion="lyrics">
+          <button class="drawer-accordion-header" type="button">
+            <div class="drawer-header-left">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+              <span>Lyrics</span>
+            </div>
+            <svg class="drawer-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="drawer-accordion-content">
+            <div class="drawer-card-box">
+              <div class="drawer-toggle-row">
+                <div>
+                  <span class="drawer-prop-label">Word-by-Word Karaoke Glow</span>
+                  <p class="drawer-prop-sub">Glow current lyrics words live in sync with audio.</p>
+                </div>
+                <label class="drawer-switch">
+                  <input type="checkbox" id="drawerKaraokeGlowToggle" checked />
+                  <span class="drawer-slider-switch"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 5: Library & Cloud Sync -->
+        <div class="drawer-accordion-item" data-accordion="library">
+          <button class="drawer-accordion-header" type="button">
+            <div class="drawer-header-left">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span>Backup & Cloud Sync</span>
+            </div>
+            <svg class="drawer-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="drawer-accordion-content">
+            <div class="drawer-card-box">
+              <span class="drawer-prop-label">Export Playlists</span>
+              <p class="drawer-prop-sub">Download your custom playlists and liked songs backup.</p>
+              <button class="drawer-action-btn" id="drawerExportPlaylistsBtn" type="button">Export Playlists (JSON)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Drawer Bottom: Sign Out (Only after signing in) or Sign In (when guest) -->
+      <div class="mobile-drawer-bottom">
+        <button class="drawer-sign-out-btn" id="drawerSignOutBtn" type="button" style="display: none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          <span>Sign Out</span>
+        </button>
+
+        <button class="drawer-sign-in-btn" id="drawerSignInBtn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+            <polyline points="10 17 15 12 10 7"/>
+            <line x1="15" y1="12" x2="3" y2="12"/>
+          </svg>
+          <span>Sign In</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Modern Auth Modal: Web Split View (Image 2) & Mobile Single Card (Image 3) -->
+    <div class="auth-modal-backdrop" id="authModal" style="display: none;">
+      <div class="auth-modal-card">
+        <button class="auth-modal-close-btn" id="closeAuthModalBtn" aria-label="Close sign in dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+
+        <!-- Desktop Split View Left Art Panel (Hidden on Mobile) -->
+        <div class="auth-art-column">
+          <div class="auth-art-overlay"></div>
+          <div class="auth-art-top-badge">
+            <span class="auth-badge-dot"></span>
+            <span>Sound Library</span>
+          </div>
+          <div class="auth-art-bottom-card">
+            <div class="auth-art-track-thumb">
+              <img src="/icons/icon.svg" alt="Track Art" />
+            </div>
+            <div class="auth-art-track-info">
+              <span class="auth-art-track-title">Track of the day</span>
+              <span class="auth-art-track-artist">MusiSurf • High Fidelity</span>
+            </div>
+            <div class="auth-art-waveform">
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Form Column (Full Width on Mobile) -->
+        <div class="auth-form-column">
+          <div class="auth-brand-header">
+            <img src="/icons/icon.svg" class="auth-brand-logo" alt="MusiSurf" />
+            <span class="auth-brand-name">MusiSurf</span>
+          </div>
+
+          <div class="auth-title-wrap">
+            <h2 class="auth-main-title" id="authMainTitle">Hi Music Lover</h2>
+            <p class="auth-sub-title" id="authSubTitle">Welcome to MusiSurf — An all-access experience</p>
+          </div>
+
+          <form class="auth-form" id="authForm" onsubmit="return false;">
+            <div class="auth-input-group" id="authNameGroup" style="display: none;">
+              <label class="auth-label" for="authNameInput">Your Name</label>
+              <div class="auth-input-wrap">
+                <svg class="auth-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <input type="text" id="authNameInput" class="auth-input" placeholder="Enter your name" autocomplete="name" />
+              </div>
+            </div>
+
+            <div class="auth-input-group">
+              <label class="auth-label" for="authEmailInput">Email or Username</label>
+              <div class="auth-input-wrap">
+                <svg class="auth-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/></svg>
+                <input type="text" id="authEmailInput" class="auth-input" placeholder="name@example.com" autocomplete="username" required />
+              </div>
+            </div>
+
+            <div class="auth-input-group">
+              <label class="auth-label" for="authPasswordInput">Password</label>
+              <div class="auth-input-wrap">
+                <svg class="auth-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <input type="password" id="authPasswordInput" class="auth-input" placeholder="Enter your password" autocomplete="current-password" required />
+                <button type="button" class="auth-eye-btn" id="togglePasswordBtn" aria-label="Toggle password visibility">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="auth-row-options">
+              <label class="auth-checkbox-label">
+                <input type="checkbox" id="authRememberMe" checked />
+                <span class="auth-checkbox-custom"></span>
+                <span>Keep me logged in</span>
+              </label>
+              <a href="#" class="auth-forgot-link" id="authForgotLink">Forgot Password?</a>
+            </div>
+
+            <button type="submit" class="auth-submit-btn" id="authSubmitBtn">
+              <span>Sign In</span>
+            </button>
+
+            <div class="auth-switch-mode">
+              <span id="authSwitchPrompt">Don't have an account?</span>
+              <button type="button" class="auth-switch-btn" id="authSwitchBtn">Sign up</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <!-- Spotify Two-Pane Settings Modal (Exact match to Reference Images 1, 2, 3) -->
     <div class="fullscreen-settings-modal" id="settingsModal" style="display: none;">
       <div class="settings-modal-shell">
@@ -2193,7 +2492,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=8.44"></script>
+  <script src="/app.js?v=8.45"></script>
 </body>
 
 </html>
