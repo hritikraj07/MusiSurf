@@ -4636,6 +4636,42 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   overflow-x: hidden !important;
 }
 
+/* User-Queued Songs with Reorder Drag Handles */
+.queue-card.user-queue-item {
+  position: relative;
+  cursor: grab;
+}
+
+.queue-card.user-queue-item:active {
+  cursor: grabbing;
+}
+
+.queue-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  cursor: grab;
+  padding: 4px 6px 4px 0;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.queue-drag-handle:hover {
+  color: #ffffff;
+}
+
+.queue-card.dragging {
+  opacity: 0.35;
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  transform: scale(0.98);
+}
+
+.queue-card.drag-over {
+  border-top: 2px solid #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
 /* ==========================================================================
    BOTTOM PERSISTENT PLAYER BAR
    ========================================================================== */

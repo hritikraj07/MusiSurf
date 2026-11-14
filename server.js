@@ -1238,76 +1238,169 @@ app.get('/api/yt-stream', async (req, res) => {
   }
 });
 
-// Synced Lyrics from lrclib.net
+// In-memory lyrics cache (stores up to 1500 entries for fast response and quota savings)
+const lyricsCache = new Map();
+const LYRICS_CACHE_MAX = 1500;
+const LYRICS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function cleanTrackTitle(title) {
+  if (!title) return '';
+  return title
+    .replace(/[\(\[](?:official\s*(?:music\s*)?video|official\s*audio|video|audio|lyric\s*video|lyrics|visualizer|hd|4k|remastered|live|full\s*song|clip)[\)\]]/gi, '')
+    .replace(/\s*-\s*(?:official\s*video|video|audio|lyrics?|visualizer).*$/gi, '')
+    .replace(/\s+(?:ft\.?|feat\.?)\s+.*$/gi, '')
+    .replace(/[\(\[]\s*[\)\]]/g, '')
+    .trim();
+}
+
+// Synced & Plain Lyrics from Multi-Provider Waterfall (LRCLIB + JioSaavn + Cache)
 app.get('/api/lyrics', async (req, res) => {
   const track = (req.query.track || '').trim();
   const artist = (req.query.artist || '').trim();
+  const album = (req.query.album || '').trim();
   const duration = req.query.duration ? parseInt(req.query.duration, 10) : null;
 
   if (!track) {
     return res.json({ success: false, message: 'Track name is required' });
   }
 
+  const cacheKey = `${track.toLowerCase()}_${artist.toLowerCase()}_${duration || 0}`;
+  const cached = lyricsCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < LYRICS_CACHE_TTL_MS)) {
+    return res.json(cached.data);
+  }
+
   try {
-    const cleanTrack = track.replace(/\(.*\)|\[.*\]|- .*/g, '').trim();
-    const cleanArtist = artist.split(',')[0].trim();
-    let url = `https://lrclib.net/api/get?track_name=${encodeURIComponent(cleanTrack)}&artist_name=${encodeURIComponent(cleanArtist)}`;
+    const cleanTrack = cleanTrackTitle(track) || track;
+    const cleanArtist = artist.split(',')[0].replace(/\s+(?:ft\.?|feat\.?).*$/i, '').trim();
+
+    // Provider 1: LRCLIB Exact Match
+    let lrcUrl = `https://lrclib.net/api/get?track_name=${encodeURIComponent(cleanTrack)}&artist_name=${encodeURIComponent(cleanArtist)}`;
+    if (album) {
+      lrcUrl += `&album_name=${encodeURIComponent(album)}`;
+    }
     if (duration && duration > 0) {
-      url += `&duration=${duration}`;
+      lrcUrl += `&duration=${duration}`;
     }
 
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'MusiSurf-MusicPlayer/1.0.0 (https://musisurf.app)'
-      }
-    });
+    try {
+      const response = await fetch(lrcUrl, {
+        headers: { 'User-Agent': 'MusiSurf-MusicPlayer/1.0.0 (https://musisurf.app)' },
+        signal: AbortSignal.timeout(4500)
+      });
 
-    if (response.ok) {
-      const data = await response.json();
-      if (data && data.syncedLyrics) {
-        return res.json({
-          success: true,
-          trackName: data.trackName,
-          artistName: data.artistName,
-          syncedLyrics: data.syncedLyrics,
-          plainLyrics: data.plainLyrics,
-          duration: data.duration || null
-        });
+      if (response.ok) {
+        const data = await response.json();
+        if (data && (data.syncedLyrics || data.plainLyrics)) {
+          const result = {
+            success: true,
+            trackName: data.trackName || track,
+            artistName: data.artistName || artist,
+            syncedLyrics: data.syncedLyrics || null,
+            plainLyrics: data.plainLyrics || null,
+            duration: data.duration || null,
+            provider: 'lrclib'
+          };
+          if (lyricsCache.size >= LYRICS_CACHE_MAX) {
+            const firstKey = lyricsCache.keys().next().value;
+            lyricsCache.delete(firstKey);
+          }
+          lyricsCache.set(cacheKey, { data: result, timestamp: Date.now() });
+          return res.json(result);
+        }
       }
+    } catch (e) {
+      // Proceed to fallback
     }
 
-    // Fallback: search query on lrclib
-    const searchUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(cleanTrack + ' ' + cleanArtist)}`;
-    const searchRes = await fetch(searchUrl, {
-      headers: { 'User-Agent': 'MusiSurf-MusicPlayer/1.0.0' }
-    });
+    // Provider 2: LRCLIB Search Query Fallback
+    try {
+      const searchUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(cleanTrack + ' ' + cleanArtist)}`;
+      const searchRes = await fetch(searchUrl, {
+        headers: { 'User-Agent': 'MusiSurf-MusicPlayer/1.0.0' },
+        signal: AbortSignal.timeout(4500)
+      });
 
-    if (searchRes.ok) {
-      const list = await searchRes.json();
-      if (Array.isArray(list) && list.length > 0) {
-        let item = null;
-        if (duration && duration > 0) {
-          const syncedList = list.filter(l => l.syncedLyrics);
-          if (syncedList.length > 0) {
-            syncedList.sort((a, b) => Math.abs((a.duration || 0) - duration) - Math.abs((b.duration || 0) - duration));
-            item = syncedList[0];
+      if (searchRes.ok) {
+        const list = await searchRes.json();
+        if (Array.isArray(list) && list.length > 0) {
+          let item = null;
+          if (duration && duration > 0) {
+            const syncedList = list.filter(l => l.syncedLyrics);
+            if (syncedList.length > 0) {
+              syncedList.sort((a, b) => Math.abs((a.duration || 0) - duration) - Math.abs((b.duration || 0) - duration));
+              item = syncedList[0];
+            }
+          }
+          if (!item) {
+            item = list.find(l => l.syncedLyrics) || list.find(l => l.plainLyrics);
+          }
+          if (item && (item.syncedLyrics || item.plainLyrics)) {
+            const result = {
+              success: true,
+              trackName: item.trackName || track,
+              artistName: item.artistName || artist,
+              syncedLyrics: item.syncedLyrics || null,
+              plainLyrics: item.plainLyrics || null,
+              duration: item.duration || null,
+              provider: 'lrclib_search'
+            };
+            lyricsCache.set(cacheKey, { data: result, timestamp: Date.now() });
+            return res.json(result);
           }
         }
-        if (!item) {
-          item = list.find(l => l.syncedLyrics) || list[0];
-        }
-        return res.json({
-          success: true,
-          trackName: item.trackName,
-          artistName: item.artistName,
-          syncedLyrics: item.syncedLyrics,
-          plainLyrics: item.plainLyrics,
-          duration: item.duration || null
-        });
       }
+    } catch (e) {
+      // Proceed to next provider
     }
 
-    res.json({ success: false, message: 'Lyrics not found' });
+    // Provider 3: JioSaavn Lyrics API (Especially rich for Bollywood, Punjabi, and Indian tracks)
+    try {
+      const saavnSearchUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=5&p=1&q=${encodeURIComponent(cleanTrack + ' ' + cleanArtist)}`;
+      const sRes = await fetch(saavnSearchUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        signal: AbortSignal.timeout(4500)
+      });
+      if (sRes.ok) {
+        const sData = await sRes.json();
+        const results = sData?.results || [];
+        const matchingSong = results.find(s => s.more_info?.has_lyrics === 'true') || results[0];
+        if (matchingSong) {
+          const lyricsId = matchingSong.more_info?.lyrics_id || matchingSong.id;
+          if (lyricsId) {
+            const lRes = await fetch(`https://www.jiosaavn.com/api.php?__call=lyrics.getLyrics&ctx=web6dot0&api_version=4&_format=json&lyrics_id=${encodeURIComponent(lyricsId)}`, {
+              headers: { 'User-Agent': 'Mozilla/5.0' },
+              signal: AbortSignal.timeout(4500)
+            });
+            if (lRes.ok) {
+              const lData = await lRes.json();
+              let rawLyrics = lData?.lyrics || '';
+              if (rawLyrics) {
+                // Decode HTML breaks and entities to plain text
+                const formattedLyrics = decodeHtmlEntities(rawLyrics.replace(/<br\s*[\/]?>/gi, '\n'));
+                const result = {
+                  success: true,
+                  trackName: matchingSong.title || track,
+                  artistName: matchingSong.more_info?.primary_artists || artist,
+                  syncedLyrics: null, // Saavn delivers plain lyrics
+                  plainLyrics: formattedLyrics,
+                  duration: parseInt(matchingSong.more_info?.duration, 10) || null,
+                  provider: 'jiosaavn'
+                };
+                lyricsCache.set(cacheKey, { data: result, timestamp: Date.now() });
+                return res.json(result);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Saavn error fallback
+    }
+
+    const notFoundResult = { success: false, message: 'Lyrics not found across available providers' };
+    lyricsCache.set(cacheKey, { data: notFoundResult, timestamp: Date.now() - (LYRICS_CACHE_TTL_MS - 300000) }); // Cache negative for 5 min
+    res.json(notFoundResult);
   } catch (err) {
     console.error('Lyrics error:', err.message);
     res.json({ success: false, message: 'Lyrics lookup error' });

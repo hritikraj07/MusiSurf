@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="MusiSurf">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css?v=8.41">
+  <link rel="stylesheet" href="/styles.css?v=8.42">
   <script>
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
@@ -1081,17 +1081,28 @@
       </div>
 
       <div class="queue-body">
-        <div class="queue-section">
+        <div class="queue-section" id="queueNowPlayingSection">
           <span class="queue-section-heading">Now Playing</span>
           <div class="queue-now-playing-wrap" id="queueNowPlaying">
             <!-- Populated by JS -->
           </div>
         </div>
 
-        <div class="queue-section">
+        <!-- Next In Queue (User-Queued Songs with Reorder Drag & Drop) -->
+        <div class="queue-section" id="queueUserSection" style="display: none;">
           <div class="queue-next-header">
-            <span class="queue-section-heading">Next Up</span>
+            <span class="queue-section-heading">Next In Queue</span>
             <button class="clear-queue-link" id="clearQueueBtn">Clear</button>
+          </div>
+          <div class="queue-list" id="queueUserList">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Next Up (From Current Album, Playlist, or Autoplay) -->
+        <div class="queue-section" id="queueContextSection">
+          <div class="queue-next-header">
+            <span class="queue-section-heading" id="queueContextHeading">Next Up</span>
           </div>
           <div class="queue-list" id="queueList">
             <!-- Populated by JS -->
@@ -1462,6 +1473,15 @@
             </div>
             <span>Add to Playlist</span>
           </button>
+          <button class="mob-option-item" id="mobOptPlayNextBtn">
+            <div class="mob-option-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="5 4 15 12 5 20 5 4"></polygon>
+                <line x1="19" y1="5" x2="19" y2="19"></line>
+              </svg>
+            </div>
+            <span>Play Next</span>
+          </button>
           <button class="mob-option-item" id="mobOptQueueBtn">
             <div class="mob-option-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1569,8 +1589,9 @@
       </div>
     </div>
 
-    <!-- Native Audio Element for Direct 320kbps Streams (Configured for background & mobile playback) -->
-    <audio id="audioPlayer" preload="auto" playsinline webkit-playsinline></audio>
+    <!-- Native Audio Elements for Dual-Deck Equal-Power Crossfading (Configured for background & mobile playback) -->
+    <audio id="audioPlayer" preload="none" playsinline webkit-playsinline></audio>
+    <audio id="audioPlayerSecondary" preload="none" playsinline webkit-playsinline></audio>
     <!-- Dedicated Silent Audio Element for Browser Background Throttling Prevention (Never interferes with main audio) -->
     <audio id="keepAliveAudio" style="display: none;" preload="none"></audio>
 
@@ -2166,7 +2187,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=8.41"></script>
+  <script src="/app.js?v=8.42"></script>
 </body>
 
 </html>
