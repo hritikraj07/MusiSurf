@@ -3102,10 +3102,13 @@
     const rawLines = plainText.split('\n');
     const validLines = [];
     for (const raw of rawLines) {
-      const trimmed = raw.trim();
+      let trimmed = raw.trim();
       if (!trimmed) continue;
-      // Skip section headers like [मुखड़ा], [अंतरा], [Verse 1], [Chorus], (Outro), etc.
-      if (/^[\[(].+[\])]$/.test(trimmed)) continue;
+      // Strip bracketed section headers like [Verse 1], [मुखड़ा], (Chorus) from line beginnings
+      trimmed = trimmed.replace(/^[\[(][^\])]+[\])]\s*/, '').trim();
+      if (!trimmed) continue;
+      // Skip standalone section headers
+      if (/^[\[(].+[\])]$/.test(trimmed) || /^(verse|chorus|bridge|outro|intro|hook|मुखड़ा|अंतरा|कोरस|स्थायी)\s*\d*[:\-]?$/i.test(trimmed)) continue;
       validLines.push(trimmed);
     }
     if (validLines.length === 0) return [];
@@ -3335,9 +3338,9 @@
 
     for (const line of lines) {
       const matches = [...line.matchAll(timeReg)];
-      const text = line.replace(timeReg, '').trim();
+      let text = line.replace(timeReg, '').replace(/^[\[(][^\])]+[\])]\s*/, '').trim();
 
-      if (text && !/^[\[(].+[\])]$/.test(text)) {
+      if (text && !/^[\[(].+[\])]$/.test(text) && !/^(verse|chorus|bridge|outro|intro|hook|मुखड़ा|अंतरा|कोरस|समाप्ति|स्थायी)\s*\d*[:\-]?$/i.test(text)) {
         for (const match of matches) {
           const mins = parseInt(match[1], 10);
           const secs = parseInt(match[2], 10);
@@ -4282,7 +4285,7 @@
         openTrackOptionsMenu(track);
         return;
       }
-      if (e.target.closest('.song-action-btn')) {
+      if (e.target.closest('.song-action-btn') || e.target.closest('.drag-handle-lines') || e.target.closest('.col-drag-handle')) {
         e.stopPropagation();
         return;
       }
@@ -4327,7 +4330,7 @@
     return `${day}/${month}/${year}`;
   }
 
-  function createTableRow(track, index, queueList, isPlaylistTable = false) {
+  function createTableRow(track, index, queueList, isPlaylistTable = false, isCustomSort = false) {
     const tr = document.createElement('tr');
     const isDownloaded = isTrackDownloaded(track.id);
     tr.className = `${state.currentTrack?.id === track.id ? 'playing' : ''} ${isDownloaded ? 'is-downloaded' : ''}`;
@@ -4338,6 +4341,17 @@
     const formattedTitle = escapeHtml(track.title);
     const formattedArtist = escapeHtml(track.artist);
     const dateAddedCellHtml = isPlaylistTable ? `<td class="col-date-added">${formatDateAdded(track.addedAt)}</td>` : '';
+    const dragHandleCellHtml = isCustomSort ? `
+      <td class="col-drag-handle">
+        <button class="drag-handle-lines" title="Drag to reorder" aria-label="Drag to reorder" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="4" y1="8" x2="20" y2="8"/>
+            <line x1="4" y1="12" x2="20" y2="12"/>
+            <line x1="4" y1="16" x2="20" y2="16"/>
+          </svg>
+        </button>
+      </td>
+    ` : '';
 
     tr.innerHTML = `
       <td class="col-num">
@@ -4370,6 +4384,7 @@
           </svg>
         </button>
       </td>
+      ${dragHandleCellHtml}
     `;
 
     tr.addEventListener('click', (e) => {
@@ -4908,18 +4923,18 @@
     // Automatically apply Spotify-style dynamic atmospheric background from artwork
     applyPlaylistDynamicBackground(playlistId, tracks, title);
 
-    // Sort handling for playlist tracks
+    // Sort handling for playlist tracks: default to 'recents'
     const sortSelect = document.getElementById('playlistTracksSortSelect');
-    const sortMode = sortSelect ? sortSelect.value : 'custom';
+    const sortMode = sortSelect ? sortSelect.value : 'recents';
     syncCustomDropdown('playlistTracksSortDropdown', sortMode);
-    
+
     let sortedTracks = [...tracks];
     if (sortMode === 'title') {
       sortedTracks.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
     } else if (sortMode === 'artist') {
       sortedTracks.sort((a, b) => (a.artist || '').localeCompare(b.artist || ''));
     } else if (sortMode === 'recents') {
-      sortedTracks.reverse();
+      sortedTracks.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
     } else if (sortMode === 'duration') {
       sortedTracks.sort((a, b) => (a.duration || 210) - (b.duration || 210));
     }
@@ -4934,18 +4949,22 @@
     }
 
     // Render table
+    const isCustomSort = isCustom && sortMode === 'custom';
+    if (elements.playlistTracksTable) {
+      elements.playlistTracksTable.classList.toggle('custom-sort-active', isCustomSort);
+    }
     elements.playlistTracksBody.innerHTML = '';
     if (sortedTracks.length === 0) {
       elements.playlistEmptyState.style.display = 'block';
     } else {
       elements.playlistEmptyState.style.display = 'none';
       sortedTracks.forEach((track, idx) => {
-        const tr = createTableRow(track, idx + 1, sortedTracks, true);
+        const tr = createTableRow(track, idx + 1, sortedTracks, true, isCustomSort);
         elements.playlistTracksBody.appendChild(tr);
       });
 
-      // Custom Sort: Drag-and-Drop & Touch Reordering (Desktop & Android)
-      if (isCustom && sortMode === 'custom') {
+      // Custom Sort: Drag-and-Drop & Touch Reordering (ONLY when Custom Sort is active)
+      if (isCustomSort) {
         const rows = elements.playlistTracksBody.querySelectorAll('tr');
         let dragSrcIdx = null;
 
@@ -5191,6 +5210,9 @@
           const subEl = document.getElementById('mobPlaylistOptionsSub');
           if (titleEl) titleEl.textContent = title;
           if (subEl) subEl.textContent = `${tracks.length} songs • Custom Playlist`;
+          if (elements.mobOptRenamePlaylistBtn) {
+            elements.mobOptRenamePlaylistBtn.style.display = window.innerWidth <= 768 ? 'none' : 'flex';
+          }
 
           const pl = state.customPlaylists.find(p => p.id === playlistId);
           if (elements.mobOptPinPlaylistBtn && pl) {
@@ -9257,6 +9279,8 @@
     const headerUserAvatar = document.getElementById('headerUserAvatar');
     const headerUserName = document.getElementById('headerUserName');
 
+    const drawerTopSignInBtn = document.getElementById('drawerTopSignInBtn');
+    const drawerUserCard = document.getElementById('drawerUserCard');
     const drawerSignInBtn = document.getElementById('drawerSignInBtn');
     const drawerSignOutBtn = document.getElementById('drawerSignOutBtn');
     const drawerUserAvatar = document.getElementById('drawerUserAvatar');
@@ -9283,6 +9307,10 @@
         if (drawerUserName) drawerUserName.textContent = user.name || user.email.split('@')[0];
         if (drawerUserEmail) drawerUserEmail.textContent = user.email;
 
+        // Drawer Top State (Hide Sign In, show User Profile)
+        if (drawerTopSignInBtn) drawerTopSignInBtn.style.display = 'none';
+        if (drawerUserCard) drawerUserCard.style.display = 'flex';
+
         // Drawer Bottom Sign Out (only shown when signed in)
         if (drawerSignInBtn) drawerSignInBtn.style.display = 'none';
         if (drawerSignOutBtn) drawerSignOutBtn.style.display = 'flex';
@@ -9292,13 +9320,17 @@
         if (headerLoginMobBtn) headerLoginMobBtn.style.display = 'inline-flex';
         if (headerUserProfile) headerUserProfile.style.display = 'none';
 
-        // Drawer User Card
+        // Drawer Top State (Show Sign In on top, hide User Profile)
+        if (drawerTopSignInBtn) drawerTopSignInBtn.style.display = 'flex';
+        if (drawerUserCard) drawerUserCard.style.display = 'none';
+
+        // Drawer User Card (fallback text)
         if (drawerUserAvatar) drawerUserAvatar.textContent = 'G';
         if (drawerUserName) drawerUserName.textContent = 'Guest User';
         if (drawerUserEmail) drawerUserEmail.textContent = 'Sign in to sync your library';
 
-        // Drawer Bottom Sign In
-        if (drawerSignInBtn) drawerSignInBtn.style.display = 'flex';
+        // Drawer Bottom Sign Out is hidden for guest; no bottom sign in
+        if (drawerSignInBtn) drawerSignInBtn.style.display = 'none';
         if (drawerSignOutBtn) drawerSignOutBtn.style.display = 'none';
       }
     }
@@ -9341,7 +9373,16 @@
       headerLoginBtn.addEventListener('click', () => openAuthModal('signin'));
     }
     if (headerLoginMobBtn) {
-      headerLoginMobBtn.addEventListener('click', () => openAuthModal('signin'));
+      headerLoginMobBtn.addEventListener('click', () => {
+        openMobileDrawer();
+      });
+    }
+
+    if (drawerTopSignInBtn) {
+      drawerTopSignInBtn.addEventListener('click', () => {
+        closeMobileDrawer();
+        openAuthModal('signin');
+      });
     }
     if (headerUserProfile) {
       headerUserProfile.addEventListener('click', () => {

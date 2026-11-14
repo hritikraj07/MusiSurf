@@ -1611,6 +1611,14 @@ function detectSongLanguage(title, artist, album) {
   return { language: 'English', script: 'Latin', code: 'en' };
 }
 
+function stripSectionHeadersFromLyrics(text) {
+  if (!text) return '';
+  return text.split('\n')
+    .map(line => line.replace(/^[\(\[][^\)\]]+[\)\]]\s*/, '').trim())
+    .filter(line => line && !/^[\(\[].+[\)\]]$/.test(line) && !/^(verse|chorus|bridge|outro|intro|hook|मुखड़ा|अंतरा|कोरस|समाप्ति|स्थायी|مکھڑا|بند|کورس|اختتام)\s*\d*[:\-]?$/i.test(line))
+    .join('\n');
+}
+
 function generateLinguisticAiLyrics(track, artist, album, langInfo) {
   if (langInfo.language === 'Hindi') {
     return `[मुखड़ा]

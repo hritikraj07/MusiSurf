@@ -113,7 +113,7 @@ html, body {
   background-color: #000000;
   overflow: hidden;
   position: relative;
-  row-gap: 6px;
+  row-gap: 0px;
   column-gap: 8px;
   padding: 0;
   margin: 0;
@@ -375,7 +375,7 @@ html, body {
 .sidebar {
   grid-area: sidebar;
   background-color: #121212 !important;
-  border-radius: 8px;
+  border-radius: 0 0 8px 8px;
   margin: 0 0 0 8px;
   display: flex;
   flex-direction: column;
@@ -875,7 +875,7 @@ html, body {
 .main-wrapper {
   grid-area: main;
   background-color: #121212;
-  border-radius: 8px;
+  border-radius: 0 0 8px 8px;
   margin: 0 8px 0 0;
   display: flex;
   flex-direction: column;
@@ -11547,8 +11547,12 @@ body[data-active-view="lyrics"] .content-scroll {
    UI ENHANCEMENTS: LYRICS, PLAYLIST HOVER, QUEUE, LOCAL FILES & SOUNDTRACK
    ========================================================================== */
 
-/* 1. Lyrics Section: Remove AI card banner from all songs */
-.ai-lyrics-header-card {
+/* 1. Lyrics Section: Remove AI card banner and tags from all songs */
+.ai-lyrics-header-card,
+.ai-lyrics-badge,
+.ai-lyric-section-tag,
+.ai-lyrics-disclaimer,
+.lyrics-status-badge {
   display: none !important;
 }
 
@@ -12576,3 +12580,128 @@ body[data-active-view="lyrics"] .content-scroll {
 
 
 
+
+/* Seamless lyricsView border-radius */
+#lyricsView {
+  border-radius: 0 !important;
+}
+
+
+/* Custom Sort Drag Handle (Spotify Style) */
+.tracks-table .col-drag-handle {
+  display: none;
+  width: 44px;
+  text-align: center;
+  padding: 0 8px;
+}
+
+.tracks-table.custom-sort-active .col-drag-handle {
+  display: table-cell;
+}
+
+.drag-handle-lines {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #b3b3b3);
+  cursor: grab;
+  padding: 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.drag-handle-lines:hover {
+  color: #ffffff;
+}
+
+.drag-handle-lines:active {
+  cursor: grabbing;
+}
+
+.drag-handle-lines svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Mobile Drawer Top Auth Box */
+.drawer-top-auth-box {
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.drawer-top-sign-in-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--accent-primary, #00f260);
+  color: #000000;
+  border: none;
+  border-radius: 999px;
+  padding: 12px 20px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 242, 96, 0.28);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.drawer-top-sign-in-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 242, 96, 0.4);
+  opacity: 0.95;
+}
+
+.drawer-top-sign-in-btn:active {
+  transform: translateY(0);
+}
+
+.drawer-top-sign-in-btn svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.3;
+}
+
+/* Mobile Viewport Scroll Lock & Mobile Playlist Cleanups */
+@media (max-width: 768px) {
+  html, body {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+  }
+
+  .app-layout {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+  }
+
+  .content-scroll {
+    height: calc(100dvh - 56px) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior-y: contain !important;
+    padding: 12px 14px calc(125px + env(safe-area-inset-bottom, 14px)) !important;
+  }
+
+  #mobOptRenamePlaylistBtn,
+  #renamePlaylistBtn {
+    display: none !important;
+  }
+
+  .tracks-table.custom-sort-active .col-actions {
+    display: none !important;
+  }
+
+  .tracks-table.custom-sort-active .col-drag-handle {
+    display: table-cell !important;
+    width: 40px !important;
+    padding-right: 12px !important;
+  }
+}

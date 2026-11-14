@@ -681,13 +681,13 @@
                   <svg class="lib-sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M3 6h18M6 12h12m-9 6h6"/>
                   </svg>
-                  <span class="custom-sort-label" id="playlistTracksSortLabel">Custom Order</span>
+                  <span class="custom-sort-label" id="playlistTracksSortLabel">Recently Added</span>
                   <svg class="custom-sort-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="6 9 12 15 18 9"></polyline>
                   </svg>
                 </button>
                 <div class="custom-sort-menu" id="playlistTracksSortMenu" role="listbox">
-                  <div class="custom-sort-item selected" data-value="custom" role="option">
+                  <div class="custom-sort-item" data-value="custom" role="option">
                     <span>Custom Order</span>
                     <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
                   </div>
@@ -699,7 +699,7 @@
                     <span>Artist (A-Z)</span>
                     <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
                   </div>
-                  <div class="custom-sort-item" data-value="recents" role="option">
+                  <div class="custom-sort-item selected" data-value="recents" role="option">
                     <span>Recently Added</span>
                     <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>
                   </div>
@@ -712,7 +712,7 @@
                   <option value="custom">Custom Order</option>
                   <option value="title">Title (A-Z)</option>
                   <option value="artist">Artist (A-Z)</option>
-                  <option value="recents">Recently Added</option>
+                  <option value="recents" selected>Recently Added</option>
                   <option value="duration">Duration</option>
                 </select>
               </div>
@@ -735,6 +735,7 @@
                     </svg>
                   </th>
                   <th class="col-actions"></th>
+                  <th class="col-drag-handle"></th>
                 </tr>
               </thead>
               <tbody id="playlistTracksBody">
@@ -923,6 +924,7 @@
                     </svg>
                   </th>
                   <th class="col-actions"></th>
+                  <th class="col-drag-handle"></th>
                 </tr>
               </thead>
               <tbody id="localTracksTbody"></tbody>
@@ -1485,6 +1487,18 @@
             </div>
             <span>Add to Playlist</span>
           </button>
+          <button class="mob-option-item" id="mobOptQueueBtn">
+            <div class="mob-option-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="8" y1="6" x2="21" y2="6"/>
+                <line x1="8" y1="12" x2="21" y2="12"/>
+                <line x1="8" y1="18" x2="16" y2="18"/>
+                <line x1="19" y1="15" x2="19" y2="21"/>
+                <line x1="16" y1="18" x2="22" y2="18"/>
+              </svg>
+            </div>
+            <span>Add to Queue</span>
+          </button>
           <button class="mob-option-item" id="mobOptGoToQueueBtn">
             <div class="mob-option-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1497,18 +1511,6 @@
               </svg>
             </div>
             <span>Go to Queue</span>
-          </button>
-          <button class="mob-option-item" id="mobOptQueueBtn">
-            <div class="mob-option-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="8" y1="6" x2="21" y2="6"/>
-                <line x1="8" y1="12" x2="21" y2="12"/>
-                <line x1="8" y1="18" x2="16" y2="18"/>
-                <line x1="19" y1="15" x2="19" y2="21"/>
-                <line x1="16" y1="18" x2="22" y2="18"/>
-              </svg>
-            </div>
-            <span>Add to Queue</span>
           </button>
           <button class="mob-option-item" id="mobOptShareBtn">
             <div class="mob-option-icon">
@@ -1774,16 +1776,26 @@
         </button>
       </div>
 
-      <!-- User Profile Header Card inside Drawer -->
-      <div class="drawer-user-card" id="drawerUserCard">
-        <div class="drawer-user-avatar-wrap">
-          <div class="drawer-user-avatar" id="drawerUserAvatar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <!-- Drawer Top: Sign In Button (on top for Guest) / User Profile Card (Signed In) -->
+      <div class="drawer-top-auth-box" id="drawerTopAuthBox">
+        <button class="drawer-top-sign-in-btn" id="drawerTopSignInBtn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+            <polyline points="10 17 15 12 10 7"/>
+            <line x1="15" y1="12" x2="3" y2="12"/>
+          </svg>
+          <span>Sign In</span>
+        </button>
+        <div class="drawer-user-card" id="drawerUserCard" style="display: none;">
+          <div class="drawer-user-avatar-wrap">
+            <div class="drawer-user-avatar" id="drawerUserAvatar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
           </div>
-        </div>
-        <div class="drawer-user-info">
-          <h3 class="drawer-user-name" id="drawerUserName">Guest Listener</h3>
-          <span class="drawer-user-status" id="drawerUserStatus">Sign in to sync your music</span>
+          <div class="drawer-user-info">
+            <h3 class="drawer-user-name" id="drawerUserName">Guest Listener</h3>
+            <span class="drawer-user-status" id="drawerUserStatus">Signed in</span>
+          </div>
         </div>
       </div>
 
@@ -1942,7 +1954,7 @@
         </div>
       </div>
 
-      <!-- Drawer Bottom: Sign Out (Only after signing in) or Sign In (when guest) -->
+      <!-- Drawer Bottom: Sign Out (Only shown after signing in) -->
       <div class="mobile-drawer-bottom">
         <button class="drawer-sign-out-btn" id="drawerSignOutBtn" type="button" style="display: none;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -1951,15 +1963,6 @@
             <line x1="21" y1="12" x2="9" y2="12"/>
           </svg>
           <span>Sign Out</span>
-        </button>
-
-        <button class="drawer-sign-in-btn" id="drawerSignInBtn" type="button">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-            <polyline points="10 17 15 12 10 7"/>
-            <line x1="15" y1="12" x2="3" y2="12"/>
-          </svg>
-          <span>Sign In</span>
         </button>
       </div>
     </aside>
