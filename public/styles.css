@@ -891,9 +891,9 @@ html, body {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  background-color: #121212 !important;
+  background-color: #000000 !important;
   z-index: 50;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: none !important;
   box-sizing: border-box !important;
   width: 100% !important;
   position: relative !important;
@@ -10313,6 +10313,21 @@ body[data-active-view="lyrics"] .content-scroll {
 
 .replay-capsule-body {
   margin: 16px 0 20px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.replay-stat-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.replay-stat-secondary {
+  text-align: right;
+  align-items: flex-end;
 }
 
 .replay-stat-row {
@@ -10502,6 +10517,9 @@ body[data-active-view="lyrics"] .content-scroll {
   .replay-capsule-card,
   .replay-top-song-card {
     padding: 20px 18px;
+  }
+  .replay-capsule-body {
+    gap: 16px;
   }
 }
 
@@ -12252,8 +12270,8 @@ body[data-active-view="lyrics"] .content-scroll {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #00f260;
-  box-shadow: 0 0 8px #00f260;
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
 }
 
 .auth-art-bottom-card {
@@ -12312,7 +12330,7 @@ body[data-active-view="lyrics"] .content-scroll {
 
 .auth-art-waveform span {
   width: 3px;
-  background: #00f260;
+  background: #ffffff;
   border-radius: 3px;
   animation: authWave 1.2s ease-in-out infinite alternate;
 }
@@ -12456,6 +12474,13 @@ body[data-active-view="lyrics"] .content-scroll {
   user-select: none;
 }
 
+.auth-checkbox-label input[type="checkbox"] {
+  accent-color: #ffffff;
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+}
+
 .auth-forgot-link {
   font-size: 0.84rem;
   color: #9ca3af;
@@ -12472,20 +12497,21 @@ body[data-active-view="lyrics"] .content-scroll {
   width: 100%;
   padding: 14px;
   border-radius: 500px;
-  background: linear-gradient(135deg, #00f260 0%, #0575e6 100%);
-  border: none;
-  color: #000000;
+  background: #ffffff !important;
+  border: none !important;
+  color: #000000 !important;
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 700 !important;
   cursor: pointer;
-  box-shadow: 0 4px 18px rgba(0, 242, 96, 0.3);
+  box-shadow: 0 4px 18px rgba(255, 255, 255, 0.15) !important;
   transition: all 0.2s ease;
   margin-top: 6px;
 }
 
 .auth-submit-btn:hover {
   transform: scale(1.02);
-  box-shadow: 0 6px 24px rgba(0, 242, 96, 0.45);
+  opacity: 0.94;
+  box-shadow: 0 6px 24px rgba(255, 255, 255, 0.25) !important;
 }
 
 .auth-switch-mode {
@@ -12498,7 +12524,7 @@ body[data-active-view="lyrics"] .content-scroll {
 .auth-switch-btn {
   background: transparent;
   border: none;
-  color: #00f260;
+  color: #ffffff !important;
   font-weight: 700;
   cursor: pointer;
   margin-left: 4px;
@@ -12530,40 +12556,22 @@ body[data-active-view="lyrics"] .content-scroll {
     text-align: left !important;
   }
   .auth-submit-btn {
-    background: #111318 !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    color: #ffffff !important;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5) !important;
+    background: #ffffff !important;
+    border: none !important;
+    color: #000000 !important;
+    font-weight: 700 !important;
+    box-shadow: 0 4px 18px rgba(255, 255, 255, 0.15) !important;
   }
   .auth-submit-btn:hover {
     background: #ffffff !important;
     color: #000000 !important;
+    opacity: 0.94;
   }
 }
 
 /* 4. Lyrics Verification Badge in Lyrics View */
 .lyrics-status-badge {
-  margin-top: 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 500px;
-  letter-spacing: 0.02em;
-}
-
-.lyrics-status-badge.badge-verified {
-  background: rgba(0, 242, 96, 0.12);
-  color: #00f260;
-  border: 1px solid rgba(0, 242, 96, 0.3);
-}
-
-.lyrics-status-badge.badge-ai {
-  background: rgba(255, 255, 255, 0.08);
-  color: #e2e4e9;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: none !important;
 }
 
 

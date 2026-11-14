@@ -162,6 +162,7 @@
     replayMonthTitle: document.getElementById('replayMonthTitle'),
     replayMinutesCount: document.getElementById('replayMinutesCount'),
     replayPlaysCount: document.getElementById('replayPlaysCount'),
+    replayTotalSongsCount: document.getElementById('replayTotalSongsCount'),
     playReplayBtn: document.getElementById('playReplayBtn'),
     shareReplayBtn: document.getElementById('shareReplayBtn'),
     replayTopSongImg: document.getElementById('replayTopSongImg'),
@@ -2912,15 +2913,7 @@
       const cached = state.lyricsCache[cacheKey];
       elements.lyricsLoading.style.display = 'none';
       if (elements.lyricsStatusBadge) {
-        if (cached.isAiGenerated) {
-          elements.lyricsStatusBadge.className = 'lyrics-status-badge badge-ai';
-          elements.lyricsStatusBadge.innerHTML = '<span>✨ AI-Created Alternative Lyrics</span>';
-          elements.lyricsStatusBadge.style.display = 'inline-flex';
-        } else {
-          elements.lyricsStatusBadge.className = 'lyrics-status-badge badge-verified';
-          elements.lyricsStatusBadge.innerHTML = '<span>✓ Verified Lyrics</span>';
-          elements.lyricsStatusBadge.style.display = 'inline-flex';
-        }
+        elements.lyricsStatusBadge.style.display = 'none';
       }
       if (cached.parsed && cached.parsed.length > 0) {
         state.rawSyncedLyrics = cached.syncedLyrics || '';
@@ -2998,9 +2991,7 @@
         const parsed = parseLrc(data.syncedLyrics, autoIntroOffset + manualOffset);
         if (parsed.length > 0) {
           if (elements.lyricsStatusBadge) {
-            elements.lyricsStatusBadge.className = 'lyrics-status-badge badge-verified';
-            elements.lyricsStatusBadge.innerHTML = '<span>✓ Verified Lyrics</span>';
-            elements.lyricsStatusBadge.style.display = 'inline-flex';
+            elements.lyricsStatusBadge.style.display = 'none';
           }
           state.lyrics = parsed;
           state.hasSyncedLyrics = true;
@@ -3017,9 +3008,7 @@
         const parsed = convertPlainLyricsToSynced(data.plainLyrics, trackDur);
         if (parsed.length > 0) {
           if (elements.lyricsStatusBadge) {
-            elements.lyricsStatusBadge.className = 'lyrics-status-badge badge-verified';
-            elements.lyricsStatusBadge.innerHTML = '<span>✓ Verified Lyrics</span>';
-            elements.lyricsStatusBadge.style.display = 'inline-flex';
+            elements.lyricsStatusBadge.style.display = 'none';
           }
           state.lyrics = parsed;
           state.hasSyncedLyrics = true;
@@ -3186,9 +3175,7 @@
 
       if (aiData && aiData.success && aiData.plainLyrics) {
         if (elements.lyricsStatusBadge) {
-          elements.lyricsStatusBadge.className = 'lyrics-status-badge badge-ai';
-          elements.lyricsStatusBadge.innerHTML = '<span>✨ AI-Created Alternative Lyrics</span>';
-          elements.lyricsStatusBadge.style.display = 'inline-flex';
+          elements.lyricsStatusBadge.style.display = 'none';
         }
         const trackDur = Math.round(durSec || getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || 180);
         const parsed = convertPlainLyricsToSynced(aiData.plainLyrics, trackDur);
@@ -6649,6 +6636,9 @@
 
     const songsPool = [...(state.history || []), ...(state.recentlyPlayed || []), ...(state.likedSongs || [])];
     const totalPlays = Math.max(18, songsPool.length);
+    const playedTracksCount = state.trackPlayCounts ? Object.keys(state.trackPlayCounts).length : 0;
+    const historyCount = (state.history && state.history.length) || 0;
+    const totalSongs = Math.max(playedTracksCount, historyCount, totalPlays);
 
     // Dynamic Live Sound Capsule Minutes
     const totalMinutes = Math.max(1, Math.floor((state.totalListenedSeconds || 9660) / 60));
@@ -6658,6 +6648,9 @@
     }
     if (elements.replayPlaysCount) {
       elements.replayPlaysCount.textContent = `${totalPlays} plays • 7 days of listening`;
+    }
+    if (elements.replayTotalSongsCount) {
+      elements.replayTotalSongsCount.textContent = totalSongs.toLocaleString();
     }
 
     // Determine #1 Most Played Song strictly from persistent track play counts

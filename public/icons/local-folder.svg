@@ -31,9 +31,8 @@
     </filter>
   </defs>
 
-  <!-- Dark Replay Obsidian Background Canvas -->
-  <rect width="128" height="128" rx="20" fill="url(#folderTileBg)"/>
-  <rect width="126" height="126" x="1" y="1" rx="19" fill="none" stroke="rgba(255, 255, 255, 0.08)" stroke-width="1.5"/>
+  <!-- Full Tile Background (Edge-to-edge with no inner stroke border) -->
+  <rect width="128" height="128" fill="url(#folderTileBg)"/>
 
   <!-- Centered Folder Emblem in Replay Platinum/Chrome Palette -->
   <g filter="url(#replayFolderGlow)">
