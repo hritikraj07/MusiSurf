@@ -829,30 +829,24 @@
                 </div>
               </div>
 
-              <!-- Section 2: Sound Capsule (Minutes Listened with Real-Time Live Tracking) -->
+              <!-- Section 2: Sound Capsule (Simplified Listening Statistics) -->
               <div class="replay-capsule-card">
                 <div class="replay-capsule-top">
                   <span class="replay-card-badge">SOUND CAPSULE</span>
-                  <div class="replay-live-pulse-badge">
-                    <span class="replay-live-dot"></span>
-                    <span>Live Tracking</span>
-                  </div>
                 </div>
                 
                 <div class="replay-capsule-body">
                   <div class="replay-stat-col replay-stat-primary">
                     <div class="replay-stat-row">
-                      <h2 class="replay-stat-number" id="replayMinutesCount">161</h2>
+                      <h2 class="replay-stat-number" id="replayMinutesCount">0</h2>
                       <span class="replay-stat-unit">MINS LISTENED</span>
                     </div>
-                    <p class="replay-stat-subtext" id="replayPlaysCount">18 plays • 7 days of listening</p>
                   </div>
                   <div class="replay-stat-col replay-stat-secondary">
                     <div class="replay-stat-row">
                       <h2 class="replay-stat-number" id="replayTotalSongsCount">0</h2>
                       <span class="replay-stat-unit">SONGS PLAYED</span>
                     </div>
-                    <p class="replay-stat-subtext" id="replaySongsSubtext">Total tracks streamed</p>
                   </div>
                 </div>
 
@@ -1603,8 +1597,8 @@
     </div>
 
     <!-- Native Audio Elements for Dual-Deck Equal-Power Crossfading (Configured for background & mobile playback) -->
-    <audio id="audioPlayer" preload="none" playsinline webkit-playsinline></audio>
-    <audio id="audioPlayerSecondary" preload="none" playsinline webkit-playsinline></audio>
+    <audio id="audioPlayer" preload="none" playsinline webkit-playsinline crossorigin="anonymous"></audio>
+    <audio id="audioPlayerSecondary" preload="none" playsinline webkit-playsinline crossorigin="anonymous"></audio>
     <!-- Dedicated Silent Audio Element for Browser Background Throttling Prevention (Never interferes with main audio) -->
     <audio id="keepAliveAudio" style="display: none;" preload="none"></audio>
 

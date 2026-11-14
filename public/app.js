@@ -46,6 +46,9 @@
     contextQueue: [], // Context queue from playlist / album / recommendations
     contextIndex: 0,
     isCrossfading: false,
+    isTransitioning: false,
+    isTransitionPreloaded: false,
+    preloadedNextTrack: null,
     lyricsCache: {}, // In-memory lyrics cache
     userQueuedCount: 0,
     localTracks: [],
@@ -62,7 +65,29 @@
     recentlyPlayed: [],
     restoredResumeTime: 0,
     contextTrack: null,
-    totalListenedSeconds: parseInt(localStorage.getItem('musisurf_total_listened_sec'), 10) || 9660,
+    totalListenedSeconds: (() => {
+      try {
+        const val = localStorage.getItem('musisurf_total_listened_sec');
+        return val !== null ? parseInt(val, 10) || 0 : 0;
+      } catch (e) { return 0; }
+    })(),
+    totalSongsPlayed: (() => {
+      try {
+        const val = localStorage.getItem('musisurf_total_songs_played');
+        return val !== null ? parseInt(val, 10) || 0 : 0;
+      } catch (e) { return 0; }
+    })(),
+    silenceCache: (() => {
+      try {
+        return JSON.parse(localStorage.getItem('musisurf_silence_cache') || '{}');
+      } catch (e) { return {}; }
+    })(),
+    _currentTrackPlayedRecorded: false,
+    _currentTrackListeningSeconds: 0,
+    _lastTrackedPlaybackTime: null,
+    _lastTrackedDeck: null,
+    _tailSilenceStartTime: null,
+    _lastStatsSaveTime: 0,
     activePlayerEngine: 'audio',
     activeSearchFilter: 'all',
     trackPlayCounts: (() => {
@@ -571,6 +596,14 @@
       const storedUser = localStorage.getItem('musisurf_user');
       if (storedUser) {
         state.currentUser = JSON.parse(storedUser);
+        if (state.currentUser) {
+          if (typeof state.currentUser.totalListenedSeconds === 'number' && !state.totalListenedSeconds) {
+            state.totalListenedSeconds = state.currentUser.totalListenedSeconds;
+          }
+          if (typeof state.currentUser.totalSongsPlayed === 'number' && !state.totalSongsPlayed) {
+            state.totalSongsPlayed = state.currentUser.totalSongsPlayed;
+          }
+        }
       }
     } catch (e) {}
 
@@ -1171,6 +1204,85 @@
     elements.audioSecondary = getSecondaryDeck();
   }
 
+  // Stable Track Identity Comparison (handles IDs, ytIds, audio URLs, and normalized title+artist)
+  function isSameTrack(t1, t2) {
+    if (!t1 || !t2) return false;
+    if (t1 === t2) return true;
+    if (t1.id && t2.id && String(t1.id) === String(t2.id)) return true;
+    if (t1.ytId && t2.ytId && String(t1.ytId) === String(t2.ytId)) return true;
+    if (t1.audioUrl && t2.audioUrl && t1.audioUrl === t2.audioUrl) return true;
+    const title1 = (t1.title || '').trim().toLowerCase();
+    const title2 = (t2.title || '').trim().toLowerCase();
+    const artist1 = (t1.artist || '').trim().toLowerCase();
+    const artist2 = (t2.artist || '').trim().toLowerCase();
+    if (title1 && title1 === title2 && artist1 && artist1 === artist2) return true;
+    return false;
+  }
+
+  // Sound Capsule & Listening Statistics Sync
+  function saveListeningStats() {
+    try {
+      localStorage.setItem('musisurf_total_listened_sec', String(Math.floor(state.totalListenedSeconds || 0)));
+      localStorage.setItem('musisurf_total_songs_played', String(state.totalSongsPlayed || 0));
+      if (state.currentUser) {
+        state.currentUser.totalListenedSeconds = state.totalListenedSeconds;
+        state.currentUser.totalSongsPlayed = state.totalSongsPlayed;
+        localStorage.setItem('musisurf_user', JSON.stringify(state.currentUser));
+      }
+    } catch (e) {}
+  }
+
+  function updateSoundCapsuleUI() {
+    const totalMinutes = Math.floor((state.totalListenedSeconds || 0) / 60);
+    const totalSongs = state.totalSongsPlayed || 0;
+    if (elements.replayMinutesCount) {
+      elements.replayMinutesCount.textContent = totalMinutes.toLocaleString();
+    }
+    if (elements.replayTotalSongsCount) {
+      elements.replayTotalSongsCount.textContent = totalSongs.toLocaleString();
+    }
+  }
+
+  function checkAndRecordSongPlayed(deck) {
+    if (!state.currentTrack || state._currentTrackPlayedRecorded) return;
+    const dur = (deck && deck.duration) || state.currentTrack.duration || 0;
+    // Meaningful listening threshold: >= 15s (or >= 25% if track is short, e.g. < 60s)
+    const threshold = (dur > 0 && dur < 60) ? Math.max(5, dur * 0.25) : 15;
+    if (state._currentTrackListeningSeconds >= threshold) {
+      state._currentTrackPlayedRecorded = true;
+      state.totalSongsPlayed = (state.totalSongsPlayed || 0) + 1;
+      saveListeningStats();
+      updateSoundCapsuleUI();
+      recordTrackPlay(state.currentTrack);
+    }
+  }
+
+  function accumulatePlaybackTime(deck) {
+    if (!deck || deck.paused || !state.isPlaying || state.isTrackLoading || isYouTubeActive()) {
+      state._lastTrackedPlaybackTime = null;
+      return;
+    }
+    const cur = deck.currentTime;
+    if (state._lastTrackedDeck === deck && typeof state._lastTrackedPlaybackTime === 'number') {
+      const delta = cur - state._lastTrackedPlaybackTime;
+      // Contiguous playback tick (ignore seeks and jumps)
+      if (delta > 0 && delta < 2.0) {
+        state.totalListenedSeconds = (state.totalListenedSeconds || 0) + delta;
+        state._currentTrackListeningSeconds = (state._currentTrackListeningSeconds || 0) + delta;
+        checkAndRecordSongPlayed(deck);
+
+        const now = Date.now();
+        if (now - (state._lastStatsSaveTime || 0) >= 5000) {
+          state._lastStatsSaveTime = now;
+          saveListeningStats();
+        }
+        updateSoundCapsuleUI();
+      }
+    }
+    state._lastTrackedPlaybackTime = cur;
+    state._lastTrackedDeck = deck;
+  }
+
   // Real Audio Silence Detection Engine (-42 dB threshold, 150ms window)
   let audioContextInstance = null;
   function getAudioContext() {
@@ -1184,9 +1296,19 @@
     return audioContextInstance;
   }
 
+  function saveSilenceCache() {
+    try {
+      localStorage.setItem('musisurf_silence_cache', JSON.stringify(state.silenceCache || {}));
+    } catch (e) {}
+  }
+
   async function detectTrackStartSilence(track, streamUrl) {
     if (!track || !streamUrl) return 0;
     if (typeof track._silenceStartOffset === 'number') return track._silenceStartOffset;
+    if (state.silenceCache && state.silenceCache[track.id]?.startOffset !== undefined) {
+      track._silenceStartOffset = state.silenceCache[track.id].startOffset;
+      return track._silenceStartOffset;
+    }
     if (!state.settings.removeDeadSilence) {
       track._silenceStartOffset = 0;
       return 0;
@@ -1200,9 +1322,9 @@
       if (ctx.state === 'suspended') {
         ctx.resume().catch(() => {});
       }
-      // Fetch initial 350KB chunk using HTTP Range request
+      // Fetch initial 384KB chunk using HTTP Range request
       const res = await fetch(streamUrl, {
-        headers: { Range: 'bytes=0-358400' }
+        headers: { Range: 'bytes=0-393216' }
       });
       if (!res.ok && res.status !== 206) {
         track._silenceStartOffset = 0;
@@ -1238,13 +1360,19 @@
       }
 
       const audibleStartTime = audibleStartSample / sampleRate;
-      // Skip dead air only if >= 350ms to preserve soft natural musical intros
-      if (audibleStartTime >= 0.35) {
-        const offset = Math.max(0, audibleStartTime - 0.05); // 50ms safety margin
+      // Skip dead air only if >= 0.5s to preserve soft natural musical intros
+      if (audibleStartTime >= 0.5) {
+        const offset = Math.max(0, audibleStartTime - 0.06); // 60ms safety lead-in margin
         track._silenceStartOffset = Math.round(offset * 100) / 100;
+        if (!state.silenceCache) state.silenceCache = {};
+        state.silenceCache[track.id] = { ...(state.silenceCache[track.id] || {}), startOffset: track._silenceStartOffset };
+        saveSilenceCache();
         console.log(`[Skip Silence] Detected ${audibleStartTime.toFixed(2)}s intro dead air in "${track.title}". Fast-forwarding to ${track._silenceStartOffset}s`);
       } else {
         track._silenceStartOffset = 0;
+        if (!state.silenceCache) state.silenceCache = {};
+        state.silenceCache[track.id] = { ...(state.silenceCache[track.id] || {}), startOffset: 0 };
+        saveSilenceCache();
       }
       return track._silenceStartOffset;
     } catch (err) {
@@ -1266,7 +1394,7 @@
   let crossfadeFadeInTimer = null;
   let crossfadeFadeOutTimer = null;
 
-  function cancelActiveCrossfade() {
+  function cancelActiveCrossfade(destroyPreload = false) {
     if (crossfadeIntervalTimer) {
       clearInterval(crossfadeIntervalTimer);
       crossfadeIntervalTimer = null;
@@ -1280,19 +1408,31 @@
       crossfadeFadeOutTimer = null;
     }
     state.isCrossfading = false;
-    state.isTransitionPreloaded = false;
-    state.preloadedNextTrack = null;
 
-    const sec = getSecondaryDeck();
-    if (sec) {
-      sec._fadeHandler = null;
-      try {
-        sec.pause();
-        sec.removeAttribute('src');
-        sec.load();
-      } catch (e) {}
-      sec.volume = 0;
+    if (destroyPreload) {
+      state.isTransitionPreloaded = false;
+      state.preloadedNextTrack = null;
+      const sec = getSecondaryDeck();
+      if (sec) {
+        sec._fadeHandler = null;
+        try {
+          sec.pause();
+          sec.removeAttribute('src');
+          sec.load();
+        } catch (e) {}
+        sec.volume = 0;
+      }
+    } else {
+      const sec = getSecondaryDeck();
+      if (sec) {
+        sec._fadeHandler = null;
+        try {
+          sec.pause();
+        } catch (e) {}
+        sec.volume = 0;
+      }
     }
+
     const act = getActiveDeck();
     if (act) {
       act._fadeHandler = null;
@@ -1301,7 +1441,7 @@
   }
 
   function fadeAudioOutAndPause(callback) {
-    cancelActiveCrossfade();
+    cancelActiveCrossfade(false);
     try {
       getActiveDeck().pause();
     } catch (e) {}
@@ -1310,7 +1450,7 @@
   }
 
   function applyCrossfadeIn() {
-    cancelActiveCrossfade();
+    cancelActiveCrossfade(false);
     const act = getActiveDeck();
     const targetVol = state.isMuted ? 0 : (state.volume || 0.8);
     if (targetVol <= 0) {
@@ -1368,8 +1508,6 @@
       outgoing._fadeHandler = null;
       try {
         outgoing.pause();
-        outgoing.removeAttribute('src');
-        outgoing.load();
       } catch (e) {}
       outgoing.volume = masterVol;
     }
@@ -1387,16 +1525,19 @@
     state.isCrossfading = false;
     state.isTransitionPreloaded = false;
     state.preloadedNextTrack = null;
+    state._currentTrackPlayedRecorded = false;
+    state._currentTrackListeningSeconds = 0;
+    state._lastTrackedPlaybackTime = null;
+    state._tailSilenceStartTime = null;
 
-    if (state.userQueue && state.userQueue.length > 0 && state.userQueue[0].id === nextTrackObj.id) {
+    if (state.userQueue && state.userQueue.length > 0 && isSameTrack(state.userQueue[0], nextTrackObj)) {
       state.userQueue.shift();
-    } else if (state.contextQueue && state.contextQueue.length > state.contextIndex + 1 && state.contextQueue[state.contextIndex + 1].id === nextTrackObj.id) {
+    } else if (state.contextQueue && state.contextQueue.length > state.contextIndex + 1 && isSameTrack(state.contextQueue[state.contextIndex + 1], nextTrackObj)) {
       state.contextIndex++;
     }
 
     state.currentTrack = nextTrackObj;
     recordRecentlyPlayed(nextTrackObj);
-    recordTrackPlay(nextTrackObj);
     updatePlayerTitlesWithTick(nextTrackObj);
     if (elements.playerArtist) elements.playerArtist.textContent = nextTrackObj.artist;
     if (elements.playerCoverImg) elements.playerCoverImg.src = nextTrackObj.image;
@@ -1421,13 +1562,15 @@
         navigator.mediaSession.playbackState = 'playing';
       } catch (e) {}
     }
+
+    schedulePreloadNextTrack(1500);
   }
 
   function startEqualPowerCrossfade(nextTrackObj, streamUrl, overrideCfSec) {
-    if (!nextTrackObj || state.isCrossfading) return;
+    if (!nextTrackObj || state.isCrossfading || state.isTransitioning) return;
     const cfSec = overrideCfSec || state.settings.crossfade || 0;
     if (cfSec <= 0) {
-      nextTrack();
+      transitionToNextSong(nextTrackObj);
       return;
     }
     const outgoing = getActiveDeck();
@@ -1467,22 +1610,33 @@
     };
 
     incoming.play().then(() => {
-      // 1. Foreground 25ms timer
       crossfadeIntervalTimer = setInterval(stepFade, 25);
-      // 2. Background audio-thread hook (survives background timer throttling)
       incoming._fadeHandler = stepFade;
       outgoing._fadeHandler = stepFade;
     }).catch(err => {
       console.warn('Equal-power crossfade play error:', err);
-      cancelActiveCrossfade();
-      nextTrack();
+      cancelActiveCrossfade(false);
+      transitionToNextSong(nextTrackObj);
     });
   }
 
+  let preloadDebounceTimer = null;
+  function schedulePreloadNextTrack(delayMs = 1500) {
+    if (preloadDebounceTimer) clearTimeout(preloadDebounceTimer);
+    preloadDebounceTimer = setTimeout(() => {
+      preloadNextTrackForTransition();
+    }, delayMs);
+  }
+
   function preloadNextTrackForTransition() {
-    if (state.isTransitionPreloaded || state.isCrossfading) return;
+    if (state.isTransitionPreloaded || state.isCrossfading || state.isTransitioning) return;
     const nextTrackCandidate = getNextUpcomingTrack();
     if (!nextTrackCandidate) return;
+
+    if (state.preloadedNextTrack && isSameTrack(state.preloadedNextTrack, nextTrackCandidate)) {
+      state.isTransitionPreloaded = true;
+      return;
+    }
 
     state.isTransitionPreloaded = true;
     state.preloadedNextTrack = nextTrackCandidate;
@@ -1507,39 +1661,159 @@
     }
   }
 
+  // Instant Next-Track Switcher (<10ms deck swap when preloaded)
+  function transitionToNextSong(targetTrack = null, queueContext = null) {
+    if (state.isTransitioning) return;
+    state.isTransitioning = true;
+    setTimeout(() => { state.isTransitioning = false; }, 350);
+
+    cancelActiveCrossfade(false);
+
+    let nextSong = targetTrack;
+    if (!nextSong) {
+      if (state.userQueue && state.userQueue.length > 0) {
+        nextSong = state.userQueue.shift();
+      } else if (state.contextQueue && state.contextQueue.length > 0) {
+        if (state.contextIndex + 1 < state.contextQueue.length) {
+          state.contextIndex++;
+          nextSong = state.contextQueue[state.contextIndex];
+        } else if (state.repeatMode === 'all') {
+          state.contextIndex = 0;
+          nextSong = state.contextQueue[0];
+        }
+      } else if (state.repeatMode === 'one' && state.currentTrack) {
+        nextSong = state.currentTrack;
+      } else {
+        const candidate = getNextUpcomingTrack();
+        if (candidate) {
+          nextSong = candidate;
+        }
+      }
+    }
+
+    if (!nextSong) {
+      state.isTransitioning = false;
+      return;
+    }
+
+    // Keep queue updated
+    state.queue = [nextSong, ...state.userQueue, ...(state.contextQueue ? state.contextQueue.slice(state.contextIndex + 1) : [])];
+    state.queueIndex = 0;
+    updateQueueDrawerUI();
+
+    const secDeck = getSecondaryDeck();
+    const actDeck = getActiveDeck();
+    const isPreloaded = state.isTransitionPreloaded && 
+                        state.preloadedNextTrack && 
+                        isSameTrack(state.preloadedNextTrack, nextSong) && 
+                        secDeck && 
+                        secDeck.src && 
+                        secDeck.readyState >= 2;
+
+    if (isPreloaded) {
+      const masterVol = state.isMuted ? 0 : (state.volume || 0.8);
+      try {
+        actDeck.pause();
+      } catch (e) {}
+
+      const startOffset = nextSong._silenceStartOffset || 0;
+      try {
+        if (startOffset > 0) secDeck.currentTime = startOffset;
+      } catch (e) {}
+
+      secDeck.volume = masterVol;
+      const p = secDeck.play();
+      if (p) p.catch(() => {});
+
+      swapActiveDeck();
+      elements.audio = getActiveDeck();
+      elements.audioSecondary = getSecondaryDeck();
+
+      state.currentTrack = nextSong;
+      state.isPlaying = true;
+      state.isTrackLoading = false;
+      state._currentTrackPlayedRecorded = false;
+      state._currentTrackListeningSeconds = 0;
+      state._lastTrackedPlaybackTime = null;
+      state._tailSilenceStartTime = null;
+      state.isTransitionPreloaded = false;
+      state.preloadedNextTrack = null;
+
+      updatePlayPauseButton();
+      updatePlayerTitlesWithTick(nextSong);
+      if (elements.playerArtist) elements.playerArtist.textContent = nextSong.artist;
+      if (elements.playerCoverImg) elements.playerCoverImg.src = nextSong.image;
+      if (elements.totalDurationLabel) elements.totalDurationLabel.textContent = nextSong.durationStr || formatTime(nextSong.duration || 0);
+      if (elements.mobPlayerArtist) elements.mobPlayerArtist.textContent = nextSong.artist;
+      if (elements.mobPlayerCover) elements.mobPlayerCover.src = nextSong.image;
+      if (elements.mobTotalDuration) elements.mobTotalDuration.textContent = nextSong.durationStr || formatTime(nextSong.duration || 0);
+      updateHeartIcon(nextSong.id);
+      highlightPlayingTrackInTables(nextSong.id);
+      applyLyricsDynamicBackground(nextSong);
+      loadLyricsForTrack(nextSong.title, nextSong.artist);
+      recordRecentlyPlayed(nextSong);
+
+      if ('mediaSession' in navigator) {
+        try {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: nextSong.title,
+            artist: nextSong.artist,
+            album: nextSong.album || 'MusiSurf',
+            artwork: [{ src: nextSong.image, sizes: '500x500', type: 'image/jpeg' }]
+          });
+          navigator.mediaSession.playbackState = 'playing';
+        } catch (e) {}
+      }
+
+      schedulePreloadNextTrack(1500);
+      state.isTransitioning = false;
+    } else {
+      state.isTransitioning = false;
+      playTrack(nextSong, queueContext || state.contextQueue, true);
+    }
+  }
+
   function checkPlaybackCrossfadeAndTransitions(cur, dur) {
-    if (!state.isPlaying || state.isTrackLoading || isYouTubeActive()) return;
+    if (!state.isPlaying || state.isTrackLoading || isYouTubeActive() || state.isTransitioning) return;
     const actDeck = getActiveDeck();
     if (!actDeck || actDeck.paused || actDeck.seeking) return;
     if (dur <= 0 || !Number.isFinite(dur) || !Number.isFinite(cur)) return;
 
-    const timeLeft = dur - cur;
+    // Coordinated Skip Silence and Crossfade
+    let endingSilenceSec = 0;
+    if (state.settings.removeDeadSilence && state.currentTrack) {
+      endingSilenceSec = state.currentTrack._endingSilenceSec || (state.silenceCache[state.currentTrack.id]?.endingSilenceSec) || 0;
+    }
+
+    const effectiveDur = Math.max(3, dur - endingSilenceSec);
+    const effectiveTimeLeft = effectiveDur - cur;
     const cfSec = state.settings.crossfade || 0;
 
-    if (cfSec > 0 && dur > 6) {
-      // Dynamic clamp for short tracks
-      const effectiveCfSec = Math.min(cfSec, Math.max(1, Math.floor(dur * 0.35)));
+    if (cfSec > 0 && effectiveDur > 6) {
+      const effectiveCfSec = Math.min(cfSec, Math.max(1, Math.floor(effectiveDur * 0.35)));
 
-      // Phase 1: Pre-load incoming track when within (effectiveCfSec + 3.5) seconds of ending
-      if (timeLeft <= (effectiveCfSec + 3.5) && !state.isTransitionPreloaded && !state.isCrossfading) {
+      // Preload incoming track well ahead: (effectiveCfSec + 3.5) seconds
+      if (effectiveTimeLeft <= (effectiveCfSec + 3.5) && !state.isTransitionPreloaded && !state.isCrossfading) {
         preloadNextTrackForTransition();
       }
 
-      // Phase 2: Start Equal-Power Crossfade Transition exactly at timeLeft <= effectiveCfSec
-      if (timeLeft <= effectiveCfSec && !state.isCrossfading && state.preloadedNextTrack) {
+      // Start Equal-Power Crossfade Transition exactly when effectiveTimeLeft <= effectiveCfSec
+      if (effectiveTimeLeft <= effectiveCfSec && !state.isCrossfading && state.preloadedNextTrack) {
         const secDeck = getSecondaryDeck();
         if (secDeck && secDeck.src) {
           startEqualPowerCrossfade(state.preloadedNextTrack, secDeck.src, effectiveCfSec);
         }
       }
     } else {
-      // Hard Cut (0s) or very short track: Preload next track 5s before ending for gapless cut
-      if (timeLeft <= 5 && !state.isTransitionPreloaded && !state.isCrossfading) {
+      // Hard Cut (0s) or Skip Silence Dead Air
+      if (effectiveTimeLeft <= 5 && !state.isTransitionPreloaded && !state.isCrossfading) {
         preloadNextTrackForTransition();
+      }
+      if (effectiveTimeLeft <= 0.15 && !state.isCrossfading && !state.isTransitioning) {
+        transitionToNextSong();
       }
     }
   }
-
   // Shuffle Mode & Per-Playlist Shuffle Persistence Controller
   function saveShuffleState() {
     try {
@@ -1670,7 +1944,29 @@
       return;
     }
 
-    recordTrackPlay(track);
+    // Guard: If clicking the CURRENTLY PLAYING song without explicit custom seek
+    if (state.currentTrack && isSameTrack(track, state.currentTrack) && customStartTime === 0) {
+      if (queueList && Array.isArray(queueList)) {
+        state.contextQueue = [...queueList];
+        state.contextIndex = state.contextQueue.findIndex(t => isSameTrack(t, track));
+        if (state.contextIndex === -1) {
+          state.contextQueue.unshift(state.currentTrack);
+          state.contextIndex = 0;
+        }
+      }
+      const act = getActiveDeck();
+      if (!state.isPlaying || (act && act.paused)) {
+        state.isPlaying = true;
+        updatePlayPauseButton();
+        if (act && act.paused) act.play().catch(() => {});
+      }
+      return;
+    }
+
+    state._currentTrackPlayedRecorded = false;
+    state._currentTrackListeningSeconds = 0;
+    state._lastTrackedPlaybackTime = null;
+    state._tailSilenceStartTime = null;
     applyLyricsDynamicBackground(track);
 
     const currentToken = ++activePlayToken;
@@ -2008,6 +2304,7 @@
               if (state.isPlaying && elements.audio.paused) {
                 elements.audio.play().catch(() => {});
               }
+              schedulePreloadNextTrack(1500);
             }
           };
           elements.audio.addEventListener('playing', onAudioReady, { once: true });
@@ -2444,68 +2741,7 @@
   }
 
   function nextTrack() {
-    cancelActiveCrossfade();
-
-    // Priority 1: User-queued songs in explicit order
-    if (state.userQueue && state.userQueue.length > 0) {
-      const nextSong = state.userQueue.shift();
-      state.queue = [nextSong, ...state.userQueue, ...state.contextQueue.slice(state.contextIndex + 1)];
-      state.queueIndex = 0;
-      updateQueueDrawerUI();
-      playTrack(nextSong, null, true);
-      return;
-    }
-
-    // Priority 2: Active Playlist / Album / Context Queue
-    if (state.contextQueue && state.contextQueue.length > 0) {
-      if (state.contextIndex + 1 < state.contextQueue.length) {
-        state.contextIndex++;
-        const nextSong = state.contextQueue[state.contextIndex];
-        state.queue = [nextSong, ...state.userQueue, ...state.contextQueue.slice(state.contextIndex + 1)];
-        state.queueIndex = 0;
-        updateQueueDrawerUI();
-        playTrack(nextSong, state.contextQueue, true);
-        return;
-      } else if (state.repeatMode === 'all') {
-        state.contextIndex = 0;
-        const nextSong = state.contextQueue[0];
-        state.queue = [nextSong, ...state.userQueue, ...state.contextQueue.slice(state.contextIndex + 1)];
-        state.queueIndex = 0;
-        updateQueueDrawerUI();
-        playTrack(nextSong, state.contextQueue, true);
-        return;
-      }
-    }
-
-    // Priority 3: Autoplay / Smart recommendations (keep music flowing seamlessly)
-    const unplayed = (state.allAvailableTracks || []).filter(t => 
-      (!state.contextQueue || !state.contextQueue.some(q => q.id === t.id)) &&
-      (!state.currentTrack || t.id !== state.currentTrack.id)
-    );
-    if (unplayed.length > 0) {
-      const nextSong = unplayed[0];
-      if (!state.contextQueue) state.contextQueue = [];
-      state.contextQueue.push(nextSong);
-      state.contextIndex = state.contextQueue.length - 1;
-      state.queue = [nextSong, ...state.userQueue];
-      updateQueueDrawerUI();
-      playTrack(nextSong, state.contextQueue, true);
-      return;
-    } else if (state.allAvailableTracks && state.allAvailableTracks.length > 0) {
-      const nextSong = state.allAvailableTracks[0];
-      state.contextQueue = [...state.allAvailableTracks];
-      state.contextIndex = 0;
-      state.queue = [nextSong, ...state.userQueue, ...state.contextQueue.slice(1)];
-      updateQueueDrawerUI();
-      playTrack(nextSong, state.contextQueue, true);
-      return;
-    }
-
-    // If repeat mode was one, repeat
-    if (state.repeatMode === 'one' && state.currentTrack) {
-      playTrack(state.currentTrack, state.contextQueue || null, false);
-      return;
-    }
+    transitionToNextSong();
   }
 
   function prevTrack() {
@@ -2587,7 +2823,7 @@
       }
       return;
     }
-    nextTrack();
+    transitionToNextSong();
   }
 
   function isYouTubeActive() {
@@ -2813,14 +3049,14 @@
       if (!state._lastPlaybackSecTick) state._lastPlaybackSecTick = nowTs;
       if (nowTs - state._lastPlaybackSecTick >= 1000) {
         state._lastPlaybackSecTick = nowTs;
-        state.totalListenedSeconds = (state.totalListenedSeconds || 0) + 1;
-        if (state.totalListenedSeconds % 10 === 0) {
-          try { localStorage.setItem('musisurf_total_listened_sec', state.totalListenedSeconds); } catch (e) {}
-        }
-        if (elements.views && elements.views.replay && elements.views.replay.classList.contains('active')) {
-          if (elements.replayMinutesCount) {
-            elements.replayMinutesCount.textContent = Math.max(1, Math.floor(state.totalListenedSeconds / 60)).toLocaleString();
+        if (isYouTubeActive() && state.isPlaying) {
+          state.totalListenedSeconds = (state.totalListenedSeconds || 0) + 1;
+          state._currentTrackListeningSeconds = (state._currentTrackListeningSeconds || 0) + 1;
+          checkAndRecordSongPlayed(null);
+          if (state.totalListenedSeconds % 5 === 0) {
+            saveListeningStats();
           }
+          updateSoundCapsuleUI();
         }
       }
 
@@ -6634,24 +6870,8 @@
       pill.classList.toggle('active', pill.dataset.period === period);
     });
 
-    const songsPool = [...(state.history || []), ...(state.recentlyPlayed || []), ...(state.likedSongs || [])];
-    const totalPlays = Math.max(18, songsPool.length);
-    const playedTracksCount = state.trackPlayCounts ? Object.keys(state.trackPlayCounts).length : 0;
-    const historyCount = (state.history && state.history.length) || 0;
-    const totalSongs = Math.max(playedTracksCount, historyCount, totalPlays);
-
-    // Dynamic Live Sound Capsule Minutes
-    const totalMinutes = Math.max(1, Math.floor((state.totalListenedSeconds || 9660) / 60));
-
-    if (elements.replayMinutesCount) {
-      elements.replayMinutesCount.textContent = totalMinutes.toLocaleString();
-    }
-    if (elements.replayPlaysCount) {
-      elements.replayPlaysCount.textContent = `${totalPlays} plays • 7 days of listening`;
-    }
-    if (elements.replayTotalSongsCount) {
-      elements.replayTotalSongsCount.textContent = totalSongs.toLocaleString();
-    }
+    // Real dynamic Sound Capsule statistics
+    updateSoundCapsuleUI();
 
     // Determine #1 Most Played Song strictly from persistent track play counts
     let topSong = null;
@@ -6666,17 +6886,16 @@
     }
 
     if (!topSong) {
-      // Stable fallback: liked songs or history without changing to currently playing track
       topSong = (state.likedSongs && state.likedSongs[0]) || (state.history && state.history[0]) || {
         title: 'Starboy',
         artist: 'The Weeknd',
         image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=240&auto=format&fit=crop&q=80',
         duration: 230
       };
-      maxPlays = 14;
+      maxPlays = 0;
     }
 
-    const finalTopPlays = maxPlays > 0 ? maxPlays : (state.history?.length || 1);
+    const finalTopPlays = maxPlays;
 
     if (elements.replayTopSongImg) {
       elements.replayTopSongImg.src = topSong.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=240&auto=format&fit=crop&q=80';
@@ -6732,10 +6951,11 @@
   }
 
   function shareReplay() {
-    const minutes = elements.replayMinutesCount?.textContent || '161';
+    const minutes = Math.floor((state.totalListenedSeconds || 0) / 60);
+    const songs = state.totalSongsPlayed || 0;
     const topSong = elements.replayTopSongTitle?.textContent || 'Top Track';
     const artist = elements.replayTopSongArtist?.textContent || 'Artist';
-    const text = `🔥 My MusiSurf Sound Capsule: ${minutes} minutes listened, Top Song: ${topSong} by ${artist}! Ride the wave of pure music at ${window.location.origin}`;
+    const text = `🔥 My MusiSurf Sound Capsule: ${minutes.toLocaleString()} mins listened across ${songs.toLocaleString()} songs played! Top Song: ${topSong} by ${artist}! Ride the wave of pure music at ${window.location.origin}`;
     if (navigator.share) {
       navigator.share({ title: 'MusiSurf Sound Capsule', text: text, url: window.location.href }).catch(() => {});
     } else {
@@ -7929,6 +8149,7 @@
         }
       });
       deck.addEventListener('pause', () => {
+        state._lastTrackedPlaybackTime = null;
         if (deck === getActiveDeck() && !state.isCrossfading) {
           state.isPlaying = false;
           updatePlayPauseButton();
@@ -7941,6 +8162,7 @@
         }
 
         if (deck !== getActiveDeck() || isYouTubeActive() || state.isTrackLoading) return;
+        accumulatePlaybackTime(deck);
         if (state.isPlaying && !state.isDraggingProgress && state.currentTrack) {
           const cur = getCurrentPlaybackTime();
           if (state.restoredResumeTime > 0 && cur >= 0.5) {
