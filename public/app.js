@@ -1273,6 +1273,7 @@
 
     const sec = getSecondaryDeck();
     if (sec) {
+      sec._fadeHandler = null;
       try {
         sec.pause();
         sec.removeAttribute('src');
@@ -1282,6 +1283,7 @@
     }
     const act = getActiveDeck();
     if (act) {
+      act._fadeHandler = null;
       act.volume = state.isMuted ? 0 : (state.volume || 0.8);
     }
   }
@@ -1341,9 +1343,77 @@
     return null;
   }
 
-  function startEqualPowerCrossfade(nextTrackObj, streamUrl) {
+  function finalizeCrossfade(nextTrackObj, masterVol) {
+    if (crossfadeIntervalTimer) {
+      clearInterval(crossfadeIntervalTimer);
+      crossfadeIntervalTimer = null;
+    }
+
+    const outgoing = getActiveDeck();
+    const incoming = getSecondaryDeck();
+
+    if (outgoing) {
+      outgoing._fadeHandler = null;
+      try {
+        outgoing.pause();
+        outgoing.removeAttribute('src');
+        outgoing.load();
+      } catch (e) {}
+      outgoing.volume = masterVol;
+    }
+
+    if (incoming) {
+      incoming._fadeHandler = null;
+      incoming.volume = masterVol;
+    }
+
+    swapActiveDeck();
+    elements.audio = getActiveDeck();
+    elements.audioSecondary = getSecondaryDeck();
+    elements.audio.volume = masterVol;
+
+    state.isCrossfading = false;
+    state.isTransitionPreloaded = false;
+    state.preloadedNextTrack = null;
+
+    if (state.userQueue && state.userQueue.length > 0 && state.userQueue[0].id === nextTrackObj.id) {
+      state.userQueue.shift();
+    } else if (state.contextQueue && state.contextQueue.length > state.contextIndex + 1 && state.contextQueue[state.contextIndex + 1].id === nextTrackObj.id) {
+      state.contextIndex++;
+    }
+
+    state.currentTrack = nextTrackObj;
+    recordRecentlyPlayed(nextTrackObj);
+    recordTrackPlay(nextTrackObj);
+    updatePlayerTitlesWithTick(nextTrackObj);
+    if (elements.playerArtist) elements.playerArtist.textContent = nextTrackObj.artist;
+    if (elements.playerCoverImg) elements.playerCoverImg.src = nextTrackObj.image;
+    if (elements.totalDurationLabel) elements.totalDurationLabel.textContent = nextTrackObj.durationStr || formatTime(nextTrackObj.duration || 0);
+    if (elements.mobPlayerArtist) elements.mobPlayerArtist.textContent = nextTrackObj.artist;
+    if (elements.mobPlayerCover) elements.mobPlayerCover.src = nextTrackObj.image;
+    if (elements.mobTotalDuration) elements.mobTotalDuration.textContent = nextTrackObj.durationStr || formatTime(nextTrackObj.duration || 0);
+    updateHeartIcon(nextTrackObj.id);
+    updateQueueDrawerUI();
+    highlightPlayingTrackInTables(nextTrackObj.id);
+    applyLyricsDynamicBackground(nextTrackObj);
+    loadLyricsForTrack(nextTrackObj.title, nextTrackObj.artist);
+
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: nextTrackObj.title,
+          artist: nextTrackObj.artist,
+          album: nextTrackObj.album || 'MusiSurf',
+          artwork: [{ src: nextTrackObj.image, sizes: '500x500', type: 'image/jpeg' }]
+        });
+        navigator.mediaSession.playbackState = 'playing';
+      } catch (e) {}
+    }
+  }
+
+  function startEqualPowerCrossfade(nextTrackObj, streamUrl, overrideCfSec) {
     if (!nextTrackObj || state.isCrossfading) return;
-    const cfSec = state.settings.crossfade || 0;
+    const cfSec = overrideCfSec || state.settings.crossfade || 0;
     if (cfSec <= 0) {
       nextTrack();
       return;
@@ -1367,75 +1437,95 @@
       incoming.currentTime = startOffset;
     } catch (e) {}
 
+    const stepFade = () => {
+      if (!state.isCrossfading) return;
+      const elapsed = performance.now() - startTime;
+      const p = Math.min(1, Math.max(0, elapsed / durationMs));
+
+      // Mathematical Equal-Power Crossfade curves (Zero acoustic dip):
+      const outGain = Math.cos(p * 0.5 * Math.PI);
+      const inGain = Math.sin(p * 0.5 * Math.PI);
+
+      outgoing.volume = Math.max(0, Math.min(1, masterVol * outGain));
+      incoming.volume = Math.max(0, Math.min(1, masterVol * inGain));
+
+      if (p >= 1) {
+        finalizeCrossfade(nextTrackObj, masterVol);
+      }
+    };
+
     incoming.play().then(() => {
-      crossfadeIntervalTimer = setInterval(() => {
-        const elapsed = performance.now() - startTime;
-        const p = Math.min(1, elapsed / durationMs);
-
-        // Mathematical Equal-Power Crossfade curves:
-        const outGain = Math.cos(p * 0.5 * Math.PI);
-        const inGain = Math.sin(p * 0.5 * Math.PI);
-
-        outgoing.volume = Math.max(0, Math.min(1, masterVol * outGain));
-        incoming.volume = Math.max(0, Math.min(1, masterVol * inGain));
-
-        if (p >= 1) {
-          clearInterval(crossfadeIntervalTimer);
-          crossfadeIntervalTimer = null;
-
-          try {
-            outgoing.pause();
-            outgoing.removeAttribute('src');
-            outgoing.load();
-          } catch (e) {}
-          outgoing.volume = masterVol;
-
-          swapActiveDeck();
-          elements.audio = getActiveDeck();
-          elements.audioSecondary = getSecondaryDeck();
-          elements.audio.volume = masterVol;
-
-          state.isCrossfading = false;
-          state.isTransitionPreloaded = false;
-          state.preloadedNextTrack = null;
-
-          if (state.userQueue.length > 0 && state.userQueue[0].id === nextTrackObj.id) {
-            state.userQueue.shift();
-          } else if (state.contextQueue.length > state.contextIndex + 1 && state.contextQueue[state.contextIndex + 1].id === nextTrackObj.id) {
-            state.contextIndex++;
-          }
-
-          state.currentTrack = nextTrackObj;
-          recordRecentlyPlayed(nextTrackObj);
-          recordTrackPlay(nextTrackObj);
-          updatePlayerTitlesWithTick(nextTrackObj);
-          elements.playerArtist.textContent = nextTrackObj.artist;
-          elements.playerCoverImg.src = nextTrackObj.image;
-          elements.totalDurationLabel.textContent = nextTrackObj.durationStr || formatTime(nextTrackObj.duration || 0);
-          if (elements.mobPlayerArtist) elements.mobPlayerArtist.textContent = nextTrackObj.artist;
-          if (elements.mobPlayerCover) elements.mobPlayerCover.src = nextTrackObj.image;
-          if (elements.mobTotalDuration) elements.mobTotalDuration.textContent = nextTrackObj.durationStr || formatTime(nextTrackObj.duration || 0);
-          updateHeartIcon(nextTrackObj.id);
-          updateQueueDrawerUI();
-          highlightPlayingTrackInTables(nextTrackObj.id);
-          applyLyricsDynamicBackground(nextTrackObj);
-          loadLyricsForTrack(nextTrackObj.title, nextTrackObj.artist);
-
-          if ('mediaSession' in navigator) {
-            navigator.mediaSession.metadata = new MediaMetadata({
-              title: nextTrackObj.title,
-              artist: nextTrackObj.artist,
-              album: nextTrackObj.album || 'MusiSurf',
-              artwork: [{ src: nextTrackObj.image, sizes: '500x500', type: 'image/jpeg' }]
-            });
-          }
-        }
-      }, 25);
+      // 1. Foreground 25ms timer
+      crossfadeIntervalTimer = setInterval(stepFade, 25);
+      // 2. Background audio-thread hook (survives background timer throttling)
+      incoming._fadeHandler = stepFade;
+      outgoing._fadeHandler = stepFade;
     }).catch(err => {
       console.warn('Equal-power crossfade play error:', err);
       cancelActiveCrossfade();
       nextTrack();
     });
+  }
+
+  function preloadNextTrackForTransition() {
+    if (state.isTransitionPreloaded || state.isCrossfading) return;
+    const nextTrackCandidate = getNextUpcomingTrack();
+    if (!nextTrackCandidate) return;
+
+    state.isTransitionPreloaded = true;
+    state.preloadedNextTrack = nextTrackCandidate;
+    const secDeck = getSecondaryDeck();
+    if (!secDeck) return;
+
+    const isYtNext = nextTrackCandidate.source === 'youtube' || nextTrackCandidate.ytId || (nextTrackCandidate.id && nextTrackCandidate.id.startsWith('yt_'));
+    if (isYtNext && !nextTrackCandidate.streamUrl) {
+      const ytId = nextTrackCandidate.ytId || (nextTrackCandidate.id ? nextTrackCandidate.id.replace('yt_', '') : '');
+      if (ytId) nextTrackCandidate.streamUrl = `/api/yt-stream?id=${encodeURIComponent(ytId)}`;
+    }
+
+    const nextAudioSrc = nextTrackCandidate.audioUrl || nextTrackCandidate.streamUrl || (nextTrackCandidate.audioBlob ? URL.createObjectURL(nextTrackCandidate.audioBlob) : null);
+    if (nextAudioSrc) {
+      secDeck.src = nextAudioSrc;
+      secDeck.preload = 'auto';
+      secDeck.volume = 0;
+      secDeck.load();
+      if (state.settings.removeDeadSilence) {
+        detectTrackStartSilence(nextTrackCandidate, nextAudioSrc).catch(() => {});
+      }
+    }
+  }
+
+  function checkPlaybackCrossfadeAndTransitions(cur, dur) {
+    if (!state.isPlaying || state.isTrackLoading || isYouTubeActive()) return;
+    const actDeck = getActiveDeck();
+    if (!actDeck || actDeck.paused || actDeck.seeking) return;
+    if (dur <= 0 || !Number.isFinite(dur) || !Number.isFinite(cur)) return;
+
+    const timeLeft = dur - cur;
+    const cfSec = state.settings.crossfade || 0;
+
+    if (cfSec > 0 && dur > 6) {
+      // Dynamic clamp for short tracks
+      const effectiveCfSec = Math.min(cfSec, Math.max(1, Math.floor(dur * 0.35)));
+
+      // Phase 1: Pre-load incoming track when within (effectiveCfSec + 3.5) seconds of ending
+      if (timeLeft <= (effectiveCfSec + 3.5) && !state.isTransitionPreloaded && !state.isCrossfading) {
+        preloadNextTrackForTransition();
+      }
+
+      // Phase 2: Start Equal-Power Crossfade Transition exactly at timeLeft <= effectiveCfSec
+      if (timeLeft <= effectiveCfSec && !state.isCrossfading && state.preloadedNextTrack) {
+        const secDeck = getSecondaryDeck();
+        if (secDeck && secDeck.src) {
+          startEqualPowerCrossfade(state.preloadedNextTrack, secDeck.src, effectiveCfSec);
+        }
+      }
+    } else {
+      // Hard Cut (0s) or very short track: Preload next track 5s before ending for gapless cut
+      if (timeLeft <= 5 && !state.isTransitionPreloaded && !state.isCrossfading) {
+        preloadNextTrackForTransition();
+      }
+    }
   }
 
   // Shuffle Mode & Per-Playlist Shuffle Persistence Controller
@@ -2741,45 +2831,8 @@
         if (elements.miniPlayerFill) elements.miniPlayerFill.style.width = '0%';
       }
 
-      // Dual-Deck Equal-Power Crossfade & Dead Silence Coordination
-      const cfSec = state.settings.crossfade || 0;
-      const actDeck = getActiveDeck();
-      if (cfSec > 0 && dur > 12 && !actDeck.paused && !actDeck.seeking && !isYouTubeActive()) {
-        const timeLeft = dur - cur;
-
-        // Phase 1: Pre-load incoming track when within (cfSec + 2.5) seconds of song ending
-        if (timeLeft <= (cfSec + 2.5) && !state.isTransitionPreloaded && !state.isCrossfading) {
-          const nextTrackCandidate = getNextUpcomingTrack();
-          if (nextTrackCandidate) {
-            state.isTransitionPreloaded = true;
-            state.preloadedNextTrack = nextTrackCandidate;
-            const secDeck = getSecondaryDeck();
-            const isYtNext = nextTrackCandidate.source === 'youtube' || nextTrackCandidate.ytId || (nextTrackCandidate.id && nextTrackCandidate.id.startsWith('yt_'));
-            if (isYtNext && !nextTrackCandidate.streamUrl) {
-              const ytId = nextTrackCandidate.ytId || (nextTrackCandidate.id ? nextTrackCandidate.id.replace('yt_', '') : '');
-              if (ytId) nextTrackCandidate.streamUrl = `/api/yt-stream?id=${encodeURIComponent(ytId)}`;
-            }
-            const nextAudioSrc = nextTrackCandidate.audioUrl || nextTrackCandidate.streamUrl || (nextTrackCandidate.audioBlob ? URL.createObjectURL(nextTrackCandidate.audioBlob) : null);
-            if (nextAudioSrc && secDeck) {
-              secDeck.src = nextAudioSrc;
-              secDeck.preload = 'auto';
-              secDeck.volume = 0;
-              secDeck.load();
-              if (state.settings.removeDeadSilence) {
-                detectTrackStartSilence(nextTrackCandidate, nextAudioSrc).catch(() => {});
-              }
-            }
-          }
-        }
-
-        // Phase 2: Start Equal-Power Crossfade Transition exactly at timeLeft <= cfSec
-        if (timeLeft <= cfSec && !state.isCrossfading && state.preloadedNextTrack) {
-          const secDeck = getSecondaryDeck();
-          if (secDeck && secDeck.src) {
-            startEqualPowerCrossfade(state.preloadedNextTrack, secDeck.src);
-          }
-        }
-      }
+      // Check Equal-Power Crossfade & Background Deck Preloading
+      checkPlaybackCrossfadeAndTransitions(cur, dur);
 
       // Sync active lyric line
       syncLyricsWithTime(cur);
@@ -2812,6 +2865,9 @@
         state.lyrics = cached.parsed;
         state.hasSyncedLyrics = true;
         renderLyricsLines(cached.parsed);
+        return;
+      } else if (cached.isAiGenerated) {
+        renderAiLyrics(cached);
         return;
       } else if (cached.plainLyrics) {
         renderPlainLyrics(cached.plainLyrics);
@@ -2894,13 +2950,9 @@
         return;
       }
 
-      // No lyrics found
-      elements.lyricsLinesContainer.innerHTML = `
-        <div style="text-align: center; color: var(--text-secondary); padding: 60px 0;">
-          <p style="font-size: 1.2rem; margin-bottom: 8px;">No synchronized lyrics available for this song.</p>
-          <p style="font-size: 0.9rem; color: var(--text-muted);">Enjoy the music!</p>
-        </div>
-      `;
+      // Built-in AI Lyrics Fallback Trigger
+      await triggerAiLyricsFallback(title, artist, state.currentTrack?.album, durSec, cacheKey);
+      return;
     } catch (err) {
       console.warn('Lyrics fetch failed:', err);
       elements.lyricsLoading.style.display = 'none';
@@ -3032,6 +3084,99 @@
         const div = document.createElement('div');
         div.className = 'lyric-line passed';
         div.textContent = line;
+        elements.lyricsLinesContainer.appendChild(div);
+      }
+    });
+  }
+
+  async function triggerAiLyricsFallback(title, artist, album, durSec, cacheKey) {
+    elements.lyricsLoading.style.display = 'flex';
+    const loadingP = elements.lyricsLoading.querySelector('p');
+    if (loadingP) loadingP.textContent = 'Generating AI-inspired poetic lyrics...';
+
+    try {
+      const aiRes = await fetch('/api/ai-lyrics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          track: title,
+          artist: artist,
+          album: album || '',
+          duration: durSec || null
+        })
+      });
+      const aiData = await aiRes.json();
+      elements.lyricsLoading.style.display = 'none';
+
+      if (aiData && aiData.success && aiData.plainLyrics) {
+        if (!state.lyricsCache) state.lyricsCache = {};
+        state.lyricsCache[cacheKey] = {
+          isAiGenerated: true,
+          plainLyrics: aiData.plainLyrics,
+          language: aiData.language,
+          script: aiData.script,
+          disclaimer: aiData.disclaimer
+        };
+        renderAiLyrics(aiData);
+        return;
+      }
+    } catch (err) {
+      console.warn('AI lyrics generation error:', err);
+    }
+
+    elements.lyricsLoading.style.display = 'none';
+    elements.lyricsLinesContainer.innerHTML = `
+      <div style="text-align: center; color: var(--text-secondary); padding: 60px 0;">
+        <p style="font-size: 1.2rem; margin-bottom: 8px;">No lyrics available for this song.</p>
+        <p style="font-size: 0.9rem; color: var(--text-muted);">Enjoy the music!</p>
+      </div>
+    `;
+  }
+
+  function renderAiLyrics(aiData) {
+    elements.lyricsLinesContainer.innerHTML = '';
+    if (elements.lyricsSyncControls) elements.lyricsSyncControls.style.display = 'none';
+    state.hasSyncedLyrics = false;
+    state.lyrics = [];
+    state.activeLyricIndex = -1;
+
+    const headerCard = document.createElement('div');
+    headerCard.className = 'ai-lyrics-header-card';
+    const langStr = escapeHtml(aiData.language || 'Original');
+    const scriptStr = aiData.script ? ` (${escapeHtml(aiData.script)})` : '';
+    headerCard.innerHTML = `
+      <div class="ai-lyrics-badge">
+        <span class="ai-badge-sparkle">✨</span>
+        <span class="ai-badge-name">AI-Created Lyrics</span>
+        <span class="ai-badge-dot">•</span>
+        <span class="ai-badge-meta">${langStr}${scriptStr}</span>
+      </div>
+      <p class="ai-lyrics-disclaimer">
+        ${escapeHtml(aiData.disclaimer || "AI-created original lyrics inspired by the song's theme. Not the official lyrics.")}
+      </p>
+    `;
+    elements.lyricsLinesContainer.appendChild(headerCard);
+
+    const rawLyrics = aiData.plainLyrics || '';
+    const lines = rawLyrics.split('\n');
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        const spacer = document.createElement('div');
+        spacer.className = 'ai-lyric-spacer';
+        elements.lyricsLinesContainer.appendChild(spacer);
+        return;
+      }
+
+      if (/^\[.+\]$/.test(trimmed)) {
+        const secHeader = document.createElement('div');
+        secHeader.className = 'ai-lyric-section-tag';
+        secHeader.textContent = trimmed;
+        elements.lyricsLinesContainer.appendChild(secHeader);
+      } else {
+        const div = document.createElement('div');
+        div.className = 'lyric-line passed ai-lyric-line';
+        div.textContent = trimmed;
         elements.lyricsLinesContainer.appendChild(div);
       }
     });
@@ -7749,6 +7894,10 @@
         }
       });
       deck.addEventListener('timeupdate', () => {
+        if (typeof deck._fadeHandler === 'function') {
+          deck._fadeHandler();
+        }
+
         if (deck !== getActiveDeck() || isYouTubeActive() || state.isTrackLoading) return;
         if (state.isPlaying && !state.isDraggingProgress && state.currentTrack) {
           const cur = getCurrentPlaybackTime();
@@ -7765,11 +7914,18 @@
             if (elements.miniPlayerFill) elements.miniPlayerFill.style.width = `${pct}%`;
           }
           syncLyricsWithTime(cur);
+
+          // Proactive background crossfade & next-track evaluation
+          checkPlaybackCrossfadeAndTransitions(cur, dur);
         }
       });
       deck.addEventListener('ended', () => {
-        if (deck === getActiveDeck() && !state.isCrossfading) {
-          onTrackEnded();
+        if (deck === getActiveDeck()) {
+          if (state.isCrossfading && state.preloadedNextTrack) {
+            finalizeCrossfade(state.preloadedNextTrack, state.isMuted ? 0 : (state.volume || 0.8));
+          } else if (!state.isCrossfading) {
+            onTrackEnded();
+          }
         }
       });
       deck.addEventListener('error', (err) => {

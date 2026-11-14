@@ -11418,6 +11418,114 @@ body[data-active-view="lyrics"] .content-scroll {
   }
 }
 
+/* ==========================================================================
+   AI-CREATED LYRICS SYSTEM & MINI-PLAYER CONTRAST UPGRADE
+   ========================================================================== */
+
+.ai-lyrics-header-card {
+  margin: 0 0 28px 0;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(29, 185, 84, 0.14) 0%, rgba(30, 45, 65, 0.28) 100%);
+  border: 1px solid rgba(29, 185, 84, 0.32);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  animation: fadeInDown 0.35s ease-out;
+}
+
+.ai-lyrics-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(29, 185, 84, 0.22);
+  border: 1px solid rgba(29, 185, 84, 0.5);
+  padding: 4px 12px;
+  border-radius: 500px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #1ed760;
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+}
+
+.ai-badge-sparkle {
+  font-size: 0.95rem;
+}
+
+.ai-badge-name {
+  color: #ffffff;
+}
+
+.ai-badge-dot {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.ai-badge-meta {
+  color: #1ed760;
+}
+
+.ai-lyrics-disclaimer {
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.78);
+  margin: 0;
+}
+
+.ai-lyric-section-tag {
+  display: inline-block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #1ed760;
+  margin: 20px 0 10px 0;
+  opacity: 0.9;
+}
+
+.ai-lyric-line {
+  font-size: 1.45rem !important;
+  line-height: 1.75 !important;
+  color: rgba(255, 255, 255, 0.94) !important;
+  font-weight: 600;
+  padding: 6px 0;
+  cursor: default !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
+}
+
+.ai-lyric-spacer {
+  height: 16px;
+}
+
+/* Image 4: High Contrast Mini-Player Subtitle & Heart Icon */
+.player-artist {
+  color: #f0f0f0 !important;
+  font-weight: 500 !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95) !important;
+}
+
+.player-artist:hover {
+  color: #ffffff !important;
+  text-decoration: underline !important;
+}
+
+.player-heart-btn {
+  color: #ffffff !important;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.85)) !important;
+  opacity: 0.95 !important;
+}
+
+.player-heart-btn svg {
+  stroke: #ffffff !important;
+  stroke-width: 2.2 !important;
+}
+
+.player-heart-btn.liked svg {
+  fill: #ff3b5c !important;
+  stroke: #ff3b5c !important;
+}
+
+
 
 
 
