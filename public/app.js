@@ -313,11 +313,13 @@
     mobOptTitle: document.getElementById('mobOptTitle'),
     mobOptArtist: document.getElementById('mobOptArtist'),
     mobOptAddToPlaylistBtn: document.getElementById('mobOptAddToPlaylistBtn'),
-    mobOptPlayNextBtn: document.getElementById('mobOptPlayNextBtn'),
+    mobOptGoToQueueBtn: document.getElementById('mobOptGoToQueueBtn'),
     mobOptQueueBtn: document.getElementById('mobOptQueueBtn'),
     mobOptDownloadBtn: document.getElementById('mobOptDownloadBtn'),
     mobOptDownloadText: document.getElementById('mobOptDownloadText'),
     mobOptRemovePlaylistBtn: document.getElementById('mobOptRemovePlaylistBtn'),
+    desktopHeaderBrand: document.getElementById('desktopHeaderBrand'),
+    libHubSoundtrackBtn: document.getElementById('libHubSoundtrackBtn'),
 
     // Sleep Timer Modal
     sleepTimerModal: document.getElementById('sleepTimerModal'),
@@ -2847,8 +2849,41 @@
   }
 
   // ==========================================================================
-  // SYNCHRONIZED LYRICS ENGINE
+  // SYNCHRONIZED LYRICS ENGINE & SMART AUTO-TIMING CONVERTER
   // ==========================================================================
+  function convertPlainLyricsToSynced(plainText, trackDuration) {
+    if (!plainText) return [];
+    const rawLines = plainText.split('\n');
+    const validLines = [];
+    for (const raw of rawLines) {
+      const trimmed = raw.trim();
+      if (!trimmed) continue;
+      // Skip section headers like [मुखड़ा], [अंतरा], [Verse 1], [Chorus], (Outro), etc.
+      if (/^[\[(].+[\])]$/.test(trimmed)) continue;
+      validLines.push(trimmed);
+    }
+    if (validLines.length === 0) return [];
+
+    const totalDur = (trackDuration && trackDuration > 10) ? trackDuration : (getTotalDuration() || 180);
+    // Dynamic intro offset (3s - 5s) and cushion before song finishes (4s - 6s)
+    const startOffset = Math.min(6, Math.max(2.5, totalDur * 0.035));
+    const usableDuration = Math.max(10, totalDur - startOffset - 5);
+
+    // Compute character-weighted time distribution so longer sentences get proportional singing time
+    const totalChars = validLines.reduce((acc, l) => acc + Math.max(l.length, 10), 0);
+    let accumulatedTime = startOffset;
+
+    return validLines.map(line => {
+      const lineTime = Number(accumulatedTime.toFixed(2));
+      const weight = Math.max(line.length, 10) / totalChars;
+      accumulatedTime += weight * usableDuration;
+      return {
+        time: lineTime,
+        text: line
+      };
+    });
+  }
+
   async function loadLyricsForTrack(title, artist) {
     elements.lyricsLoading.style.display = 'flex';
     elements.lyricsLinesContainer.innerHTML = '';
@@ -2860,17 +2895,19 @@
     if (state.lyricsCache && state.lyricsCache[cacheKey]) {
       const cached = state.lyricsCache[cacheKey];
       elements.lyricsLoading.style.display = 'none';
-      if (cached.syncedLyrics && cached.parsed && cached.parsed.length > 0) {
-        state.rawSyncedLyrics = cached.syncedLyrics;
+      if (cached.parsed && cached.parsed.length > 0) {
+        state.rawSyncedLyrics = cached.syncedLyrics || '';
         state.lyrics = cached.parsed;
         state.hasSyncedLyrics = true;
         renderLyricsLines(cached.parsed);
         return;
-      } else if (cached.isAiGenerated) {
-        renderAiLyrics(cached);
-        return;
       } else if (cached.plainLyrics) {
-        renderPlainLyrics(cached.plainLyrics);
+        const trackDur = Math.round(getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || 180);
+        const parsed = convertPlainLyricsToSynced(cached.plainLyrics, trackDur);
+        state.lyrics = parsed;
+        state.hasSyncedLyrics = true;
+        cached.parsed = parsed;
+        renderLyricsLines(parsed);
         return;
       }
     }
@@ -2943,11 +2980,17 @@
       }
 
       if (data.success && data.plainLyrics) {
-        // Render plain lyrics
-        if (!state.lyricsCache) state.lyricsCache = {};
-        state.lyricsCache[cacheKey] = { plainLyrics: data.plainLyrics };
-        renderPlainLyrics(data.plainLyrics);
-        return;
+        // Auto-convert plain lyrics to fully synchronized karaoke lines
+        const trackDur = Math.round(getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || parseDurationToSeconds(state.currentTrack?.durationStr) || 180);
+        const parsed = convertPlainLyricsToSynced(data.plainLyrics, trackDur);
+        if (parsed.length > 0) {
+          state.lyrics = parsed;
+          state.hasSyncedLyrics = true;
+          if (!state.lyricsCache) state.lyricsCache = {};
+          state.lyricsCache[cacheKey] = { plainLyrics: data.plainLyrics, parsed };
+          renderLyricsLines(parsed);
+          return;
+        }
       }
 
       // Built-in AI Lyrics Fallback Trigger
@@ -3032,7 +3075,7 @@
       const matches = [...line.matchAll(timeReg)];
       const text = line.replace(timeReg, '').trim();
 
-      if (text) {
+      if (text && !/^[\[(].+[\])]$/.test(text)) {
         for (const match of matches) {
           const mins = parseInt(match[1], 10);
           const secs = parseInt(match[2], 10);
@@ -3078,21 +3121,17 @@
   }
 
   function renderPlainLyrics(plainText) {
-    elements.lyricsLinesContainer.innerHTML = '';
-    plainText.split('\n').forEach(line => {
-      if (line.trim()) {
-        const div = document.createElement('div');
-        div.className = 'lyric-line passed';
-        div.textContent = line;
-        elements.lyricsLinesContainer.appendChild(div);
-      }
-    });
+    const trackDur = Math.round(getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || 180);
+    const parsed = convertPlainLyricsToSynced(plainText, trackDur);
+    state.hasSyncedLyrics = true;
+    state.lyrics = parsed;
+    renderLyricsLines(parsed);
   }
 
   async function triggerAiLyricsFallback(title, artist, album, durSec, cacheKey) {
     elements.lyricsLoading.style.display = 'flex';
     const loadingP = elements.lyricsLoading.querySelector('p');
-    if (loadingP) loadingP.textContent = 'Generating AI-inspired poetic lyrics...';
+    if (loadingP) loadingP.textContent = 'Generating live synchronized lyrics...';
 
     try {
       const aiRes = await fetch('/api/ai-lyrics', {
@@ -3109,15 +3148,17 @@
       elements.lyricsLoading.style.display = 'none';
 
       if (aiData && aiData.success && aiData.plainLyrics) {
+        const trackDur = Math.round(durSec || getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || 180);
+        const parsed = convertPlainLyricsToSynced(aiData.plainLyrics, trackDur);
+        state.hasSyncedLyrics = true;
+        state.lyrics = parsed;
         if (!state.lyricsCache) state.lyricsCache = {};
         state.lyricsCache[cacheKey] = {
           isAiGenerated: true,
           plainLyrics: aiData.plainLyrics,
-          language: aiData.language,
-          script: aiData.script,
-          disclaimer: aiData.disclaimer
+          parsed
         };
-        renderAiLyrics(aiData);
+        renderLyricsLines(parsed);
         return;
       }
     } catch (err) {
@@ -3134,52 +3175,12 @@
   }
 
   function renderAiLyrics(aiData) {
-    elements.lyricsLinesContainer.innerHTML = '';
-    if (elements.lyricsSyncControls) elements.lyricsSyncControls.style.display = 'none';
-    state.hasSyncedLyrics = false;
-    state.lyrics = [];
-    state.activeLyricIndex = -1;
-
-    const headerCard = document.createElement('div');
-    headerCard.className = 'ai-lyrics-header-card';
-    const langStr = escapeHtml(aiData.language || 'Original');
-    const scriptStr = aiData.script ? ` (${escapeHtml(aiData.script)})` : '';
-    headerCard.innerHTML = `
-      <div class="ai-lyrics-badge">
-        <span class="ai-badge-sparkle">✨</span>
-        <span class="ai-badge-name">AI-Created Lyrics</span>
-        <span class="ai-badge-dot">•</span>
-        <span class="ai-badge-meta">${langStr}${scriptStr}</span>
-      </div>
-      <p class="ai-lyrics-disclaimer">
-        ${escapeHtml(aiData.disclaimer || "AI-created original lyrics inspired by the song's theme. Not the official lyrics.")}
-      </p>
-    `;
-    elements.lyricsLinesContainer.appendChild(headerCard);
-
     const rawLyrics = aiData.plainLyrics || '';
-    const lines = rawLyrics.split('\n');
-    lines.forEach(line => {
-      const trimmed = line.trim();
-      if (!trimmed) {
-        const spacer = document.createElement('div');
-        spacer.className = 'ai-lyric-spacer';
-        elements.lyricsLinesContainer.appendChild(spacer);
-        return;
-      }
-
-      if (/^\[.+\]$/.test(trimmed)) {
-        const secHeader = document.createElement('div');
-        secHeader.className = 'ai-lyric-section-tag';
-        secHeader.textContent = trimmed;
-        elements.lyricsLinesContainer.appendChild(secHeader);
-      } else {
-        const div = document.createElement('div');
-        div.className = 'lyric-line passed ai-lyric-line';
-        div.textContent = trimmed;
-        elements.lyricsLinesContainer.appendChild(div);
-      }
-    });
+    const trackDur = Math.round(getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || 180);
+    const parsed = convertPlainLyricsToSynced(rawLyrics, trackDur);
+    state.hasSyncedLyrics = true;
+    state.lyrics = parsed;
+    renderLyricsLines(parsed);
   }
 
   function syncLyricsWithTime(currentTime) {
@@ -4041,9 +4042,9 @@
   }
 
   function formatDateAdded(ts) {
-    if (!ts) return 'Recently';
+    if (!ts) return 'Today';
     const d = new Date(ts);
-    if (isNaN(d.getTime())) return 'Recently';
+    if (isNaN(d.getTime())) return 'Today';
     const now = new Date();
     const dDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
     const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -4051,16 +4052,11 @@
 
     if (diffDays <= 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
 
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const month = months[d.getMonth()];
-    const day = d.getDate();
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
-    if (year === now.getFullYear()) {
-      return `${month} ${day}`;
-    }
-    return `${month} ${day}, ${year}`;
+    return `${day}/${month}/${year}`;
   }
 
   function createTableRow(track, index, queueList, isPlaylistTable = false) {
@@ -5164,9 +5160,6 @@
       div.innerHTML = `
         <div class="playlist-cover-mini">
           ${createPlaylistCollageHtml(pl.tracks)}
-          <button class="playlist-cover-play-btn" title="Play ${escapeHtml(pl.name)}" aria-label="Play">
-            <svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"/></svg>
-          </button>
         </div>
         <div class="library-item-info">
           <span class="library-item-title">${escapeHtml(pl.name)}</span>
@@ -5175,33 +5168,8 @@
         ${pl.isPinned ? '<span class="sidebar-pin-icon" title="Pinned">📌</span>' : ''}
       `;
 
-      // Hover Play Button on Playlist Cover (Starts playback & opens playlist)
-      const playCoverBtn = div.querySelector('.playlist-cover-play-btn');
-      if (playCoverBtn) {
-        playCoverBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          try {
-            if (elements.audio) { elements.audio.pause(); elements.audio.currentTime = 0; }
-            if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.stopVideo === 'function') {
-              state.ytPlayer.stopVideo();
-            }
-          } catch (err) {}
-
-          renderPlaylistView(pl.id);
-          if (pl.tracks && pl.tracks.length > 0) {
-            state.activePlaylistId = pl.id;
-            state.activePlaylistTracks = [...pl.tracks];
-            playTrack(pl.tracks[0], pl.tracks, true, 0);
-          } else {
-            showToast('Playlist is empty, add some songs first!', 'ℹ️');
-          }
-        });
-      }
-
-      // Regular Row Click (Only opens playlist, doesn't auto-play)
-      div.addEventListener('click', (e) => {
-        if (e.target.closest('.playlist-cover-play-btn')) return;
+      // Regular Row Click (Opens playlist)
+      div.addEventListener('click', () => {
         renderPlaylistView(pl.id);
       });
       elements.customPlaylistsList.appendChild(div);
@@ -5391,6 +5359,15 @@
         });
         elements.queueList.appendChild(fragment);
       }
+    }
+  }
+
+  function openQueueDrawer() {
+    if (elements.queueDrawer) {
+      elements.queueDrawer.classList.add('open');
+      if (elements.queueBtn) elements.queueBtn.classList.add('active');
+      if (elements.queueDrawerBackdrop) elements.queueDrawerBackdrop.classList.add('active');
+      requestAnimationFrame(updateQueueDrawerUI);
     }
   }
 
@@ -7292,11 +7269,10 @@
       });
     }
 
-    if (elements.mobOptPlayNextBtn) {
-      elements.mobOptPlayNextBtn.addEventListener('click', () => {
+    if (elements.mobOptGoToQueueBtn) {
+      elements.mobOptGoToQueueBtn.addEventListener('click', () => {
         if (elements.mobTrackOptionsModal) elements.mobTrackOptionsModal.style.display = 'none';
-        const target = state.contextTrack || state.currentTrack;
-        if (target) playNext(target);
+        openQueueDrawer();
       });
     }
 
@@ -7477,9 +7453,22 @@
       });
     }
 
-    // Replay Navigation & Actions (Image 4 & 5)
+    // Desktop Brand Logo Click -> Redirect to Home
+    if (elements.desktopHeaderBrand) {
+      elements.desktopHeaderBrand.style.cursor = 'pointer';
+      elements.desktopHeaderBrand.addEventListener('click', () => {
+        switchView('home');
+        const scrollContainer = document.querySelector('.content-scroll');
+        if (scrollContainer) scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    }
+
+    // Your Soundtrack Navigation & Actions (Image 4 & 5)
     if (elements.navReplayBtn) {
       elements.navReplayBtn.addEventListener('click', () => switchView('replay'));
+    }
+    if (elements.libHubSoundtrackBtn) {
+      elements.libHubSoundtrackBtn.addEventListener('click', () => switchView('replay'));
     }
     if (elements.topStreakBadge) {
       elements.topStreakBadge.addEventListener('click', () => switchView('replay'));
@@ -8031,11 +8020,11 @@
     let lastSearchTapTime = 0;
 
     function triggerSearchFocus() {
-      state.isExploreMode = false;
-      try { localStorage.setItem('musisurf_explore_mode', 'false'); } catch (err) {}
+      state.isExploreMode = true;
+      try { localStorage.setItem('musisurf_explore_mode', 'true'); } catch (err) {}
       switchView('search');
       updateMobNav('mobNavSearch');
-      if (elements.searchBrowseSection) elements.searchBrowseSection.style.display = 'none';
+      if (elements.searchBrowseSection) elements.searchBrowseSection.style.display = 'block';
       if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'block';
       if (elements.searchRecentGrid) elements.searchRecentGrid.style.display = 'grid';
       if (elements.topCompassBtn) elements.topCompassBtn.classList.remove('active');
@@ -8088,32 +8077,23 @@
         }
         clearTimeout(searchHoldTimer);
 
-        const now = Date.now();
-        // Double-click / double-tap detection: directly redirects & focuses searchbar
-        if (now - lastSearchTapTime < 380) {
-          e.preventDefault();
-          lastSearchTapTime = 0;
+        if (state.currentView !== 'search') {
+          // 1st click when in another section: redirect to search section / explore section
+          state.isExploreMode = true;
+          try { localStorage.setItem('musisurf_explore_mode', 'true'); } catch (err) {}
+          switchView('search');
+          if (elements.searchBrowseSection) {
+            elements.searchBrowseSection.style.display = 'block';
+          }
+          if (elements.searchResultsWrapper && (!elements.globalSearchInput || !elements.globalSearchInput.value.trim())) {
+            elements.searchResultsWrapper.style.display = 'none';
+          }
+          if (elements.searchEmptyState) elements.searchEmptyState.style.display = 'none';
+          updateMobNav('mobNavSearch');
+        } else {
+          // Already in search section, click again: redirect/focus to search bar with explore visible
           triggerSearchFocus();
-          return;
         }
-        lastSearchTapTime = now;
-
-        // On single tap: Show explore categories
-        state.isExploreMode = true;
-        try { localStorage.setItem('musisurf_explore_mode', 'true'); } catch (err) {}
-        switchView('search');
-        if (elements.globalSearchInput) elements.globalSearchInput.value = '';
-        if (elements.clearSearchBtn) elements.clearSearchBtn.style.display = 'none';
-        if (elements.searchResultsWrapper) elements.searchResultsWrapper.style.display = 'none';
-        if (elements.searchEmptyState) elements.searchEmptyState.style.display = 'none';
-        if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'none';
-        if (elements.searchRecentGrid) elements.searchRecentGrid.style.display = 'none';
-        if (elements.searchBrowseSection) {
-          elements.searchBrowseSection.style.display = 'block';
-        }
-        if (elements.searchAutocompleteDropdown) elements.searchAutocompleteDropdown.style.display = 'none';
-        if (elements.topCompassBtn) elements.topCompassBtn.classList.add('active');
-        updateMobNav('mobNavSearch');
       });
     }
 

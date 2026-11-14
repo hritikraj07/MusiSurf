@@ -11525,9 +11525,124 @@ body[data-active-view="lyrics"] .content-scroll {
   stroke: #ff3b5c !important;
 }
 
+/* ==========================================================================
+   UI ENHANCEMENTS: LYRICS, PLAYLIST HOVER, QUEUE, LOCAL FILES & SOUNDTRACK
+   ========================================================================== */
 
+/* 1. Lyrics Section: Remove AI card banner from all songs */
+.ai-lyrics-header-card {
+  display: none !important;
+}
 
+/* 2. Playlist Cover: Do NOT show play/pause icon on hover */
+.playlist-cover-play-btn,
+.playlist-cover-mini .playlist-cover-play-btn,
+.playlist-list-item:hover .playlist-cover-mini .playlist-cover-play-btn,
+.app-layout.sidebar-full-width .playlist-cover-play-btn {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
 
+/* 3. Mobile Playlist Options: Remove Pin Playlist option */
+#mobOptPinPlaylistBtn {
+  display: none !important;
+}
 
+/* 4. Inside Playlist: Do NOT show top nav on mobile only */
+@media (max-width: 768px) {
+  body[data-active-view="playlist"] .top-header,
+  body[data-active-view="playlist"] #topHeader {
+    display: none !important;
+  }
+  body[data-active-view="playlist"] .app-layout {
+    grid-template-rows: 1fr var(--player-height, 90px) !important;
+    grid-template-areas: "main" !important;
+  }
+}
+
+/* 5. Local Files: Obsidian & Platinum Theme (Matched to Replay Icon Theme) */
+#localMusicView .local-files-hero {
+  background: linear-gradient(180deg, rgba(24, 25, 30, 0.95) 0%, rgba(18, 19, 22, 0.7) 60%, transparent 100%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#localMusicView .local-cover-art,
+.local-icon-box {
+  background: linear-gradient(135deg, #18191e 0%, #121316 50%, #0a0b0d 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
+}
+
+.add-local-files-btn {
+  background: linear-gradient(135deg, #ffffff 0%, #e2e4e9 100%) !important;
+  color: #0a0b0d !important;
+  font-weight: 700 !important;
+  border: none !important;
+  box-shadow: 0 4px 14px rgba(255, 255, 255, 0.25) !important;
+}
+
+.add-local-files-btn:hover {
+  background: #ffffff !important;
+  transform: scale(1.03) !important;
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.35) !important;
+}
+
+/* 6. Your Soundtrack: Mobile Library Hub Integration */
+.soundtrack-icon-box {
+  background: linear-gradient(135deg, #18191e 0%, #121316 50%, #0a0b0d 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.soundtrack-cover-img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 8px !important;
+}
+
+@media (max-width: 768px) {
+  .library-hub-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+  .library-hub-card.lib-hub-soundtrack,
+  .library-hub-card.lib-hub-local,
+  .library-hub-card.lib-hub-downloaded {
+    grid-column: auto !important;
+  }
+}
+
+/* 7. Queue Window: Ultra Smooth Sliding Animation */
+.queue-drawer {
+  transition: transform 0.36s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.32s ease !important;
+}
+.queue-backdrop {
+  transition: opacity 0.32s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.32s ease !important;
+}
+
+#localMusicView #playAllLocalBtn {
+  background: linear-gradient(135deg, #ffffff 0%, #e2e4e9 100%) !important;
+  color: #0a0b0d !important;
+  border: none !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 14px rgba(255, 255, 255, 0.2) !important;
+}
+#localMusicView #playAllLocalBtn:hover {
+  background: #ffffff !important;
+  transform: scale(1.03) !important;
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.35) !important;
+}
+
+.ai-lyric-section-tag {
+  display: none !important;
+}
+
+#desktopHeaderBrand {
+  cursor: pointer;
+}
 
 

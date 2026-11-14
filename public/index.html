@@ -34,7 +34,7 @@
     if ('serviceWorker' in navigator) {
       caches.keys().then(function (names) {
         for (var name of names) {
-          if (name !== 'musisurf-v8.41') caches.delete(name);
+          if (name !== 'musisurf-v8.44') caches.delete(name);
         }
       });
     }
@@ -203,13 +203,13 @@
         </div>
 
         <div class="library-content">
-          <!-- Replay (Top of Library with Custom Album Cover, Not Pinned by default) -->
-          <div class="library-item replay-nav-item" id="navReplayBtn" data-view="replay" title="Replay - Your Listening Stats">
+          <!-- Your Soundtrack (Top of Library with Custom Album Cover, Not Pinned by default) -->
+          <div class="library-item replay-nav-item" id="navReplayBtn" data-view="replay" title="Your Soundtrack - Your Listening Stats">
             <div class="replay-cover-art-box">
-              <img src="/icons/replay-cover.svg" class="replay-cover-art-img" alt="Replay Cover" />
+              <img src="/icons/replay-cover.svg" class="replay-cover-art-img" alt="Your Soundtrack Cover" />
             </div>
             <div class="library-item-info">
-              <span class="library-item-title">Replay</span>
+              <span class="library-item-title">Your Soundtrack</span>
               <span class="library-item-meta">Your listening stats</span>
             </div>
           </div>
@@ -793,8 +793,8 @@
             <div class="replay-header">
               <img src="/icons/replay-cover.svg" class="replay-header-badge-img" alt="Replay Cover" />
               <div class="replay-title-wrap">
-                <h1 class="replay-title">Replay</h1>
-                <p class="replay-subtitle">Your personal sound capsule & top listening stats</p>
+                <h1 class="replay-title">Your Soundtrack</h1>
+                <p class="replay-subtitle">Your personal sound capsule & listening stats</p>
               </div>
             </div>
 
@@ -959,7 +959,7 @@
               <button class="lib-pill" data-lib-filter="local">Local</button>
             </div>
 
-            <!-- Library Hub Quick Cards (Row 1: Liked + Local Files; Row 2: Downloaded Songs) -->
+            <!-- Library Hub Quick Cards (Row 1: Liked + Your Soundtrack; Row 2: Local Files + Downloaded Songs) -->
             <div class="library-hub-grid" id="libHubGrid">
               <!-- Liked Songs Card -->
               <div class="library-hub-card" id="libHubLikedBtn">
@@ -975,7 +975,18 @@
                 </div>
               </div>
 
-              <!-- Local Files Card (Short name, sits nicely beside Liked in Row 1) -->
+              <!-- Your Soundtrack Card -->
+              <div class="library-hub-card lib-hub-soundtrack" id="libHubSoundtrackBtn">
+                <div class="lib-hub-icon soundtrack-icon-box">
+                  <img src="/icons/replay-cover.svg" alt="Your Soundtrack" class="soundtrack-cover-img" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" />
+                </div>
+                <div class="lib-hub-details">
+                  <h3 class="lib-hub-name">Your Soundtrack</h3>
+                  <span class="lib-hub-meta" id="libHubSoundtrackMeta">Stats & Capsule</span>
+                </div>
+              </div>
+
+              <!-- Local Files Card -->
               <div class="library-hub-card lib-hub-local" id="libHubLocalBtn">
                 <div class="lib-hub-icon local-icon-box">
                   <img src="/icons/local-folder.svg" alt="Local Files" class="local-folder-icon-img" />
@@ -986,7 +997,7 @@
                 </div>
               </div>
 
-              <!-- Downloaded / Offline Card (Moved down to Row 2: full width so name never cuts down) -->
+              <!-- Downloaded / Offline Card -->
               <div class="library-hub-card lib-hub-downloaded" id="libHubDownloadedBtn">
                 <div class="lib-hub-icon downloaded-icon-box">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -1473,14 +1484,18 @@
             </div>
             <span>Add to Playlist</span>
           </button>
-          <button class="mob-option-item" id="mobOptPlayNextBtn">
+          <button class="mob-option-item" id="mobOptGoToQueueBtn">
             <div class="mob-option-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="5 4 15 12 5 20 5 4"></polygon>
-                <line x1="19" y1="5" x2="19" y2="19"></line>
+                <line x1="8" y1="6" x2="21" y2="6"></line>
+                <line x1="8" y1="12" x2="21" y2="12"></line>
+                <line x1="8" y1="18" x2="21" y2="18"></line>
+                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                <line x1="3" y1="18" x2="3.01" y2="18"></line>
               </svg>
             </div>
-            <span>Play Next</span>
+            <span>Go to Queue</span>
           </button>
           <button class="mob-option-item" id="mobOptQueueBtn">
             <div class="mob-option-icon">
@@ -1547,15 +1562,6 @@
           </button>
         </div>
         <div class="mob-options-list">
-          <button class="mob-option-item" id="mobOptPinPlaylistBtn">
-            <div class="mob-option-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="17" x2="12" y2="22"/>
-                <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.89A2 2 0 0 1 15 10.77V6a3 3 0 0 0-6 0v4.77a2 2 0 0 1-1.11 1.79l-1.78.89A2 2 0 0 0 5 15.24Z"/>
-              </svg>
-            </div>
-            <span id="mobOptPinPlaylistText">Pin Playlist</span>
-          </button>
           <button class="mob-option-item" id="mobOptRenamePlaylistBtn">
             <div class="mob-option-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2187,7 +2193,7 @@
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <!-- Main Application Script -->
-  <script src="/app.js?v=8.43"></script>
+  <script src="/app.js?v=8.44"></script>
 </body>
 
 </html>
