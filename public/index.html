@@ -1900,21 +1900,21 @@
           <div class="drawer-accordion-content">
             <div class="drawer-card-box">
               <div class="drawer-control-header">
-                <span class="drawer-prop-label">Crossfade Songs</span>
-                <span class="drawer-badge-pill" id="drawerCrossfadeVal">0s (Off)</span>
+                <span class="drawer-prop-label">AutoMix Songs</span>
+                <span class="drawer-badge-pill" id="drawerCrossfadeVal">5s overlap</span>
               </div>
-              <p class="drawer-prop-sub">Spotify-style seamless overlap between tracks.</p>
-              <input type="range" class="drawer-slider" id="drawerCrossfadeSlider" min="0" max="12" step="1" value="0" />
+              <p class="drawer-prop-sub">Seamless DJ-grade overlap between tracks.</p>
+              <input type="range" class="drawer-slider" id="drawerCrossfadeSlider" min="0" max="12" step="0.5" value="5" />
 
               <div class="drawer-divider"></div>
 
               <div class="drawer-toggle-row">
                 <div>
-                  <span class="drawer-prop-label">Skip Silence</span>
-                  <p class="drawer-prop-sub">Real-time silence detection to skip dead air.</p>
+                  <span class="drawer-prop-label">Edge Dead Silence Removal</span>
+                  <p class="drawer-prop-sub">Trims dead silence at the start and end of tracks.</p>
                 </div>
                 <label class="drawer-switch">
-                  <input type="checkbox" id="drawerSkipSilenceToggle" />
+                  <input type="checkbox" id="drawerSkipSilenceToggle" checked />
                   <span class="drawer-slider-switch"></span>
                 </label>
               </div>
@@ -2289,44 +2289,44 @@
             </div>
           </section>
 
-          <!-- PLAYBACK TAB CONTENT (Image 2 Crossfade + Image 3 4-Feature Cards) -->
+          <!-- PLAYBACK TAB CONTENT (AutoMix & Edge Dead Silence Removal) -->
           <section class="settings-tab-view" id="settingsPlaybackSection">
             <div class="settings-tab-header">
               <h1 class="settings-tab-title">Playback</h1>
               <p class="settings-tab-desc">Fades, transitions, audio speeds and gapless playback</p>
             </div>
 
-            <!-- Exact Crossfade Card (Image 2) -->
+            <!-- Exact AutoMix Card (Overlapping Dual-Deck Playback) -->
             <div class="crossfade-card-container">
               <div class="crossfade-card-top-row">
-                <span class="crossfade-headline">Crossfade • <strong class="crossfade-live-time" id="liveCrossfadeSeconds">7.5 s</strong></span>
-                <span class="crossfade-subtext-right">Drag to shape the blend</span>
+                <span class="crossfade-headline">AutoMix • <strong class="crossfade-live-time" id="liveCrossfadeSeconds">5.0 s</strong></span>
+                <span class="crossfade-subtext-right">Drag to shape the overlap blend</span>
               </div>
               
               <!-- Gradient Track Slider -->
               <div class="crossfade-gradient-slider-wrap">
-                <input type="range" class="crossfade-gradient-input" id="crossfadeSlider" min="0" max="12" step="0.5" value="7.5">
+                <input type="range" class="crossfade-gradient-input" id="crossfadeSlider" min="0" max="12" step="0.5" value="5.0">
               </div>
 
               <!-- Hard Cut to Long Blend Boundary Labels -->
               <div class="crossfade-boundary-labels">
-                <span>0 S • HARD CUT</span>
-                <span>12 S • LONG BLEND</span>
+                <span>0 S • OFF (HARD CUT)</span>
+                <span>12 S • LONG OVERLAP</span>
               </div>
             </div>
 
-            <!-- Playback Features: Skip Silence & Smart Autoplay -->
+            <!-- Playback Features: Edge Dead Silence Removal & Smart Autoplay -->
             <div class="playback-features-grid" style="grid-template-columns: 1fr; gap: 12px;">
-              <!-- Skip silence (Full Width) -->
+              <!-- Edge Dead Silence Removal (Full Width) -->
               <div class="playback-feature-card" style="width: 100%; grid-column: 1 / -1;">
                 <div class="feat-card-header">
-                  <h4 class="feat-card-title">Skip silence</h4>
+                  <h4 class="feat-card-title">Edge Dead Silence Removal</h4>
                   <label class="sound-toggle-switch mini-toggle">
                     <input type="checkbox" id="skipSilenceToggleSwitch" checked>
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
-                <p class="feat-card-desc">Scans the head and tail of a track at -42 dB and seeks past the dead air.</p>
+                <p class="feat-card-desc">Automatically removes dead silence at the start and end of tracks at -45 dB without cutting into the music.</p>
               </div>
 
               <!-- Smart Autoplay & Continuous Recommendations -->

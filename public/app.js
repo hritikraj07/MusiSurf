@@ -49,11 +49,14 @@
     ytReady: false,
     settings: {
       removeDeadSilence: true,
-      crossfade: 0
+      autoMixDuration: 5,
+      get crossfade() { return this.autoMixDuration; },
+      set crossfade(val) { this.autoMixDuration = val; }
     },
     userQueue: [], // Spotify-like priority manual queue
     contextQueue: [], // Context queue from playlist / album / recommendations
     contextIndex: 0,
+    isAutoMixing: false,
     isCrossfading: false,
     isTransitioning: false,
     isTransitionPreloaded: false,
@@ -1519,7 +1522,18 @@
     state._lastTrackedDeck = deck;
   }
 
-  // Real Audio Silence Detection Engine (-42 dB threshold, 150ms window)
+  // ==========================================================================
+  // EDGE-ONLY DEAD SILENCE REMOVAL ENGINE (-45 dBFS, Leading & Trailing Only)
+  // ==========================================================================
+  // Strict rule: Trims digital dead silence ONLY at track start and track end.
+  // NEVER scans, skips, or cuts quiet passages, dramatic pauses, or acoustic parts in the middle.
+  const SILENCE_DB_THRESHOLD = -45;
+  const SILENCE_LINEAR_THRESHOLD = Math.pow(10, SILENCE_DB_THRESHOLD / 20); // ~0.005623
+  const MAX_START_TRIM = 8.0; // 8.0s safety cap (or 15% of track duration)
+  const MAX_END_TRIM = 12.0;  // 12.0s safety cap (or 20% of track duration)
+  const ANTI_CLICK_PRE_PAD = 0.03;  // 30ms anti-click margin before first note
+  const ANTI_CLICK_POST_PAD = 0.05; // 50ms anti-click margin after reverb tail
+
   let audioContextInstance = null;
   function getAudioContext() {
     if (!audioContextInstance && (window.AudioContext || window.webkitAudioContext)) {
@@ -1532,120 +1546,274 @@
     return audioContextInstance;
   }
 
-  function saveSilenceCache() {
+  const trackEdgeSilenceCache = new Map();
+
+  function getTrackSilenceCacheKey(track) {
+    if (!track) return '';
+    return String(track.id || track.ytId || track.audioUrl || `${track.title || ''}::${track.artist || ''}`);
+  }
+
+  function loadEdgeSilenceLocalStorage() {
     try {
-      localStorage.setItem('musisurf_silence_cache', JSON.stringify(state.silenceCache || {}));
+      const raw = localStorage.getItem('musisurf_edge_silence_cache') || localStorage.getItem('musisurf_silence_cache');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        for (const [k, v] of Object.entries(parsed)) {
+          if (v && typeof v.effectiveStart === 'number') {
+            trackEdgeSilenceCache.set(k, v);
+          } else if (v && typeof v.startOffset === 'number') {
+            trackEdgeSilenceCache.set(k, {
+              effectiveStart: v.startOffset,
+              effectiveEnd: v.endingSilenceSec ? Math.max(0, (v.rawDuration || 0) - v.endingSilenceSec) : (v.rawDuration || 0),
+              rawDuration: v.rawDuration || 0,
+              analyzed: true
+            });
+          }
+        }
+      }
+    } catch (e) {}
+  }
+  loadEdgeSilenceLocalStorage();
+
+  function persistEdgeSilenceCache() {
+    try {
+      const obj = {};
+      const entries = Array.from(trackEdgeSilenceCache.entries()).slice(-200);
+      for (const [k, v] of entries) {
+        obj[k] = v;
+      }
+      localStorage.setItem('musisurf_edge_silence_cache', JSON.stringify(obj));
     } catch (e) {}
   }
 
-  async function detectTrackStartSilence(track, streamUrl) {
-    if (!track || !streamUrl) return 0;
-    if (typeof track._silenceStartOffset === 'number') return track._silenceStartOffset;
-    if (state.silenceCache && state.silenceCache[track.id]?.startOffset !== undefined) {
-      track._silenceStartOffset = state.silenceCache[track.id].startOffset;
-      return track._silenceStartOffset;
+  async function getOrAnalyzeTrackEdges(track, streamUrl, audioElem = null) {
+    if (!track) return { effectiveStart: 0, effectiveEnd: 0, rawDuration: 0, analyzed: true };
+    const key = getTrackSilenceCacheKey(track);
+
+    if (trackEdgeSilenceCache.has(key)) {
+      const cached = trackEdgeSilenceCache.get(key);
+      if (cached && cached.analyzed) {
+        track._effectiveStart = cached.effectiveStart;
+        track._effectiveEnd = cached.effectiveEnd;
+        track._silenceStartOffset = cached.effectiveStart;
+        return cached;
+      }
     }
+
+    const rawDur = track.duration || (audioElem && audioElem.duration) || 0;
+
     if (!state.settings.removeDeadSilence) {
+      const res = { effectiveStart: 0, effectiveEnd: rawDur, rawDuration: rawDur, analyzed: true };
+      trackEdgeSilenceCache.set(key, res);
+      track._effectiveStart = 0;
+      track._effectiveEnd = rawDur;
       track._silenceStartOffset = 0;
-      return 0;
+      return res;
     }
+
     try {
       const ctx = getAudioContext();
-      if (!ctx) {
-        track._silenceStartOffset = 0;
-        return 0;
+      if (!ctx) throw new Error('AudioContext unavailable');
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+
+      let arrayBuf = null;
+      const abortCtrl = new AbortController();
+      const timeoutTimer = setTimeout(() => abortCtrl.abort(), 4000);
+
+      if (track.fileBlob || track.audioBlob) {
+        clearTimeout(timeoutTimer);
+        const blob = track.fileBlob || track.audioBlob;
+        arrayBuf = await blob.arrayBuffer();
+      } else if (streamUrl) {
+        const res = await fetch(streamUrl, {
+          headers: { Range: 'bytes=0-393216' },
+          signal: abortCtrl.signal
+        });
+        clearTimeout(timeoutTimer);
+        if (res.ok || res.status === 206) {
+          arrayBuf = await res.arrayBuffer();
+        }
       }
-      if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
-      }
-      // Fetch initial 384KB chunk using HTTP Range request
-      const res = await fetch(streamUrl, {
-        headers: { Range: 'bytes=0-393216' }
-      });
-      if (!res.ok && res.status !== 206) {
-        track._silenceStartOffset = 0;
-        return 0;
-      }
-      const arrayBuf = await res.arrayBuffer();
+
+      if (!arrayBuf) throw new Error('No audio buffer data retrieved');
+
       const audioBuffer = await new Promise((resolve, reject) => {
         ctx.decodeAudioData(arrayBuf, resolve, reject);
       });
-      if (!audioBuffer) {
-        track._silenceStartOffset = 0;
-        return 0;
-      }
 
-      // Linear RMS threshold for -42 dB: 10^(-42 / 20) ≈ 0.007943
-      const linearThreshold = 0.007943;
+      if (!audioBuffer) throw new Error('Audio decoding failed');
+
       const sampleRate = audioBuffer.sampleRate;
       const channelData = audioBuffer.getChannelData(0);
-      const windowSize = Math.floor(sampleRate * 0.15); // 150ms window
+      const windowSize = Math.max(1, Math.floor(sampleRate * 0.005)); // 5ms window
 
-      let audibleStartSample = 0;
-      for (let i = 0; i < channelData.length - windowSize; i += Math.floor(windowSize / 2)) {
+      // 1. LEADING EDGE SCAN (Strictly t = 0 to MAX_START_TRIM)
+      const effectiveRawDur = rawDur > 0 ? rawDur : (audioBuffer.duration || 0);
+      const maxStartTrimLimit = Math.min(MAX_START_TRIM, effectiveRawDur > 0 ? effectiveRawDur * 0.15 : MAX_START_TRIM);
+      const maxStartSample = Math.min(channelData.length, Math.floor(sampleRate * maxStartTrimLimit));
+
+      let firstAudibleSample = 0;
+      let foundAudibleStart = false;
+
+      for (let i = 0; i < maxStartSample - windowSize; i += Math.floor(windowSize / 2)) {
         let sumSq = 0;
         for (let j = 0; j < windowSize; j++) {
           const s = channelData[i + j];
           sumSq += s * s;
         }
         const rms = Math.sqrt(sumSq / windowSize);
-        if (rms >= linearThreshold) {
-          audibleStartSample = i;
+        if (rms >= SILENCE_LINEAR_THRESHOLD) {
+          firstAudibleSample = i;
+          foundAudibleStart = true;
           break;
         }
       }
 
-      const audibleStartTime = audibleStartSample / sampleRate;
-      // Skip dead air only if >= 0.5s to preserve soft natural musical intros
-      if (audibleStartTime >= 0.5) {
-        const offset = Math.max(0, audibleStartTime - 0.06); // 60ms safety lead-in margin
-        track._silenceStartOffset = Math.round(offset * 100) / 100;
-        if (!state.silenceCache) state.silenceCache = {};
-        state.silenceCache[track.id] = { ...(state.silenceCache[track.id] || {}), startOffset: track._silenceStartOffset };
-        saveSilenceCache();
-        console.log(`[Skip Silence] Detected ${audibleStartTime.toFixed(2)}s intro dead air in "${track.title}". Fast-forwarding to ${track._silenceStartOffset}s`);
-      } else {
-        track._silenceStartOffset = 0;
-        if (!state.silenceCache) state.silenceCache = {};
-        state.silenceCache[track.id] = { ...(state.silenceCache[track.id] || {}), startOffset: 0 };
-        saveSilenceCache();
+      let effectiveStart = 0;
+      if (foundAudibleStart) {
+        const firstAudibleSec = firstAudibleSample / sampleRate;
+        if (firstAudibleSec >= 0.15) {
+          effectiveStart = Math.max(0, firstAudibleSec - ANTI_CLICK_PRE_PAD);
+          effectiveStart = Math.round(effectiveStart * 100) / 100;
+        }
       }
-      return track._silenceStartOffset;
+
+      // 2. TRAILING EDGE SCAN
+      let effectiveEnd = effectiveRawDur;
+      if (audioBuffer.duration >= effectiveRawDur - 1 && audioBuffer.duration > 10) {
+        const maxEndTrimLimit = Math.min(MAX_END_TRIM, effectiveRawDur * 0.20);
+        const minEndSample = Math.max(0, channelData.length - Math.floor(sampleRate * maxEndTrimLimit));
+
+        let lastAudibleSample = channelData.length;
+        let foundAudibleEnd = false;
+
+        for (let i = channelData.length - windowSize; i >= minEndSample; i -= Math.floor(windowSize / 2)) {
+          let sumSq = 0;
+          for (let j = 0; j < windowSize; j++) {
+            const s = channelData[i + j];
+            sumSq += s * s;
+          }
+          const rms = Math.sqrt(sumSq / windowSize);
+          if (rms >= SILENCE_LINEAR_THRESHOLD) {
+            lastAudibleSample = i + windowSize;
+            foundAudibleEnd = true;
+            break;
+          }
+        }
+
+        if (foundAudibleEnd) {
+          const lastAudibleSec = lastAudibleSample / sampleRate;
+          if (effectiveRawDur - lastAudibleSec >= 0.25) {
+            effectiveEnd = Math.min(effectiveRawDur, lastAudibleSec + ANTI_CLICK_POST_PAD);
+            effectiveEnd = Math.round(effectiveEnd * 100) / 100;
+          }
+        }
+      }
+
+      // Strict invariant: Zero scanning or clipping between effectiveStart and effectiveEnd
+      const result = {
+        effectiveStart,
+        effectiveEnd: effectiveEnd > effectiveStart ? effectiveEnd : effectiveRawDur,
+        rawDuration: effectiveRawDur,
+        analyzed: true
+      };
+
+      trackEdgeSilenceCache.set(key, result);
+      track._silenceStartOffset = result.effectiveStart;
+      track._effectiveStart = result.effectiveStart;
+      track._effectiveEnd = result.effectiveEnd;
+      persistEdgeSilenceCache();
+      return result;
     } catch (err) {
+      const fallback = {
+        effectiveStart: 0,
+        effectiveEnd: rawDur,
+        rawDuration: rawDur,
+        analyzed: true
+      };
+      trackEdgeSilenceCache.set(key, fallback);
       track._silenceStartOffset = 0;
-      return 0;
+      track._effectiveStart = 0;
+      track._effectiveEnd = rawDur;
+      return fallback;
     }
+  }
+
+  // Backward compatibility alias for legacy callers
+  function detectTrackStartSilence(track, streamUrl) {
+    return getOrAnalyzeTrackEdges(track, streamUrl).then(res => res.effectiveStart);
+  }
+
+  function saveSilenceCache() {
+    persistEdgeSilenceCache();
+  }
+
+  // ==========================================================================
+  // TRUE DUAL-DECK AUTOMIX ENGINE (Equal-Power Cosine/Sine Overlap)
+  // ==========================================================================
+  function formatAutoMixLabel(sec) {
+    const s = Math.round((parseFloat(sec) || 0) * 10) / 10;
+    if (s <= 0) return 'Off (0s)';
+    if (s <= 3) return `${s}s overlap (Quick)`;
+    if (s <= 6) return `${s}s overlap (Smooth)`;
+    if (s <= 9) return `${s}s overlap (Extended)`;
+    return `${s}s overlap (Long)`;
+  }
+
+  function formatAutoMixHeadline(sec) {
+    const s = Math.round((parseFloat(sec) || 0) * 10) / 10;
+    if (s <= 0) return '0.0 s (Off)';
+    return `${s.toFixed(1)} s`;
   }
 
   function formatCrossfadeLabel(sec) {
-    const s = Math.round((parseFloat(sec) || 0) * 10) / 10;
-    if (s <= 0) return '0s • Hard Cut';
-    if (s <= 3) return `${s}s • Short Blend`;
-    if (s <= 6) return `${s}s • Medium Blend`;
-    if (s <= 9) return `${s}s • Extended Blend`;
-    return `${s}s • Long Blend`;
+    return formatAutoMixLabel(sec);
   }
 
-  let crossfadeIntervalTimer = null;
+  let autoMixTransitionId = 0;
+  let autoMixState = null;
+  let autoMixAnimFrame = null;
+  let autoMixIntervalTimer = null;
   let crossfadeFadeInTimer = null;
-  let crossfadeFadeOutTimer = null;
 
-  function cancelActiveCrossfade(destroyPreload = false) {
-    if (crossfadeIntervalTimer) {
-      clearInterval(crossfadeIntervalTimer);
-      crossfadeIntervalTimer = null;
+  function cancelActiveAutoMix(destroyStandby = false) {
+    autoMixTransitionId++;
+    if (autoMixAnimFrame) {
+      cancelAnimationFrame(autoMixAnimFrame);
+      autoMixAnimFrame = null;
     }
-    if (crossfadeFadeInTimer) {
-      clearInterval(crossfadeFadeInTimer);
-      crossfadeFadeInTimer = null;
+    if (autoMixIntervalTimer) {
+      clearInterval(autoMixIntervalTimer);
+      autoMixIntervalTimer = null;
     }
-    if (crossfadeFadeOutTimer) {
-      clearInterval(crossfadeFadeOutTimer);
-      crossfadeFadeOutTimer = null;
+
+    if (autoMixState) {
+      const { outgoingDeck, incomingDeck } = autoMixState;
+      if (outgoingDeck) {
+        outgoingDeck._fadeHandler = null;
+        try {
+          outgoingDeck.pause();
+          outgoingDeck.volume = 0;
+        } catch (e) {}
+      }
+      if (incomingDeck) {
+        incomingDeck._fadeHandler = null;
+        if (destroyStandby) {
+          try {
+            incomingDeck.pause();
+            incomingDeck.removeAttribute('src');
+            incomingDeck.load();
+          } catch (e) {}
+          incomingDeck.volume = 0;
+        }
+      }
+      autoMixState = null;
     }
+
+    state.isAutoMixing = false;
     state.isCrossfading = false;
 
-    if (destroyPreload) {
+    if (destroyStandby) {
       state.isTransitionPreloaded = false;
       state.preloadedNextTrack = null;
       const sec = getSecondaryDeck();
@@ -1658,15 +1826,6 @@
         } catch (e) {}
         sec.volume = 0;
       }
-    } else {
-      const sec = getSecondaryDeck();
-      if (sec) {
-        sec._fadeHandler = null;
-        try {
-          sec.pause();
-        } catch (e) {}
-        sec.volume = 0;
-      }
     }
 
     const act = getActiveDeck();
@@ -1676,8 +1835,12 @@
     }
   }
 
+  function cancelActiveCrossfade(destroyPreload = false) {
+    cancelActiveAutoMix(destroyPreload);
+  }
+
   function fadeAudioOutAndPause(callback) {
-    cancelActiveCrossfade(false);
+    cancelActiveAutoMix(false);
     try {
       getActiveDeck().pause();
     } catch (e) {}
@@ -1686,7 +1849,7 @@
   }
 
   function applyCrossfadeIn() {
-    cancelActiveCrossfade(false);
+    cancelActiveAutoMix(false);
     const act = getActiveDeck();
     const targetVol = state.isMuted ? 0 : (state.volume || 0.8);
     if (targetVol <= 0) {
@@ -1705,6 +1868,169 @@
         crossfadeFadeInTimer = null;
       }
     }, 20);
+  }
+
+  function startDualDeckAutoMix(nextTrackObj, streamUrl, actualFadeSec) {
+    if (!nextTrackObj || state.isAutoMixing || state.isTransitioning) return;
+    const autoMixSec = actualFadeSec || state.settings.autoMixDuration || 0;
+    if (autoMixSec <= 0) {
+      transitionToNextSong(nextTrackObj);
+      return;
+    }
+
+    const outgoing = getActiveDeck();
+    const incoming = getSecondaryDeck();
+    if (!outgoing || !incoming) return;
+
+    const transitionId = ++autoMixTransitionId;
+    state.isAutoMixing = true;
+    state.isCrossfading = true;
+
+    const masterVol = state.isMuted ? 0 : (state.volume || 0.8);
+    const durationMs = autoMixSec * 1000;
+    const startTime = performance.now();
+
+    if (!incoming.src || incoming.src !== streamUrl) {
+      incoming.src = streamUrl;
+      incoming.load();
+    }
+    incoming.volume = 0;
+
+    const edgeInfo = trackEdgeSilenceCache.get(getTrackSilenceCacheKey(nextTrackObj));
+    const startOffset = (edgeInfo && edgeInfo.effectiveStart) || nextTrackObj._silenceStartOffset || 0;
+    try {
+      incoming.currentTime = startOffset;
+    } catch (e) {}
+
+    autoMixState = {
+      transitionId,
+      incomingTrack: nextTrackObj,
+      outgoingDeck: outgoing,
+      incomingDeck: incoming,
+      startTime,
+      durationMs,
+      actualFadeSec: autoMixSec,
+      paused: false,
+      pausedAt: 0,
+      uiSwitched: false,
+      masterVol
+    };
+
+    const stepFade = () => {
+      if (!state.isAutoMixing || !autoMixState || autoMixState.transitionId !== transitionId) return;
+      if (autoMixState.paused) return;
+
+      const now = performance.now();
+      const elapsed = now - autoMixState.startTime;
+      const progress = Math.max(0, Math.min(1, elapsed / autoMixState.durationMs));
+
+      // Mathematical Equal-Power Crossfade curves (Zero acoustic dip):
+      // cos^2(p) + sin^2(p) = 1.0 everywhere across the overlap
+      const outGain = Math.cos(progress * 0.5 * Math.PI);
+      const inGain = Math.sin(progress * 0.5 * Math.PI);
+
+      const currentMaster = state.isMuted ? 0 : (state.volume || 0.8);
+      outgoing.volume = Math.max(0, Math.min(1, currentMaster * outGain));
+      incoming.volume = Math.max(0, Math.min(1, currentMaster * inGain));
+
+      // Early / Midpoint UI & Metadata switch (Atomic Handoff)
+      if (progress >= 0.25 && !autoMixState.uiSwitched) {
+        autoMixState.uiSwitched = true;
+        checkAndRecordSongPlayed(outgoing);
+        recordRecentlyPlayed(nextTrackObj);
+        applyAuthoritativeTrack(nextTrackObj, { source: 'automix_handoff' });
+        updateQueueDrawerUI();
+      }
+
+      if (progress >= 1) {
+        finalizeDualDeckAutoMix(nextTrackObj, currentMaster, transitionId);
+      }
+    };
+
+    incoming.play().then(() => {
+      if (autoMixTransitionId !== transitionId) return;
+      const loop = () => {
+        if (state.isAutoMixing && autoMixState && autoMixState.transitionId === transitionId) {
+          stepFade();
+          if (state.isAutoMixing) {
+            autoMixAnimFrame = requestAnimationFrame(loop);
+          }
+        }
+      };
+      autoMixAnimFrame = requestAnimationFrame(loop);
+      autoMixIntervalTimer = setInterval(stepFade, 25);
+      incoming._fadeHandler = stepFade;
+      outgoing._fadeHandler = stepFade;
+    }).catch(err => {
+      console.warn('Dual-deck AutoMix play note:', err);
+      cancelActiveAutoMix(false);
+      transitionToNextSong(nextTrackObj);
+    });
+  }
+
+  function startEqualPowerCrossfade(nextTrackObj, streamUrl, overrideCfSec) {
+    startDualDeckAutoMix(nextTrackObj, streamUrl, overrideCfSec);
+  }
+
+  function finalizeDualDeckAutoMix(nextTrackObj, masterVol, transitionId) {
+    if (autoMixTransitionId !== transitionId) return;
+
+    if (autoMixAnimFrame) {
+      cancelAnimationFrame(autoMixAnimFrame);
+      autoMixAnimFrame = null;
+    }
+    if (autoMixIntervalTimer) {
+      clearInterval(autoMixIntervalTimer);
+      autoMixIntervalTimer = null;
+    }
+
+    const outgoing = getActiveDeck();
+    const incoming = getSecondaryDeck();
+
+    if (outgoing) {
+      outgoing._fadeHandler = null;
+      try {
+        outgoing.pause();
+        outgoing.removeAttribute('src');
+        outgoing.load();
+      } catch (e) {}
+      outgoing.volume = 0;
+    }
+
+    if (incoming) {
+      incoming._fadeHandler = null;
+      incoming.volume = masterVol;
+    }
+
+    swapActiveDeck();
+    elements.audio = getActiveDeck();
+    elements.audioSecondary = getSecondaryDeck();
+    elements.audio.volume = masterVol;
+
+    state.isAutoMixing = false;
+    state.isCrossfading = false;
+    autoMixState = null;
+    state.isTransitionPreloaded = false;
+    state.preloadedNextTrack = null;
+    state._currentTrackPlayedRecorded = false;
+    state._currentTrackListeningSeconds = 0;
+    state._lastTrackedPlaybackTime = null;
+    state.consecutivePlaybackErrors = 0;
+
+    if (state.userQueue && state.userQueue.length > 0 && isSameTrack(state.userQueue[0], nextTrackObj)) {
+      state.userQueue.shift();
+    } else if (state.contextQueue && state.contextQueue.length > state.contextIndex + 1 && isSameTrack(state.contextQueue[state.contextIndex + 1], nextTrackObj)) {
+      state.contextIndex++;
+    }
+
+    recordRecentlyPlayed(nextTrackObj);
+    applyAuthoritativeTrack(nextTrackObj, { source: 'automix_finalized' });
+    updateQueueDrawerUI();
+    schedulePreloadNextTrack(1500);
+  }
+
+  function finalizeCrossfade(nextTrackObj, masterVol) {
+    finalizeDualDeckAutoMix(nextTrackObj, masterVol, autoMixTransitionId);
   }
 
   // ============================================================================
@@ -2072,108 +2398,6 @@
     return null;
   }
 
-  function finalizeCrossfade(nextTrackObj, masterVol) {
-    if (crossfadeIntervalTimer) {
-      clearInterval(crossfadeIntervalTimer);
-      crossfadeIntervalTimer = null;
-    }
-
-    const outgoing = getActiveDeck();
-    const incoming = getSecondaryDeck();
-
-    if (outgoing) {
-      outgoing._fadeHandler = null;
-      try {
-        outgoing.pause();
-      } catch (e) {}
-      outgoing.volume = masterVol;
-    }
-
-    if (incoming) {
-      incoming._fadeHandler = null;
-      incoming.volume = masterVol;
-    }
-
-    swapActiveDeck();
-    elements.audio = getActiveDeck();
-    elements.audioSecondary = getSecondaryDeck();
-    elements.audio.volume = masterVol;
-
-    state.isCrossfading = false;
-    state.isTransitionPreloaded = false;
-    state.preloadedNextTrack = null;
-    state._currentTrackPlayedRecorded = false;
-    state._currentTrackListeningSeconds = 0;
-    state._lastTrackedPlaybackTime = null;
-    state._tailSilenceStartTime = null;
-    state.consecutivePlaybackErrors = 0;
-
-    if (state.userQueue && state.userQueue.length > 0 && isSameTrack(state.userQueue[0], nextTrackObj)) {
-      state.userQueue.shift();
-    } else if (state.contextQueue && state.contextQueue.length > state.contextIndex + 1 && isSameTrack(state.contextQueue[state.contextIndex + 1], nextTrackObj)) {
-      state.contextIndex++;
-    }
-
-    recordRecentlyPlayed(nextTrackObj);
-    applyAuthoritativeTrack(nextTrackObj, { source: 'crossfade_finalized' });
-    updateQueueDrawerUI();
-    schedulePreloadNextTrack(1500);
-  }
-
-  function startEqualPowerCrossfade(nextTrackObj, streamUrl, overrideCfSec) {
-    if (!nextTrackObj || state.isCrossfading || state.isTransitioning) return;
-    const cfSec = overrideCfSec || state.settings.crossfade || 0;
-    if (cfSec <= 0) {
-      transitionToNextSong(nextTrackObj);
-      return;
-    }
-    const outgoing = getActiveDeck();
-    const incoming = getSecondaryDeck();
-    if (!outgoing || !incoming) return;
-
-    state.isCrossfading = true;
-    const masterVol = state.isMuted ? 0 : (state.volume || 0.8);
-    const durationMs = cfSec * 1000;
-    const startTime = performance.now();
-
-    if (!incoming.src || incoming.src !== streamUrl) {
-      incoming.src = streamUrl;
-      incoming.load();
-    }
-    incoming.volume = 0;
-    const startOffset = nextTrackObj._silenceStartOffset || 0;
-    try {
-      incoming.currentTime = startOffset;
-    } catch (e) {}
-
-    const stepFade = () => {
-      if (!state.isCrossfading) return;
-      const elapsed = performance.now() - startTime;
-      const p = Math.min(1, Math.max(0, elapsed / durationMs));
-
-      // Mathematical Equal-Power Crossfade curves (Zero acoustic dip):
-      const outGain = Math.cos(p * 0.5 * Math.PI);
-      const inGain = Math.sin(p * 0.5 * Math.PI);
-
-      outgoing.volume = Math.max(0, Math.min(1, masterVol * outGain));
-      incoming.volume = Math.max(0, Math.min(1, masterVol * inGain));
-
-      if (p >= 1) {
-        finalizeCrossfade(nextTrackObj, masterVol);
-      }
-    };
-
-    incoming.play().then(() => {
-      crossfadeIntervalTimer = setInterval(stepFade, 25);
-      incoming._fadeHandler = stepFade;
-      outgoing._fadeHandler = stepFade;
-    }).catch(err => {
-      console.warn('Equal-power crossfade play error:', err);
-      cancelActiveCrossfade(false);
-      transitionToNextSong(nextTrackObj);
-    });
-  }
-
   let preloadDebounceTimer = null;
   function schedulePreloadNextTrack(delayMs = 1500) {
     if (preloadDebounceTimer) clearTimeout(preloadDebounceTimer);
@@ -2183,7 +2407,7 @@
   }
 
   function preloadNextTrackForTransition() {
-    if (state.isTransitionPreloaded || state.isCrossfading || state.isTransitioning) return;
+    if (state.isTransitionPreloaded || state.isAutoMixing || state.isCrossfading || state.isTransitioning) return;
     const nextTrackCandidate = getNextUpcomingTrack();
     if (!nextTrackCandidate) return;
 
@@ -2210,7 +2434,7 @@
       secDeck.volume = 0;
       secDeck.load();
       if (state.settings.removeDeadSilence) {
-        detectTrackStartSilence(nextTrackCandidate, nextAudioSrc).catch(() => {});
+        getOrAnalyzeTrackEdges(nextTrackCandidate, nextAudioSrc, secDeck).catch(() => {});
       }
     }
   }
@@ -2221,7 +2445,7 @@
     state.isTransitioning = true;
     setTimeout(() => { state.isTransitioning = false; }, 350);
 
-    cancelActiveCrossfade(false);
+    cancelActiveAutoMix(false);
 
     let nextSong = targetTrack;
     let switchedToRecommendations = false;
@@ -2400,37 +2624,48 @@
     if (!actDeck || actDeck.paused || actDeck.seeking) return;
     if (dur <= 0 || !Number.isFinite(dur) || !Number.isFinite(cur)) return;
 
-    // Coordinated Skip Silence and Crossfade
-    let endingSilenceSec = 0;
-    if (state.settings.removeDeadSilence && state.currentTrack) {
-      endingSilenceSec = state.currentTrack._endingSilenceSec || (state.silenceCache[state.currentTrack.id]?.endingSilenceSec) || 0;
-    }
+    const currentTrack = state.currentTrack;
+    if (!currentTrack) return;
 
-    const effectiveDur = Math.max(3, dur - endingSilenceSec);
-    const effectiveTimeLeft = effectiveDur - cur;
-    const cfSec = state.settings.crossfade || 0;
+    // Coordinated Edge Dead Silence & AutoMix
+    const key = getTrackSilenceCacheKey(currentTrack);
+    const edgeInfo = trackEdgeSilenceCache.get(key);
+    const effectiveStart = (edgeInfo && typeof edgeInfo.effectiveStart === 'number') 
+      ? edgeInfo.effectiveStart 
+      : (currentTrack._effectiveStart || currentTrack._silenceStartOffset || 0);
+    const effectiveEnd = (edgeInfo && typeof edgeInfo.effectiveEnd === 'number' && edgeInfo.effectiveEnd > effectiveStart) 
+      ? edgeInfo.effectiveEnd 
+      : (currentTrack._effectiveEnd || dur);
 
-    if (cfSec > 0 && effectiveDur > 6) {
-      const effectiveCfSec = Math.min(cfSec, Math.max(1, Math.floor(effectiveDur * 0.35)));
+    const effectiveTimeLeft = effectiveEnd - cur;
+    const autoMixSec = typeof state.settings.autoMixDuration === 'number' 
+      ? state.settings.autoMixDuration 
+      : (state.settings.crossfade || 0);
 
-      // Preload incoming track well ahead: (effectiveCfSec + 3.5) seconds
-      if (effectiveTimeLeft <= (effectiveCfSec + 3.5) && !state.isTransitionPreloaded && !state.isCrossfading) {
+    if (autoMixSec > 0 && (effectiveEnd - effectiveStart) > 4) {
+      // Clamped overlap blend duration (max 40% of track playable span)
+      const actualFadeSec = Math.min(autoMixSec, Math.max(1, Math.floor((effectiveEnd - effectiveStart) * 0.4)));
+
+      // Preload incoming track well ahead: Math.max(actualFadeSec + 6, 12) seconds
+      const preloadLeadTime = Math.max(actualFadeSec + 6, 12);
+      if (effectiveTimeLeft <= preloadLeadTime && !state.isTransitionPreloaded && !state.isAutoMixing && !state.isCrossfading) {
         preloadNextTrackForTransition();
       }
 
-      // Start Equal-Power Crossfade Transition exactly when effectiveTimeLeft <= effectiveCfSec
-      if (effectiveTimeLeft <= effectiveCfSec && !state.isCrossfading && state.preloadedNextTrack) {
+      // Start Dual-Deck Overlap exactly when effectiveTimeLeft <= actualFadeSec
+      if (effectiveTimeLeft <= actualFadeSec && !state.isAutoMixing && !state.isCrossfading && state.preloadedNextTrack) {
         const secDeck = getSecondaryDeck();
         if (secDeck && secDeck.src) {
-          startEqualPowerCrossfade(state.preloadedNextTrack, secDeck.src, effectiveCfSec);
+          startDualDeckAutoMix(state.preloadedNextTrack, secDeck.src, actualFadeSec);
         }
       }
     } else {
-      // Hard Cut (0s) or Skip Silence Dead Air
-      if (effectiveTimeLeft <= 5 && !state.isTransitionPreloaded && !state.isCrossfading) {
+      // Hard Cut (0s AutoMix) - Preload 5s ahead
+      if (effectiveTimeLeft <= 5 && !state.isTransitionPreloaded && !state.isAutoMixing && !state.isCrossfading) {
         preloadNextTrackForTransition();
       }
-      if (effectiveTimeLeft <= 0.15 && !state.isCrossfading && !state.isTransitioning) {
+      // Instant Hard Cut at effectiveEnd without playing trailing dead air!
+      if (effectiveTimeLeft <= 0.08 && !state.isAutoMixing && !state.isCrossfading && !state.isTransitioning) {
         transitionToNextSong();
       }
     }
@@ -2637,7 +2872,7 @@
       if (state.history.length > 50) state.history.shift();
     }
 
-    cancelActiveCrossfade();
+    cancelActiveAutoMix(true);
 
     // Spotify-like Queue Management: Isolated search results vs context playlist
     if (queueList && Array.isArray(queueList)) {
@@ -2740,8 +2975,16 @@
         };
         elements.audio.addEventListener('loadedmetadata', seekStartTime, { once: true });
         elements.audio.addEventListener('canplay', seekStartTime, { once: true });
+      } else if (state.settings.removeDeadSilence) {
+        getOrAnalyzeTrackEdges(track, blobUrl, elements.audio).then(edges => {
+          if (edges && edges.effectiveStart > 0.05 && elements.audio.currentTime < edges.effectiveStart && state.isPlaying) {
+            try { elements.audio.currentTime = edges.effectiveStart; } catch (e) {}
+          }
+        }).catch(() => {});
       }
-      applyCrossfadeIn();
+      if ((state.settings.autoMixDuration || state.settings.crossfade || 0) > 0) {
+        applyCrossfadeIn();
+      }
       elements.audio.play().catch(err => {
         console.warn('Local storage audio play error:', err);
       });
@@ -2792,8 +3035,16 @@
           };
           elements.audio.addEventListener('loadedmetadata', seekStartTime, { once: true });
           elements.audio.addEventListener('canplay', seekStartTime, { once: true });
+        } else if (state.settings.removeDeadSilence) {
+          getOrAnalyzeTrackEdges(track, blobUrl, elements.audio).then(edges => {
+            if (edges && edges.effectiveStart > 0.05 && elements.audio.currentTime < edges.effectiveStart && state.isPlaying) {
+              try { elements.audio.currentTime = edges.effectiveStart; } catch (e) {}
+            }
+          }).catch(() => {});
         }
-        applyCrossfadeIn();
+        if ((state.settings.autoMixDuration || state.settings.crossfade || 0) > 0) {
+          applyCrossfadeIn();
+        }
         elements.audio.play().catch(err => {
           if (currentToken !== activePlayToken || err.name === 'AbortError') return;
           console.warn('Offline playback error:', err);
@@ -2839,9 +3090,9 @@
           } else {
             try { elements.audio.currentTime = 0; } catch (e) {}
             if (state.settings.removeDeadSilence) {
-              detectTrackStartSilence(track, audioSrc).then(offset => {
-                if (offset > 0 && elements.audio.currentTime < offset && state.isPlaying) {
-                  try { elements.audio.currentTime = offset; } catch (e) {}
+              getOrAnalyzeTrackEdges(track, audioSrc, elements.audio).then(edges => {
+                if (edges && edges.effectiveStart > 0.05 && elements.audio.currentTime < edges.effectiveStart && state.isPlaying) {
+                  try { elements.audio.currentTime = edges.effectiveStart; } catch (e) {}
                 }
               }).catch(() => {});
             }
@@ -2858,7 +3109,7 @@
           };
           elements.audio.addEventListener('playing', onAudioReady, { once: true });
           elements.audio.addEventListener('canplay', onAudioReady, { once: true });
-          if (state.settings.crossfade > 0) {
+          if ((state.settings.autoMixDuration || state.settings.crossfade || 0) > 0) {
             applyCrossfadeIn();
           } else {
             elements.audio.volume = state.isMuted ? 0 : state.volume;
@@ -2976,18 +3227,42 @@
       : (!elements.audio.paused && !elements.audio.ended && elements.audio.currentTime > 0);
 
     if (state.isPlaying || isActuallyPlaying) {
-      // Smooth fade-out pause
+      // Smooth fade-out pause or pause dual decks during active AutoMix
       state.isPlaying = false;
-      fadeAudioOutAndPause(() => {
-        if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
-          try { state.ytPlayer.pauseVideo(); } catch (e) {}
+      if (state.isAutoMixing && autoMixState) {
+        autoMixState.paused = true;
+        autoMixState.pausedAt = performance.now();
+        if (autoMixState.outgoingDeck) {
+          try { autoMixState.outgoingDeck.pause(); } catch (e) {}
         }
-      });
+        if (autoMixState.incomingDeck) {
+          try { autoMixState.incomingDeck.pause(); } catch (e) {}
+        }
+      } else {
+        fadeAudioOutAndPause(() => {
+          if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
+            try { state.ytPlayer.pauseVideo(); } catch (e) {}
+          }
+        });
+      }
       updatePlayPauseButton();
     } else {
       // Resume playback
       state.isPlaying = true;
       updatePlayPauseButton();
+
+      if (state.isAutoMixing && autoMixState && autoMixState.paused) {
+        const pauseDuration = performance.now() - (autoMixState.pausedAt || performance.now());
+        autoMixState.startTime += pauseDuration;
+        autoMixState.paused = false;
+        if (autoMixState.outgoingDeck) {
+          autoMixState.outgoingDeck.play().catch(() => {});
+        }
+        if (autoMixState.incomingDeck) {
+          autoMixState.incomingDeck.play().catch(() => {});
+        }
+        return;
+      }
 
       const resumeTime = state.restoredResumeTime || 0;
 
@@ -3483,6 +3758,9 @@
   }
 
   function seekTo(seconds) {
+    if (state.isAutoMixing) {
+      cancelActiveAutoMix(true);
+    }
     const total = getTotalDuration();
     const targetSeconds = Math.max(0, Math.min(total > 0 ? total : 99999, Number(seconds) || 0));
     lastKnownPlaybackTime = targetSeconds;
@@ -3497,7 +3775,8 @@
         } else {
           elements.audio.currentTime = targetSeconds;
         }
-        if (state.settings.crossfade > 0 && total > 0 && (total - targetSeconds) > state.settings.crossfade) {
+        const autoMixVal = typeof state.settings.autoMixDuration === 'number' ? state.settings.autoMixDuration : (state.settings.crossfade || 0);
+        if (autoMixVal > 0 && total > 0 && (total - targetSeconds) > autoMixVal) {
           elements.audio.volume = state.isMuted ? 0 : state.volume;
         }
       } catch (e) {
@@ -3525,7 +3804,17 @@
     state.isMuted = state.volume === 0;
     localStorage.setItem('musisurf_volume', state.volume.toString());
 
-    elements.audio.volume = state.isMuted ? 0 : state.volume;
+    if (state.isAutoMixing && autoMixState) {
+      autoMixState.masterVol = state.isMuted ? 0 : state.volume;
+      const elapsed = performance.now() - autoMixState.startTime;
+      const progress = Math.max(0, Math.min(1, elapsed / autoMixState.durationMs));
+      const outGain = Math.cos(progress * 0.5 * Math.PI);
+      const inGain = Math.sin(progress * 0.5 * Math.PI);
+      if (autoMixState.outgoingDeck) autoMixState.outgoingDeck.volume = Math.max(0, Math.min(1, autoMixState.masterVol * outGain));
+      if (autoMixState.incomingDeck) autoMixState.incomingDeck.volume = Math.max(0, Math.min(1, autoMixState.masterVol * inGain));
+    } else {
+      elements.audio.volume = state.isMuted ? 0 : state.volume;
+    }
     if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.setVolume === 'function') {
       state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
     }
@@ -6906,11 +7195,26 @@
       }
     } catch (e) {}
 
-    // Crossfade Slider (Image 2)
-    const cf = typeof state.settings.crossfade === 'number' ? state.settings.crossfade : 7.5;
-    if (elements.crossfadeSlider) elements.crossfadeSlider.value = cf;
-    if (elements.liveCrossfadeSeconds) elements.liveCrossfadeSeconds.textContent = formatCrossfadeLabel(cf);
-    if (elements.crossfadeValueLabel) elements.crossfadeValueLabel.textContent = formatCrossfadeLabel(cf);
+    // AutoMix Duration & Edge Dead Silence Migration
+    try {
+      const legacyCf = localStorage.getItem('musisurf_crossfade');
+      const savedAutoMix = localStorage.getItem('musisurf_automix_duration');
+      if (savedAutoMix !== null) {
+        state.settings.autoMixDuration = parseFloat(savedAutoMix) || 0;
+      } else if (legacyCf !== null && state.settings.autoMixDuration === undefined) {
+        state.settings.autoMixDuration = parseFloat(legacyCf) || 0;
+      }
+    } catch (e) {}
+
+    const autoMixVal = typeof state.settings.autoMixDuration === 'number' 
+      ? state.settings.autoMixDuration 
+      : (typeof state.settings.crossfade === 'number' ? state.settings.crossfade : 5);
+    state.settings.autoMixDuration = autoMixVal;
+    state.settings.crossfade = autoMixVal;
+
+    if (elements.crossfadeSlider) elements.crossfadeSlider.value = autoMixVal;
+    if (elements.liveCrossfadeSeconds) elements.liveCrossfadeSeconds.textContent = formatAutoMixHeadline(autoMixVal);
+    if (elements.crossfadeValueLabel) elements.crossfadeValueLabel.textContent = formatAutoMixLabel(autoMixVal);
 
     // Skip Silence & Automix
     if (elements.deadSilenceToggleSwitch) {
@@ -6953,12 +7257,12 @@
 
     // Sync Mobile Drawer Controls
     const drawerCfSlider = document.getElementById('drawerCrossfadeSlider');
-    const drawerCfVal = document.getElementById('drawerCrossfadeValue');
+    const drawerCfVal = document.getElementById('drawerCrossfadeVal') || document.getElementById('drawerCrossfadeValue');
     const drawerSkipSilToggle = document.getElementById('drawerSkipSilenceToggle');
     const drawerQualitySelect = document.getElementById('drawerAudioQualitySelect');
 
-    if (drawerCfSlider) drawerCfSlider.value = cf;
-    if (drawerCfVal) drawerCfVal.textContent = formatCrossfadeLabel(cf);
+    if (drawerCfSlider) drawerCfSlider.value = autoMixVal;
+    if (drawerCfVal) drawerCfVal.textContent = formatAutoMixLabel(autoMixVal);
     if (drawerSkipSilToggle) drawerSkipSilToggle.checked = state.settings.removeDeadSilence !== false;
     if (drawerQualitySelect) drawerQualitySelect.value = state.settings.streamingQuality || state.settings.audioQuality || 'high';
   }
@@ -6966,6 +7270,10 @@
   function saveSettings() {
     try {
       localStorage.setItem('musisurf_settings', JSON.stringify(state.settings));
+      if (typeof state.settings.autoMixDuration === 'number') {
+        localStorage.setItem('musisurf_automix_duration', state.settings.autoMixDuration.toString());
+        localStorage.setItem('musisurf_crossfade', state.settings.autoMixDuration.toString()); // backward compatibility
+      }
     } catch (e) {}
   }
 
@@ -8675,31 +8983,38 @@
       });
     });
 
-    // Crossfade Slider (Image 2 Gradient Track)
+    // AutoMix Slider (Gradient Track)
     const crossfadeSlider = elements.crossfadeSlider || document.getElementById('crossfadeSlider');
     const liveTimeLabel = elements.liveCrossfadeSeconds || document.getElementById('liveCrossfadeSeconds');
+    const drawerCfVal = document.getElementById('drawerCrossfadeVal') || document.getElementById('drawerCrossfadeValue');
+    const drawerCfSlider = document.getElementById('drawerCrossfadeSlider');
+
     if (crossfadeSlider) {
       crossfadeSlider.addEventListener('input', (e) => {
         const val = parseFloat(e.target.value) || 0;
+        state.settings.autoMixDuration = val;
         state.settings.crossfade = val;
-        if (liveTimeLabel) liveTimeLabel.textContent = formatCrossfadeLabel(val);
-        if (elements.crossfadeValueLabel) elements.crossfadeValueLabel.textContent = formatCrossfadeLabel(val);
+        if (liveTimeLabel) liveTimeLabel.textContent = formatAutoMixHeadline(val);
+        if (elements.crossfadeValueLabel) elements.crossfadeValueLabel.textContent = formatAutoMixLabel(val);
+        if (drawerCfSlider) drawerCfSlider.value = val;
+        if (drawerCfVal) drawerCfVal.textContent = formatAutoMixLabel(val);
       });
       crossfadeSlider.addEventListener('change', (e) => {
         const val = parseFloat(e.target.value) || 0;
+        state.settings.autoMixDuration = val;
         state.settings.crossfade = val;
         saveSettings();
-        showToast(val === 0 ? 'Crossfade turned off' : `Crossfade set to ${formatCrossfadeLabel(val)}`, '🎚️');
+        showToast(val === 0 ? 'AutoMix turned off (Hard Cut)' : `AutoMix set to ${formatAutoMixLabel(val)}`, '🎚️');
       });
     }
 
-    // Automix & Skip Silence Toggles (Image 3)
+    // Automix & Skip Silence Toggles
     const automixSwitch = elements.automixToggleSwitch || document.getElementById('automixToggleSwitch');
     if (automixSwitch) {
       automixSwitch.addEventListener('change', () => {
         state.settings.automix = automixSwitch.checked;
         saveSettings();
-        showToast(automixSwitch.checked ? 'Automix enabled' : 'Automix disabled', '🎶');
+        showToast(automixSwitch.checked ? 'AutoMix enabled' : 'AutoMix disabled', '🎶');
       });
     }
 
@@ -8710,8 +9025,10 @@
       skipSilenceSwitch.addEventListener('change', () => {
         state.settings.removeDeadSilence = skipSilenceSwitch.checked;
         if (deadSilenceSwitch) deadSilenceSwitch.checked = skipSilenceSwitch.checked;
+        const drawerSkip = document.getElementById('drawerSkipSilenceToggle');
+        if (drawerSkip) drawerSkip.checked = skipSilenceSwitch.checked;
         saveSettings();
-        showToast(skipSilenceSwitch.checked ? 'Skip silence enabled (-42 dB)' : 'Skip silence disabled', '⚡');
+        showToast(skipSilenceSwitch.checked ? 'Edge Dead Silence Removal enabled (-45 dBFS)' : 'Edge Dead Silence Removal disabled', '⚡');
       });
     }
 
@@ -8719,8 +9036,10 @@
       deadSilenceSwitch.addEventListener('change', () => {
         state.settings.removeDeadSilence = deadSilenceSwitch.checked;
         if (skipSilenceSwitch) skipSilenceSwitch.checked = deadSilenceSwitch.checked;
+        const drawerSkip = document.getElementById('drawerSkipSilenceToggle');
+        if (drawerSkip) drawerSkip.checked = deadSilenceSwitch.checked;
         saveSettings();
-        showToast(deadSilenceSwitch.checked ? 'Remove dead silence enabled' : 'Remove dead silence disabled', '⚡');
+        showToast(deadSilenceSwitch.checked ? 'Edge Dead Silence Removal enabled (-45 dBFS)' : 'Edge Dead Silence Removal disabled', '⚡');
       });
     }
 
@@ -9933,22 +10252,23 @@
       });
     });
 
-    // Drawer Crossfade Slider (0 to 12s)
+    // Drawer AutoMix Slider (0 to 12s)
     const drawerCfSlider = document.getElementById('drawerCrossfadeSlider');
-    const drawerCfVal = document.getElementById('drawerCrossfadeValue');
+    const drawerCfVal = document.getElementById('drawerCrossfadeVal') || document.getElementById('drawerCrossfadeValue');
     if (drawerCfSlider) {
       drawerCfSlider.addEventListener('input', (e) => {
-        const val = parseFloat(e.target.value);
+        const val = parseFloat(e.target.value) || 0;
+        state.settings.autoMixDuration = val;
         state.settings.crossfade = val;
-        if (drawerCfVal) drawerCfVal.textContent = formatCrossfadeLabel(val);
+        if (drawerCfVal) drawerCfVal.textContent = formatAutoMixLabel(val);
         if (elements.crossfadeSlider) elements.crossfadeSlider.value = val;
-        if (elements.liveCrossfadeSeconds) elements.liveCrossfadeSeconds.textContent = formatCrossfadeLabel(val);
-        if (elements.crossfadeValueLabel) elements.crossfadeValueLabel.textContent = formatCrossfadeLabel(val);
+        if (elements.liveCrossfadeSeconds) elements.liveCrossfadeSeconds.textContent = formatAutoMixHeadline(val);
+        if (elements.crossfadeValueLabel) elements.crossfadeValueLabel.textContent = formatAutoMixLabel(val);
         saveSettings();
       });
     }
 
-    // Drawer Skip Silence Switch
+    // Drawer Edge Dead Silence Switch
     const drawerSkipToggle = document.getElementById('drawerSkipSilenceToggle');
     if (drawerSkipToggle) {
       drawerSkipToggle.addEventListener('change', (e) => {
@@ -9957,7 +10277,7 @@
         if (elements.deadSilenceToggleSwitch) elements.deadSilenceToggleSwitch.checked = val;
         if (elements.skipSilenceToggleSwitch) elements.skipSilenceToggleSwitch.checked = val;
         saveSettings();
-        showToast(val ? 'Skip silence enabled' : 'Skip silence disabled', '⏭');
+        showToast(val ? 'Edge Dead Silence Removal enabled (-45 dBFS)' : 'Edge Dead Silence Removal disabled', '⚡');
       });
     }
 

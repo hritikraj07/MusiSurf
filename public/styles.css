@@ -11174,8 +11174,9 @@ body[data-active-view="lyrics"] .content-scroll {
 }
 
 /* ==========================================================================
-   CROSSFADE CARD UI (Exact match to Reference Image 2)
+   AUTOMIX / CROSSFADE CARD UI (Exact match to Reference Image 2)
    ========================================================================== */
+.automix-card-container,
 .crossfade-card-container {
   background: #181818;
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -11186,12 +11187,14 @@ body[data-active-view="lyrics"] .content-scroll {
   gap: 20px;
 }
 
+.automix-card-top-row,
 .crossfade-card-top-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
+.automix-headline,
 .crossfade-headline {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 1.15rem;
@@ -11200,21 +11203,25 @@ body[data-active-view="lyrics"] .content-scroll {
   letter-spacing: -0.01em;
 }
 
+.automix-live-time,
 .crossfade-live-time {
   color: #ffffff;
   font-weight: 800;
 }
 
+.automix-subtext-right,
 .crossfade-subtext-right {
   font-size: 0.92rem;
   color: #727272;
 }
 
+.automix-gradient-slider-wrap,
 .crossfade-gradient-slider-wrap {
   position: relative;
   width: 100%;
 }
 
+.automix-gradient-input,
 .crossfade-gradient-input {
   -webkit-appearance: none;
   appearance: none;
@@ -11226,6 +11233,7 @@ body[data-active-view="lyrics"] .content-scroll {
   cursor: pointer;
 }
 
+.automix-gradient-input::-webkit-slider-thumb,
 .crossfade-gradient-input::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -11238,10 +11246,12 @@ body[data-active-view="lyrics"] .content-scroll {
   transition: transform 0.15s ease;
 }
 
+.automix-gradient-input::-webkit-slider-thumb:hover,
 .crossfade-gradient-input::-webkit-slider-thumb:hover {
   transform: scale(1.2);
 }
 
+.automix-gradient-input::-moz-range-thumb,
 .crossfade-gradient-input::-moz-range-thumb {
   width: 18px;
   height: 18px;
@@ -11252,6 +11262,7 @@ body[data-active-view="lyrics"] .content-scroll {
   cursor: pointer;
 }
 
+.automix-boundary-labels,
 .crossfade-boundary-labels {
   display: flex;
   justify-content: space-between;
