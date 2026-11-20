@@ -263,6 +263,7 @@
     lyricsSyncPlus: document.getElementById('lyricsSyncPlus'),
     lyricsSyncReset: document.getElementById('lyricsSyncReset'),
     lyricsSyncLabel: document.getElementById('lyricsSyncLabel'),
+    lyricsFullscreenBtn: document.getElementById('lyricsFullscreenBtn'),
 
     // Queue Drawer
     queueDrawer: document.getElementById('queueDrawer'),
@@ -5738,6 +5739,10 @@
     state.currentView = viewName;
     document.body.dataset.activeView = viewName;
 
+    if (viewName !== 'lyrics' && document.body.classList.contains('lyrics-fullscreen-active')) {
+      exitLyricsFullscreen();
+    }
+
     if (viewName !== 'playlist') {
       state.viewingPlaylistId = null;
       state.viewingPlaylistTracks = null;
@@ -7567,8 +7572,66 @@
       });
     }
 
+    // Lyrics Fullscreen Mode Controller (Web Only)
+    function enterLyricsFullscreen() {
+      document.body.classList.add('lyrics-fullscreen-active');
+      if (elements.lyricsFullscreenBtn) {
+        elements.lyricsFullscreenBtn.title = 'Exit full screen';
+        elements.lyricsFullscreenBtn.setAttribute('aria-label', 'Exit full screen');
+        const enterIcon = elements.lyricsFullscreenBtn.querySelector('.icon-enter-fullscreen');
+        const exitIcon = elements.lyricsFullscreenBtn.querySelector('.icon-exit-fullscreen');
+        if (enterIcon) enterIcon.style.display = 'none';
+        if (exitIcon) exitIcon.style.display = 'block';
+      }
+      try {
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      } catch (e) {}
+
+      if (typeof syncLyricsWithTime === 'function' && typeof getCurrentPlaybackTime === 'function') {
+        requestAnimationFrame(() => {
+          syncLyricsWithTime(getCurrentPlaybackTime());
+        });
+      }
+    }
+
+    function exitLyricsFullscreen() {
+      document.body.classList.remove('lyrics-fullscreen-active');
+      if (elements.lyricsFullscreenBtn) {
+        elements.lyricsFullscreenBtn.title = 'Full screen';
+        elements.lyricsFullscreenBtn.setAttribute('aria-label', 'Full screen');
+        const enterIcon = elements.lyricsFullscreenBtn.querySelector('.icon-enter-fullscreen');
+        const exitIcon = elements.lyricsFullscreenBtn.querySelector('.icon-exit-fullscreen');
+        if (enterIcon) enterIcon.style.display = 'block';
+        if (exitIcon) exitIcon.style.display = 'none';
+      }
+      try {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      } catch (e) {}
+
+      if (typeof syncLyricsWithTime === 'function' && typeof getCurrentPlaybackTime === 'function') {
+        requestAnimationFrame(() => {
+          syncLyricsWithTime(getCurrentPlaybackTime());
+        });
+      }
+    }
+
+    function toggleLyricsFullscreen() {
+      if (document.body.classList.contains('lyrics-fullscreen-active')) {
+        exitLyricsFullscreen();
+      } else {
+        enterLyricsFullscreen();
+      }
+    }
+
     // Lyrics View Toggle & Close Handling (Restores Mobile Player Modal if opened from it)
     const handleCloseLyrics = () => {
+      if (document.body.classList.contains('lyrics-fullscreen-active')) {
+        exitLyricsFullscreen();
+      }
       const returnToModal = state.openedLyricsFromMobilePlayer;
       state.openedLyricsFromMobilePlayer = false;
       const targetView = state.previousView && state.previousView !== 'lyrics' ? state.previousView : 'home';
@@ -7591,6 +7654,25 @@
     };
     if (elements.lyricsBtn) elements.lyricsBtn.addEventListener('click', toggleLyricsView);
     if (elements.closeLyricsBtn) elements.closeLyricsBtn.addEventListener('click', handleCloseLyrics);
+    if (elements.lyricsFullscreenBtn) {
+      elements.lyricsFullscreenBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleLyricsFullscreen();
+      });
+    }
+
+    // Sync Esc key & browser fullscreen change with in-app lyrics fullscreen mode
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.body.classList.contains('lyrics-fullscreen-active')) {
+        exitLyricsFullscreen();
+      }
+    });
+
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && document.body.classList.contains('lyrics-fullscreen-active')) {
+        exitLyricsFullscreen();
+      }
+    });
     if (elements.lyricsSyncMinus) {
       elements.lyricsSyncMinus.addEventListener('click', (e) => {
         e.stopPropagation();
