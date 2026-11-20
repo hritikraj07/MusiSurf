@@ -290,7 +290,19 @@
       if (reqId !== this.activeRequestId) return;
       if (expectedTrackId && this.currentTrackId && expectedTrackId !== this.currentTrackId) return;
 
-      const primaryColor = palette.primary;
+      // Ensure border outline matches the lyrics window background color 100%
+      let bgThemeColor = null;
+      if (typeof document !== 'undefined') {
+        const docColor = (document.documentElement && document.documentElement.style.getPropertyValue('--lyrics-theme-color')) || '';
+        const docRgb = (document.documentElement && document.documentElement.style.getPropertyValue('--lyrics-theme-rgb')) || '';
+        if (docColor && docColor !== '#2d3748') {
+          bgThemeColor = docColor;
+        } else if (docRgb && docRgb !== '45, 55, 72') {
+          bgThemeColor = `rgb(${docRgb})`;
+        }
+      }
+
+      const primaryColor = bgThemeColor || palette.primary;
       const el = targetEl || (typeof document !== 'undefined' ? document.getElementById('lyrics-edge-glow') : null);
       if (el) {
         // Strictly monochromatic to the song's dominant album color

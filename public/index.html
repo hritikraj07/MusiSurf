@@ -114,7 +114,7 @@
         </div>
       </div>
 
-      <!-- Right: User Avatar / Account Icon (Opens Sign In / Sign Up Modal for Guest, Profile for Signed In) -->
+      <!-- Right: User Avatar / Account Icon (Matching Image 1: Clean Single Circular Profile Button) -->
       <div class="top-header-right">
         <button class="top-user-avatar-btn" id="headerUserAvatarBtn" type="button" title="Account & Sign In" aria-label="Account & Sign In">
           <div class="top-user-avatar-circle" id="headerUserAvatarCircle">
@@ -122,7 +122,6 @@
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
               <circle cx="12" cy="7" r="4"/>
             </svg>
-            <span class="top-user-initial" id="headerUserInitial" style="display: none;">U</span>
           </div>
         </button>
       </div>
@@ -655,11 +654,13 @@
                   <rect x="14" y="4" width="4" height="16" />
                 </svg>
               </button>
-              <button class="playlist-shuffle-btn" id="shufflePlaylistBtn" title="Mode 1: In Order + Autoplay • Click to cycle modes">
-                <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
+              <button class="playlist-shuffle-btn" id="shufflePlaylistBtn" title="Mode 1: In Order + Autoplay • Click to cycle modes" aria-label="Playback order mode">
+                <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="3" y1="6" x2="14" y2="6"/>
+                  <line x1="3" y1="12" x2="14" y2="12"/>
+                  <line x1="3" y1="18" x2="11" y2="18"/>
+                  <polygon points="16 13 21 16 16 19 16 13" fill="currentColor"/>
                 </svg>
-                <span class="playlist-mode-badge" id="playlistModeBadge">In Order</span>
               </button>
               <button class="playlist-action-icon-btn pin-playlist-btn" id="pinPlaylistBtn" title="Pin Playlist" style="display: none;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -823,8 +824,8 @@
             </div>
           </div>
 
-          <!-- Web-Only Lyrics Fullscreen Option (Documented in Settings, hidden from UI) -->
-          <button class="lyrics-fullscreen-btn" id="lyricsFullscreenBtn" title="Full screen" aria-label="Full screen" type="button" style="display: none !important;">
+          <!-- Web-Only Lyrics Fullscreen Option (Bottom Right Corner) -->
+          <button class="lyrics-fullscreen-btn" id="lyricsFullscreenBtn" title="Full screen (F)" aria-label="Full screen" type="button">
             <svg class="icon-enter-fullscreen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="15 3 21 3 21 9"/>
               <polyline points="9 21 3 21 3 15"/>
@@ -1134,7 +1135,7 @@
       <div class="queue-header">
         <h3 class="queue-title">Play Queue</h3>
         <div class="queue-header-actions">
-          <button class="queue-autoplay-pill-btn active" id="queueAutoplayToggleBtn" title="Toggle Smart Autoplay (Continuous vibe-matched recommendations)">
+          <button class="queue-autoplay-pill-btn active" id="queueAutoplayToggleBtn" title="Toggle Smart Autoplay (Continuous vibe-matched recommendations)" style="display: none !important;">
             <span class="autoplay-dot"></span>
             <span class="autoplay-text">Autoplay</span>
           </button>
@@ -1179,8 +1180,8 @@
         <!-- Recommended Section (Smart Endless Recommendations) -->
         <div class="queue-section" id="queueRecommendedSection">
           <div class="queue-next-header">
-            <span class="queue-section-heading" id="queueRecommendedHeading">Recommended • Based on your vibe</span>
-            <span class="queue-reco-vibe-pill" id="queueRecoVibePill">✨ Smart Autoplay</span>
+            <span class="queue-section-heading" id="queueRecommendedHeading">Recommended</span>
+            <span class="queue-reco-vibe-pill" id="queueRecoVibePill" style="display: none !important;">✨ Smart Autoplay</span>
           </div>
           <div class="queue-list" id="queueRecommendedList">
             <!-- Populated by JS -->

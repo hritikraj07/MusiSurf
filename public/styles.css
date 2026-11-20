@@ -1053,14 +1053,14 @@ html, body {
   order: 2 !important;
 }
 
-/* User Avatar Button (Replaces Sign In button everywhere - Exact Match to Attachment 6) */
+/* User Avatar Button (Replaces Sign In button everywhere - Exact Match to Image 1) */
 .top-user-avatar-btn {
-  width: 40px !important;
-  height: 40px !important;
-  min-width: 40px !important;
-  min-height: 40px !important;
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
   border-radius: 50% !important;
-  background: #181818 !important;
+  background: rgba(255, 255, 255, 0.08) !important;
   border: 1.5px solid rgba(255, 255, 255, 0.18) !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -1077,9 +1077,9 @@ html, body {
 }
 
 .top-user-avatar-btn:hover {
-  background: #242424 !important;
+  background: rgba(255, 255, 255, 0.16) !important;
   border-color: rgba(255, 255, 255, 0.45) !important;
-  transform: scale(1.08) !important;
+  transform: scale(1.06) !important;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
 }
 
@@ -1088,12 +1088,12 @@ html, body {
 }
 
 .top-user-avatar-circle {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
 }
 
 .top-user-icon-svg {
@@ -1106,16 +1106,7 @@ html, body {
 }
 
 .top-user-initial {
-  font-size: 15px !important;
-  font-weight: 700 !important;
-  color: #000000 !important;
-  background: #ffffff !important;
-  width: 100% !important;
-  height: 100% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  border-radius: 50% !important;
+  display: none !important;
 }
 
 /* Remove Sign In text buttons globally from everywhere */
@@ -3889,62 +3880,61 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .playlist-shuffle-btn {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 6px 14px !important;
-  border-radius: 20px !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  border-radius: 50% !important;
+  padding: 0 !important;
   transition: all var(--transition-fast);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   position: relative;
   box-shadow: none !important;
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.2px;
 }
 
 .playlist-shuffle-btn:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1) !important;
-  border-color: rgba(255, 255, 255, 0.22) !important;
-  transform: translateY(-1px);
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  transform: scale(1.05) !important;
 }
 
 .playlist-shuffle-btn.mode-1,
 .playlist-shuffle-btn.active.mode-1 {
   color: var(--text-secondary, #b3b3b3) !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
-  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
 }
 
 .playlist-shuffle-btn.mode-2,
 .playlist-shuffle-btn.active.mode-2 {
   color: #ffffff !important;
-  border-color: rgba(255, 255, 255, 0.28) !important;
-  background: rgba(255, 255, 255, 0.12) !important;
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  background: rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.08) !important;
 }
 
 .playlist-shuffle-btn.mode-3,
 .playlist-shuffle-btn.active.mode-3 {
   color: #ffffff !important;
-  border-color: rgba(255, 255, 255, 0.38) !important;
-  background: rgba(255, 255, 255, 0.16) !important;
-  box-shadow: 0 0 15px rgba(255, 255, 255, 0.09) !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.12) !important;
 }
 
 .playlist-mode-badge {
-  font-size: 0.78rem;
-  font-weight: 600;
-  white-space: nowrap;
+  display: none !important;
 }
 
 .playlist-shuffle-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 20px !important;
+  height: 20px !important;
   flex-shrink: 0;
 }
 
@@ -6639,11 +6629,14 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     display: none !important;
   }
 
-  /* Mobile Top Bar Brand (Official MusiSurf Logo + Text on Far Left) */
+  /* Mobile Top Bar Brand (Official MusiSurf Logo + Text on Far Left - Matching Red Box) */
   .mobile-top-brand {
     display: flex !important;
     align-items: center !important;
     gap: 9px !important;
+    order: 0 !important;
+    margin-right: auto !important;
+    margin-left: 0 !important;
     cursor: pointer !important;
     user-select: none !important;
     -webkit-tap-highlight-color: transparent !important;
@@ -12325,24 +12318,25 @@ body[data-active-view="lyrics"] .content-scroll {
 }
 
 @media (max-width: 768px) {
-  .mobile-drawer-trigger-btn {
-    display: inline-flex !important;
+  .mobile-drawer-trigger-btn,
+  #mobileDrawerTrigger {
+    display: none !important;
   }
   .desktop-header-brand-wrap {
     display: none !important;
   }
-  .top-login-btn#headerLoginBtn {
+  .top-login-btn#headerLoginBtn,
+  .top-login-btn.mobile-sign-in-btn,
+  .mobile-sign-in-btn {
     display: none !important;
   }
-  .top-login-btn.mobile-sign-in-btn {
-    display: inline-flex !important;
-    padding: 7px 16px !important;
-    font-size: 0.85rem !important;
-    font-weight: 600 !important;
-    border-radius: 500px !important;
-    background: #ffffff !important;
-    color: #000000 !important;
-    border: none !important;
+  .mobile-top-brand {
+    display: flex !important;
+    align-items: center !important;
+    gap: 9px !important;
+    order: 0 !important;
+    margin-right: auto !important;
+    margin-left: 0 !important;
   }
 }
 
@@ -13293,12 +13287,52 @@ body[data-active-view="lyrics"] .content-scroll {
    WEB-ONLY LYRICS FULLSCREEN (Bottom Right Button & Immersive Fullscreen Mode)
    ========================================================================== */
 
-/* 1. Fullscreen Button: Documented in Settings shortcut table only, hidden from UI */
+/* 1. Fullscreen Button: Inside Lyrics Window (Bottom Right Corner - Circled in Image 4) */
 .lyrics-fullscreen-btn,
 #lyricsFullscreenBtn {
+  position: absolute;
+  bottom: 24px;
+  right: 28px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 35;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.lyrics-fullscreen-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.45);
+  transform: scale(1.08);
+}
+
+.lyrics-fullscreen-btn:active {
+  transform: scale(0.95);
+}
+
+.lyrics-fullscreen-btn svg {
+  width: 20px;
+  height: 20px;
+  stroke: #ffffff;
+  stroke-width: 2.2;
+}
+
+body.lyrics-fullscreen-active .lyrics-fullscreen-btn .icon-enter-fullscreen {
   display: none !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
+}
+
+body.lyrics-fullscreen-active .lyrics-fullscreen-btn .icon-exit-fullscreen {
+  display: block !important;
 }
 
 /* 2. Fullscreen Active Mode: Completely hides sidebar, player bar, top nav bar, etc. (Shows only lyrics) */
@@ -13481,7 +13515,8 @@ body.lyrics-fullscreen-active #lyricsView .lyrics-scroll-body {
   overflow: hidden;
   filter: drop-shadow(0 0 4px var(--glow-primary, var(--lyrics-theme-color, #fff))) drop-shadow(0 0 14px var(--glow-primary, var(--lyrics-theme-color, #e056fd)));
   transition: filter 0.8s ease;
-  will-change: filter;
+  will-change: filter, padding;
+  animation: borderBeamHeightPulse 4s ease-in-out infinite alternate;
 }
 
 .edge-glow-beam::before {
@@ -13510,18 +13545,44 @@ body.lyrics-fullscreen-active #lyricsView .lyrics-scroll-body {
 }
 
 /* Pause beam rotation smoothly when audio is paused */
+.lyrics-edge-glow:not(.is-playing) .edge-glow-beam,
 .lyrics-edge-glow:not(.is-playing) .edge-glow-beam::before,
 .lyrics-edge-glow:not(.is-playing) .edge-glow-bloom::before {
   animation-play-state: paused;
 }
 
-/* Continuous Perimeter Traveling Rotation */
-@keyframes rotateBorderBeam {
+/* Dynamic perimeter beam height & thickness modulation */
+@keyframes borderBeamHeightPulse {
   0% {
-    transform: translate(-50%, -50%) rotate(0deg);
+    padding: 2px;
+    filter: drop-shadow(0 0 4px var(--glow-primary, var(--lyrics-theme-color, #fff))) drop-shadow(0 0 12px var(--glow-primary, var(--lyrics-theme-color, #e056fd)));
+  }
+  50% {
+    padding: 3.5px;
+    filter: drop-shadow(0 0 7px var(--glow-primary, var(--lyrics-theme-color, #fff))) drop-shadow(0 0 22px var(--glow-primary, var(--lyrics-theme-color, #e056fd)));
   }
   100% {
-    transform: translate(-50%, -50%) rotate(360deg);
+    padding: 2px;
+    filter: drop-shadow(0 0 5px var(--glow-primary, var(--lyrics-theme-color, #fff))) drop-shadow(0 0 14px var(--glow-primary, var(--lyrics-theme-color, #e056fd)));
+  }
+}
+
+/* Continuous Perimeter Traveling Rotation with dynamic line height & length modulation */
+@keyframes rotateBorderBeam {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg) scale(1.0, 1.0);
+  }
+  25% {
+    transform: translate(-50%, -50%) rotate(90deg) scale(1.08, 0.94);
+  }
+  50% {
+    transform: translate(-50%, -50%) rotate(180deg) scale(0.95, 1.07);
+  }
+  75% {
+    transform: translate(-50%, -50%) rotate(270deg) scale(1.08, 0.94);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg) scale(1.0, 1.0);
   }
 }
 

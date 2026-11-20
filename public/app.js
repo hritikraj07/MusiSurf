@@ -2288,14 +2288,30 @@
       if (mode !== '1') elements.shufflePlaylistBtn.classList.add('active');
 
       if (mode === '1') {
-        if (elements.playlistModeBadge) elements.playlistModeBadge.textContent = 'In Order';
-        elements.shufflePlaylistBtn.title = 'Mode 1: In Order + Autoplay • Plays playlist in order, then switches to endless recommendations. Click to switch to Mode 2';
+        // Mode 1: Plays playlist in order
+        elements.shufflePlaylistBtn.innerHTML = `
+          <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6" x2="14" y2="6"/>
+            <line x1="3" y1="12" x2="14" y2="12"/>
+            <line x1="3" y1="18" x2="11" y2="18"/>
+            <polygon points="16 13 21 16 16 19 16 13" fill="currentColor"/>
+          </svg>`;
+        elements.shufflePlaylistBtn.title = 'In Order (Plays playlist in order + autoplay) • Click for Random Order';
       } else if (mode === '2') {
-        if (elements.playlistModeBadge) elements.playlistModeBadge.textContent = 'Shuffle Once';
-        elements.shufflePlaylistBtn.title = 'Mode 2: Shuffle Once + Autoplay • Plays every song once randomly, then switches to endless recommendations. Click to switch to Mode 3';
+        // Mode 2: Plays in random order (Shuffle Once)
+        elements.shufflePlaylistBtn.innerHTML = `
+          <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>
+          </svg>`;
+        elements.shufflePlaylistBtn.title = 'Random Order (Shuffle once + autoplay) • Click for Random Order with Loop';
       } else if (mode === '3') {
-        if (elements.playlistModeBadge) elements.playlistModeBadge.textContent = 'Shuffle & Loop';
-        elements.shufflePlaylistBtn.title = 'Mode 3: Shuffle & Repeat Playlist • Loops playlist indefinitely with newly shuffled cycles. Click to switch to Mode 1';
+        // Mode 3: Plays in random order with loop (Shuffle & Loop)
+        elements.shufflePlaylistBtn.innerHTML = `
+          <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>
+            <circle cx="19" cy="19" r="2.8" fill="currentColor"/>
+          </svg>`;
+        elements.shufflePlaylistBtn.title = 'Random Order with Loop (Shuffle & Loop) • Click for In Order';
       }
     }
   }
@@ -5866,10 +5882,18 @@
       if (lyricsViewEl) {
         lyricsViewEl.style.setProperty('--lyrics-theme-rgb', rgbStr);
         lyricsViewEl.style.setProperty('--lyrics-theme-color', `rgb(${rgbStr})`);
+        lyricsViewEl.style.setProperty('--glow-primary', `rgb(${rgbStr})`);
+        lyricsViewEl.style.setProperty('--glow-secondary', `rgb(${rgbStr})`);
+        lyricsViewEl.style.setProperty('--glow-tertiary', `rgb(${rgbStr})`);
+        lyricsViewEl.style.setProperty('--glow-quaternary', `rgb(${rgbStr})`);
       }
       if (glowEl) {
         glowEl.style.setProperty('--lyrics-theme-rgb', rgbStr);
         glowEl.style.setProperty('--lyrics-theme-color', `rgb(${rgbStr})`);
+        glowEl.style.setProperty('--glow-primary', `rgb(${rgbStr})`);
+        glowEl.style.setProperty('--glow-secondary', `rgb(${rgbStr})`);
+        glowEl.style.setProperty('--glow-tertiary', `rgb(${rgbStr})`);
+        glowEl.style.setProperty('--glow-quaternary', `rgb(${rgbStr})`);
       }
     } catch (e) {
       document.documentElement.style.setProperty('--lyrics-theme-color', '#2d3748');
@@ -5877,10 +5901,18 @@
       if (lyricsViewEl) {
         lyricsViewEl.style.setProperty('--lyrics-theme-color', '#2d3748');
         lyricsViewEl.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
+        lyricsViewEl.style.setProperty('--glow-primary', '#2d3748');
+        lyricsViewEl.style.setProperty('--glow-secondary', '#2d3748');
+        lyricsViewEl.style.setProperty('--glow-tertiary', '#2d3748');
+        lyricsViewEl.style.setProperty('--glow-quaternary', '#2d3748');
       }
       if (glowEl) {
         glowEl.style.setProperty('--lyrics-theme-color', '#2d3748');
         glowEl.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
+        glowEl.style.setProperty('--glow-primary', '#2d3748');
+        glowEl.style.setProperty('--glow-secondary', '#2d3748');
+        glowEl.style.setProperty('--glow-tertiary', '#2d3748');
+        glowEl.style.setProperty('--glow-quaternary', '#2d3748');
       }
     }
   }
@@ -10738,18 +10770,15 @@
     function updateAuthUI() {
       const user = state.currentUser;
       if (user && user.email) {
-        // Logged In State
+        // Logged In State (Clean single profile avatar button matching Image 1)
         if (headerUserAvatarBtn) {
-          headerUserAvatarBtn.title = user.name || user.email;
-          if (headerUserIconSvg) headerUserIconSvg.style.display = 'none';
-          if (headerUserInitial) {
-            headerUserInitial.style.display = 'flex';
-            headerUserInitial.textContent = (user.name || user.email || 'U')[0].toUpperCase();
-          }
+          headerUserAvatarBtn.title = `${user.name || user.email} (Signed In)`;
+          if (headerUserIconSvg) headerUserIconSvg.style.display = 'block';
+          if (headerUserInitial) headerUserInitial.style.display = 'none';
         }
 
         if (mobTopAvatar) {
-          mobTopAvatar.innerHTML = `<span style="font-weight:700;font-size:14px;color:#fff;">${(user.name || user.email || 'U')[0].toUpperCase()}</span>`;
+          mobTopAvatar.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
         }
 
         // Drawer User Card
@@ -10764,7 +10793,7 @@
         if (drawerSignInBtn) drawerSignInBtn.style.display = 'none';
         if (drawerSignOutBtn) drawerSignOutBtn.style.display = 'flex';
       } else {
-        // Guest State
+        // Guest State (Clean single profile avatar button matching Image 1)
         if (headerUserAvatarBtn) {
           headerUserAvatarBtn.title = 'Account & Sign In';
           if (headerUserIconSvg) headerUserIconSvg.style.display = 'block';
