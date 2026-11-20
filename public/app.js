@@ -283,6 +283,7 @@
     lyricsSyncReset: document.getElementById('lyricsSyncReset'),
     lyricsSyncLabel: document.getElementById('lyricsSyncLabel'),
     lyricsFullscreenBtn: document.getElementById('lyricsFullscreenBtn'),
+    lyricsEdgeGlow: document.getElementById('lyrics-edge-glow'),
     lyricsScriptToggleBtn: document.getElementById('lyricsScriptToggleBtn'),
     contributeLyricsModal: document.getElementById('contributeLyricsModal'),
     closeContributeLyricsBtn: document.getElementById('closeContributeLyricsBtn'),
@@ -728,6 +729,10 @@
           lyricsViewEl.style.setProperty('--lyrics-theme-color', `rgb(${topR}, ${topG}, ${topB})`);
         }
       }).catch(() => {});
+    }
+
+    if (state.currentView === 'lyrics') {
+      updateLyricsEdgeGlowState();
     }
 
     // 9. Reset and Clean Lyrics View Immediately for New Track
@@ -3437,6 +3442,10 @@
     } else {
       stopBackgroundKeepAlive();
     }
+
+    if (state.currentView === 'lyrics') {
+      updateLyricsEdgeGlowState();
+    }
   }
 
   // Direct Audio Downloader: Instantly adds to "Downloaded" playlist in Library, and triggers file download on Desktop
@@ -5652,6 +5661,38 @@
     });
   }
 
+  // Desktop Ambient Edge Border Glow Animation Controller (Lyrics Window Only)
+  function isDesktopWebGlowEligible() {
+    return window.innerWidth > 768 && (!window.matchMedia || window.matchMedia('(hover: hover) and (pointer: fine)').matches);
+  }
+
+  function updateLyricsEdgeGlowState() {
+    const glowEl = elements.lyricsEdgeGlow || document.getElementById('lyrics-edge-glow');
+    if (!glowEl) return;
+
+    const isLyricsActive = state.currentView === 'lyrics';
+    const isDesktop = isDesktopWebGlowEligible();
+
+    if (!isLyricsActive || !isDesktop) {
+      glowEl.classList.remove('is-active', 'is-playing');
+      return;
+    }
+
+    glowEl.classList.add('is-active');
+
+    // Playing state: song is actively playing and audio is not paused
+    const actDeck = getActiveDeck();
+    const isPlaying = !!(state.isPlaying && actDeck && !actDeck.paused);
+    glowEl.classList.toggle('is-playing', isPlaying);
+
+    const track = state.currentTrack;
+    if (track) {
+      if (window.albumThemeExtractor && typeof window.albumThemeExtractor.applyThemeToEdgeGlow === 'function') {
+        window.albumThemeExtractor.applyThemeToEdgeGlow(track, glowEl, track.id);
+      }
+    }
+  }
+
   async function applyLyricsDynamicBackground(track) {
     const lyricsViewEl = document.getElementById('lyricsView');
     const current = track || state.currentTrack;
@@ -6670,6 +6711,14 @@
     state.previousView = state.currentView;
     state.currentView = viewName;
     document.body.dataset.activeView = viewName;
+
+    // Ambient Edge Border Glow (Desktop Web Lyrics Window Only)
+    if (viewName === 'lyrics') {
+      updateLyricsEdgeGlowState();
+    } else {
+      const glowEl = elements.lyricsEdgeGlow || document.getElementById('lyrics-edge-glow');
+      if (glowEl) glowEl.classList.remove('is-active', 'is-playing');
+    }
 
     if (viewName !== 'lyrics' && document.body.classList.contains('lyrics-fullscreen-active')) {
       exitLyricsFullscreen();
@@ -8584,6 +8633,8 @@
 
     // Lyrics View Toggle & Close Handling (Restores Mobile Player Modal if opened from it)
     const handleCloseLyrics = () => {
+      const glowEl = elements.lyricsEdgeGlow || document.getElementById('lyrics-edge-glow');
+      if (glowEl) glowEl.classList.remove('is-active', 'is-playing');
       if (document.body.classList.contains('lyrics-fullscreen-active')) {
         exitLyricsFullscreen();
       }
@@ -8626,6 +8677,12 @@
     document.addEventListener('fullscreenchange', () => {
       if (!document.fullscreenElement && document.body.classList.contains('lyrics-fullscreen-active')) {
         exitLyricsFullscreen();
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (state.currentView === 'lyrics') {
+        updateLyricsEdgeGlowState();
       }
     });
     if (elements.lyricsSyncMinus) {

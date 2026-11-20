@@ -737,6 +737,12 @@
 
         <!-- SYNCHRONIZED LYRICS VIEW (Exact Match to Image 2 - Dynamic Atmospheric Backdrop) -->
         <section class="view-section" id="lyricsView">
+          <!-- Album-Themed Ambient Edge Border Glow Animation (Desktop Web Lyrics Window Only) -->
+          <div id="lyrics-edge-glow" class="lyrics-edge-glow" aria-hidden="true">
+            <div class="edge-glow-bloom"></div>
+            <div class="edge-glow-rim"></div>
+          </div>
+
           <div class="lyrics-view-top-actions">
             <div class="lyrics-top-badges" id="lyricsTopBadges">
               <span class="lyrics-mode-pill" id="lyricsStatusBadge" style="display: none !important;"></span>
@@ -2569,6 +2575,8 @@
 
   <!-- YouTube Iframe API -->
   <script src="https://www.youtube.com/iframe_api"></script>
+  <!-- Ambient Edge Border Glow Color Extractor Engine -->
+  <script src="/albumThemeExtractor.js"></script>
   <!-- Main Application Script -->
   <script src="/app.js?v=8.45"></script>
 </body>

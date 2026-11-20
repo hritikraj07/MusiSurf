@@ -13019,3 +13019,165 @@ body.lyrics-fullscreen-active #lyricsView .lyrics-scroll-body {
   padding: 60px 20px 80px !important;
   height: 100% !important;
 }
+
+/* ==========================================================================
+   ALBUM-THEMED AMBIENT EDGE BORDER GLOW ANIMATION (Desktop Web Lyrics Window Only)
+   ========================================================================== */
+:root {
+  --glow-primary: #ff7b25;
+  --glow-secondary: #fbb13c;
+  --glow-tertiary: #a8201a;
+  --glow-quaternary: #e76f51;
+}
+
+#lyrics-edge-glow,
+.lyrics-edge-glow {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  overflow: hidden;
+  box-sizing: border-box;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  will-change: opacity, filter;
+}
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  #lyrics-edge-glow.is-active,
+  .lyrics-edge-glow.is-active {
+    display: block;
+    opacity: 0.38; /* subtle low-intensity resting state when paused */
+  }
+
+  #lyrics-edge-glow.is-active.is-playing,
+  .lyrics-edge-glow.is-active.is-playing {
+    opacity: 1;
+    animation: edgeGlowBreathe 3.6s ease-in-out infinite;
+  }
+}
+
+/* Layer 1: Soft Diffused Outer Bloom (24px–48px inward blur) */
+.edge-glow-bloom {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 18px;
+  box-shadow:
+    inset 0 0 28px 4px var(--glow-primary),
+    inset 0 0 56px 12px var(--glow-secondary),
+    inset 0 0 95px 24px rgba(0, 0, 0, 0.45);
+  opacity: 0.68;
+  transition: box-shadow 0.8s ease, opacity 0.5s ease;
+  will-change: box-shadow, opacity;
+}
+
+.lyrics-edge-glow.is-playing .edge-glow-bloom {
+  animation: edgeGlowBloomPulse 3.6s ease-in-out infinite;
+}
+
+/* Layer 2: Crisp Inner Rim (2px–3px) with flowing conic gradient */
+.edge-glow-rim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 18px;
+  padding: 2.5px; /* crisp 2.5px hairline rim */
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  overflow: hidden;
+  filter: drop-shadow(0 0 6px var(--glow-primary)) drop-shadow(0 0 16px var(--glow-secondary));
+  transition: filter 0.8s ease;
+  will-change: filter;
+}
+
+.edge-glow-rim::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    var(--glow-primary) 0%,
+    var(--glow-secondary) 25%,
+    var(--glow-tertiary) 50%,
+    var(--glow-quaternary) 75%,
+    var(--glow-primary) 100%
+  );
+  animation: rotateRimPseudo 10s linear infinite;
+  will-change: transform;
+  transition: background 0.8s ease;
+}
+
+/* Pause rotation smoothly when music is paused */
+.lyrics-edge-glow:not(.is-playing) .edge-glow-rim::before {
+  animation-play-state: paused;
+}
+
+/* Rotation Animation */
+@keyframes rotateRimPseudo {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Dynamic Breathing Pulse (Active Playback) */
+@keyframes edgeGlowBreathe {
+  0%, 100% {
+    opacity: 0.84;
+    filter: brightness(1.0);
+  }
+  50% {
+    opacity: 1.0;
+    filter: brightness(1.22);
+  }
+}
+
+@keyframes edgeGlowBloomPulse {
+  0%, 100% {
+    opacity: 0.58;
+    filter: brightness(1.0);
+  }
+  50% {
+    opacity: 0.88;
+    filter: brightness(1.24);
+  }
+}
+
+/* Strictly disable and hide on mobile viewports (<= 768px) and touch layouts */
+@media (max-width: 768px), (hover: none), (pointer: coarse) {
+  #lyrics-edge-glow,
+  .lyrics-edge-glow {
+    display: none !important;
+    animation: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+  .edge-glow-bloom,
+  .edge-glow-rim,
+  .edge-glow-rim::before {
+    display: none !important;
+    animation: none !important;
+  }
+}
+
+/* Reduced Motion: Show calm, static ambient glow without rotation */
+@media (prefers-reduced-motion: reduce) {
+  #lyrics-edge-glow.is-active,
+  .lyrics-edge-glow.is-active,
+  .edge-glow-bloom,
+  .edge-glow-rim,
+  .edge-glow-rim::before {
+    animation: none !important;
+    transition: opacity 0.3s ease !important;
+  }
+}
