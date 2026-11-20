@@ -274,6 +274,7 @@
     lyricsTrackArtist: document.getElementById('lyricsTrackArtist'),
     lyricsStatusBadge: document.getElementById('lyricsStatusBadge'),
     lyricsLoading: document.getElementById('lyricsLoading'),
+    lyricsLoadingText: document.getElementById('lyricsLoadingText'),
     lyricsLinesContainer: document.getElementById('lyricsLinesContainer'),
     lyricsScrollBody: document.getElementById('lyricsScrollBody'),
     closeLyricsBtn: document.getElementById('closeLyricsBtn'),
@@ -3943,6 +3944,49 @@
   state.lyricsAbortController = null;
   state.currentLyricsData = null;
   state.lyricsScriptMode = 'native'; // 'native' (Devanagari/Gurmukhi/Urdu) or 'latin'
+  state.lyricsLoadingTimers = [];
+
+  // Persistent Verified Lyrics Database (Client-Side LocalStorage, 250 items, 7-day TTL)
+  const VERIFIED_LYRICS_STORAGE_KEY = 'musisurf_verified_lyrics_v2';
+  const VERIFIED_LYRICS_MAX_ENTRIES = 250;
+  const VERIFIED_LYRICS_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+  function getPersistentVerifiedLyrics(cacheKey) {
+    if (!cacheKey) return null;
+    try {
+      const raw = localStorage.getItem(VERIFIED_LYRICS_STORAGE_KEY);
+      if (!raw) return null;
+      const store = JSON.parse(raw);
+      const entry = store[cacheKey];
+      if (!entry || !entry.data) return null;
+      if (Date.now() - (entry.timestamp || 0) > VERIFIED_LYRICS_TTL_MS) {
+        delete store[cacheKey];
+        try { localStorage.setItem(VERIFIED_LYRICS_STORAGE_KEY, JSON.stringify(store)); } catch (e) {}
+        return null;
+      }
+      return entry.data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function setPersistentVerifiedLyrics(cacheKey, data) {
+    if (!cacheKey || !data) return;
+    try {
+      const raw = localStorage.getItem(VERIFIED_LYRICS_STORAGE_KEY);
+      let store = raw ? JSON.parse(raw) : {};
+      const keys = Object.keys(store);
+      if (keys.length >= VERIFIED_LYRICS_MAX_ENTRIES && !store[cacheKey]) {
+        keys.sort((a, b) => (store[a].timestamp || 0) - (store[b].timestamp || 0));
+        delete store[keys[0]];
+      }
+      store[cacheKey] = {
+        data,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(VERIFIED_LYRICS_STORAGE_KEY, JSON.stringify(store));
+    } catch (e) {}
+  }
 
   async function loadLyricsForTrack(trackOrTitle, maybeArtist, maybeOptions) {
     let trackObj = null;
@@ -3983,8 +4027,8 @@
 
     // Reset state & UI immediately (clean previous song's lyrics immediately)
     elements.lyricsLoading.style.display = 'flex';
-    const loadingP = elements.lyricsLoading.querySelector('p');
-    if (loadingP) loadingP.textContent = 'Searching for verified lyrics...';
+    const loadingP = elements.lyricsLoadingText || elements.lyricsLoading.querySelector('p');
+    if (loadingP) loadingP.textContent = 'Checking saved verified lyrics...';
 
     elements.lyricsLinesContainer.innerHTML = '';
     state.lyrics = [];
@@ -4018,21 +4062,28 @@
       elements.lyricsAlbumCover.style.display = 'block';
     }
 
-    // Check memory cache first
+    // Check memory cache or persistent verified local store first
     const cacheKey = `${title.toLowerCase().trim()}___${artist.toLowerCase().trim()}`;
-    if (state.lyricsCache && state.lyricsCache[cacheKey]) {
-      const cached = state.lyricsCache[cacheKey];
+    const cachedData = (state.lyricsCache && state.lyricsCache[cacheKey]) || getPersistentVerifiedLyrics(cacheKey);
+    if (cachedData) {
+      if (!state.lyricsCache) state.lyricsCache = {};
+      state.lyricsCache[cacheKey] = cachedData;
       // Guard: Only render cached lyrics if STILL the current active track and epoch
       if (targetEpoch === state.trackEpoch && state.currentTrack?.id === trackId) {
+        if (state.lyricsLoadingTimers) {
+          state.lyricsLoadingTimers.forEach(id => clearTimeout(id));
+          state.lyricsLoadingTimers = [];
+        }
         elements.lyricsLoading.style.display = 'none';
-        if (cached.syncedLyrics) {
-          state.currentLyricsData = cached;
-          const parsed = parseLrc(cached.syncedLyrics, (state.lyricsAutoIntroOffset || 0) + (state.lyricsManualOffset || 0));
-          renderLyricsLines(parsed, cached.language, cached.script, cached);
+        if (cachedData.syncedLyrics) {
+          state.currentLyricsData = cachedData;
+          state.rawSyncedLyrics = cachedData.syncedLyrics;
+          const parsed = parseLrc(cachedData.syncedLyrics, (state.lyricsAutoIntroOffset || 0) + (state.lyricsManualOffset || 0));
+          renderLyricsLines(parsed, cachedData.language, cachedData.script, cachedData);
           return;
-        } else if (cached.plainLyrics) {
-          state.currentLyricsData = cached;
-          renderPlainLyrics(cached.plainLyrics, cached.language, cached.script, cached);
+        } else if (cachedData.plainLyrics) {
+          state.currentLyricsData = cachedData;
+          renderPlainLyrics(cachedData.plainLyrics, cachedData.language, cachedData.script, cachedData);
           return;
         }
       }
@@ -4063,6 +4114,27 @@
       return;
     }
 
+    // Cancel previous loading step timers & setup progressive discovery feedback
+    if (state.lyricsLoadingTimers && state.lyricsLoadingTimers.length) {
+      state.lyricsLoadingTimers.forEach(id => clearTimeout(id));
+    }
+    state.lyricsLoadingTimers = [];
+
+    const setLyricsStatusText = (text) => {
+      if (elements.lyricsLoadingText) {
+        elements.lyricsLoadingText.textContent = text;
+      } else if (elements.lyricsLoading) {
+        const p = elements.lyricsLoading.querySelector('p');
+        if (p) p.textContent = text;
+      }
+    };
+
+    setLyricsStatusText('Checking saved verified lyrics...');
+    state.lyricsLoadingTimers.push(setTimeout(() => setLyricsStatusText('Searching primary synchronized providers...'), 600));
+    state.lyricsLoadingTimers.push(setTimeout(() => setLyricsStatusText('Checking regional and verified catalog...'), 1800));
+    state.lyricsLoadingTimers.push(setTimeout(() => setLyricsStatusText('Scanning additional verified sources...'), 3200));
+    state.lyricsLoadingTimers.push(setTimeout(() => setLyricsStatusText('Verifying song identity & synchronization...'), 4500));
+
     try {
       let queryStr = `track=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`;
       if (album) queryStr += `&album=${encodeURIComponent(album)}`;
@@ -4070,6 +4142,12 @@
 
       const res = await fetch(`/api/lyrics?${queryStr}`, { signal: abortSignal });
       const data = await res.json();
+
+      // Clear progressive status timers
+      if (state.lyricsLoadingTimers && state.lyricsLoadingTimers.length) {
+        state.lyricsLoadingTimers.forEach(id => clearTimeout(id));
+        state.lyricsLoadingTimers = [];
+      }
 
       // Guard against stale response (network delay over hotspot)
       if (reqId !== state.currentLyricsRequestId || targetEpoch !== state.trackEpoch || (state.currentTrack && state.currentTrack.id !== trackId)) {
@@ -4083,6 +4161,7 @@
         state.currentLyricsData = data;
         if (!state.lyricsCache) state.lyricsCache = {};
         state.lyricsCache[cacheKey] = data;
+        setPersistentVerifiedLyrics(cacheKey, data);
 
         if (data.syncedLyrics) {
           state.rawSyncedLyrics = data.syncedLyrics;
@@ -4122,6 +4201,10 @@
       // No verified lyrics found across providers -> Honest Unavailable State
       renderLyricsUnavailable(title, artist, trackId);
     } catch (err) {
+      if (state.lyricsLoadingTimers && state.lyricsLoadingTimers.length) {
+        state.lyricsLoadingTimers.forEach(id => clearTimeout(id));
+        state.lyricsLoadingTimers = [];
+      }
       if (err.name === 'AbortError') return;
       console.warn('Lyrics fetch failed:', err);
       if (reqId !== state.currentLyricsRequestId || targetEpoch !== state.trackEpoch || (state.currentTrack && state.currentTrack.id !== trackId)) return;
@@ -4202,6 +4285,15 @@
   function renderLyricsLines(lyrics, language = 'English', script = 'Latin', data = null) {
     elements.lyricsLinesContainer.innerHTML = '';
     const langCode = (language === 'Hindi' ? 'hi' : (language === 'Punjabi' ? 'pa' : (language === 'Urdu' ? 'ur' : 'en')));
+    const isRtl = language === 'Urdu' || script === 'Urdu (Nastaliq)';
+
+    if (isRtl) {
+      elements.lyricsLinesContainer.setAttribute('dir', 'rtl');
+      elements.lyricsLinesContainer.classList.add('rtl-lyrics');
+    } else {
+      elements.lyricsLinesContainer.removeAttribute('dir');
+      elements.lyricsLinesContainer.classList.remove('rtl-lyrics');
+    }
 
     state.lyrics = lyrics;
     state.hasSyncedLyrics = true;
@@ -4226,10 +4318,11 @@
 
     lyrics.forEach((item, idx) => {
       const div = document.createElement('div');
-      div.className = 'lyric-line';
+      div.className = 'lyric-line' + (isRtl ? ' rtl-lyrics' : '');
       div.dataset.index = idx;
       div.dataset.time = item.time;
       div.dataset.lang = langCode;
+      if (isRtl) div.setAttribute('dir', 'rtl');
 
       const tokens = item.text.split(/(\s+)/);
       let wordIdx = 0;
@@ -4258,6 +4351,15 @@
     state.activeLyricIndex = -1;
 
     const langCode = (language === 'Hindi' ? 'hi' : (language === 'Punjabi' ? 'pa' : (language === 'Urdu' ? 'ur' : 'en')));
+    const isRtl = language === 'Urdu' || script === 'Urdu (Nastaliq)';
+
+    if (isRtl) {
+      elements.lyricsLinesContainer.setAttribute('dir', 'rtl');
+      elements.lyricsLinesContainer.classList.add('rtl-lyrics');
+    } else {
+      elements.lyricsLinesContainer.removeAttribute('dir');
+      elements.lyricsLinesContainer.classList.remove('rtl-lyrics');
+    }
 
     if (elements.lyricsSyncControls) {
       elements.lyricsSyncControls.style.display = 'none';
@@ -4277,7 +4379,8 @@
     }
 
     const container = document.createElement('div');
-    container.className = 'lyrics-plain-container';
+    container.className = 'lyrics-plain-container' + (isRtl ? ' rtl-lyrics' : '');
+    if (isRtl) container.setAttribute('dir', 'rtl');
 
     const notice = document.createElement('div');
     notice.className = 'lyrics-plain-notice';
@@ -4292,8 +4395,9 @@
     container.appendChild(notice);
 
     const pre = document.createElement('div');
-    pre.className = 'lyrics-plain-text';
+    pre.className = 'lyrics-plain-text' + (isRtl ? ' rtl-lyrics' : '');
     pre.dataset.lang = langCode;
+    if (isRtl) pre.setAttribute('dir', 'rtl');
     pre.textContent = plainText;
     container.appendChild(pre);
 
@@ -8911,6 +9015,86 @@
       });
     }
 
+    // Contribute Lyrics Modal Handlers
+    if (elements.contributeLyricsForm) {
+      elements.contributeLyricsForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const track = (elements.contributeTrackInput?.value || '').trim();
+        const artist = (elements.contributeArtistInput?.value || '').trim();
+        const lyrics = (elements.contributeLyricsText?.value || '').trim();
+        const album = state.currentTrack?.album || '';
+
+        if (!track || !lyrics || lyrics.length < 20) {
+          showToast('Please enter at least 20 characters of lyrics.', '⚠️');
+          return;
+        }
+
+        const submitBtn = document.getElementById('saveContributeLyricsBtn');
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Saving...';
+        }
+
+        try {
+          const res = await fetch('/api/lyrics/contribute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ track, artist, album, lyrics })
+          });
+          const resData = await res.json();
+          if (resData.success && resData.data) {
+            const cacheKey = `${track.toLowerCase().trim()}___${(artist || '').toLowerCase().trim()}`;
+            if (!state.lyricsCache) state.lyricsCache = {};
+            state.lyricsCache[cacheKey] = resData.data;
+            setPersistentVerifiedLyrics(cacheKey, resData.data);
+
+            if (elements.contributeLyricsModal) elements.contributeLyricsModal.style.display = 'none';
+            showToast('Lyrics saved & verified successfully!', '✓');
+
+            if (state.currentTrack && state.currentTrack.title.toLowerCase().trim() === track.toLowerCase().trim()) {
+              state.currentLyricsData = resData.data;
+              if (resData.data.syncedLyrics) {
+                state.rawSyncedLyrics = resData.data.syncedLyrics;
+                const parsed = parseLrc(resData.data.syncedLyrics, 0);
+                renderLyricsLines(parsed, resData.data.language, resData.data.script, resData.data);
+              } else if (resData.data.plainLyrics) {
+                renderPlainLyrics(resData.data.plainLyrics, resData.data.language, resData.data.script, resData.data);
+              }
+            }
+          } else {
+            showToast(resData.message || 'Failed to save lyrics', '⚠️');
+          }
+        } catch (err) {
+          showToast('Failed to save lyrics. Check internet connection.', '⚠️');
+        } finally {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Lyrics';
+          }
+        }
+      });
+    }
+
+    if (elements.closeContributeLyricsBtn) {
+      elements.closeContributeLyricsBtn.addEventListener('click', () => {
+        if (elements.contributeLyricsModal) elements.contributeLyricsModal.style.display = 'none';
+      });
+    }
+
+    if (elements.cancelContributeLyricsBtn) {
+      elements.cancelContributeLyricsBtn.addEventListener('click', () => {
+        if (elements.contributeLyricsModal) elements.contributeLyricsModal.style.display = 'none';
+      });
+    }
+
+    if (elements.contributeLyricsModal) {
+      elements.contributeLyricsModal.addEventListener('click', (e) => {
+        if (e.target === elements.contributeLyricsModal) {
+          elements.contributeLyricsModal.style.display = 'none';
+        }
+      });
+    }
+
     // Desktop Brand Logo Click -> Redirect to Home
     if (elements.desktopHeaderBrand) {
       elements.desktopHeaderBrand.style.cursor = 'pointer';
@@ -10240,6 +10424,7 @@
         elements.createPlaylistModal.style.display = 'none';
         if (elements.renamePlaylistModal) elements.renamePlaylistModal.style.display = 'none';
         if (elements.deletePlaylistConfirmModal) elements.deletePlaylistConfirmModal.style.display = 'none';
+        if (elements.contributeLyricsModal) elements.contributeLyricsModal.style.display = 'none';
         elements.addToPlaylistModal.style.display = 'none';
         if (elements.settingsModal) elements.settingsModal.style.display = 'none';
         if (elements.exportFormatModal) elements.exportFormatModal.style.display = 'none';

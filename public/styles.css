@@ -10032,7 +10032,11 @@ body[data-active-view="lyrics"] .content-scroll {
 
 .lyric-line[data-lang="ur"],
 .lyrics-plain-text[data-lang="ur"],
-.lyrics-hero-title[data-lang="ur"] {
+.lyrics-hero-title[data-lang="ur"],
+.lyric-line.rtl-lyrics,
+.lyrics-plain-text.rtl-lyrics,
+.lyrics-lines-container[dir="rtl"],
+.lyrics-plain-container[dir="rtl"] {
   font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', 'Urdu Typesetting', serif !important;
   direction: rtl !important;
   text-align: right !important;
