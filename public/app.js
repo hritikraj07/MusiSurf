@@ -263,6 +263,14 @@
     lyricsSyncReset: document.getElementById('lyricsSyncReset'),
     lyricsSyncLabel: document.getElementById('lyricsSyncLabel'),
     lyricsFullscreenBtn: document.getElementById('lyricsFullscreenBtn'),
+    lyricsScriptToggleBtn: document.getElementById('lyricsScriptToggleBtn'),
+    contributeLyricsModal: document.getElementById('contributeLyricsModal'),
+    closeContributeLyricsBtn: document.getElementById('closeContributeLyricsBtn'),
+    cancelContributeLyricsBtn: document.getElementById('cancelContributeLyricsBtn'),
+    contributeLyricsForm: document.getElementById('contributeLyricsForm'),
+    contributeTrackInput: document.getElementById('contributeTrackInput'),
+    contributeArtistInput: document.getElementById('contributeArtistInput'),
+    contributeLyricsText: document.getElementById('contributeLyricsText'),
 
     // Queue Drawer
     queueDrawer: document.getElementById('queueDrawer'),
@@ -3097,80 +3105,97 @@
   // ==========================================================================
   // SYNCHRONIZED LYRICS ENGINE & SMART AUTO-TIMING CONVERTER
   // ==========================================================================
-  function convertPlainLyricsToSynced(plainText, trackDuration) {
-    if (!plainText) return [];
-    const rawLines = plainText.split('\n');
-    const validLines = [];
-    for (const raw of rawLines) {
-      let trimmed = raw.trim();
-      if (!trimmed) continue;
-      // Strip bracketed section headers like [Verse 1], [मुखड़ा], (Chorus) from line beginnings
-      trimmed = trimmed.replace(/^[\[(][^\])]+[\])]\s*/, '').trim();
-      if (!trimmed) continue;
-      // Skip standalone section headers
-      if (/^[\[(].+[\])]$/.test(trimmed) || /^(verse|chorus|bridge|outro|intro|hook|मुखड़ा|अंतरा|कोरस|स्थायी)\s*\d*[:\-]?$/i.test(trimmed)) continue;
-      validLines.push(trimmed);
+  // Request tracking & abort controller to prevent async race conditions
+  state.currentLyricsRequestId = 0;
+  state.lyricsAbortController = null;
+  state.currentLyricsData = null;
+  state.lyricsScriptMode = 'native'; // 'native' (Devanagari/Gurmukhi/Urdu) or 'latin'
+
+  async function loadLyricsForTrack(trackOrTitle, maybeArtist, maybeOptions) {
+    let trackObj = null;
+    let title = '';
+    let artist = '';
+    let album = '';
+    let duration = 0;
+    let trackId = '';
+
+    if (trackOrTitle && typeof trackOrTitle === 'object') {
+      trackObj = trackOrTitle;
+      title = trackObj.title || '';
+      artist = trackObj.artist || '';
+      album = trackObj.album || '';
+      duration = Math.round(trackObj.duration || parseDurationToSeconds(trackObj.durationStr) || getTotalDuration() || 0);
+      trackId = trackObj.id || (title + '__' + artist);
+    } else {
+      title = trackOrTitle || (state.currentTrack?.title) || '';
+      artist = maybeArtist || (state.currentTrack?.artist) || '';
+      album = state.currentTrack?.album || '';
+      duration = Math.round(state.currentTrack?.duration || parseDurationToSeconds(state.currentTrack?.durationStr) || getTotalDuration() || 0);
+      trackId = state.currentTrack?.id || (title + '__' + artist);
     }
-    if (validLines.length === 0) return [];
 
-    const totalDur = (trackDuration && trackDuration > 10) ? trackDuration : (getTotalDuration() || 180);
-    // Dynamic intro offset (3s - 5s) and cushion before song finishes (4s - 6s)
-    const startOffset = Math.min(6, Math.max(2.5, totalDur * 0.035));
-    const usableDuration = Math.max(10, totalDur - startOffset - 5);
+    if (!title) {
+      if (elements.lyricsLoading) elements.lyricsLoading.style.display = 'none';
+      return;
+    }
 
-    // Compute character-weighted time distribution so longer sentences get proportional singing time
-    const totalChars = validLines.reduce((acc, l) => acc + Math.max(l.length, 10), 0);
-    let accumulatedTime = startOffset;
+    // Abort previous in-flight lyrics request (prevent race conditions when skipping)
+    if (state.lyricsAbortController) {
+      try { state.lyricsAbortController.abort(); } catch (e) {}
+    }
+    state.lyricsAbortController = new AbortController();
+    const abortSignal = state.lyricsAbortController.signal;
+    const reqId = ++state.currentLyricsRequestId;
 
-    return validLines.map(line => {
-      const lineTime = Number(accumulatedTime.toFixed(2));
-      const weight = Math.max(line.length, 10) / totalChars;
-      accumulatedTime += weight * usableDuration;
-      return {
-        time: lineTime,
-        text: line
-      };
-    });
-  }
-
-  async function loadLyricsForTrack(title, artist) {
+    // Reset state & UI immediately (clean previous song's lyrics immediately)
     elements.lyricsLoading.style.display = 'flex';
+    const loadingP = elements.lyricsLoading.querySelector('p');
+    if (loadingP) loadingP.textContent = 'Searching for verified lyrics...';
+
     elements.lyricsLinesContainer.innerHTML = '';
     state.lyrics = [];
     state.hasSyncedLyrics = false;
     state.activeLyricIndex = -1;
+    state.currentLyricsData = null;
 
-    // Reset status badge
     if (elements.lyricsStatusBadge) {
       elements.lyricsStatusBadge.style.display = 'none';
-      elements.lyricsStatusBadge.className = 'lyrics-status-badge';
-      elements.lyricsStatusBadge.innerHTML = '';
+      elements.lyricsStatusBadge.textContent = '';
+    }
+    if (elements.lyricsScriptToggleBtn) {
+      elements.lyricsScriptToggleBtn.style.display = 'none';
+    }
+    if (elements.lyricsSyncControls) {
+      elements.lyricsSyncControls.style.display = 'none';
     }
 
-    const cacheKey = `${(title || '').toLowerCase().trim()}___${(artist || '').toLowerCase().trim()}`;
+    // Update Hero Art & Meta immediately to match currently requested song
+    if (elements.lyricsTrackTitle) elements.lyricsTrackTitle.textContent = title;
+    if (elements.lyricsTrackArtist) elements.lyricsTrackArtist.textContent = artist;
+    if (elements.lyricsAlbumCover && (trackObj?.image || state.currentTrack?.image)) {
+      elements.lyricsAlbumCover.src = trackObj?.image || state.currentTrack?.image;
+      elements.lyricsAlbumCover.style.display = 'block';
+    }
+
+    // Check memory cache first
+    const cacheKey = `${title.toLowerCase().trim()}___${artist.toLowerCase().trim()}`;
     if (state.lyricsCache && state.lyricsCache[cacheKey]) {
       const cached = state.lyricsCache[cacheKey];
       elements.lyricsLoading.style.display = 'none';
-      if (elements.lyricsStatusBadge) {
-        elements.lyricsStatusBadge.style.display = 'none';
-      }
-      if (cached.parsed && cached.parsed.length > 0) {
-        state.rawSyncedLyrics = cached.syncedLyrics || '';
-        state.lyrics = cached.parsed;
-        state.hasSyncedLyrics = true;
-        renderLyricsLines(cached.parsed);
+
+      if (cached.syncedLyrics) {
+        state.currentLyricsData = cached;
+        const parsed = parseLrc(cached.syncedLyrics, (state.lyricsAutoIntroOffset || 0) + (state.lyricsManualOffset || 0));
+        renderLyricsLines(parsed, cached.language, cached.script, cached);
         return;
       } else if (cached.plainLyrics) {
-        const trackDur = Math.round(getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || 180);
-        const parsed = convertPlainLyricsToSynced(cached.plainLyrics, trackDur);
-        state.lyrics = parsed;
-        state.hasSyncedLyrics = true;
-        cached.parsed = parsed;
-        renderLyricsLines(parsed);
+        state.currentLyricsData = cached;
+        renderPlainLyrics(cached.plainLyrics, cached.language, cached.script, cached);
         return;
       }
     }
 
+    // Offline check
     if (!navigator.onLine) {
       elements.lyricsLoading.style.display = 'none';
       elements.lyricsLinesContainer.innerHTML = `
@@ -3187,102 +3212,74 @@
             </svg>
           </div>
           <h3 style="font-size: 1.35rem; font-weight: 700; color: #fff; margin-bottom: 8px;">Connect to internet to view lyrics</h3>
-          <p style="font-size: 0.92rem; color: var(--text-secondary); max-width: 380px; margin: 0 auto;">Live karaoke lyrics stream from the internet. Connect to the internet to sing along in real time.</p>
+          <p style="font-size: 0.92rem; color: var(--text-secondary); max-width: 380px; margin: 0 auto;">Live lyrics stream from verified sources. Connect to internet to sing along.</p>
         </div>
       `;
       return;
     }
 
     try {
-      const durSec = Math.round(getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || parseDurationToSeconds(state.currentTrack?.durationStr) || 0);
-      let durParam = '';
-      if (durSec > 0) {
-        durParam = `&duration=${durSec}`;
-      }
-      const res = await fetch(`/api/lyrics?track=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}${durParam}`);
+      let queryStr = `track=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`;
+      if (album) queryStr += `&album=${encodeURIComponent(album)}`;
+      if (duration > 0) queryStr += `&duration=${duration}`;
+
+      const res = await fetch(`/api/lyrics?${queryStr}`, { signal: abortSignal });
       const data = await res.json();
 
+      // Guard against stale response
+      if (reqId !== state.currentLyricsRequestId) return;
+      if (state.currentTrack && state.currentTrack.id && state.currentTrack.id !== trackId) return;
+
       elements.lyricsLoading.style.display = 'none';
 
-      if (data.success && data.syncedLyrics) {
-        state.rawSyncedLyrics = data.syncedLyrics;
-        const trackDur = Math.round(getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || parseDurationToSeconds(state.currentTrack?.durationStr) || 0);
-        const lrcDur = data.duration ? parseInt(data.duration, 10) : 0;
-        let autoIntroOffset = 0;
-        if (trackDur > 0 && lrcDur > 0) {
-          const delta = trackDur - lrcDur;
-          if (delta > 2 && delta < 60) {
-            autoIntroOffset = delta;
+      if (data && data.success) {
+        state.currentLyricsData = data;
+        if (!state.lyricsCache) state.lyricsCache = {};
+        state.lyricsCache[cacheKey] = data;
+
+        if (data.syncedLyrics) {
+          state.rawSyncedLyrics = data.syncedLyrics;
+          const trackDur = duration || Math.round(getTotalDuration() || 0);
+          const lrcDur = data.duration ? parseInt(data.duration, 10) : 0;
+          let autoIntroOffset = 0;
+          if (trackDur > 0 && lrcDur > 0) {
+            const delta = trackDur - lrcDur;
+            if (delta > 2 && delta < 60) {
+              autoIntroOffset = delta;
+            }
+          }
+          state.lyricsAutoIntroOffset = autoIntroOffset;
+
+          const trackKey = trackId;
+          let manualOffset = 0;
+          try {
+            const saved = localStorage.getItem(`musisurf_lyrics_offset_${trackKey}`);
+            if (saved !== null) manualOffset = parseFloat(saved) || 0;
+          } catch (e) {}
+          state.lyricsManualOffset = manualOffset;
+          updateLyricsSyncControlsUI();
+
+          const parsed = parseLrc(data.syncedLyrics, autoIntroOffset + manualOffset);
+          if (parsed.length > 0) {
+            renderLyricsLines(parsed, data.language, data.script, data);
+            return;
           }
         }
-        state.lyricsAutoIntroOffset = autoIntroOffset;
 
-        const trackKey = state.currentTrack?.id || (title + '_' + artist);
-        let manualOffset = 0;
-        try {
-          const saved = localStorage.getItem(`musisurf_lyrics_offset_${trackKey}`);
-          if (saved !== null) manualOffset = parseFloat(saved) || 0;
-        } catch (e) {}
-        state.lyricsManualOffset = manualOffset;
-        updateLyricsSyncControlsUI();
-
-        // Parse LRC format [mm:ss.xx] line with combined offset
-        const parsed = parseLrc(data.syncedLyrics, autoIntroOffset + manualOffset);
-        if (parsed.length > 0) {
-          if (elements.lyricsStatusBadge) {
-            elements.lyricsStatusBadge.style.display = 'none';
-          }
-          state.lyrics = parsed;
-          state.hasSyncedLyrics = true;
-          if (!state.lyricsCache) state.lyricsCache = {};
-          state.lyricsCache[cacheKey] = { syncedLyrics: data.syncedLyrics, parsed };
-          renderLyricsLines(parsed);
+        if (data.plainLyrics) {
+          renderPlainLyrics(data.plainLyrics, data.language, data.script, data);
           return;
         }
       }
 
-      if (data.success && data.plainLyrics) {
-        // Auto-convert plain lyrics to fully synchronized karaoke lines
-        const trackDur = Math.round(getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || parseDurationToSeconds(state.currentTrack?.durationStr) || 180);
-        const parsed = convertPlainLyricsToSynced(data.plainLyrics, trackDur);
-        if (parsed.length > 0) {
-          if (elements.lyricsStatusBadge) {
-            elements.lyricsStatusBadge.style.display = 'none';
-          }
-          state.lyrics = parsed;
-          state.hasSyncedLyrics = true;
-          if (!state.lyricsCache) state.lyricsCache = {};
-          state.lyricsCache[cacheKey] = { plainLyrics: data.plainLyrics, parsed };
-          renderLyricsLines(parsed);
-          return;
-        }
-      }
-
-      // Built-in AI Lyrics Fallback Trigger
-      await triggerAiLyricsFallback(title, artist, state.currentTrack?.album, durSec, cacheKey);
-      return;
+      // No verified lyrics found across providers -> Honest Unavailable State
+      renderLyricsUnavailable(title, artist, trackId);
     } catch (err) {
+      if (err.name === 'AbortError') return;
       console.warn('Lyrics fetch failed:', err);
+      if (reqId !== state.currentLyricsRequestId) return;
       elements.lyricsLoading.style.display = 'none';
-      if (!navigator.onLine) {
-        elements.lyricsLinesContainer.innerHTML = `
-          <div class="lyrics-offline-state" style="text-align: center; color: var(--text-secondary); padding: 80px 20px;">
-            <div style="width: 64px; height: 64px; margin: 0 auto 20px; border-radius: 50%; background: rgba(0, 242, 96, 0.12); border: 1px solid rgba(0, 242, 96, 0.3); display: flex; align-items: center; justify-content: center; color: var(--accent-primary, #00f260);">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 32px; height: 32px;">
-                <line x1="1" y1="1" x2="23" y2="23" />
-                <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
-                <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
-                <path d="M10.71 5.05A16 16 0 0 1 22.56 9" />
-                <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" />
-                <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
-                <line x1="12" y1="20" x2="12.01" y2="20" />
-              </svg>
-            </div>
-            <h3 style="font-size: 1.35rem; font-weight: 700; color: #fff; margin-bottom: 8px;">Connect to internet to view lyrics</h3>
-            <p style="font-size: 0.92rem; color: var(--text-secondary); max-width: 380px; margin: 0 auto;">Live karaoke lyrics stream from the internet. Connect to the internet to sing along in real time.</p>
-          </div>
-        `;
-      }
+      renderLyricsUnavailable(title, artist, trackId);
     }
   }
 
@@ -3305,7 +3302,7 @@
     if (parsed.length > 0) {
       state.lyrics = parsed;
       state.hasSyncedLyrics = true;
-      renderLyricsLines(parsed);
+      renderLyricsLines(parsed, state.currentLyricsData?.language, state.currentLyricsData?.script, state.currentLyricsData);
     }
   }
 
@@ -3321,7 +3318,7 @@
     if (parsed.length > 0) {
       state.lyrics = parsed;
       state.hasSyncedLyrics = true;
-      renderLyricsLines(parsed);
+      renderLyricsLines(parsed, state.currentLyricsData?.language, state.currentLyricsData?.script, state.currentLyricsData);
     }
   }
 
@@ -3355,21 +3352,42 @@
     return result;
   }
 
-  function renderLyricsLines(lyrics) {
+  function renderLyricsLines(lyrics, language = 'English', script = 'Latin', data = null) {
     elements.lyricsLinesContainer.innerHTML = '';
+    const langCode = (language === 'Hindi' ? 'hi' : (language === 'Punjabi' ? 'pa' : (language === 'Urdu' ? 'ur' : 'en')));
+
+    state.lyrics = lyrics;
+    state.hasSyncedLyrics = true;
+
+    // Show Synchronized Badge
+    if (elements.lyricsStatusBadge) {
+      elements.lyricsStatusBadge.textContent = '• Synchronized';
+      elements.lyricsStatusBadge.style.display = 'inline-block';
+    }
+
+    // Show Script Toggle if Romanized + Devanagari available
+    if (elements.lyricsScriptToggleBtn && data && data.hasDevanagariAlt) {
+      elements.lyricsScriptToggleBtn.textContent = state.lyricsScriptMode === 'latin' ? 'हिन्दी' : 'English / Latin';
+      elements.lyricsScriptToggleBtn.style.display = 'inline-block';
+    } else if (elements.lyricsScriptToggleBtn) {
+      elements.lyricsScriptToggleBtn.style.display = 'none';
+    }
+
+    if (elements.lyricsSyncControls) {
+      elements.lyricsSyncControls.style.display = 'flex';
+    }
+
     lyrics.forEach((item, idx) => {
       const div = document.createElement('div');
       div.className = 'lyric-line';
       div.dataset.index = idx;
       div.dataset.time = item.time;
+      div.dataset.lang = langCode;
 
-      // Tokenize sentence into individual words for live karaoke word-by-word glow
       const tokens = item.text.split(/(\s+)/);
       let wordIdx = 0;
       div.innerHTML = tokens.map(tok => {
-        if (/^\s+$/.test(tok)) {
-          return tok;
-        }
+        if (/^\s+$/.test(tok)) return tok;
         const wHtml = `<span class="lyric-word" data-w="${wordIdx}">${escapeHtml(tok)}</span>`;
         wordIdx++;
         return wHtml;
@@ -3381,77 +3399,128 @@
       });
       elements.lyricsLinesContainer.appendChild(div);
     });
+
     state.activeLyricIndex = -1;
     syncLyricsWithTime(getCurrentPlaybackTime());
   }
 
-  function renderPlainLyrics(plainText) {
-    const trackDur = Math.round(getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || 180);
-    const parsed = convertPlainLyricsToSynced(plainText, trackDur);
-    state.hasSyncedLyrics = true;
-    state.lyrics = parsed;
-    renderLyricsLines(parsed);
-  }
+  function renderPlainLyrics(plainText, language = 'English', script = 'Latin', data = null) {
+    elements.lyricsLinesContainer.innerHTML = '';
+    state.lyrics = [];
+    state.hasSyncedLyrics = false;
+    state.activeLyricIndex = -1;
 
-  async function triggerAiLyricsFallback(title, artist, album, durSec, cacheKey) {
-    elements.lyricsLoading.style.display = 'flex';
-    const loadingP = elements.lyricsLoading.querySelector('p');
-    if (loadingP) loadingP.textContent = 'Generating live synchronized lyrics...';
+    const langCode = (language === 'Hindi' ? 'hi' : (language === 'Punjabi' ? 'pa' : (language === 'Urdu' ? 'ur' : 'en')));
 
-    try {
-      const aiRes = await fetch('/api/ai-lyrics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          track: title,
-          artist: artist,
-          album: album || '',
-          duration: durSec || null
-        })
-      });
-      const aiData = await aiRes.json();
-      elements.lyricsLoading.style.display = 'none';
-
-      if (aiData && aiData.success && aiData.plainLyrics) {
-        if (elements.lyricsStatusBadge) {
-          elements.lyricsStatusBadge.style.display = 'none';
-        }
-        const trackDur = Math.round(durSec || getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || 180);
-        const parsed = convertPlainLyricsToSynced(aiData.plainLyrics, trackDur);
-        state.hasSyncedLyrics = true;
-        state.lyrics = parsed;
-        if (!state.lyricsCache) state.lyricsCache = {};
-        state.lyricsCache[cacheKey] = {
-          isAiGenerated: true,
-          plainLyrics: aiData.plainLyrics,
-          parsed
-        };
-        renderLyricsLines(parsed);
-        return;
-      }
-    } catch (err) {
-      console.warn('AI lyrics generation error:', err);
+    if (elements.lyricsSyncControls) {
+      elements.lyricsSyncControls.style.display = 'none';
     }
 
     if (elements.lyricsStatusBadge) {
-      elements.lyricsStatusBadge.style.display = 'none';
+      elements.lyricsStatusBadge.textContent = 'Plain Lyrics';
+      elements.lyricsStatusBadge.style.display = 'inline-block';
     }
-    elements.lyricsLoading.style.display = 'none';
-    elements.lyricsLinesContainer.innerHTML = `
-      <div style="text-align: center; color: var(--text-secondary); padding: 60px 0;">
-        <p style="font-size: 1.2rem; margin-bottom: 8px;">No lyrics available for this song.</p>
-        <p style="font-size: 0.9rem; color: var(--text-muted);">Enjoy the music!</p>
-      </div>
+
+    if (elements.lyricsScriptToggleBtn && data && data.hasDevanagariAlt) {
+      elements.lyricsScriptToggleBtn.textContent = state.lyricsScriptMode === 'latin' ? 'हिन्दी' : 'English / Latin';
+      elements.lyricsScriptToggleBtn.style.display = 'inline-block';
+    } else if (elements.lyricsScriptToggleBtn) {
+      elements.lyricsScriptToggleBtn.style.display = 'none';
+    }
+
+    const container = document.createElement('div');
+    container.className = 'lyrics-plain-container';
+
+    const notice = document.createElement('div');
+    notice.className = 'lyrics-plain-notice';
+    notice.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <span>Verified plain lyrics • Synchronization not available for this recording</span>
     `;
+    container.appendChild(notice);
+
+    const pre = document.createElement('div');
+    pre.className = 'lyrics-plain-text';
+    pre.dataset.lang = langCode;
+    pre.textContent = plainText;
+    container.appendChild(pre);
+
+    elements.lyricsLinesContainer.appendChild(container);
   }
 
-  function renderAiLyrics(aiData) {
-    const rawLyrics = aiData.plainLyrics || '';
-    const trackDur = Math.round(getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || 180);
-    const parsed = convertPlainLyricsToSynced(rawLyrics, trackDur);
-    state.hasSyncedLyrics = true;
-    state.lyrics = parsed;
-    renderLyricsLines(parsed);
+  function renderLyricsUnavailable(title, artist, trackId) {
+    elements.lyricsLinesContainer.innerHTML = '';
+    state.lyrics = [];
+    state.hasSyncedLyrics = false;
+    state.activeLyricIndex = -1;
+    state.currentLyricsData = null;
+
+    if (elements.lyricsSyncControls) elements.lyricsSyncControls.style.display = 'none';
+    if (elements.lyricsStatusBadge) elements.lyricsStatusBadge.style.display = 'none';
+    if (elements.lyricsScriptToggleBtn) elements.lyricsScriptToggleBtn.style.display = 'none';
+
+    const box = document.createElement('div');
+    box.className = 'lyrics-unavailable-box';
+    box.innerHTML = `
+      <div class="lyrics-unavailable-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 18V5l12-2v13" />
+          <circle cx="6" cy="18" r="3" />
+          <circle cx="18" cy="16" r="3" />
+          <line x1="2" y1="2" x2="22" y2="22" stroke-width="2.2" />
+        </svg>
+      </div>
+      <h3 class="lyrics-unavailable-title">Lyrics aren't available for this track yet</h3>
+      <p class="lyrics-unavailable-sub">We couldn't find verified lyrics for "${escapeHtml(title)}" by ${escapeHtml(artist)}.</p>
+      <button class="lyrics-contribute-btn" id="lyricsContributeBtn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        Add Lyrics
+      </button>
+    `;
+
+    const contributeBtn = box.querySelector('#lyricsContributeBtn');
+    if (contributeBtn) {
+      contributeBtn.addEventListener('click', () => {
+        openContributeLyricsModal(title, artist);
+      });
+    }
+
+    elements.lyricsLinesContainer.appendChild(box);
+  }
+
+  function toggleLyricsScript() {
+    if (!state.currentLyricsData || !state.currentLyricsData.hasDevanagariAlt) return;
+    const isCurrentlyLatin = state.lyricsScriptMode === 'latin';
+    state.lyricsScriptMode = isCurrentlyLatin ? 'native' : 'latin';
+
+    const d = state.currentLyricsData;
+    if (d.syncedLyrics) {
+      const activeLrc = state.lyricsScriptMode === 'latin'
+        ? (d.romanizedSyncedLyrics || d.syncedLyrics)
+        : (d.syncedLyrics);
+      const parsed = parseLrc(activeLrc, (state.lyricsAutoIntroOffset || 0) + (state.lyricsManualOffset || 0));
+      renderLyricsLines(parsed, d.language, state.lyricsScriptMode === 'latin' ? 'Latin' : 'Devanagari', d);
+    } else if (d.plainLyrics) {
+      const activePlain = state.lyricsScriptMode === 'latin'
+        ? (d.romanizedPlainLyrics || d.plainLyrics)
+        : (d.plainLyrics);
+      renderPlainLyrics(activePlain, d.language, state.lyricsScriptMode === 'latin' ? 'Latin' : 'Devanagari', d);
+    }
+  }
+
+  function openContributeLyricsModal(title, artist) {
+    if (!elements.contributeLyricsModal) return;
+    if (elements.contributeTrackInput) elements.contributeTrackInput.value = title || state.currentTrack?.title || '';
+    if (elements.contributeArtistInput) elements.contributeArtistInput.value = artist || state.currentTrack?.artist || '';
+    if (elements.contributeLyricsText) elements.contributeLyricsText.value = '';
+    elements.contributeLyricsModal.style.display = 'flex';
   }
 
   function syncLyricsWithTime(currentTime) {

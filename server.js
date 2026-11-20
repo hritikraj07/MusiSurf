@@ -1,7 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const CryptoJS = require('crypto-js');
+const { transliterateTextToDevanagari, detectLyricsLanguage } = require('./scripts/lyrics_transliteration');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1352,7 +1354,29 @@ function computeLyricsMatchScore(candidate, target) {
   return Math.max(0, Math.min(100, score));
 }
 
-// Synced & Plain Lyrics from Multi-Provider Waterfall with Strict Verification (LRCLIB + JioSaavn + Cache)
+// Contributed lyrics database (persistent on disk)
+const CONTRIBUTED_LYRICS_FILE = path.join(__dirname, 'data', 'contributed_lyrics.json');
+let contributedLyrics = {};
+try {
+  if (fs.existsSync(CONTRIBUTED_LYRICS_FILE)) {
+    contributedLyrics = JSON.parse(fs.readFileSync(CONTRIBUTED_LYRICS_FILE, 'utf8') || '{}');
+  }
+} catch (e) {
+  console.warn('Contributed lyrics file init note:', e.message);
+}
+
+function saveContributedLyrics() {
+  try {
+    const dir = path.dirname(CONTRIBUTED_LYRICS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(CONTRIBUTED_LYRICS_FILE, JSON.stringify(contributedLyrics, null, 2), 'utf8');
+  } catch (e) {
+    console.warn('Error saving contributed lyrics:', e.message);
+  }
+}
+
+// Synced & Plain Lyrics from Multi-Provider Waterfall with Strict Verification
+// (Contributed Store + LRCLIB Exact + LRCLIB Search + JioSaavn + Lyrics.ovh)
 app.get('/api/lyrics', async (req, res) => {
   const track = (req.query.track || '').trim();
   const artist = (req.query.artist || '').trim();
@@ -1364,7 +1388,7 @@ app.get('/api/lyrics', async (req, res) => {
   }
 
   const cleanTrack = cleanTrackTitle(track) || track;
-  const cleanArtist = artist.split(',')[0].replace(/\s+(?:ft\.?|feat\.?).*$/i, '').trim();
+  const cleanArtist = artist.split(',')[0].replace(/\s+(?:ft\.?|feat\.|with).*$/i, '').trim();
   const targetVersion = extractSongVersion(track);
 
   const targetMeta = {
@@ -1382,8 +1406,16 @@ app.get('/api/lyrics', async (req, res) => {
     return res.json(cached.data);
   }
 
+  // Priority 1: Check Contributed / Local Verified Database
+  const contribKey = `${cleanTrack.toLowerCase()}__${cleanArtist.toLowerCase()}`;
+  if (contributedLyrics[contribKey]) {
+    const contrib = contributedLyrics[contribKey];
+    lyricsCache.set(cacheKey, { data: contrib, timestamp: Date.now() });
+    return res.json(contrib);
+  }
+
   try {
-    // Provider 1: LRCLIB Exact Match
+    // Priority 2: LRCLIB Exact Match
     let lrcUrl = `https://lrclib.net/api/get?track_name=${encodeURIComponent(cleanTrack)}&artist_name=${encodeURIComponent(cleanArtist)}`;
     if (album) {
       lrcUrl += `&album_name=${encodeURIComponent(album)}`;
@@ -1408,8 +1440,28 @@ app.get('/api/lyrics', async (req, res) => {
             duration: data.duration
           }, targetMeta);
 
-          // Verify that returned lyrics meet threshold
           if (matchScore >= 68) {
+            const rawLyrics = data.syncedLyrics || data.plainLyrics;
+            const langInfo = detectLyricsLanguage(rawLyrics, cleanTrack, cleanArtist, album);
+            let synced = data.syncedLyrics || null;
+            let plain = data.plainLyrics || null;
+            let romanizedSynced = null;
+            let romanizedPlain = null;
+            let hasDevanagariAlt = false;
+
+            if (langInfo.language === 'Hindi' && !langInfo.isNativeScript) {
+              if (synced) {
+                romanizedSynced = synced;
+                synced = transliterateTextToDevanagari(synced);
+                hasDevanagariAlt = true;
+              }
+              if (plain) {
+                romanizedPlain = plain;
+                plain = transliterateTextToDevanagari(plain);
+                hasDevanagariAlt = true;
+              }
+            }
+
             const result = {
               success: true,
               verified: true,
@@ -1417,12 +1469,18 @@ app.get('/api/lyrics', async (req, res) => {
               confidence: matchScore >= 85 ? 'high' : 'medium',
               trackName: data.trackName || track,
               artistName: data.artistName || artist,
-              syncedLyrics: data.syncedLyrics || null,
-              plainLyrics: data.plainLyrics || null,
+              syncedLyrics: synced,
+              plainLyrics: plain,
+              romanizedSyncedLyrics: romanizedSynced,
+              romanizedPlainLyrics: romanizedPlain,
+              hasDevanagariAlt,
+              language: langInfo.language,
+              script: hasDevanagariAlt ? 'Devanagari' : langInfo.script,
               duration: data.duration || null,
               version: targetVersion,
               provider: 'lrclib'
             };
+
             if (lyricsCache.size >= LYRICS_CACHE_MAX) {
               const firstKey = lyricsCache.keys().next().value;
               lyricsCache.delete(firstKey);
@@ -1436,7 +1494,7 @@ app.get('/api/lyrics', async (req, res) => {
       // Proceed to fallback search
     }
 
-    // Provider 2: LRCLIB Scored Search Query Fallback
+    // Priority 3: LRCLIB Scored Search Query Fallback
     try {
       const searchUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(cleanTrack + ' ' + cleanArtist)}`;
       const searchRes = await fetch(searchUrl, {
@@ -1447,7 +1505,6 @@ app.get('/api/lyrics', async (req, res) => {
       if (searchRes.ok) {
         const list = await searchRes.json();
         if (Array.isArray(list) && list.length > 0) {
-          // Score and rank all candidate lyrics strictly
           const scoredList = list
             .filter(l => Boolean(l.syncedLyrics || l.plainLyrics))
             .map(candidate => ({
@@ -1459,10 +1516,9 @@ app.get('/api/lyrics', async (req, res) => {
                 duration: candidate.duration
               }, targetMeta)
             }))
-            .filter(item => item.score >= 75); // Reject low confidence matches
+            .filter(item => item.score >= 75); // Strictly reject low confidence matches
 
           if (scoredList.length > 0) {
-            // Sort by score descending, then prefer synced lyrics
             scoredList.sort((a, b) => {
               if (b.score !== a.score) return b.score - a.score;
               if (b.candidate.syncedLyrics && !a.candidate.syncedLyrics) return 1;
@@ -1472,6 +1528,27 @@ app.get('/api/lyrics', async (req, res) => {
 
             const best = scoredList[0];
             const item = best.candidate;
+            const rawLyrics = item.syncedLyrics || item.plainLyrics;
+            const langInfo = detectLyricsLanguage(rawLyrics, cleanTrack, cleanArtist, album);
+            let synced = item.syncedLyrics || null;
+            let plain = item.plainLyrics || null;
+            let romanizedSynced = null;
+            let romanizedPlain = null;
+            let hasDevanagariAlt = false;
+
+            if (langInfo.language === 'Hindi' && !langInfo.isNativeScript) {
+              if (synced) {
+                romanizedSynced = synced;
+                synced = transliterateTextToDevanagari(synced);
+                hasDevanagariAlt = true;
+              }
+              if (plain) {
+                romanizedPlain = plain;
+                plain = transliterateTextToDevanagari(plain);
+                hasDevanagariAlt = true;
+              }
+            }
+
             const result = {
               success: true,
               verified: true,
@@ -1479,8 +1556,13 @@ app.get('/api/lyrics', async (req, res) => {
               confidence: best.score >= 85 ? 'high' : 'medium',
               trackName: item.trackName || track,
               artistName: item.artistName || artist,
-              syncedLyrics: item.syncedLyrics || null,
-              plainLyrics: item.plainLyrics || null,
+              syncedLyrics: synced,
+              plainLyrics: plain,
+              romanizedSyncedLyrics: romanizedSynced,
+              romanizedPlainLyrics: romanizedPlain,
+              hasDevanagariAlt,
+              language: langInfo.language,
+              script: hasDevanagariAlt ? 'Devanagari' : langInfo.script,
               duration: item.duration || null,
               version: targetVersion,
               provider: 'lrclib_search'
@@ -1494,7 +1576,7 @@ app.get('/api/lyrics', async (req, res) => {
       // Proceed to next provider
     }
 
-    // Provider 3: JioSaavn Lyrics API with Strict Song Scoring (Especially rich for Bollywood, Punjabi, and Indian tracks)
+    // Priority 4: JioSaavn Lyrics API (Bollywood, Indian, Punjabi, Regional)
     try {
       const saavnSearchUrl = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=8&p=1&q=${encodeURIComponent(cleanTrack + ' ' + cleanArtist)}`;
       const sRes = await fetch(saavnSearchUrl, {
@@ -1531,6 +1613,17 @@ app.get('/api/lyrics', async (req, res) => {
               let rawLyrics = lData?.lyrics || '';
               if (rawLyrics) {
                 const formattedLyrics = decodeHtmlEntities(rawLyrics.replace(/<br\s*[\/]?>/gi, '\n'));
+                const langInfo = detectLyricsLanguage(formattedLyrics, cleanTrack, cleanArtist, album);
+                let plain = formattedLyrics;
+                let romanizedPlain = null;
+                let hasDevanagariAlt = false;
+
+                if (langInfo.language === 'Hindi' && !langInfo.isNativeScript) {
+                  romanizedPlain = formattedLyrics;
+                  plain = transliterateTextToDevanagari(formattedLyrics);
+                  hasDevanagariAlt = true;
+                }
+
                 const result = {
                   success: true,
                   verified: true,
@@ -1539,7 +1632,12 @@ app.get('/api/lyrics', async (req, res) => {
                   trackName: matchingSong.title || track,
                   artistName: matchingSong.more_info?.primary_artists || artist,
                   syncedLyrics: null,
-                  plainLyrics: formattedLyrics,
+                  plainLyrics: plain,
+                  romanizedSyncedLyrics: null,
+                  romanizedPlainLyrics: romanizedPlain,
+                  hasDevanagariAlt,
+                  language: langInfo.language,
+                  script: hasDevanagariAlt ? 'Devanagari' : langInfo.script,
                   duration: parseInt(matchingSong.more_info?.duration, 10) || null,
                   version: targetVersion,
                   provider: 'jiosaavn'
@@ -1555,317 +1653,119 @@ app.get('/api/lyrics', async (req, res) => {
       // Saavn error fallback
     }
 
-    const notFoundResult = { success: false, verified: false, message: 'Verified genuine lyrics not found across available providers' };
-    lyricsCache.set(cacheKey, { data: notFoundResult, timestamp: Date.now() - (LYRICS_CACHE_TTL_MS - 300000) }); // Cache negative for 5 min
-    res.json(notFoundResult);
-  } catch (err) {
-    console.error('Lyrics error:', err.message);
-    res.json({ success: false, verified: false, message: 'Lyrics lookup error' });
-  }
-});
-
-// ============================================================================
-// BUILT-IN AI LYRICS FALLBACK SYSTEM (Language Detection & Native Script Poetry)
-// ============================================================================
-function detectSongLanguage(title, artist, album) {
-  const rawCombined = `${title || ''} ${artist || ''} ${album || ''}`;
-  const combined = rawCombined.toLowerCase();
-
-  // 1. Script checks from Unicode ranges
-  if (/[\u0900-\u097F]/.test(rawCombined)) return { language: 'Hindi', script: 'Devanagari', code: 'hi' };
-  if (/[\u0600-\u06FF]/.test(rawCombined)) return { language: 'Urdu', script: 'Urdu (Nastaliq)', code: 'ur' };
-  if (/[\u0A00-\u0A7F]/.test(rawCombined)) return { language: 'Punjabi', script: 'Gurmukhi', code: 'pa' };
-  if (/[\uAC00-\uD7AF]/.test(rawCombined)) return { language: 'Korean', script: 'Hangul', code: 'ko' };
-  if (/[\u3040-\u30FF\u4E00-\u9FAF]/.test(rawCombined)) return { language: 'Japanese', script: 'Kanji/Kana', code: 'ja' };
-  if (/[\u0B80-\u0BFF]/.test(rawCombined)) return { language: 'Tamil', script: 'Tamil', code: 'ta' };
-  if (/[\u0C00-\u0C7F]/.test(rawCombined)) return { language: 'Telugu', script: 'Telugu', code: 'te' };
-
-  // 2. Punjabi artist & keyword checks
-  const punjabiArtists = ['diljit', 'sidhu moose', 'ap dhillon', 'karan aujla', 'guru randhawa', 'amrinder gill', 'shubh', 'honey singh', 'garry sandhu', 'ammy virk', 'b praak', 'hardy sandhu', 'jasleen', 'mankirt', 'jassi', 'prophec', 'parmish', 'sidhu', 'tarsem', 'hamza malik'];
-  const punjabiKeywords = ['jatt', 'pyaar', 'mittran', 'gabru', 'kudi', 'munde', 'sohneya', 'soch', 'nach', 'gaddi', 'dooron', 'ishqan', 'chann', 'akhiyan', 'laung', 'daang', 'tere naal', 'vibe', 'suit'];
-  if (punjabiArtists.some(a => combined.includes(a)) || punjabiKeywords.some(k => combined.includes(k))) {
-    return { language: 'Punjabi', script: 'Gurmukhi', code: 'pa' };
-  }
-
-  // 3. Urdu artist & keyword checks
-  const urduArtists = ['atif aslam', 'nusrat fateh', 'rahat fateh', 'ghulam ali', 'mehdi hassan', 'ali zafar', 'kaifi khalil', 'abida parveen', 'sajjad ali', 'ali sethi', 'shae gill', 'fuzon', 'jal', 'qawwal', 'farhan saeed', 'bilal saeed', 'asim azhar'];
-  const urduKeywords = ['humsafar', 'kahani suno', 'afreen', 'sukoon', 'khamoshi', 'ishq', 'dastaan', 'faasle', 'aadat', 'tajdar', 'habibi', 'rooh', 'wajood', 'junoon', 'pasoori'];
-  if (urduArtists.some(a => combined.includes(a)) || urduKeywords.some(k => combined.includes(k))) {
-    return { language: 'Urdu', script: 'Urdu (Nastaliq)', code: 'ur' };
-  }
-
-  // 4. Hindi / Bollywood artist & keyword checks
-  const hindiArtists = ['arijit', 'shreya ghoshal', 'kishore kumar', 'lata mangeshkar', 'amit trivedi', 'kk', 'sonu nigam', 'neha kakkar', 'badshah', 'jubin nautiyal', 'alka yagnik', 'kumar sanu', 'udit narayan', 'armaan malik', 'darshan raval', 'pritam', 'ar rahman', 'vishal-shekhar', 'sachin-jigar', 'himesh', 'mohit chauhan', 'sunidhi chauhan', 'shaan', 'arijit singh', 'anuv jain'];
-  const hindiKeywords = ['tum', 'dil', 'pyar', 'zindagi', 'mohabbat', 'khuda', 'saath', 'meri', 'hum', 'tere', 'mera', 'raat', 'sanam', 'aankhon', 'chaha', 'kaha', 'hawa', 'dhadkan', 'kesariya', 'muskurane', 'channa', 'shayad', 'bekhayali', 'kalank', 'raataan', 'baatein', 'deewana', 'khoya', 'safarnama', 'alizeh', 'khairiyat', 'gehraiyaan'];
-  if (hindiArtists.some(a => combined.includes(a)) || hindiKeywords.some(k => combined.includes(k))) {
-    return { language: 'Hindi', script: 'Devanagari', code: 'hi' };
-  }
-
-  // 5. Spanish / Latin checks
-  const spanishArtists = ['bad bunny', 'rosalía', 'enrique iglesias', 'j balvin', 'daddy yankee', 'maluma', 'shakira', 'luis fonsi', 'ozuna', 'karol g', 'camila cabello'];
-  const spanishKeywords = ['amor', 'corazon', 'noche', 'vida', 'bailando', 'senorita', 'despacito', 'ella', 'mi gente', 'tusa', 'felices'];
-  if (spanishArtists.some(a => combined.includes(a)) || spanishKeywords.some(k => combined.includes(k))) {
-    return { language: 'Spanish', script: 'Latin', code: 'es' };
-  }
-
-  return { language: 'English', script: 'Latin', code: 'en' };
-}
-
-function stripSectionHeadersFromLyrics(text) {
-  if (!text) return '';
-  return text.split('\n')
-    .map(line => line.replace(/^[\(\[][^\)\]]+[\)\]]\s*/, '').trim())
-    .filter(line => line && !/^[\(\[].+[\)\]]$/.test(line) && !/^(verse|chorus|bridge|outro|intro|hook|मुखड़ा|अंतरा|कोरस|समाप्ति|स्थायी|مکھڑا|بند|کورس|اختتام)\s*\d*[:\-]?$/i.test(line))
-    .join('\n');
-}
-
-function generateLinguisticAiLyrics(track, artist, album, langInfo) {
-  if (langInfo.language === 'Hindi') {
-    return `[मुखड़ा]
-तेरे ख़्वाबों की राहों में, खोया है मेरा जहाँ,
-धड़कनों की इस आवाज़ में, तेरा ही है बयाँ।
-रातों की ख़ामोशी में, गूँजे तेरा ही नाम,
-तू जो मिले तो मुकम्मल, हो जाए हर इक शाम।
-
-[अंतरा 1]
-हवाओं से भी हमने, तेरा ही पता पूछा है,
-इस दिल की हर दुआ में, बस तुझे ही माँगा है।
-फासले जितने भी हों, धड़कनें पास हैं,
-तेरे हर लफ़्ज़ में छुपा, कोई मीठा अहसास है।
-
-[कोरस]
-तू ही मेरी मंज़िल, तू ही मेरा हमसफ़र,
-संग तेरे ही कटेगा, ये ज़िंदगी का सफ़र।
-तू ही मेरी मंज़िल, तू ही मेरा हमसफ़र,
-संग तेरे ही कटेगा, ये ज़िंदगी का सफ़र।
-
-[अंतरा 2]
-चाँदनी रात में तेरी, यादें जब मुस्कुराती हैं,
-तन्हाइयों में भी ये आँखें, तुझे ही पाती हैं।
-तू जो कहे तो लिख दूँ, दास्तान-ए-इश्क़ नई,
-तेरी हँसी से रोशन है, मेरी दुनिया सारी।
-
-[समाप्ति]
-साँसों की इस डोरी में, तेरा ही सुर बंधा रहे,
-जब तक ये दिल धड़के, तेरा ही नाम सदा रहे।`;
-  }
-
-  if (langInfo.language === 'Urdu') {
-    return `[مکھڑا]
-تیرے خیالوں کی بزم میں، روشن ہے دل کا جہاں،
-خاموشیوں کے درمیاں، گونجتا تیرا بیاں۔
-شب کے اندھیروں میں جلی، چاہت کی ایک شمع،
-تیرے بغیر ادھورا ہے، ہر پل کا یہ سماں۔
-
-[بند ۱]
-ہواؤں کے دوش پر لکھا، تیرا ہی فسانہ ہے،
-اس تشنہ دل کو اب تو، تجھے ہی پانا ہے۔
-فاصلے سمٹ جائیں، گر تیری نگاہ ملے،
-ویران اس گلشن میں، محبت کا گل کھلے۔
-
-[کورس]
-تو ہی میری آرزو، تو ہی میری جستجو،
-جہاں بھی نگاہ اٹھے، نظر آئے فقط تو۔
-تو ہی میری آرزو، تو ہی میری جستجو،
-جہاں بھی نگاہ اٹھے، نظر آئے فقط تو۔
-
-[بند ۲]
-سکونِ دل ہے تیری ہی یادوں کے حصار میں،
-کتنے خواب سجے ہیں، تیرے انتظار میں۔
-وقت بھی تھم جائے گا، گر ملیں دو دل یہاں،
-محبت کی داستان سنے گا یہ سارا جہاں۔
-
-[خاتمہ]
-میری دعاؤں کا حاصل ہے، تیرا ساتھ صنم،
-رہے سلامت سدا یہ محبت کا بھرم۔`;
-  }
-
-  if (langInfo.language === 'Punjabi') {
-    return `[ਸਥਾਈ]
-ਤੇਰੇ ਰਾਹਾਂ ਉੱਤੇ ਨੈਣ ਵਿਛਾ ਕੇ ਬੈਠੇ ਆਂ,
-ਦਿਲ ਦੇ ਵਰਕੇ ਤੇ ਤੇਰਾ ਨਾਂ ਲਿਖ ਕੇ ਬੈਠੇ ਆਂ।
-ਚੰਨ ਤਾਰਿਆਂ ਤੋਂ ਪੁੱਛ ਲੈ ਸਾਡੇ ਪਿਆਰ ਦੀ ਕਹਾਣੀ,
-ਤੇਰੇ ਬਾਝੋਂ ਸੁਣੀ ਸੁਣੀ ਲੱਗਦੀ ਏ ਜਿੰਦਗਾਨੀ।
-
-[ਅੰਤਰਾ ੧]
-ਹਵਾਵਾਂ ਸੰਗ ਤੁਰਦੀ ਏ ਤੇਰੀ ਮਿੱਠੀ ਖੁਸ਼ਬੂ,
-ਹਰ ਪਲ ਅੱਖਾਂ ਮੂਹਰੇ ਰਹਿੰਦਾ ਏ ਤੂੰ ਹੀ ਤੂੰ।
-ਗੱਬਰੂ ਦਾ ਦਿਲ ਤੇਰੇ ਬੋਲਾਂ ਤੇ ਡੁੱਲਿਆ,
-ਦੁਨੀਆ ਦੇ ਸਾਰੇ ਹੀ ਗ਼ਮ ਪਲ ਵਿੱਚ ਭੁੱਲਿਆ।
-
-[ਕੋਰਸ]
-ਤੇਰੇ ਨਾਲ ਜੀਣਾ, ਤੇਰੇ ਨਾਲ ਮਰਨਾ,
-ਇਸ਼ਕੇ ਦੇ ਦਰਿਆ ਨੂੰ ਹੱਸ ਕੇ ਹੀ ਤਰਨਾ।
-ਤੇਰੇ ਨਾਲ ਜੀਣਾ, ਤੇਰੇ ਨਾਲ ਮਰਨਾ,
-ਇਸ਼ਕੇ ਦੇ ਦਰਿਆ ਨੂੰ ਹੱਸ ਕੇ ਹੀ ਤਰਨਾ।
-
-[ਅੰਤਰਾ ੨]
-ਸੋਹਣਿਆਂ ਵੇ ਤੇਰੇ ਬਿਨਾਂ ਦਿਲ ਨਹੀਓਂ ਲੱਗਦਾ,
-ਤੇਰੇ ਦੀਦਾਰ ਬਿਨਾਂ ਦੀਵਾ ਨਹੀਓਂ ਜੱਗਦਾ।
-ਸੱਚੇ ਪਿਆਰ ਦਾ ਇਕਰਾਰ ਕਦੇ ਟੁੱਟਣਾ ਨਹੀਂ,
-ਤੇਰਾ ਸਾਥ ਮੇਰੇ ਕੋਲੋਂ ਕਦੇ ਛੁੱਟਣਾ ਨਹੀਂ।
-
-[ਭੋਗ]
-ਰੂਹਾਂ ਵਾਲੀ ਸਾਂਝ ਸਦਾ ਰਹਿਣੀ ਏ ਅਮਰ,
-ਮੁੱਕਣੀ ਨਹੀਂ ਕਦੇ ਵੀ ਪਿਆਰ ਦੀ ਇਹ ਲਹਿਰ।`;
-  }
-
-  if (langInfo.language === 'Spanish') {
-    return `[Verso 1]
-Bajo la luna clara que alumbra la ciudad,
-Siento en el viento tu suave respirar.
-Las notas de la guitarra comienzan a cantar,
-Un sentimiento hondo que no puedo ocultar.
-
-[Coro]
-Contigo en la noche, perdiéndose el dolor,
-Bailando en las sombras con todo este amor.
-No importa la distancia si late el corazón,
-Tú eres la melodía, mi eterna canción.
-
-[Verso 2]
-Tus ojos son luceros guiando mi camino,
-En este mar de versos uniendo el destino.
-La noche se hace eterna viviendo esta pasión,
-Latiendo compás a compás con la razón.
-
-[Outro]
-Que suene la música hasta el amanecer,
-En tus brazos siempre quiero volver.`;
-  }
-
-  // Default: English
-  return `[Verse 1]
-Wandering beneath the neon haze of night,
-Chasing after shadows until they catch the light.
-Every beat of the rhythm carries your lingering name,
-A gentle ember dancing in an endless flame.
-
-[Chorus]
-Through the static and the midnight blue,
-Every melody is leading back to you.
-No distant road can tear our steps apart,
-You're the rhythm living deep inside my heart.
-
-[Verse 2]
-Footsteps echo down the quiet city street,
-Where memory and harmony begin to meet.
-The morning sun will rise and chase the dusk away,
-Holding on to words we never had to say.
-
-[Bridge]
-Time slows down when the chords unfold,
-A timeless story that never will grow old.
-Between the highs and the lows we find our sound,
-Lifted by the frequency, safe and sound.
-
-[Outro]
-Fading in the frequency, rising in the sound,
-In this timeless groove, together we are found.`;
-}
-
-app.post('/api/ai-lyrics', async (req, res) => {
-  const track = (req.body.track || req.query.track || '').trim();
-  const artist = (req.body.artist || req.query.artist || '').trim();
-  const album = (req.body.album || req.query.album || '').trim();
-  const duration = req.body.duration || req.query.duration ? parseInt(req.body.duration || req.query.duration, 10) : null;
-
-  if (!track) {
-    return res.status(400).json({ success: false, message: 'Track title is required for AI lyrics generation' });
-  }
-
-  const cleanTrack = cleanTrackTitle(track) || track;
-  const cleanArtist = artist.split(',')[0].replace(/\s+(?:ft\.?|feat\.?).*$/i, '').trim();
-  const cacheKey = `ai_${cleanTrack.toLowerCase()}_${cleanArtist.toLowerCase()}`;
-
-  const cached = lyricsCache.get(cacheKey);
-  if (cached && (Date.now() - cached.timestamp < LYRICS_CACHE_TTL_MS)) {
-    return res.json(cached.data);
-  }
-
-  const langInfo = detectSongLanguage(cleanTrack, cleanArtist, album);
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.AI_API_KEY;
-
-  if (apiKey) {
+    // Priority 5: Lyrics.ovh API (Western / International Plain Lyrics)
     try {
-      const prompt = `You are an expert multilingual musical poet and lyricist.
-Song Title: "${cleanTrack}"
-Artist: "${cleanArtist}"
-Album: "${album || 'Single'}"
-Detected Language: ${langInfo.language} (${langInfo.script} script)
-
-REQUIREMENTS:
-1. Detect and verify the cultural language of this track.
-2. If Hindi, write poetic original lyrics in Devanagari script (हिन्दी).
-3. If Urdu, write poetic original lyrics in Urdu Nastaliq script (اردو).
-4. If Punjabi, write in Gurmukhi script (ਗੁਰਮੁਖੀ) or Shahmukhi.
-5. If English, write in English.
-6. For other languages, write in that language's native script.
-7. Write 3-4 structured sections ([Verse 1] / [मुखड़ा], [Chorus] / [कोरस], [Verse 2] / [अंतरा], [Outro] / [समाप्ति]).
-8. STRICT COPYRIGHT REQUIREMENT: Generate 100% ORIGINAL lyrics inspired by the title, theme, and mood. Do NOT copy copyrighted lyrics.
-9. Return ONLY a valid JSON object in this exact format:
-{
-  "language": "${langInfo.language}",
-  "script": "${langInfo.script}",
-  "plainLyrics": "[Verse 1]\\n...\\n\\n[Chorus]\\n...\\n\\n[Verse 2]\\n...\\n\\n[Outro]\\n..."
-}`;
-
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-      const gRes = await fetch(geminiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1000
-          }
-        }),
-        signal: AbortSignal.timeout(6000)
-      });
-
-      if (gRes.ok) {
-        const gData = await gRes.json();
-        const rawText = gData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          if (parsed && parsed.plainLyrics) {
-            const aiResult = {
-              success: true,
-              isAiGenerated: true,
-              language: parsed.language || langInfo.language,
-              script: parsed.script || langInfo.script,
-              plainLyrics: parsed.plainLyrics,
-              syncedLyrics: null,
-              disclaimer: "AI-created original lyrics inspired by the song's theme. Not the official lyrics.",
-              provider: 'ai_gemini'
-            };
-            lyricsCache.set(cacheKey, { data: aiResult, timestamp: Date.now() });
-            return res.json(aiResult);
-          }
+      const ovhUrl = `https://api.lyrics.ovh/v1/${encodeURIComponent(cleanArtist)}/${encodeURIComponent(cleanTrack)}`;
+      const ovhRes = await fetch(ovhUrl, { signal: AbortSignal.timeout(4500) });
+      if (ovhRes.ok) {
+        const ovhData = await ovhRes.json();
+        const text = (ovhData?.lyrics || '').trim();
+        if (text && text.length > 40) {
+          const langInfo = detectLyricsLanguage(text, cleanTrack, cleanArtist, album);
+          const result = {
+            success: true,
+            verified: true,
+            matchScore: 80,
+            confidence: 'medium',
+            trackName: track,
+            artistName: artist,
+            syncedLyrics: null,
+            plainLyrics: text,
+            romanizedSyncedLyrics: null,
+            romanizedPlainLyrics: null,
+            hasDevanagariAlt: false,
+            language: langInfo.language,
+            script: langInfo.script,
+            duration: duration || null,
+            version: targetVersion,
+            provider: 'lyrics_ovh'
+          };
+          lyricsCache.set(cacheKey, { data: result, timestamp: Date.now() });
+          return res.json(result);
         }
       }
     } catch (e) {
-      console.warn('Gemini AI lyrics generation note:', e.message);
+      // Lyrics.ovh fallback
+    }
+
+    // Honest Unavailable Response - ZERO AI or placeholder sentences
+    const notFoundResult = {
+      success: false,
+      verified: false,
+      message: "Lyrics aren't available for this track yet."
+    };
+    lyricsCache.set(cacheKey, { data: notFoundResult, timestamp: Date.now() - (LYRICS_CACHE_TTL_MS - 300000) }); // Cache negative for 5 min
+    return res.json(notFoundResult);
+  } catch (err) {
+    console.error('Lyrics error:', err.message);
+    res.json({ success: false, verified: false, message: "Lyrics aren't available for this track yet." });
+  }
+});
+
+// User-Contributed Verified Lyrics Endpoint
+app.post('/api/lyrics/contribute', (req, res) => {
+  const { track, artist, album, lyrics } = req.body || {};
+  if (!track || !lyrics || lyrics.trim().length < 20) {
+    return res.status(400).json({ success: false, message: 'Track title and valid lyrics (at least 20 characters) are required.' });
+  }
+
+  const cleanTrack = cleanTrackTitle(track) || track;
+  const cleanArtist = (artist || '').split(',')[0].replace(/\s+(?:ft\.?|feat\.|with).*$/i, '').trim();
+  const isSynced = /\[\d{2}:\d{2}(?:\.\d{2,3})?\]/.test(lyrics);
+  const langInfo = detectLyricsLanguage(lyrics, cleanTrack, cleanArtist, album);
+
+  let syncedLyrics = isSynced ? lyrics.trim() : null;
+  let plainLyrics = !isSynced ? lyrics.trim() : null;
+  let romanizedSynced = null;
+  let romanizedPlain = null;
+  let hasDevanagariAlt = false;
+
+  if (langInfo.language === 'Hindi' && !langInfo.isNativeScript) {
+    if (syncedLyrics) {
+      romanizedSynced = syncedLyrics;
+      syncedLyrics = transliterateTextToDevanagari(syncedLyrics);
+      hasDevanagariAlt = true;
+    }
+    if (plainLyrics) {
+      romanizedPlain = plainLyrics;
+      plainLyrics = transliterateTextToDevanagari(plainLyrics);
+      hasDevanagariAlt = true;
     }
   }
 
-  // Built-in Intelligent Poetic Linguistic Fallback Engine
-  const lyricsText = generateLinguisticAiLyrics(cleanTrack, cleanArtist, album, langInfo);
-  const fallbackResult = {
+  const contribData = {
     success: true,
-    isAiGenerated: true,
+    verified: true,
+    isUserContributed: true,
+    trackName: cleanTrack,
+    artistName: cleanArtist || 'Various Artists',
+    syncedLyrics,
+    plainLyrics,
+    romanizedSyncedLyrics: romanizedSynced,
+    romanizedPlainLyrics: romanizedPlain,
+    hasDevanagariAlt,
     language: langInfo.language,
-    script: langInfo.script,
-    plainLyrics: lyricsText,
-    syncedLyrics: null,
-    disclaimer: "AI-created original lyrics inspired by the song's theme. Not the official lyrics.",
-    provider: 'ai_engine'
+    script: hasDevanagariAlt ? 'Devanagari' : langInfo.script,
+    provider: 'user_contributed',
+    timestamp: Date.now()
   };
 
-  lyricsCache.set(cacheKey, { data: fallbackResult, timestamp: Date.now() });
-  return res.json(fallbackResult);
+  const key = `${cleanTrack.toLowerCase()}__${(cleanArtist || '').toLowerCase()}`;
+  contributedLyrics[key] = contribData;
+  saveContributedLyrics();
+
+  const cacheKey = `${cleanTrack.toLowerCase()}__${cleanArtist.toLowerCase()}__standard__0`;
+  lyricsCache.set(cacheKey, { data: contribData, timestamp: Date.now() });
+
+  res.json({ success: true, message: 'Lyrics contributed and verified successfully!', data: contribData });
+});
+
+// Legacy / Optional AI lyrics route - Returns honest disabled status
+app.post('/api/ai-lyrics', (req, res) => {
+  res.json({
+    success: false,
+    message: "AI-generated fictional lyrics have been permanently disabled in MusiSurf to ensure authentic verified lyrics."
+  });
 });
 
 // Image Proxy for Canvas Color Extraction (Zero CORS Issues)

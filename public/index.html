@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Devanagari:wght@400;600;700&family=Noto+Sans+Gurmukhi:wght@400;600;700&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap"
     rel="stylesheet">
 
   <!-- PWA & Mobile Meta Tags -->
@@ -737,6 +737,10 @@
         <!-- SYNCHRONIZED LYRICS VIEW (Exact Match to Image 2 - Dynamic Atmospheric Backdrop) -->
         <section class="view-section" id="lyricsView">
           <div class="lyrics-view-top-actions">
+            <div class="lyrics-top-badges" id="lyricsTopBadges">
+              <span class="lyrics-mode-pill" id="lyricsStatusBadge" style="display: none;">• Synchronized</span>
+              <button class="lyrics-script-toggle-btn" id="lyricsScriptToggleBtn" type="button" style="display: none;" title="Toggle Script between Native and Latin">हिन्दी / EN</button>
+            </div>
             <div class="lyrics-sync-controls" id="lyricsSyncControls" title="Fine-tune audio lyrics synchronization" style="display: none !important;">
               <button class="lyrics-sync-btn" id="lyricsSyncMinus" title="Delay lyrics by 0.5s">-0.5s</button>
               <span class="lyrics-sync-label" id="lyricsSyncLabel">Sync: 0.0s</span>
@@ -1662,6 +1666,40 @@
           <div class="modal-footer">
             <button type="button" class="btn-secondary" id="cancelRenamePlaylistBtn">Cancel</button>
             <button type="submit" class="btn-primary">Save Name</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Contribute Lyrics Modal (MusiSurf Dark Theme) -->
+    <div class="modal-backdrop" id="contributeLyricsModal" style="display: none;">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Contribute Lyrics</h3>
+          <button class="modal-close-btn" id="closeContributeLyricsBtn" type="button" title="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <form id="contributeLyricsForm">
+          <div class="form-group">
+            <label>Track Title</label>
+            <input type="text" id="contributeTrackInput" readonly class="input-readonly" style="opacity: 0.85; cursor: default;">
+          </div>
+          <div class="form-group">
+            <label>Artist</label>
+            <input type="text" id="contributeArtistInput" readonly class="input-readonly" style="opacity: 0.85; cursor: default;">
+          </div>
+          <div class="form-group">
+            <label for="contributeLyricsText">Lyrics (Plain text or [mm:ss.xx] LRC format)</label>
+            <textarea id="contributeLyricsText" rows="9" placeholder="Enter or paste lyrics here..." required style="font-family: inherit; font-size: 0.95rem; line-height: 1.5; resize: vertical;"></textarea>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Supports plain lyrics or line timestamps [00:15.20]. Verified and saved for playback.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn-secondary" id="cancelContributeLyricsBtn">Cancel</button>
+            <button type="submit" class="btn-primary" id="saveContributeLyricsBtn">Save Lyrics</button>
           </div>
         </form>
       </div>
