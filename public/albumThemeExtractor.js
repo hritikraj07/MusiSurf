@@ -290,19 +290,21 @@
       if (reqId !== this.activeRequestId) return;
       if (expectedTrackId && this.currentTrackId && expectedTrackId !== this.currentTrackId) return;
 
+      const primaryColor = palette.primary;
       const el = targetEl || (typeof document !== 'undefined' ? document.getElementById('lyrics-edge-glow') : null);
       if (el) {
-        el.style.setProperty('--glow-primary', palette.primary);
-        el.style.setProperty('--glow-secondary', palette.secondary);
-        el.style.setProperty('--glow-tertiary', palette.tertiary);
-        el.style.setProperty('--glow-quaternary', palette.quaternary);
+        // Strictly monochromatic to the song's dominant album color
+        el.style.setProperty('--glow-primary', primaryColor);
+        el.style.setProperty('--glow-secondary', primaryColor);
+        el.style.setProperty('--glow-tertiary', primaryColor);
+        el.style.setProperty('--glow-quaternary', primaryColor);
       }
       const lyricsViewEl = typeof document !== 'undefined' ? document.getElementById('lyricsView') : null;
       if (lyricsViewEl) {
-        lyricsViewEl.style.setProperty('--glow-primary', palette.primary);
-        lyricsViewEl.style.setProperty('--glow-secondary', palette.secondary);
-        lyricsViewEl.style.setProperty('--glow-tertiary', palette.tertiary);
-        lyricsViewEl.style.setProperty('--glow-quaternary', palette.quaternary);
+        lyricsViewEl.style.setProperty('--glow-primary', primaryColor);
+        lyricsViewEl.style.setProperty('--glow-secondary', primaryColor);
+        lyricsViewEl.style.setProperty('--glow-tertiary', primaryColor);
+        lyricsViewEl.style.setProperty('--glow-quaternary', primaryColor);
       }
 
       return palette;

@@ -2260,6 +2260,26 @@
     }
   }
 
+  function updateRepeatUI() {
+    const mode = state.repeatMode || 'off';
+    const isAll = mode === 'all';
+    const isOne = mode === 'one';
+    const isActive = isAll || isOne;
+
+    [elements.repeatBtn, elements.mobRepeatBtn].forEach(btn => {
+      if (!btn) return;
+      btn.classList.toggle('active', isActive);
+      btn.classList.toggle('repeat-one', isOne);
+      if (isOne) {
+        btn.title = 'Repeat: Current Track (R)';
+      } else if (isAll) {
+        btn.title = 'Repeat: All (R)';
+      } else {
+        btn.title = 'Repeat: Off (R)';
+      }
+    });
+  }
+
   function updatePlaylistModeUI() {
     const mode = state.playlistMode || '1';
     if (elements.shufflePlaylistBtn) {
@@ -2285,6 +2305,16 @@
     modeNum = (modeNum % 3) + 1;
     state.playlistMode = String(modeNum);
     localStorage.setItem('musisurf_playlist_playback_mode', state.playlistMode);
+
+    // Bidirectionally synchronize bottom player repeat mode with playlist playback mode
+    if (state.playlistMode === '1') {
+      state.repeatMode = 'off';
+      updateRepeatUI();
+    } else if (state.playlistMode === '3') {
+      state.repeatMode = 'all';
+      updateRepeatUI();
+    }
+
     updatePlaylistModeUI();
 
     // If currently playing a playlist, gracefully adapt upcoming cycle
@@ -8465,12 +8495,20 @@
       if (state.repeatMode === 'off') {
         state.repeatMode = 'all';
         showToast('Repeat: All', '🔁');
+        // Synchronize with playlist mode (Mode 3: Shuffle & Repeat Playlist)
+        state.playlistMode = '3';
+        localStorage.setItem('musisurf_playlist_playback_mode', '3');
+        updatePlaylistModeUI();
       } else if (state.repeatMode === 'all') {
         state.repeatMode = 'one';
         showToast('Repeat: Current Track', '🔂');
       } else {
         state.repeatMode = 'off';
         showToast('Repeat: Off', '➡️');
+        // Synchronize with playlist mode (Mode 1: In Order + Autoplay)
+        state.playlistMode = '1';
+        localStorage.setItem('musisurf_playlist_playback_mode', '1');
+        updatePlaylistModeUI();
       }
       updateRepeatUI();
     }
