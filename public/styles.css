@@ -5336,52 +5336,45 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
    ========================================================================== */
 .mobile-nav-bar {
   display: none !important;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 64px;
-  background-color: rgba(14, 15, 18, 0.96);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid var(--border-subtle);
-  z-index: 300;
-  grid-template-columns: repeat(3, 1fr);
-  align-items: center;
-  justify-items: center;
-  padding: 0 12px;
 }
 
 .mobile-nav-item {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
   background: transparent;
   border: none;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.6);
   font-size: 0.68rem;
   font-weight: 700;
   cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 8px;
-  transition: color var(--transition-fast);
+  padding: 6px 18px;
+  border-radius: 9999px;
+  transition: all var(--transition-fast);
 }
 
 .mobile-nav-item svg {
-  width: 22px;
-  height: 22px;
-  transition: transform var(--transition-fast);
+  width: 20px;
+  height: 20px;
+  stroke-width: 2.2;
+  transition: transform var(--transition-fast), color var(--transition-fast);
 }
 
 .mobile-nav-item.active {
   color: #fff;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .mobile-nav-item.active svg {
-  color: var(--accent-primary);
+  color: var(--accent-primary, #00f260);
   transform: translateY(-1px);
+}
+
+.mobile-nav-item .tubelight-lamp {
+  display: none;
 }
 
 /* Fullscreen Mobile Now Playing Screen (100% Solid Opaque Background) */
@@ -5858,15 +5851,123 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     display: none !important;
   }
 
-  /* Show Mobile Bottom Navigation */
+  /* Show Mobile Bottom Navigation (Floating Tubelight Rounded-Full Island) */
   .mobile-nav-bar {
-    display: grid !important;
+    display: flex !important;
+    position: fixed !important;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: auto !important;
+    max-width: calc(100vw - 32px) !important;
+    height: auto !important;
+    background: rgba(14, 15, 20, 0.78) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 9999px !important; /* All round corners shape from all corners */
+    box-shadow: 0 12px 36px -4px rgba(0, 0, 0, 0.75), 0 0 1px 1px rgba(255, 255, 255, 0.08) !important;
+    padding: 4px 6px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    z-index: 500 !important;
+    box-sizing: border-box !important;
+  }
+
+  .mobile-nav-item {
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 2px !important;
+    background: transparent !important;
+    border: none !important;
+    color: rgba(255, 255, 255, 0.58) !important;
+    font-size: 0.68rem !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    padding: 6px 20px !important;
+    border-radius: 9999px !important;
+    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    user-select: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  .mobile-nav-item svg {
+    width: 20px !important;
+    height: 20px !important;
+    stroke-width: 2.2 !important;
+    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s ease !important;
+  }
+
+  .mobile-nav-item.active {
+    color: #ffffff !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+  }
+
+  .mobile-nav-item.active svg {
+    color: var(--accent-primary, #00f260) !important;
+    transform: translateY(-1px) scale(1.08) !important;
+  }
+
+  /* Tubelight Lamp Beam (Top edge glowing light) */
+  .mobile-nav-item .tubelight-lamp {
+    display: none;
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 32px;
+    height: 3px;
+    background: var(--accent-primary, #00f260);
+    border-radius: 9999px 9999px 0 0;
+    pointer-events: none;
+    box-shadow: 0 0 10px var(--accent-primary, #00f260),
+                0 0 20px rgba(0, 242, 96, 0.65),
+                0 0 32px rgba(0, 242, 96, 0.35);
+  }
+
+  /* Ambient soft glow blur underneath the lamp */
+  .mobile-nav-item .tubelight-lamp::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 48px;
+    height: 18px;
+    background: rgba(0, 242, 96, 0.32);
+    border-radius: 50%;
+    filter: blur(8px);
+    pointer-events: none;
+  }
+
+  .mobile-nav-item.active .tubelight-lamp {
+    display: block !important;
+    animation: tubelightFlickerOn 0.25s ease-out forwards;
+  }
+
+  @keyframes tubelightFlickerOn {
+    0% {
+      opacity: 0;
+      transform: translateX(-50%) scaleX(0.4);
+    }
+    60% {
+      opacity: 0.85;
+      transform: translateX(-50%) scaleX(1.15);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(-50%) scaleX(1);
+    }
   }
 
   /* Transform Persistent Player Bar into a Spotify-style Mini Player Floating above Nav Bar */
   .player-bar {
     position: fixed;
-    bottom: 64px;
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
     left: 8px;
     right: 8px;
     width: auto;
