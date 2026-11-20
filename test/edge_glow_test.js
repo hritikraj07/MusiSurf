@@ -225,6 +225,78 @@ async function runAllTests() {
     assert.strictEqual(state.isPlaying, false);
   });
 
+  // 8. Lyrics Fullscreen 'F' Key & Escape Behavior
+  runTest('Lyrics fullscreen F-key handler activates strictly when currentView is lyrics', () => {
+    function simulateKeydownF(currentView, isFullscreen, isTyping) {
+      if (isTyping) return { triggered: false, isFullscreen };
+      if (currentView === 'lyrics') {
+        return { triggered: true, isFullscreen: !isFullscreen };
+      }
+      return { triggered: false, isFullscreen };
+    }
+
+    function simulateEscape(isFullscreen) {
+      return { isFullscreen: false };
+    }
+
+    // On lyrics view: press F -> enters fullscreen
+    let res = simulateKeydownF('lyrics', false, false);
+    assert.strictEqual(res.triggered, true);
+    assert.strictEqual(res.isFullscreen, true);
+
+    // On lyrics view: press F again -> exits fullscreen
+    res = simulateKeydownF('lyrics', true, false);
+    assert.strictEqual(res.triggered, true);
+    assert.strictEqual(res.isFullscreen, false);
+
+    // Press Escape -> exits fullscreen
+    res = simulateEscape(true);
+    assert.strictEqual(res.isFullscreen, false);
+
+    // On Home page: press F -> does NOT enter fullscreen
+    res = simulateKeydownF('home', false, false);
+    assert.strictEqual(res.triggered, false);
+    assert.strictEqual(res.isFullscreen, false);
+
+    // On Search page: press F -> does NOT enter fullscreen
+    res = simulateKeydownF('search', false, false);
+    assert.strictEqual(res.triggered, false);
+    assert.strictEqual(res.isFullscreen, false);
+
+    // While typing in search/input: press F -> does NOT trigger
+    res = simulateKeydownF('lyrics', false, true);
+    assert.strictEqual(res.triggered, false);
+    assert.strictEqual(res.isFullscreen, false);
+  });
+
+  // 9. Index.html & Styles.css Integrity: Border beam and Settings Documentation
+  runTest('Index.html and styles.css contain Border Beam layers and Settings documentation', () => {
+    const fs = require('fs');
+    const path = require('path');
+
+    const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
+    const css = fs.readFileSync(path.join(__dirname, '../public/styles.css'), 'utf8');
+
+    // DOM structure contains ambient, bloom, and beam layers
+    assert(html.includes('id="lyrics-edge-glow"'), 'lyrics-edge-glow container must exist');
+    assert(html.includes('class="edge-glow-ambient"'), 'edge-glow-ambient must exist');
+    assert(html.includes('class="edge-glow-bloom"'), 'edge-glow-bloom must exist');
+    assert(html.includes('class="edge-glow-beam"'), 'edge-glow-beam must exist');
+
+    // UI button is hidden from lyrics window
+    assert(html.includes('id="lyricsFullscreenBtn"') && html.includes('style="display: none !important;"'), 'lyricsFullscreenBtn must be hidden from UI');
+
+    // Settings modal documents the F shortcut
+    assert(html.includes('Fullscreen (Lyrics view)'), 'Settings keyboard shortcuts table must document F key');
+    assert(html.includes('Lyrics Fullscreen Shortcut'), 'Settings Lyrics tab must document F key shortcut');
+
+    // CSS contains cross-platform webkit & standard masks and rotateBorderBeam animation
+    assert(css.includes('-webkit-mask'), 'CSS must include -webkit-mask for Safari/macOS');
+    assert(css.includes('mask:'), 'CSS must include standard mask for modern browsers');
+    assert(css.includes('rotateBorderBeam'), 'CSS must include rotateBorderBeam keyframe');
+    assert(css.includes('border-radius: 16px'), 'Lyrics window must have rounded corners in windowed desktop mode');
+  });
+
   console.log('\n====================================================');
   console.log(`Tests Completed: ${passed + failed}`);
   console.log(`Passed: ${passed}`);

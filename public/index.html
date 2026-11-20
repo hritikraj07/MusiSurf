@@ -769,8 +769,9 @@
         <section class="view-section" id="lyricsView">
           <!-- Album-Themed Ambient Edge Border Glow Animation (Desktop Web Lyrics Window Only) -->
           <div id="lyrics-edge-glow" class="lyrics-edge-glow" aria-hidden="true">
+            <div class="edge-glow-ambient"></div>
             <div class="edge-glow-bloom"></div>
-            <div class="edge-glow-rim"></div>
+            <div class="edge-glow-beam"></div>
           </div>
 
           <div class="lyrics-view-top-actions">
@@ -819,8 +820,8 @@
             </div>
           </div>
 
-          <!-- Web-Only Lyrics Fullscreen Option (Bottom Right, Aligned with Close Cross) -->
-          <button class="lyrics-fullscreen-btn" id="lyricsFullscreenBtn" title="Full screen" aria-label="Full screen" type="button">
+          <!-- Web-Only Lyrics Fullscreen Option (Documented in Settings, hidden from UI) -->
+          <button class="lyrics-fullscreen-btn" id="lyricsFullscreenBtn" title="Full screen" aria-label="Full screen" type="button" style="display: none !important;">
             <svg class="icon-enter-fullscreen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="15 3 21 3 21 9"/>
               <polyline points="9 21 3 21 3 15"/>
@@ -2418,6 +2419,10 @@
                       <div class="kbd-keys"><kbd class="ctrl-key-badge">L</kbd></div>
                       <span class="kbd-action-label">Lyrics</span>
                     </div>
+                    <div class="kbd-shortcut-row">
+                      <div class="kbd-keys"><kbd class="ctrl-key-badge">F</kbd></div>
+                      <span class="kbd-action-label">Fullscreen (Lyrics view)</span>
+                    </div>
                   </div>
                   <div class="kbd-shortcut-col">
                     <div class="kbd-shortcut-row">
@@ -2435,6 +2440,10 @@
                     <div class="kbd-shortcut-row">
                       <div class="kbd-keys"><kbd class="ctrl-key-badge">/</kbd></div>
                       <span class="kbd-action-label">Search</span>
+                    </div>
+                    <div class="kbd-shortcut-row">
+                      <div class="kbd-keys"><kbd class="ctrl-key-badge">Esc</kbd></div>
+                      <span class="kbd-action-label">Exit Fullscreen</span>
                     </div>
                   </div>
                 </div>
@@ -2479,6 +2488,15 @@
                   <input type="checkbox" id="lyricsAutoScrollToggle" checked>
                   <span class="toggle-slider"></span>
                 </label>
+              </div>
+              <div class="sound-card-item">
+                <div class="sound-card-left">
+                  <div class="sound-meta">
+                    <h3 class="sound-title">Lyrics Fullscreen Shortcut</h3>
+                    <p class="sound-desc">Press <kbd class="ctrl-key-badge">F</kbd> while viewing lyrics on desktop to enter or exit immersive full screen, or press <kbd class="ctrl-key-badge">Esc</kbd> to exit</p>
+                  </div>
+                </div>
+                <span class="feat-quality-badge">F / Esc</span>
               </div>
             </div>
           </section>

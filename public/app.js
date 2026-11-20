@@ -5704,6 +5704,7 @@
 
   async function applyLyricsDynamicBackground(track) {
     const lyricsViewEl = document.getElementById('lyricsView');
+    const glowEl = elements.lyricsEdgeGlow || document.getElementById('lyrics-edge-glow');
     const current = track || state.currentTrack;
     if (!current || !current.image) {
       document.documentElement.style.setProperty('--lyrics-theme-color', '#2d3748');
@@ -5711,6 +5712,10 @@
       if (lyricsViewEl) {
         lyricsViewEl.style.setProperty('--lyrics-theme-color', '#2d3748');
         lyricsViewEl.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
+      }
+      if (glowEl) {
+        glowEl.style.setProperty('--lyrics-theme-color', '#2d3748');
+        glowEl.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
       }
       return;
     }
@@ -5728,12 +5733,20 @@
         lyricsViewEl.style.setProperty('--lyrics-theme-rgb', rgbStr);
         lyricsViewEl.style.setProperty('--lyrics-theme-color', `rgb(${rgbStr})`);
       }
+      if (glowEl) {
+        glowEl.style.setProperty('--lyrics-theme-rgb', rgbStr);
+        glowEl.style.setProperty('--lyrics-theme-color', `rgb(${rgbStr})`);
+      }
     } catch (e) {
       document.documentElement.style.setProperty('--lyrics-theme-color', '#2d3748');
       document.documentElement.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
       if (lyricsViewEl) {
         lyricsViewEl.style.setProperty('--lyrics-theme-color', '#2d3748');
         lyricsViewEl.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
+      }
+      if (glowEl) {
+        glowEl.style.setProperty('--lyrics-theme-color', '#2d3748');
+        glowEl.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
       }
     }
   }
@@ -10195,6 +10208,12 @@
         if (elements.repeatBtn) elements.repeatBtn.click();
       } else if (e.key.toLowerCase() === 'l') {
         toggleLyricsView();
+      } else if (e.key.toLowerCase() === 'f') {
+        // Lyrics fullscreen mode: enabled ONLY when on lyrics window on desktop web
+        if (state.currentView === 'lyrics') {
+          e.preventDefault();
+          toggleLyricsFullscreen();
+        }
       } else if (e.key.toLowerCase() === 'q') {
         const willOpen = !elements.queueDrawer.classList.contains('open');
         elements.queueDrawer.classList.toggle('open', willOpen);
@@ -10209,6 +10228,9 @@
         e.preventDefault();
         if (typeof openSettingsModal === 'function') openSettingsModal();
       } else if (e.key === 'Escape') {
+        if (document.body.classList.contains('lyrics-fullscreen-active')) {
+          exitLyricsFullscreen();
+        }
         const authModal = document.getElementById('authModal');
         if (authModal) authModal.style.display = 'none';
         if (typeof closeMobileDrawer === 'function') closeMobileDrawer();

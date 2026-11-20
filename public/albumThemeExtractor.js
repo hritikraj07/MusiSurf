@@ -297,6 +297,13 @@
         el.style.setProperty('--glow-tertiary', palette.tertiary);
         el.style.setProperty('--glow-quaternary', palette.quaternary);
       }
+      const lyricsViewEl = typeof document !== 'undefined' ? document.getElementById('lyricsView') : null;
+      if (lyricsViewEl) {
+        lyricsViewEl.style.setProperty('--glow-primary', palette.primary);
+        lyricsViewEl.style.setProperty('--glow-secondary', palette.secondary);
+        lyricsViewEl.style.setProperty('--glow-tertiary', palette.tertiary);
+        lyricsViewEl.style.setProperty('--glow-quaternary', palette.quaternary);
+      }
 
       return palette;
     }
