@@ -3899,10 +3899,10 @@
     state.lyrics = lyrics;
     state.hasSyncedLyrics = true;
 
-    // Show Synchronized Badge
+    // Synchronized Badge removed per user instruction
     if (elements.lyricsStatusBadge) {
-      elements.lyricsStatusBadge.textContent = '• Synchronized';
-      elements.lyricsStatusBadge.style.display = 'inline-block';
+      elements.lyricsStatusBadge.textContent = '';
+      elements.lyricsStatusBadge.style.display = 'none';
     }
 
     // Show Script Toggle if Romanized + Devanagari available
@@ -3956,9 +3956,10 @@
       elements.lyricsSyncControls.style.display = 'none';
     }
 
+    // Plain Lyrics Badge removed per user instruction
     if (elements.lyricsStatusBadge) {
-      elements.lyricsStatusBadge.textContent = 'Plain Lyrics';
-      elements.lyricsStatusBadge.style.display = 'inline-block';
+      elements.lyricsStatusBadge.textContent = '';
+      elements.lyricsStatusBadge.style.display = 'none';
     }
 
     if (elements.lyricsScriptToggleBtn && data && data.hasDevanagariAlt) {
