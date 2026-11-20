@@ -3637,48 +3637,61 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .playlist-shuffle-btn {
-  background: transparent !important;
-  border: none !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 6px;
-  border-radius: 0 !important;
+  padding: 6px 14px !important;
+  border-radius: 20px !important;
   transition: all var(--transition-fast);
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
   position: relative;
   box-shadow: none !important;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
 }
 
 .playlist-shuffle-btn:hover {
   color: #fff;
-  transform: scale(1.1);
-  background: transparent !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  transform: translateY(-1px);
 }
 
-.playlist-shuffle-btn.active {
+.playlist-shuffle-btn.mode-1,
+.playlist-shuffle-btn.active.mode-1 {
   color: var(--accent-primary) !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
+  border-color: rgba(16, 185, 129, 0.35) !important;
+  background: rgba(16, 185, 129, 0.09) !important;
 }
 
-.playlist-shuffle-btn.active::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background-color: var(--accent-primary);
+.playlist-shuffle-btn.mode-2,
+.playlist-shuffle-btn.active.mode-2 {
+  color: #38bdf8 !important;
+  border-color: rgba(56, 189, 248, 0.35) !important;
+  background: rgba(56, 189, 248, 0.09) !important;
+}
+
+.playlist-shuffle-btn.mode-3,
+.playlist-shuffle-btn.active.mode-3 {
+  color: #f43f5e !important;
+  border-color: rgba(244, 63, 94, 0.35) !important;
+  background: rgba(244, 63, 94, 0.09) !important;
+}
+
+.playlist-mode-badge {
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .playlist-shuffle-btn svg {
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
 
 .playlist-action-icon-btn {
@@ -4393,6 +4406,98 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   max-width: 100%;
   box-sizing: border-box;
   overflow-x: hidden !important;
+}
+
+.queue-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.queue-autoplay-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.queue-autoplay-pill-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.queue-autoplay-pill-btn.active {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #10b981;
+}
+
+.queue-autoplay-pill-btn .autoplay-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: background 0.2s ease;
+}
+
+.queue-autoplay-pill-btn.active .autoplay-dot {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+.queue-reco-vibe-pill {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  padding: 3px 8px;
+  border-radius: 12px;
+  letter-spacing: 0.3px;
+}
+
+.queue-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.reco-action-btn {
+  background: transparent !important;
+  border: none !important;
+  color: var(--text-muted);
+  padding: 4px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  transition: all 0.15s ease;
+}
+
+.reco-action-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.reco-action-btn.reco-play-btn:hover {
+  color: var(--accent-primary);
+}
+
+.reco-action-btn.reco-add-btn:hover {
+  color: #38bdf8;
 }
 
 /* User-Queued Songs with Reorder Drag Handles */

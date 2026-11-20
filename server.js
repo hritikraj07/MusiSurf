@@ -106,6 +106,7 @@ function transformSaavnSong(item) {
     artist: decodeHtmlEntities(artist),
     album: decodeHtmlEntities(more.album || item.album || 'Single'),
     year: item.year || more.release_date?.substring(0, 4) || '',
+    language: (item.language || more.language || '').toLowerCase().trim(),
     image: image,
     audioUrl: audioUrl, // 320kbps direct ad-free audio stream
     streamUrl: audioUrl ? `/api/stream?url=${encodeURIComponent(audioUrl)}` : null,
@@ -1116,6 +1117,279 @@ app.get('/api/trending', async (req, res) => {
       return res.json({ success: true, sections: trendingSectionsCache });
     }
     res.status(500).json({ success: false, error: 'Failed to load trending music' });
+  }
+});
+
+// ============================================================================
+// Intelligent Recommendations & Vibe Matching Engine
+// ============================================================================
+const MOOD_KEYWORDS = {
+  romantic: ['romantic', 'love', 'pyaar', 'ishq', 'dil', 'tum', 'tere', 'humsafar', 'slow', 'acoustic', 'ballad', 'mohabbat', 'pehla', 'janam', 'kasam', 'deewana', 'duet', 'soulmate'],
+  sad: ['sad', 'dard', 'judaai', 'bewafa', 'heartbreak', 'tears', 'alone', 'broken', 'roothna', 'yaad', 'tanha', 'rona', 'bikhra', 'chhod', 'gham', 'alvida', 'judai', 'khoya'],
+  energetic: ['party', 'dance', 'banger', 'remix', 'club', 'dhol', 'bhangra', 'nach', 'dj', 'bass', 'high energy', 'beat', 'swag', 'munda', 'kudi', 'groove', 'edm', 'upbeat'],
+  chill: ['chill', 'lofi', 'unplugged', 'acoustic', 'sunset', 'peaceful', 'calm', 'relax', 'vibes', 'soft', 'coffee', 'midnight', 'sleep', 'ambient', 'breeze'],
+  sufi: ['sufi', 'qawwali', 'bhajan', 'spiritual', 'khwaja', 'maula', 'allah', 'krishna', 'shiva', 'devotional', 'ishq murshid', 'fakira', 'arziyan']
+};
+
+function detectSongVibe(title = '', artist = '', album = '') {
+  const text = `${title} ${artist} ${album}`.toLowerCase();
+  let bestMood = 'romantic';
+  let maxMatches = 0;
+  for (const [mood, words] of Object.entries(MOOD_KEYWORDS)) {
+    let matches = 0;
+    for (const w of words) {
+      if (text.includes(w)) matches++;
+    }
+    if (matches > maxMatches) {
+      maxMatches = matches;
+      bestMood = mood;
+    }
+  }
+  let energy = 'medium';
+  if (bestMood === 'energetic') energy = 'high';
+  else if (bestMood === 'sad' || bestMood === 'chill') energy = 'low';
+  return { mood: bestMood, energy };
+}
+
+function detectSongLanguage(title = '', artist = '', explicitLang = '') {
+  if (explicitLang && explicitLang.trim()) {
+    const l = explicitLang.toLowerCase().trim();
+    if (l !== 'unknown' && l !== 'undefined' && l !== 'null') return l;
+  }
+  const text = `${title} ${artist}`.toLowerCase();
+  if (/[\u0900-\u097F]/.test(title + artist)) return 'hindi';
+  if (/[\u0A00-\u0A7F]/.test(title + artist)) return 'punjabi';
+  if (/[\u0600-\u06FF]/.test(title + artist)) return 'urdu';
+
+  const punjabiArtists = ['diljit', 'karan aujla', 'sidhu moose', 'ap dhillon', 'shubh', 'guru randhawa', 'ammy virk', 'b praak', 'jassie gill', 'harrdy sandhu', 'wazir patar', 'jordan sandhu', 'kulwinder billa', 'mankirt', 'sukhe', 'arjan dhillon', 'parmish verma', 'sidhu', 'tarsem'];
+  if (punjabiArtists.some(pa => text.includes(pa))) return 'punjabi';
+
+  const hindiArtists = ['arijit', 'pritam', 'shreya ghoshal', 'neha kakkar', 'jubin', 'vishal mishra', 'darshan raval', 'sonu nigam', 'sunidhi', 'kishore kumar', 'lata mangeshkar', 'kumar sanu', 'udit narayan', 'alka yagnik', 'atif aslam', 'mohit chauhan', 'sachin-jigar', 'meet bros', 'tony kakkar', 'badshah', 'raftaar'];
+  if (hindiArtists.some(ha => text.includes(ha))) return 'hindi';
+
+  const englishArtists = ['taylor swift', 'ed sheeran', 'weeknd', 'drake', 'bieber', 'billie eilish', 'bruno mars', 'dua lipa', 'post malone', 'ariana grande', 'coldplay', 'eminem', 'adele', 'maroon 5', 'shawn mendes', 'charlie puth', 'olivia rodrigo', 'selena gomez', 'rihanna', 'katy perry', 'imagine dragons'];
+  if (englishArtists.some(ea => text.includes(ea))) return 'english';
+
+  return 'hindi';
+}
+
+function areLanguagesCompatible(langA, langB, mood) {
+  if (!langA || !langB) return true;
+  const a = langA.toLowerCase();
+  const b = langB.toLowerCase();
+  if (a === b) return true;
+  if ((a === 'hindi' && b === 'punjabi') || (a === 'punjabi' && b === 'hindi')) return true;
+  if ((a === 'hindi' && b === 'urdu') || (a === 'urdu' && b === 'hindi')) return true;
+  return false;
+}
+
+app.get('/api/recommendations', async (req, res) => {
+  const seedId = (req.query.seedId || '').trim();
+  let title = (req.query.title || '').trim();
+  let artist = (req.query.artist || '').trim();
+  let album = (req.query.album || '').trim();
+  let language = (req.query.language || '').toLowerCase().trim();
+  const rawExclude = (req.query.excludeIds || '').trim();
+  const excludeSet = new Set(rawExclude ? rawExclude.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : []);
+  if (seedId) excludeSet.add(seedId.toLowerCase());
+  const limit = Math.min(30, Math.max(1, parseInt(req.query.limit || '12', 10)));
+
+  try {
+    let saavnArtistId = null;
+    let saavnPrimaryArtistName = null;
+    let saavnAlbumId = null;
+
+    // 1. If Saavn song, fetch deep metadata to get accurate language, artist IDs, album
+    if (seedId.startsWith('saavn_')) {
+      const rawPid = seedId.replace('saavn_', '');
+      try {
+        const detailsRes = await fetch(`https://www.jiosaavn.com/api.php?__call=song.getDetails&pids=${rawPid}&_format=json&_marker=0&api_version=4`, {
+          signal: AbortSignal.timeout(4000)
+        });
+        if (detailsRes.ok) {
+          const detailsData = await detailsRes.json();
+          const detail = detailsData[rawPid];
+          if (detail) {
+            if (detail.title && !title) title = decodeHtmlEntities(detail.title);
+            if (detail.language && (!language || language === 'unknown')) language = detail.language.toLowerCase().trim();
+            const primaryArtists = detail.more_info?.artistMap?.primary_artists || [];
+            if (primaryArtists.length > 0) {
+              saavnArtistId = primaryArtists[0].id;
+              saavnPrimaryArtistName = primaryArtists[0].name;
+              if (!artist) artist = primaryArtists.map(a => a.name).join(', ');
+            }
+            if (detail.more_info?.album_id) saavnAlbumId = detail.more_info.album_id;
+            if (detail.more_info?.album && !album) album = detail.more_info.album;
+          }
+        }
+      } catch (e) {
+        console.warn('Saavn seed details fetch warning:', e.message);
+      }
+    }
+
+    // Determine final language & vibe
+    language = detectSongLanguage(title, artist, language);
+    const { mood, energy } = detectSongVibe(title, artist, album);
+    const primaryArtistClean = (saavnPrimaryArtistName || artist.split(',')[0] || '').trim();
+
+    // 2. Fetch candidates from multiple relevant streams
+    const fetchPromises = [];
+
+    // Stream A: Top songs from the primary artist (if Saavn artist ID available)
+    if (saavnArtistId) {
+      fetchPromises.push(
+        fetch(`https://www.jiosaavn.com/api.php?__call=artist.getArtistPageDetails&artistId=${saavnArtistId}&_format=json&_marker=0&api_version=4`, {
+          signal: AbortSignal.timeout(4000)
+        })
+          .then(r => r.json())
+          .then(d => (d.topSongs?.songs || []).map(transformSaavnSong).filter(t => t && t.audioUrl))
+          .catch(() => [])
+      );
+    }
+
+    // Stream B: Vibe and genre specific search in this language
+    const vibeQuery = `${language} ${mood} hits`;
+    fetchPromises.push(searchSaavn(vibeQuery, 15));
+
+    // Stream C: Primary artist in this language
+    if (primaryArtistClean) {
+      const artistQuery = `${primaryArtistClean} ${language} songs`;
+      fetchPromises.push(searchSaavn(artistQuery, 12));
+    }
+
+    // Stream D: If album ID available, fetch album tracks
+    if (saavnAlbumId) {
+      fetchPromises.push(
+        fetch(`https://www.jiosaavn.com/api.php?__call=content.getAlbumDetails&albumid=${saavnAlbumId}&_format=json&_marker=0&api_version=4`, {
+          signal: AbortSignal.timeout(4000)
+        })
+          .then(r => r.json())
+          .then(d => (d.list || d.songs || []).map(transformSaavnSong).filter(t => t && t.audioUrl))
+          .catch(() => [])
+      );
+    }
+
+    // Fallback: If YouTube seed or non-Saavn, also query YouTube for vibe
+    if (!seedId.startsWith('saavn_') || fetchPromises.length === 0) {
+      fetchPromises.push(searchYouTube(`${title} ${artist}`, 10));
+    }
+
+    const settled = await Promise.allSettled(fetchPromises);
+    const candidatePool = [];
+    for (const r of settled) {
+      if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+        candidatePool.push(...r.value);
+      }
+    }
+
+    // 3. Filter and score candidate songs
+    const seenKeys = new Set();
+    const scoredCandidates = [];
+    const seedNormTitle = (title || '').toLowerCase().replace(/[\(\[\{].*?[\)\]\}]/g, '').trim();
+
+    for (const track of candidatePool) {
+      if (!track || !track.title) continue;
+      const trackIdLower = (track.id || '').toLowerCase();
+      if (excludeSet.has(trackIdLower)) continue;
+
+      const normTitle = (track.title || '').toLowerCase().replace(/[\(\[\{].*?[\)\]\}]/g, '').trim();
+      const normArtist = (track.artist || '').toLowerCase().trim();
+      const dedupeKey = `${normTitle}:::${normArtist.split(',')[0].trim()}`;
+      if (seenKeys.has(dedupeKey)) continue;
+      seenKeys.add(dedupeKey);
+
+      // Do not recommend the exact same song
+      if (normTitle === seedNormTitle && seedNormTitle.length > 2) continue;
+
+      // Validation check
+      const valid = validateMusicContent(track);
+      if (!valid.isMusic) continue;
+
+      // Calculate Vibe Matching Score (out of 100)
+      let score = 50;
+
+      // Language Compatibility (+40 exact, +15 compatible regional, -70 incompatible)
+      const candLang = (track.language || detectSongLanguage(track.title, track.artist, '')).toLowerCase();
+      if (candLang === language) {
+        score += 40;
+      } else if (areLanguagesCompatible(language, candLang, mood)) {
+        score += 15;
+      } else {
+        score -= 70; // Strictly avoid jarring random language jumps!
+      }
+
+      // Artist Match (+30 primary, +15 collaborating)
+      if (primaryArtistClean && normArtist.includes(primaryArtistClean.toLowerCase())) {
+        score += 30;
+      }
+
+      // Vibe Match (+25)
+      const candVibe = detectSongVibe(track.title, track.artist, track.album || '');
+      if (candVibe.mood === mood) {
+        score += 25;
+      }
+
+      // Popularity / Play Count (+15)
+      if (track.playCount > 500000 || track.isVerified) {
+        score += 15;
+      }
+
+      scoredCandidates.push({
+        track,
+        score,
+        candLang,
+        candMood: candVibe.mood
+      });
+    }
+
+    // Sort by score descending
+    scoredCandidates.sort((a, b) => b.score - a.score);
+
+    // Album variety filter: maximum 2 tracks per album
+    const albumCount = new Map();
+    const finalResults = [];
+
+    for (const item of scoredCandidates) {
+      const alb = (item.track.album || 'single').toLowerCase().trim();
+      if (alb && alb !== 'single') {
+        const count = albumCount.get(alb) || 0;
+        if (count >= 2) continue;
+        albumCount.set(alb, count + 1);
+      }
+      finalResults.push(item.track);
+      if (finalResults.length >= limit) break;
+    }
+
+    // Fallback: if fewer than 4 candidates, query broad trending in this language
+    if (finalResults.length < 4) {
+      try {
+        const fallbackSongs = await searchSaavn(`${language} top hits`, limit);
+        for (const fb of fallbackSongs) {
+          if (!excludeSet.has((fb.id || '').toLowerCase()) && !finalResults.some(t => t.id === fb.id)) {
+            finalResults.push(fb);
+            if (finalResults.length >= limit) break;
+          }
+        }
+      } catch (e) {}
+    }
+
+    res.json({
+      success: true,
+      vibe: mood,
+      energy: energy,
+      language: language,
+      seed: {
+        id: seedId,
+        title,
+        artist,
+        language
+      },
+      count: finalResults.length,
+      results: finalResults
+    });
+  } catch (err) {
+    console.error('Recommendations endpoint error:', err);
+    res.status(500).json({ success: false, error: 'Failed to generate recommendations' });
   }
 });
 

@@ -622,10 +622,11 @@
                   <rect x="14" y="4" width="4" height="16" />
                 </svg>
               </button>
-              <button class="playlist-shuffle-btn" id="shufflePlaylistBtn" title="Shuffle Play">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <button class="playlist-shuffle-btn" id="shufflePlaylistBtn" title="Mode 1: In Order + Autoplay • Click to cycle modes">
+                <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
                 </svg>
+                <span class="playlist-mode-badge" id="playlistModeBadge">In Order</span>
               </button>
               <button class="playlist-action-icon-btn pin-playlist-btn" id="pinPlaylistBtn" title="Pin Playlist" style="display: none;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1092,12 +1093,18 @@
     <aside class="queue-drawer" id="queueDrawer">
       <div class="queue-header">
         <h3 class="queue-title">Play Queue</h3>
-        <button class="icon-sub-btn" id="closeQueueBtn" title="Close Queue">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+        <div class="queue-header-actions">
+          <button class="queue-autoplay-pill-btn active" id="queueAutoplayToggleBtn" title="Toggle Smart Autoplay (Continuous vibe-matched recommendations)">
+            <span class="autoplay-dot"></span>
+            <span class="autoplay-text">Autoplay</span>
+          </button>
+          <button class="icon-sub-btn" id="closeQueueBtn" title="Close Queue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div class="queue-body">
@@ -1125,6 +1132,17 @@
             <span class="queue-section-heading" id="queueContextHeading">Next Up</span>
           </div>
           <div class="queue-list" id="queueList">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Recommended Section (Smart Endless Recommendations) -->
+        <div class="queue-section" id="queueRecommendedSection">
+          <div class="queue-next-header">
+            <span class="queue-section-heading" id="queueRecommendedHeading">Recommended • Based on your vibe</span>
+            <span class="queue-reco-vibe-pill" id="queueRecoVibePill">✨ Smart Autoplay</span>
+          </div>
+          <div class="queue-list" id="queueRecommendedList">
             <!-- Populated by JS -->
           </div>
         </div>
@@ -2297,8 +2315,8 @@
               </div>
             </div>
 
-            <!-- Playback Features: Skip Silence (Full Width) -->
-            <div class="playback-features-grid" style="grid-template-columns: 1fr;">
+            <!-- Playback Features: Skip Silence & Smart Autoplay -->
+            <div class="playback-features-grid" style="grid-template-columns: 1fr; gap: 12px;">
               <!-- Skip silence (Full Width) -->
               <div class="playback-feature-card" style="width: 100%; grid-column: 1 / -1;">
                 <div class="feat-card-header">
@@ -2309,6 +2327,18 @@
                   </label>
                 </div>
                 <p class="feat-card-desc">Scans the head and tail of a track at -42 dB and seeks past the dead air.</p>
+              </div>
+
+              <!-- Smart Autoplay & Continuous Recommendations -->
+              <div class="playback-feature-card" style="width: 100%; grid-column: 1 / -1;">
+                <div class="feat-card-header">
+                  <h4 class="feat-card-title">Smart Autoplay & Recommendations</h4>
+                  <label class="sound-toggle-switch mini-toggle">
+                    <input type="checkbox" id="smartAutoplayToggleSwitch" checked>
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <p class="feat-card-desc">Continuously play relevant, vibe-matched music based on your listening session when your song or playlist ends.</p>
               </div>
             </div>
 

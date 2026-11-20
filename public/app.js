@@ -31,6 +31,15 @@
     viewingPlaylistId: null,
     viewingPlaylistTracks: null,
     isPlaylistShuffle: false,
+    autoplay: localStorage.getItem('musisurf_autoplay_enabled') !== 'false',
+    playlistMode: localStorage.getItem('musisurf_playlist_playback_mode') || '1', // '1': In Order + Autoplay, '2': Shuffle Once + Autoplay, '3': Shuffle & Repeat Playlist
+    recommendationQueue: [],
+    sessionHistory: [],
+    sessionProfile: { languages: [], artists: [], moods: [], recentTracks: [] },
+    recommendationSeed: null,
+    isFetchingRecommendations: false,
+    playlistCycle: [],
+    playlistCycleIndex: 0,
     lyrics: [],
     hasSyncedLyrics: false,
     activeLyricIndex: -1,
@@ -229,6 +238,7 @@
     playlistEmptyState: document.getElementById('playlistEmptyState'),
     playAllPlaylistBtn: document.getElementById('playAllPlaylistBtn'),
     shufflePlaylistBtn: document.getElementById('shufflePlaylistBtn'),
+    playlistModeBadge: document.getElementById('playlistModeBadge'),
     pinPlaylistBtn: document.getElementById('pinPlaylistBtn'),
     renamePlaylistBtn: document.getElementById('renamePlaylistBtn'),
     playlistTracksSortSelect: document.getElementById('playlistTracksSortSelect'),
@@ -285,6 +295,12 @@
     queueContextHeading: document.getElementById('queueContextHeading'),
     queueList: document.getElementById('queueList'),
     clearQueueBtn: document.getElementById('clearQueueBtn'),
+    queueAutoplayToggleBtn: document.getElementById('queueAutoplayToggleBtn'),
+    queueRecommendedSection: document.getElementById('queueRecommendedSection'),
+    queueRecommendedHeading: document.getElementById('queueRecommendedHeading'),
+    queueRecommendedList: document.getElementById('queueRecommendedList'),
+    queueRecoVibePill: document.getElementById('queueRecoVibePill'),
+    smartAutoplayToggleSwitch: document.getElementById('smartAutoplayToggleSwitch'),
 
     // Player Bar
     playerBar: document.getElementById('playerBar'),
@@ -1479,27 +1495,347 @@
     }, 20);
   }
 
+  // ============================================================================
+  // Smart Autoplay & Session Vibe Profiler
+  // ============================================================================
+  const CLIENT_MOOD_KEYWORDS = {
+    romantic: ['romantic', 'love', 'pyaar', 'ishq', 'dil', 'tum', 'tere', 'humsafar', 'slow', 'acoustic', 'ballad', 'mohabbat', 'pehla', 'janam', 'kasam'],
+    sad: ['sad', 'dard', 'judaai', 'bewafa', 'heartbreak', 'tears', 'alone', 'broken', 'roothna', 'yaad', 'tanha', 'rona', 'bikhra', 'chhod', 'alvida'],
+    energetic: ['party', 'dance', 'banger', 'remix', 'club', 'dhol', 'bhangra', 'nach', 'dj', 'bass', 'high energy', 'beat', 'swag'],
+    chill: ['chill', 'lofi', 'unplugged', 'acoustic', 'sunset', 'peaceful', 'calm', 'relax', 'vibes', 'soft'],
+    sufi: ['sufi', 'qawwali', 'bhajan', 'spiritual', 'khwaja', 'maula', 'allah']
+  };
+
+  function detectClientMood(track) {
+    if (!track) return 'romantic';
+    const text = `${track.title || ''} ${track.artist || ''} ${track.album || ''}`.toLowerCase();
+    for (const [mood, words] of Object.entries(CLIENT_MOOD_KEYWORDS)) {
+      if (words.some(w => text.includes(w))) return mood;
+    }
+    return 'romantic';
+  }
+
+  function detectClientLanguage(track) {
+    if (!track) return 'hindi';
+    if (track.language && track.language !== 'unknown') return track.language.toLowerCase();
+    const text = `${track.title || ''} ${track.artist || ''}`.toLowerCase();
+    if (/[\u0900-\u097F]/.test(text)) return 'hindi';
+    if (/[\u0A00-\u0A7F]/.test(text)) return 'punjabi';
+    if (/[\u0600-\u06FF]/.test(text)) return 'urdu';
+    const punjabiArtists = ['diljit', 'karan aujla', 'sidhu moose', 'ap dhillon', 'shubh', 'guru randhawa', 'ammy virk', 'b praak', 'jassie gill', 'harrdy sandhu'];
+    if (punjabiArtists.some(pa => text.includes(pa))) return 'punjabi';
+    const englishArtists = ['taylor swift', 'ed sheeran', 'weeknd', 'drake', 'bieber', 'billie eilish', 'bruno mars', 'dua lipa', 'coldplay'];
+    if (englishArtists.some(ea => text.includes(ea))) return 'english';
+    return 'hindi';
+  }
+
+  function updateSessionProfile(track) {
+    if (!track) return;
+    if (!state.sessionHistory) state.sessionHistory = [];
+    if (!state.sessionHistory.includes(track.id)) {
+      state.sessionHistory.push(track.id);
+      if (state.sessionHistory.length > 60) state.sessionHistory.shift();
+    }
+
+    const lang = detectClientLanguage(track);
+    const mood = detectClientMood(track);
+    const artist = (track.artist || '').split(',')[0].trim();
+
+    if (!state.sessionProfile) {
+      state.sessionProfile = { languages: [], artists: [], moods: [], recentTracks: [] };
+    }
+
+    if (!state.sessionProfile.languages) state.sessionProfile.languages = [];
+    state.sessionProfile.languages.unshift(lang);
+    if (state.sessionProfile.languages.length > 5) state.sessionProfile.languages.pop();
+
+    if (!state.sessionProfile.moods) state.sessionProfile.moods = [];
+    state.sessionProfile.moods.unshift(mood);
+    if (state.sessionProfile.moods.length > 5) state.sessionProfile.moods.pop();
+
+    if (artist) {
+      if (!state.sessionProfile.artists) state.sessionProfile.artists = [];
+      state.sessionProfile.artists.unshift(artist);
+      if (state.sessionProfile.artists.length > 5) state.sessionProfile.artists.pop();
+    }
+
+    if (!state.sessionProfile.recentTracks) state.sessionProfile.recentTracks = [];
+    state.sessionProfile.recentTracks.unshift(track);
+    if (state.sessionProfile.recentTracks.length > 5) state.sessionProfile.recentTracks.pop();
+  }
+
+  let recommendationFetchAbort = null;
+  async function fetchRecommendationBatch(seedTrack = null, force = false) {
+    if (!state.autoplay && !force) return;
+    if (state.isFetchingRecommendations && !force) return;
+
+    const seed = seedTrack || state.currentTrack || state.recommendationSeed;
+    if (!seed || !seed.title) return;
+
+    state.isFetchingRecommendations = true;
+    if (elements.queueRecoVibePill) {
+      elements.queueRecoVibePill.textContent = '✨ Finding vibe matches...';
+    }
+
+    try {
+      if (recommendationFetchAbort) {
+        recommendationFetchAbort.abort();
+      }
+      recommendationFetchAbort = new AbortController();
+
+      const excludeIds = [
+        ...new Set([
+          ...(state.sessionHistory || []),
+          ...(state.userQueue || []).map(t => t.id),
+          ...(state.recommendationQueue || []).map(t => t.id),
+          seed.id
+        ])
+      ].filter(Boolean).slice(-40).join(',');
+
+      const lang = seed.language || (state.sessionProfile?.languages?.[0]) || detectClientLanguage(seed);
+      const url = `/api/recommendations?seedId=${encodeURIComponent(seed.id || '')}&title=${encodeURIComponent(seed.title || '')}&artist=${encodeURIComponent(seed.artist || '')}&language=${encodeURIComponent(lang || '')}&excludeIds=${encodeURIComponent(excludeIds)}&limit=12`;
+
+      const res = await fetch(url, { signal: recommendationFetchAbort.signal });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.results) && data.results.length > 0) {
+          const existingIds = new Set([
+            ...(state.sessionHistory || []),
+            ...(state.userQueue || []).map(t => t.id),
+            ...(state.recommendationQueue || []).map(t => t.id),
+            state.currentTrack?.id
+          ].filter(Boolean));
+
+          const newTracks = [];
+          for (const t of data.results) {
+            if (!t || !t.id || existingIds.has(t.id)) continue;
+            existingIds.add(t.id);
+            newTracks.push(t);
+          }
+
+          if (!state.recommendationQueue) state.recommendationQueue = [];
+          state.recommendationQueue.push(...newTracks);
+
+          if (elements.queueRecoVibePill) {
+            const vibeText = data.vibe ? (data.vibe.charAt(0).toUpperCase() + data.vibe.slice(1)) : 'Autoplay';
+            const langText = data.language ? (data.language.charAt(0).toUpperCase() + data.language.slice(1)) : '';
+            elements.queueRecoVibePill.textContent = `✨ ${langText} ${vibeText}`.trim();
+          }
+
+          updateQueueDrawerUI();
+          schedulePreloadNextTrack(1200);
+        }
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.warn('Recommendation fetch warning:', err.message);
+      }
+    } finally {
+      state.isFetchingRecommendations = false;
+      if (elements.queueRecoVibePill && elements.queueRecoVibePill.textContent.includes('Finding')) {
+        elements.queueRecoVibePill.textContent = '✨ Smart Autoplay';
+      }
+    }
+  }
+
+  // Fisher-Yates shuffle that ensures boundary separation
+  function generateShuffledPlaylistCycle(tracks, avoidStartTrackId = null) {
+    if (!tracks || !Array.isArray(tracks) || tracks.length === 0) return [];
+    if (tracks.length === 1) return [...tracks];
+    const shuffled = [...tracks];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    // Avoid repeating last track at cycle boundary
+    if (avoidStartTrackId && shuffled[0].id === avoidStartTrackId && shuffled.length > 1) {
+      const swapIdx = Math.floor(Math.random() * (shuffled.length - 1)) + 1;
+      [shuffled[0], shuffled[swapIdx]] = [shuffled[swapIdx], shuffled[0]];
+    }
+    return shuffled;
+  }
+
+  function initPlaylistCycle(tracks, startIndex = 0) {
+    if (!tracks || tracks.length === 0) return;
+    const mode = state.playlistMode || '1';
+
+    if (mode === '1') {
+      // Mode 1: Play in order, then autoplay
+      state.contextQueue = [...tracks];
+      state.contextIndex = startIndex;
+      state.playlistCycle = [...tracks];
+      state.playlistCycleIndex = startIndex;
+    } else if (mode === '2') {
+      // Mode 2: Shuffle playlist once, then autoplay
+      const selectedTrack = tracks[startIndex] || tracks[0];
+      const remaining = tracks.filter((t, i) => i !== startIndex);
+      const shuffledRemaining = generateShuffledPlaylistCycle(remaining);
+      state.playlistCycle = [selectedTrack, ...shuffledRemaining];
+      state.playlistCycleIndex = 0;
+      state.contextQueue = [...state.playlistCycle];
+      state.contextIndex = 0;
+    } else if (mode === '3') {
+      // Mode 3: Shuffle and repeat active playlist indefinitely
+      const selectedTrack = tracks[startIndex] || tracks[0];
+      const remaining = tracks.filter((t, i) => i !== startIndex);
+      const shuffledRemaining = generateShuffledPlaylistCycle(remaining);
+      state.playlistCycle = [selectedTrack, ...shuffledRemaining];
+      state.playlistCycleIndex = 0;
+      state.contextQueue = [...state.playlistCycle];
+      state.contextIndex = 0;
+    }
+  }
+
+  function updatePlaylistModeUI() {
+    const mode = state.playlistMode || '1';
+    if (elements.shufflePlaylistBtn) {
+      elements.shufflePlaylistBtn.classList.remove('mode-1', 'mode-2', 'mode-3', 'active');
+      elements.shufflePlaylistBtn.classList.add(`mode-${mode}`);
+      if (mode !== '1') elements.shufflePlaylistBtn.classList.add('active');
+
+      if (mode === '1') {
+        if (elements.playlistModeBadge) elements.playlistModeBadge.textContent = 'In Order';
+        elements.shufflePlaylistBtn.title = 'Mode 1: In Order + Autoplay • Plays playlist in order, then switches to endless recommendations. Click to switch to Mode 2';
+      } else if (mode === '2') {
+        if (elements.playlistModeBadge) elements.playlistModeBadge.textContent = 'Shuffle Once';
+        elements.shufflePlaylistBtn.title = 'Mode 2: Shuffle Once + Autoplay • Plays every song once randomly, then switches to endless recommendations. Click to switch to Mode 3';
+      } else if (mode === '3') {
+        if (elements.playlistModeBadge) elements.playlistModeBadge.textContent = 'Shuffle & Loop';
+        elements.shufflePlaylistBtn.title = 'Mode 3: Shuffle & Repeat Playlist • Loops playlist indefinitely with newly shuffled cycles. Click to switch to Mode 1';
+      }
+    }
+  }
+
+  function cyclePlaylistMode() {
+    let modeNum = parseInt(state.playlistMode || '1', 10);
+    modeNum = (modeNum % 3) + 1;
+    state.playlistMode = String(modeNum);
+    localStorage.setItem('musisurf_playlist_playback_mode', state.playlistMode);
+    updatePlaylistModeUI();
+
+    // If currently playing a playlist, gracefully adapt upcoming cycle
+    if (state.activePlaylistTracks && state.activePlaylistTracks.length > 0 && state.currentTrack) {
+      const curId = state.currentTrack.id;
+      if (state.playlistMode === '1') {
+        state.contextQueue = [...state.activePlaylistTracks];
+        state.contextIndex = Math.max(0, state.activePlaylistTracks.findIndex(t => t.id === curId));
+        state.playlistCycle = [...state.activePlaylistTracks];
+        state.playlistCycleIndex = state.contextIndex;
+        showToast('Playback Mode: In Order + Autoplay 📋✨', '📋');
+      } else if (state.playlistMode === '2') {
+        const remaining = state.activePlaylistTracks.filter(t => t.id !== curId);
+        state.playlistCycle = [state.currentTrack, ...generateShuffledPlaylistCycle(remaining)];
+        state.playlistCycleIndex = 0;
+        state.contextQueue = [...state.playlistCycle];
+        state.contextIndex = 0;
+        showToast('Playback Mode: Shuffle Once + Autoplay 🔀✨', '🔀');
+      } else if (state.playlistMode === '3') {
+        const remaining = state.activePlaylistTracks.filter(t => t.id !== curId);
+        state.playlistCycle = [state.currentTrack, ...generateShuffledPlaylistCycle(remaining)];
+        state.playlistCycleIndex = 0;
+        state.contextQueue = [...state.playlistCycle];
+        state.contextIndex = 0;
+        showToast('Playback Mode: Shuffle & Repeat Active Playlist 🔀🔁', '🔁');
+      }
+      updateQueueDrawerUI();
+    } else {
+      if (state.playlistMode === '1') showToast('Mode 1: In Order + Autoplay 📋✨', '📋');
+      else if (state.playlistMode === '2') showToast('Mode 2: Shuffle Once + Autoplay 🔀✨', '🔀');
+      else if (state.playlistMode === '3') showToast('Mode 3: Shuffle & Repeat Playlist 🔀🔁', '🔁');
+    }
+  }
+
+  function toggleAutoplay() {
+    state.autoplay = !state.autoplay;
+    localStorage.setItem('musisurf_autoplay_enabled', state.autoplay ? 'true' : 'false');
+    if (elements.smartAutoplayToggleSwitch) elements.smartAutoplayToggleSwitch.checked = state.autoplay;
+    if (elements.queueAutoplayToggleBtn) {
+      elements.queueAutoplayToggleBtn.classList.toggle('active', state.autoplay);
+      const txt = elements.queueAutoplayToggleBtn.querySelector('.autoplay-text');
+      if (txt) txt.textContent = state.autoplay ? 'Autoplay On' : 'Autoplay Off';
+    }
+    showToast(`Smart Autoplay ${state.autoplay ? 'Enabled ✨' : 'Disabled ⏸️'}`, state.autoplay ? '✨' : '⏸️');
+    if (state.autoplay && (!state.recommendationQueue || state.recommendationQueue.length === 0)) {
+      fetchRecommendationBatch();
+    }
+    updateQueueDrawerUI();
+  }
+
+  function setAutoplay(val) {
+    state.autoplay = Boolean(val);
+    localStorage.setItem('musisurf_autoplay_enabled', state.autoplay ? 'true' : 'false');
+    if (elements.smartAutoplayToggleSwitch) elements.smartAutoplayToggleSwitch.checked = state.autoplay;
+    if (elements.queueAutoplayToggleBtn) {
+      elements.queueAutoplayToggleBtn.classList.toggle('active', state.autoplay);
+      const txt = elements.queueAutoplayToggleBtn.querySelector('.autoplay-text');
+      if (txt) txt.textContent = state.autoplay ? 'Autoplay On' : 'Autoplay Off';
+    }
+    showToast(`Smart Autoplay ${state.autoplay ? 'Enabled ✨' : 'Disabled ⏸️'}`, state.autoplay ? '✨' : '⏸️');
+    if (state.autoplay && (!state.recommendationQueue || state.recommendationQueue.length === 0)) {
+      fetchRecommendationBatch();
+    }
+    updateQueueDrawerUI();
+  }
+
   function getNextUpcomingTrack() {
+    // 1. User manual queue has highest priority
     if (state.userQueue && state.userQueue.length > 0) {
       return state.userQueue[0];
     }
-    if (state.contextQueue && state.contextQueue.length > state.contextIndex + 1) {
-      return state.contextQueue[state.contextIndex + 1];
-    }
-    if (state.repeatMode === 'all' && state.contextQueue && state.contextQueue.length > 0) {
-      return state.contextQueue[0];
-    }
+
+    // 2. Repeat one mode
     if (state.repeatMode === 'one' && state.currentTrack) {
       return state.currentTrack;
     }
-    if (state.allAvailableTracks && state.allAvailableTracks.length > 0) {
-      const unplayed = state.allAvailableTracks.filter(t => 
-        (!state.contextQueue || !state.contextQueue.some(q => q.id === t.id)) &&
-        (!state.currentTrack || t.id !== state.currentTrack.id)
-      );
-      if (unplayed.length > 0) return unplayed[0];
-      return state.allAvailableTracks[0];
+
+    // 3. Active playlist context based on selected mode
+    if (state.activePlaylistTracks && state.activePlaylistTracks.length > 0) {
+      const mode = state.playlistMode || '1';
+
+      if (mode === '1') {
+        // Mode 1: In Order + Autoplay
+        if (state.contextQueue && state.contextIndex + 1 < state.contextQueue.length) {
+          return state.contextQueue[state.contextIndex + 1];
+        }
+        // At end of playlist in Mode 1: transition to recommendations!
+        if (state.autoplay && state.recommendationQueue && state.recommendationQueue.length > 0) {
+          return state.recommendationQueue[0];
+        }
+      } else if (mode === '2') {
+        // Mode 2: Shuffle Once + Autoplay
+        if (state.playlistCycle && state.playlistCycleIndex + 1 < state.playlistCycle.length) {
+          return state.playlistCycle[state.playlistCycleIndex + 1];
+        }
+        // At end of shuffled playlist in Mode 2: transition to recommendations!
+        if (state.autoplay && state.recommendationQueue && state.recommendationQueue.length > 0) {
+          return state.recommendationQueue[0];
+        }
+      } else if (mode === '3') {
+        // Mode 3: Shuffle & Repeat Playlist
+        if (state.playlistCycle && state.playlistCycleIndex + 1 < state.playlistCycle.length) {
+          return state.playlistCycle[state.playlistCycleIndex + 1];
+        }
+        // At end of cycle in Mode 3: next cycle's candidate (never leave playlist!)
+        const candidate = state.activePlaylistTracks.find(t => t.id !== state.currentTrack?.id) || state.activePlaylistTracks[0];
+        return candidate;
+      }
     }
+
+    // 4. Non-playlist context: standalone track from search or active context
+    if (state.contextQueue && state.contextQueue.length > state.contextIndex + 1) {
+      return state.contextQueue[state.contextIndex + 1];
+    }
+
+    // 5. Smart Autoplay recommendation queue
+    if (state.autoplay && state.recommendationQueue && state.recommendationQueue.length > 0) {
+      return state.recommendationQueue[0];
+    }
+
+    // 6. Global repeat all fallback
+    if (state.repeatMode === 'all' && state.contextQueue && state.contextQueue.length > 0) {
+      return state.contextQueue[0];
+    }
+
     return null;
   }
 
@@ -1678,30 +2014,112 @@
     cancelActiveCrossfade(false);
 
     let nextSong = targetTrack;
+    let switchedToRecommendations = false;
+    let loopedPlaylist = false;
+
     if (!nextSong) {
+      // 1. Manual user queue (Priority 1)
       if (state.userQueue && state.userQueue.length > 0) {
         nextSong = state.userQueue.shift();
-      } else if (state.contextQueue && state.contextQueue.length > 0) {
-        if (state.contextIndex + 1 < state.contextQueue.length) {
-          state.contextIndex++;
-          nextSong = state.contextQueue[state.contextIndex];
-        } else if (state.repeatMode === 'all') {
-          state.contextIndex = 0;
-          nextSong = state.contextQueue[0];
-        }
-      } else if (state.repeatMode === 'one' && state.currentTrack) {
+      }
+      // 2. Repeat One
+      else if (state.repeatMode === 'one' && state.currentTrack) {
         nextSong = state.currentTrack;
-      } else {
-        const candidate = getNextUpcomingTrack();
-        if (candidate) {
-          nextSong = candidate;
+      }
+      // 3. Active Playlist Context (Modes 1, 2, 3)
+      else if (state.activePlaylistTracks && state.activePlaylistTracks.length > 0) {
+        const mode = state.playlistMode || '1';
+
+        if (mode === '1') {
+          // Mode 1: In order
+          if (state.contextQueue && state.contextIndex + 1 < state.contextQueue.length) {
+            state.contextIndex++;
+            nextSong = state.contextQueue[state.contextIndex];
+          } else if (state.autoplay) {
+            // End of playlist -> Switch to recommendations!
+            state.activePlaylistTracks = null;
+            state.activePlaylistId = null;
+            if (state.recommendationQueue && state.recommendationQueue.length > 0) {
+              nextSong = state.recommendationQueue.shift();
+              switchedToRecommendations = true;
+            } else {
+              fetchRecommendationBatch(state.currentTrack, true);
+            }
+          }
+        } else if (mode === '2') {
+          // Mode 2: Shuffle once
+          if (state.playlistCycle && state.playlistCycleIndex + 1 < state.playlistCycle.length) {
+            state.playlistCycleIndex++;
+            nextSong = state.playlistCycle[state.playlistCycleIndex];
+            state.contextIndex = state.playlistCycleIndex;
+          } else if (state.autoplay) {
+            // End of shuffled playlist -> Switch to recommendations!
+            state.activePlaylistTracks = null;
+            state.activePlaylistId = null;
+            if (state.recommendationQueue && state.recommendationQueue.length > 0) {
+              nextSong = state.recommendationQueue.shift();
+              switchedToRecommendations = true;
+            } else {
+              fetchRecommendationBatch(state.currentTrack, true);
+            }
+          }
+        } else if (mode === '3') {
+          // Mode 3: Shuffle & Repeat playlist
+          if (state.playlistCycle && state.playlistCycleIndex + 1 < state.playlistCycle.length) {
+            state.playlistCycleIndex++;
+            nextSong = state.playlistCycle[state.playlistCycleIndex];
+            state.contextIndex = state.playlistCycleIndex;
+          } else {
+            // Cycle complete! Generate fresh cycle avoiding boundary repetition
+            const lastId = state.currentTrack?.id;
+            state.playlistCycle = generateShuffledPlaylistCycle(state.activePlaylistTracks, lastId);
+            state.playlistCycleIndex = 0;
+            state.contextQueue = [...state.playlistCycle];
+            state.contextIndex = 0;
+            nextSong = state.playlistCycle[0];
+            loopedPlaylist = true;
+          }
         }
+      }
+      // 4. Standalone track from search or ongoing autoplay
+      else if (state.contextQueue && state.contextIndex + 1 < state.contextQueue.length) {
+        state.contextIndex++;
+        nextSong = state.contextQueue[state.contextIndex];
+      }
+      // 5. Smart Autoplay recommendation queue
+      else if (state.autoplay) {
+        if (state.recommendationQueue && state.recommendationQueue.length > 0) {
+          nextSong = state.recommendationQueue.shift();
+          switchedToRecommendations = true;
+        } else {
+          // Fetch immediately if recommendations ran low
+          fetchRecommendationBatch(state.currentTrack, true);
+        }
+      }
+      // 6. Repeat All fallback
+      else if (state.repeatMode === 'all' && state.contextQueue && state.contextQueue.length > 0) {
+        state.contextIndex = 0;
+        nextSong = state.contextQueue[0];
       }
     }
 
     if (!nextSong) {
       state.isTransitioning = false;
+      if (state.autoplay && state.currentTrack) {
+        fetchRecommendationBatch(state.currentTrack, true);
+      }
       return;
+    }
+
+    if (switchedToRecommendations) {
+      showToast('Playlist finished • Continuing with vibe recommendations ✨', '✨');
+    } else if (loopedPlaylist) {
+      showToast('Looping playlist with fresh shuffle 🔀🔁', '🔁');
+    }
+
+    // Refill recommendation queue if running low (<= 4 tracks left)
+    if (state.autoplay && state.recommendationQueue && state.recommendationQueue.length <= 4) {
+      fetchRecommendationBatch(nextSong);
     }
 
     // Keep queue updated
@@ -1773,6 +2191,7 @@
         } catch (e) {}
       }
 
+      updateSessionProfile(nextSong);
       schedulePreloadNextTrack(1500);
       state.isTransitioning = false;
     } else {
@@ -2035,11 +2454,20 @@
       }
     } else if (queueList === null) {
       // Standalone track played (e.g. from search results) - does NOT pollute upcoming queue
+      state.activePlaylistTracks = null;
+      state.activePlaylistId = null;
       state.contextQueue = [track];
       state.contextIndex = 0;
+      state.recommendationSeed = track;
     }
     state.queue = [track, ...state.userQueue, ...state.contextQueue.slice(state.contextIndex + 1)];
     state.queueIndex = 0;
+
+    // Update Session Profile and initiate background recommendation fetching
+    updateSessionProfile(track);
+    if (state.autoplay && (!state.recommendationQueue || state.recommendationQueue.length <= 4)) {
+      fetchRecommendationBatch(track);
+    }
 
     state.currentTrack = track;
     track._introTrimmed = false;
@@ -5158,20 +5586,6 @@
       if (isCurrentPlaylistTrack) {
         togglePlayPause();
       } else {
-        const isShuf = isPlaylistShuffled(playlistId);
-        let queueList = [...listToPlay];
-
-        if (isShuf && queueList.length > 1) {
-          // Shuffle playlist tracks (keeping random first)
-          const first = queueList[Math.floor(Math.random() * queueList.length)];
-          const remaining = queueList.filter(t => t.id !== first.id);
-          for (let i = remaining.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
-          }
-          queueList = [first, ...remaining];
-        }
-
         state.activePlaylistTracks = [...listToPlay];
         state.activePlaylistId = playlistId;
         state.viewingPlaylistId = playlistId;
@@ -5185,57 +5599,18 @@
           recordRecentlyPlayedPlaylist({ id: playlistId, name: title, image: playlistCover, tracks: listToPlay });
         } catch (e) {}
 
-        playTrack(queueList[0], queueList);
+        initPlaylistCycle(listToPlay, 0);
+        const startingTrack = state.playlistCycle && state.playlistCycle.length > 0 ? state.playlistCycle[0] : listToPlay[0];
+        playTrack(startingTrack, state.contextQueue);
         updatePlayPauseButton();
       }
     };
 
-    // Shuffle Button (Persistently remembers shuffle state per playlist)
-    const isShufActive = isPlaylistShuffled(playlistId);
-    elements.shufflePlaylistBtn.classList.toggle('active', isShufActive);
-    elements.shufflePlaylistBtn.title = isShufActive
-      ? "Mode: Random (No Repeats) • Click for In-Order"
-      : "Mode: In-Order • Click to Shuffle (No Repeats)";
+    // 3-Mode Playback Button (Mode 1: In Order + Autoplay, Mode 2: Shuffle Once + Autoplay, Mode 3: Shuffle & Repeat Playlist)
+    updatePlaylistModeUI();
 
     elements.shufflePlaylistBtn.onclick = () => {
-      if (!tracks || tracks.length === 0) return;
-      const newShuf = !isPlaylistShuffled(playlistId);
-      setPlaylistShuffled(playlistId, newShuf);
-
-      elements.shufflePlaylistBtn.classList.toggle('active', newShuf);
-      if (elements.shuffleBtn) elements.shuffleBtn.classList.toggle('active', newShuf);
-      if (elements.mobShuffleBtn) elements.mobShuffleBtn.classList.toggle('active', newShuf);
-
-      state.activePlaylistTracks = [...tracks];
-      state.activePlaylistId = playlistId;
-      const shuffleCover = (tracks && tracks[0]?.image) || '';
-      try {
-        recordRecentlyPlayedPlaylist({ id: playlistId, name: title, image: shuffleCover, tracks: tracks });
-      } catch (e) {}
-
-      if (newShuf) {
-        elements.shufflePlaylistBtn.title = "Mode: Random (No Repeats) • Click for In-Order";
-        showToast("Shuffle Mode: Random (No repeats)", "🔀");
-        // If this playlist is currently playing, shuffle the upcoming queue without restarting current song
-        if (state.isPlaying && state.queue && state.queue.length > 1) {
-          const current = state.currentTrack;
-          const remaining = tracks.filter(t => t.id !== current?.id);
-          for (let i = remaining.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
-          }
-          state.queue = current ? [current, ...remaining] : remaining;
-          renderQueueList();
-        }
-      } else {
-        elements.shufflePlaylistBtn.title = "Mode: In-Order • Click to Shuffle (No Repeats)";
-        showToast("Play Mode: In Order", "📋");
-        // If this playlist is currently playing, restore sequential queue without restarting current song
-        if (state.isPlaying && state.queue) {
-          state.queue = [...tracks];
-          renderQueueList();
-        }
-      }
+      cyclePlaylistMode();
     };
 
     updatePlayPauseButton();
@@ -5717,6 +6092,93 @@
           fragment.appendChild(card);
         });
         elements.queueList.appendChild(fragment);
+      }
+    }
+
+    // 4. Recommended Section (Smart Endless Recommendations)
+    if (elements.queueRecommendedSection && elements.queueRecommendedList) {
+      if (elements.queueAutoplayToggleBtn) {
+        elements.queueAutoplayToggleBtn.classList.toggle('active', Boolean(state.autoplay));
+        const txt = elements.queueAutoplayToggleBtn.querySelector('.autoplay-text');
+        if (txt) txt.textContent = state.autoplay ? 'Autoplay' : 'Autoplay Off';
+      }
+
+      if (!state.autoplay) {
+        elements.queueRecommendedList.innerHTML = '<span style="color: var(--text-muted); font-size: 0.82rem; padding: 10px 0; display: block;">Smart Autoplay is currently turned off</span>';
+      } else if (!state.recommendationQueue || state.recommendationQueue.length === 0) {
+        if (state.isFetchingRecommendations) {
+          elements.queueRecommendedList.innerHTML = '<span style="color: var(--text-muted); font-size: 0.82rem; padding: 10px 0; display: block;">✨ Finding vibe matches based on your listening...</span>';
+        } else {
+          elements.queueRecommendedList.innerHTML = '<span style="color: var(--text-muted); font-size: 0.82rem; padding: 10px 0; display: block;">Upcoming recommendations will automatically generate here</span>';
+        }
+      } else {
+        elements.queueRecommendedList.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+
+        state.recommendationQueue.forEach((t, i) => {
+          const card = document.createElement('div');
+          card.className = 'queue-card queue-reco-card';
+          card.innerHTML = `
+            <img src="${t.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80'}" alt="${escapeHtml(t.title)}" class="queue-img" loading="lazy">
+            <div class="queue-card-info">
+              <div class="queue-card-title">${escapeHtml(t.title)}${getPlaylistTickBadgeHtml(t.id)}${getDownloadedBadgeHtml(t.id)}</div>
+              <div class="queue-card-artist">${escapeHtml(t.artist)}</div>
+            </div>
+            <div class="queue-card-actions">
+              <button class="reco-action-btn reco-play-btn" title="Play Now" aria-label="Play Now">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+              </button>
+              <button class="reco-action-btn reco-add-btn" title="Add to Manual Queue" aria-label="Add to Queue">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+              </button>
+              <button class="reco-action-btn remove-queue-btn" title="Dismiss recommendation" aria-label="Dismiss">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+          `;
+
+          // Play immediately
+          card.querySelector('.reco-play-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            state.recommendationQueue.splice(i, 1);
+            playTrack(t, null, true);
+          });
+
+          // Add to manual user queue
+          card.querySelector('.reco-add-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const [item] = state.recommendationQueue.splice(i, 1);
+            addToQueue(item);
+          });
+
+          // Dismiss
+          card.querySelector('.remove-queue-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            state.recommendationQueue.splice(i, 1);
+            updateQueueDrawerUI();
+            if (state.recommendationQueue.length <= 4) {
+              fetchRecommendationBatch();
+            }
+          });
+
+          card.addEventListener('click', (e) => {
+            if (e.target.closest('button')) return;
+            state.recommendationQueue.splice(i, 1);
+            playTrack(t, null, true);
+          });
+
+          fragment.appendChild(card);
+        });
+
+        elements.queueRecommendedList.appendChild(fragment);
       }
     }
   }
@@ -7574,6 +8036,20 @@
       elements.closeQueueBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         closeQueueDrawer();
+      });
+    }
+
+    if (elements.queueAutoplayToggleBtn) {
+      elements.queueAutoplayToggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleAutoplay();
+      });
+    }
+
+    if (elements.smartAutoplayToggleSwitch) {
+      elements.smartAutoplayToggleSwitch.checked = state.autoplay;
+      elements.smartAutoplayToggleSwitch.addEventListener('change', (e) => {
+        setAutoplay(e.target.checked);
       });
     }
 
@@ -9641,6 +10117,8 @@
     setVolume(state.volume);
     updateLikedCountUI();
     renderSidebarPlaylists();
+    updatePlaylistModeUI();
+    updateQueueDrawerUI();
     setupEventListeners();
     loadTrendingShelves();
     renderSearchRecentUI();
