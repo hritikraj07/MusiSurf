@@ -9780,8 +9780,18 @@
     }
 
     if (elements.mobTopProfileBtn) {
-      elements.mobTopProfileBtn.addEventListener('click', () => {
-        if (typeof openMobileDrawer === 'function') openMobileDrawer();
+      elements.mobTopProfileBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!state.currentUser || !state.currentUser.email) {
+          if (typeof openAuthModal === 'function') {
+            openAuthModal('signin');
+          } else {
+            const authM = document.getElementById('authModal');
+            if (authM) authM.style.display = 'flex';
+          }
+        } else if (typeof openMobileDrawer === 'function') {
+          openMobileDrawer();
+        }
       });
     }
 
@@ -10670,11 +10680,11 @@
     const authSwitchPrompt = document.getElementById('authSwitchPrompt');
     const authForgotLink = document.getElementById('authForgotLink');
 
-    const headerLoginBtn = document.getElementById('headerLoginBtn');
-    const headerLoginMobBtn = document.getElementById('headerLoginMobBtn');
-    const headerUserProfile = document.getElementById('headerUserProfile');
-    const headerUserAvatar = document.getElementById('headerUserAvatar');
-    const headerUserName = document.getElementById('headerUserName');
+    const headerUserAvatarBtn = document.getElementById('headerUserAvatarBtn');
+    const headerUserIconSvg = document.getElementById('headerUserIconSvg');
+    const headerUserInitial = document.getElementById('headerUserInitial');
+    const mobTopProfileBtn = document.getElementById('mobTopProfileBtn');
+    const mobTopAvatar = document.getElementById('mobTopAvatar');
 
     const drawerTopSignInBtn = document.getElementById('drawerTopSignInBtn');
     const drawerUserCard = document.getElementById('drawerUserCard');
@@ -10682,6 +10692,7 @@
     const drawerSignOutBtn = document.getElementById('drawerSignOutBtn');
     const drawerUserAvatar = document.getElementById('drawerUserAvatar');
     const drawerUserName = document.getElementById('drawerUserName');
+    const drawerUserStatus = document.getElementById('drawerUserStatus');
     const drawerUserEmail = document.getElementById('drawerUserEmail');
 
     let authMode = 'signin';
@@ -10690,43 +10701,50 @@
       const user = state.currentUser;
       if (user && user.email) {
         // Logged In State
-        if (headerLoginBtn) headerLoginBtn.style.display = 'none';
-        if (headerLoginMobBtn) headerLoginMobBtn.style.display = 'none';
-        if (headerUserProfile) {
-          headerUserProfile.style.display = 'flex';
-          const initial = (user.name || user.email || 'U')[0].toUpperCase();
-          if (headerUserAvatar) headerUserAvatar.textContent = initial;
-          if (headerUserName) headerUserName.textContent = user.name || user.email.split('@')[0];
+        if (headerUserAvatarBtn) {
+          headerUserAvatarBtn.title = user.name || user.email;
+          if (headerUserIconSvg) headerUserIconSvg.style.display = 'none';
+          if (headerUserInitial) {
+            headerUserInitial.style.display = 'flex';
+            headerUserInitial.textContent = (user.name || user.email || 'U')[0].toUpperCase();
+          }
+        }
+
+        if (mobTopAvatar) {
+          mobTopAvatar.innerHTML = `<span style="font-weight:700;font-size:14px;color:#fff;">${(user.name || user.email || 'U')[0].toUpperCase()}</span>`;
         }
 
         // Drawer User Card
-        if (drawerUserAvatar) drawerUserAvatar.textContent = (user.name || user.email || 'U')[0].toUpperCase();
+        if (drawerUserAvatar) drawerUserAvatar.innerHTML = `<span style="font-weight:700;font-size:16px;color:#fff;">${(user.name || user.email || 'U')[0].toUpperCase()}</span>`;
         if (drawerUserName) drawerUserName.textContent = user.name || user.email.split('@')[0];
+        if (drawerUserStatus) drawerUserStatus.textContent = 'Signed in';
         if (drawerUserEmail) drawerUserEmail.textContent = user.email;
 
-        // Drawer Top State (Hide Sign In, show User Profile)
         if (drawerTopSignInBtn) drawerTopSignInBtn.style.display = 'none';
         if (drawerUserCard) drawerUserCard.style.display = 'flex';
 
-        // Drawer Bottom Sign Out (only shown when signed in)
         if (drawerSignInBtn) drawerSignInBtn.style.display = 'none';
         if (drawerSignOutBtn) drawerSignOutBtn.style.display = 'flex';
       } else {
         // Guest State
-        if (headerLoginBtn) headerLoginBtn.style.display = 'inline-flex';
-        if (headerLoginMobBtn) headerLoginMobBtn.style.display = 'inline-flex';
-        if (headerUserProfile) headerUserProfile.style.display = 'none';
+        if (headerUserAvatarBtn) {
+          headerUserAvatarBtn.title = 'Account & Sign In';
+          if (headerUserIconSvg) headerUserIconSvg.style.display = 'block';
+          if (headerUserInitial) headerUserInitial.style.display = 'none';
+        }
 
-        // Drawer Top State (Show Sign In on top, hide User Profile)
-        if (drawerTopSignInBtn) drawerTopSignInBtn.style.display = 'flex';
-        if (drawerUserCard) drawerUserCard.style.display = 'none';
+        if (mobTopAvatar) {
+          mobTopAvatar.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+        }
 
-        // Drawer User Card (fallback text)
-        if (drawerUserAvatar) drawerUserAvatar.textContent = 'G';
-        if (drawerUserName) drawerUserName.textContent = 'Guest User';
+        if (drawerUserAvatar) drawerUserAvatar.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+        if (drawerUserName) drawerUserName.textContent = 'Guest Listener';
+        if (drawerUserStatus) drawerUserStatus.textContent = 'Tap to sign in / sign up';
         if (drawerUserEmail) drawerUserEmail.textContent = 'Sign in to sync your library';
 
-        // Drawer Bottom Sign Out is hidden for guest; no bottom sign in
+        if (drawerTopSignInBtn) drawerTopSignInBtn.style.display = 'none';
+        if (drawerUserCard) drawerUserCard.style.display = 'flex';
+
         if (drawerSignInBtn) drawerSignInBtn.style.display = 'none';
         if (drawerSignOutBtn) drawerSignOutBtn.style.display = 'none';
       }
@@ -10765,13 +10783,36 @@
       if (authModal) authModal.style.display = 'none';
     }
 
-    // Header buttons
-    if (headerLoginBtn) {
-      headerLoginBtn.addEventListener('click', () => openAuthModal('signin'));
+    // Top User Avatar Button (Web / Desktop)
+    if (headerUserAvatarBtn) {
+      headerUserAvatarBtn.addEventListener('click', () => {
+        if (!state.currentUser || !state.currentUser.email) {
+          openAuthModal('signin');
+        } else {
+          openSettingsModal();
+        }
+      });
     }
-    if (headerLoginMobBtn) {
-      headerLoginMobBtn.addEventListener('click', () => {
-        openMobileDrawer();
+
+    // Top Profile Button (Mobile)
+    if (mobTopProfileBtn) {
+      mobTopProfileBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!state.currentUser || !state.currentUser.email) {
+          openAuthModal('signin');
+        } else {
+          openMobileDrawer();
+        }
+      });
+    }
+
+    // Drawer Top Card trigger
+    if (drawerUserCard) {
+      drawerUserCard.addEventListener('click', () => {
+        if (!state.currentUser || !state.currentUser.email) {
+          closeMobileDrawer();
+          openAuthModal('signin');
+        }
       });
     }
 
@@ -10779,15 +10820,6 @@
       drawerTopSignInBtn.addEventListener('click', () => {
         closeMobileDrawer();
         openAuthModal('signin');
-      });
-    }
-    if (headerUserProfile) {
-      headerUserProfile.addEventListener('click', () => {
-        if (window.innerWidth <= 768) {
-          openMobileDrawer();
-        } else {
-          openSettingsModal();
-        }
       });
     }
 

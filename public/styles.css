@@ -669,6 +669,7 @@ html, body {
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
+  order: 0 !important;
 }
 
 /* Desktop Top Bar Brand Logo + Name (Web/Desktop Only) */
@@ -757,6 +758,17 @@ html, body {
 }
 
 @media (min-width: 769px) {
+  .top-header-left {
+    display: flex !important;
+    order: 0 !important;
+    margin-right: auto !important;
+    margin-left: 0 !important;
+  }
+
+  .desktop-header-brand-wrap {
+    display: inline-flex !important;
+  }
+
   .top-header-center {
     position: absolute !important;
     left: 50% !important;
@@ -767,6 +779,151 @@ html, body {
     display: flex !important;
     align-items: center !important;
     gap: 12px !important;
+    order: 1 !important;
+  }
+
+  .top-search-pill .search-explore-btn,
+  .top-search-pill #topCompassBtn {
+    display: inline-flex !important;
+  }
+
+  .top-search-pill .search-pill-divider {
+    display: block !important;
+  }
+
+  .top-search-pill .search-shortcut-badge {
+    display: inline-flex !important;
+  }
+
+  .top-header-right {
+    display: flex !important;
+    order: 2 !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+  }
+
+  /* Desktop Inside Playlist Hero: horizontal Spotify layout */
+  #playlistView .playlist-hero {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-end !important;
+    text-align: left !important;
+    gap: 28px !important;
+    padding: 24px 0 32px !important;
+    margin-bottom: 24px !important;
+  }
+
+  #playlistView .playlist-cover-art {
+    width: 220px !important;
+    height: 220px !important;
+    min-width: 220px !important;
+    min-height: 220px !important;
+    margin: 0 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6) !important;
+  }
+
+  #playlistView .playlist-meta-details {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    text-align: left !important;
+  }
+
+  #playlistView .playlist-hero-title {
+    font-size: 3.5rem !important;
+    font-weight: 800 !important;
+    letter-spacing: -1.5px !important;
+    line-height: 1.05 !important;
+    margin: 8px 0 12px 0 !important;
+    text-align: left !important;
+  }
+
+  #playlistView .playlist-hero-desc {
+    text-align: left !important;
+    max-width: 600px !important;
+    font-size: 0.88rem !important;
+  }
+
+  #playlistView .playlist-actions-bar {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 20px !important;
+    margin-bottom: 24px !important;
+    width: 100% !important;
+  }
+
+  #playlistView .playlist-actions-primary {
+    display: flex !important;
+    align-items: center !important;
+    gap: 20px !important;
+    width: auto !important;
+  }
+
+  #playlistView .playlist-actions-primary .mobile-playlist-more-btn {
+    display: none !important;
+  }
+
+  /* Desktop Inside Playlist Table Layout: full columns & header restoration */
+  .tracks-table thead,
+  #playlistView .tracks-table thead {
+    display: table-header-group !important;
+  }
+
+  .tracks-table th.col-num,
+  .tracks-table td.col-num,
+  #playlistView .tracks-table th.col-num,
+  #playlistView .tracks-table td.col-num {
+    display: table-cell !important;
+    width: 44px !important;
+    text-align: center !important;
+  }
+
+  .tracks-table th.col-title,
+  .tracks-table td.col-title,
+  #playlistView .tracks-table th.col-title,
+  #playlistView .tracks-table td.col-title {
+    display: table-cell !important;
+  }
+
+  .tracks-table th.col-album,
+  .tracks-table td.col-album,
+  #playlistView .tracks-table th.col-album,
+  #playlistView .tracks-table td.col-album {
+    display: table-cell !important;
+    width: 22% !important;
+  }
+
+  .tracks-table th.col-date-added,
+  .tracks-table td.col-date-added,
+  #playlistView .tracks-table th.col-date-added,
+  #playlistView .tracks-table td.col-date-added {
+    display: table-cell !important;
+    width: 16% !important;
+  }
+
+  .tracks-table th.col-duration,
+  .tracks-table td.col-duration,
+  #playlistView .tracks-table th.col-duration,
+  #playlistView .tracks-table td.col-duration {
+    display: table-cell !important;
+    width: 80px !important;
+    text-align: right !important;
+  }
+
+  .tracks-table th.col-actions,
+  .tracks-table td.col-actions,
+  #playlistView .tracks-table th.col-actions,
+  #playlistView .tracks-table td.col-actions {
+    display: table-cell !important;
+    width: 48px !important;
+  }
+
+  .tracks-table th.col-source,
+  .tracks-table td.col-source {
+    display: table-cell !important;
   }
 }
 
@@ -893,39 +1050,79 @@ html, body {
   flex-shrink: 0 !important;
   margin-left: auto !important;
   padding-right: 4px !important;
+  order: 2 !important;
 }
 
-.top-login-btn {
+/* User Avatar Button (Replaces Sign In button everywhere - Exact Match to Attachment 6) */
+.top-user-avatar-btn {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  border-radius: 50% !important;
+  background: #181818 !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.18) !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  background: #ffffff !important;
-  color: #000000 !important;
-  font-family: inherit !important;
-  font-size: 14.5px !important;
-  font-weight: 700 !important;
-  line-height: 1 !important;
-  padding: 9px 22px !important;
-  border-radius: 9999px !important;
-  border: none !important;
   cursor: pointer !important;
-  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease !important;
-  letter-spacing: 0.01em !important;
-  white-space: nowrap !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+  color: #ffffff !important;
+  padding: 0 !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  outline: none !important;
+  position: relative !important;
+  flex-shrink: 0 !important;
+  overflow: hidden !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
 }
 
-.top-login-btn:hover {
-  background: #f0f0f0 !important;
-  transform: scale(1.04) !important;
-  box-shadow: 0 4px 14px rgba(255, 255, 255, 0.15) !important;
+.top-user-avatar-btn:hover {
+  background: #242424 !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
+  transform: scale(1.08) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
 }
 
-.top-login-btn:active {
-  transform: scale(0.98) !important;
+.top-user-avatar-btn:active {
+  transform: scale(0.96) !important;
 }
 
-.top-login-circle-btn {
+.top-user-avatar-circle {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.top-user-icon-svg {
+  width: 20px !important;
+  height: 20px !important;
+  display: block !important;
+  stroke: #ffffff !important;
+  stroke-width: 2 !important;
+  flex-shrink: 0 !important;
+}
+
+.top-user-initial {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: #000000 !important;
+  background: #ffffff !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+}
+
+/* Remove Sign In text buttons globally from everywhere */
+.top-login-btn,
+.mobile-sign-in-btn,
+.top-login-circle-btn,
+.drawer-top-sign-in-btn {
   display: none !important;
 }
 
@@ -1002,15 +1199,24 @@ html, body {
   align-items: center;
   justify-content: center;
   padding: 4px;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
 }
 
 .clear-search-btn:hover {
   color: #fff;
+  transform: scale(1.1);
 }
 
 .clear-search-btn svg {
   width: 16px;
   height: 16px;
+}
+
+.clear-search-btn:not([style*="display: none"]) ~ .search-shortcut-badge {
+  display: none !important;
 }
 
 .search-shortcut-badge {
@@ -1020,8 +1226,12 @@ html, body {
   padding: 2px 7px;
   border-radius: 4px;
   color: var(--text-secondary);
-  margin-left: 8px;
+  margin-left: 4px;
+  margin-right: 4px;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Autocomplete Floating Dropdown (Image 5 & 6) */
@@ -1269,29 +1479,41 @@ html, body {
   margin-right: -2px !important;
 }
 
-.sidebar-settings-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: transparent;
-  border: none;
-  color: var(--text-secondary, #9ea0a8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all var(--transition-fast);
+.library-header-actions .sidebar-settings-btn,
+.sidebar-settings-btn,
+#sidebarSettingsBtn {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  border: none !important;
+  color: var(--text-secondary, #9ea0a8) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all var(--transition-fast) !important;
+  padding: 0 !important;
 }
 
-.sidebar-settings-btn:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.08);
-  transform: scale(1.08);
+.library-header-actions .sidebar-settings-btn:hover,
+.sidebar-settings-btn:hover,
+#sidebarSettingsBtn:hover {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  transform: scale(1.1) !important;
 }
 
-.sidebar-settings-btn svg {
-  width: 18px;
-  height: 18px;
+.library-header-actions .sidebar-settings-btn svg,
+.sidebar-settings-btn svg,
+#sidebarSettingsBtn svg {
+  width: 24px !important;
+  height: 24px !important;
+  stroke-width: 2.2 !important;
+  display: block !important;
+  flex-shrink: 0 !important;
 }
 
 .mobile-top-brand,
@@ -2319,11 +2541,11 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   border: 1px solid var(--border-subtle);
 }
 
-/* 6 Quick Play Tiles */
+/* 6 Quick Play Tiles (3-Column Desktop Layout & Longer/Taller Cards) */
 .quick-picks-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 14px;
   margin-bottom: 24px;
 }
 
@@ -2336,7 +2558,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   cursor: pointer;
   position: relative;
   transition: background-color var(--transition-fast), transform var(--transition-fast), border-color var(--transition-fast);
-  height: 56px;
+  height: 68px !important;
   border: 1px solid transparent;
 }
 
@@ -2355,15 +2577,15 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .quick-pick-img {
-  width: 56px;
-  height: 56px;
+  width: 68px !important;
+  height: 68px !important;
   object-fit: cover;
   flex-shrink: 0;
 }
 
 .quick-pick-info {
   flex: 1;
-  padding: 0 12px;
+  padding: 0 14px;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -4753,20 +4975,34 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .control-btn {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
   background: transparent;
   border: none;
   color: var(--text-secondary);
   cursor: pointer;
-  display: flex;
+  display: inline-flex !important;
   align-items: center;
   justify-content: center;
   position: relative;
   transition: all var(--transition-fast);
+  border-radius: 50%;
+  padding: 0;
+}
+
+.control-btn svg {
+  width: 20px !important;
+  height: 20px !important;
+  display: block !important;
+  flex-shrink: 0 !important;
 }
 
 .control-btn:hover {
   color: #fff;
-  transform: scale(1.08);
+  transform: scale(1.1);
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
 .control-btn.active {
@@ -6511,14 +6747,6 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   #libHubDownloadedBtn,
   [data-lib-filter="downloaded"] {
     display: none !important;
-  }
-    margin: 0 !important;
-    gap: 0 !important;
-    display: flex !important;
-    align-items: center !important;
-    position: static !important;
-    transform: none !important;
-    order: 1 !important;
   }
 
   .top-search-pill {

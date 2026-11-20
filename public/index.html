@@ -114,14 +114,17 @@
         </div>
       </div>
 
-      <!-- Right: Sign In Button (Web) & Sign In Button (Mobile) -->
+      <!-- Right: User Avatar / Account Icon (Opens Sign In / Sign Up Modal for Guest, Profile for Signed In) -->
       <div class="top-header-right">
-        <button class="top-login-btn" id="headerLoginBtn" type="button">Sign In</button>
-        <button class="top-login-btn mobile-sign-in-btn" id="headerLoginMobBtn" type="button">Sign In</button>
-        <div class="header-user-profile" id="headerUserProfile" style="display: none;" title="Your Account">
-          <div class="header-user-avatar" id="headerUserAvatar">U</div>
-          <span class="header-user-name" id="headerUserName">User</span>
-        </div>
+        <button class="top-user-avatar-btn" id="headerUserAvatarBtn" type="button" title="Account & Sign In" aria-label="Account & Sign In">
+          <div class="top-user-avatar-circle" id="headerUserAvatarCircle">
+            <svg class="top-user-icon-svg" id="headerUserIconSvg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+            <span class="top-user-initial" id="headerUserInitial" style="display: none;">U</span>
+          </div>
+        </button>
       </div>
 
       <!-- Mobile Top Bar Right: Search Icon + Profile/Avatar Icon (Shown strictly on Mobile) -->
@@ -1884,25 +1887,17 @@
         </button>
       </div>
 
-      <!-- Drawer Top: Sign In Button (on top for Guest) / User Profile Card (Signed In) -->
+      <!-- Drawer Top: User Profile Card (Click to Sign In if Guest, View Profile if Signed In) -->
       <div class="drawer-top-auth-box" id="drawerTopAuthBox">
-        <button class="drawer-top-sign-in-btn" id="drawerTopSignInBtn" type="button">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-            <polyline points="10 17 15 12 10 7"/>
-            <line x1="15" y1="12" x2="3" y2="12"/>
-          </svg>
-          <span>Sign In</span>
-        </button>
-        <div class="drawer-user-card" id="drawerUserCard" style="display: none;">
+        <div class="drawer-user-card" id="drawerUserCard" role="button" tabindex="0" title="Account & Sign In">
           <div class="drawer-user-avatar-wrap">
             <div class="drawer-user-avatar" id="drawerUserAvatar">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             </div>
           </div>
           <div class="drawer-user-info">
             <h3 class="drawer-user-name" id="drawerUserName">Guest Listener</h3>
-            <span class="drawer-user-status" id="drawerUserStatus">Signed in</span>
+            <span class="drawer-user-status" id="drawerUserStatus">Tap to sign in / sign up</span>
           </div>
         </div>
       </div>
