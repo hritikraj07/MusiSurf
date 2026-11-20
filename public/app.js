@@ -59,6 +59,13 @@
     isTransitionPreloaded: false,
     preloadedNextTrack: null,
     lyricsCache: {}, // In-memory lyrics cache
+    trackEpoch: 0,
+    currentLyricsRequestId: 0,
+    currentLyricsTrackId: null,
+    isAwaitingRecommendations: false,
+    consecutivePlaybackErrors: 0,
+    lastAdvanceTimestamp: 0,
+    lastCompletedTrackId: null,
     userQueuedCount: 0,
     localTracks: [],
     isTrimmingStartSilence: false,
@@ -551,6 +558,249 @@
     if (elements.mobPlayerTitle) {
       elements.mobPlayerTitle.innerHTML = `<span class="title-text-main" title="${escapeHtml(track.title)}">${escapeHtml(track.title)}</span>${tickHtml}${dlHtml}`;
     }
+  }
+
+  const DEFAULT_ALBUM_ART = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80';
+
+  function logPlaybackDiag(category, message, details = null) {
+    if (window.__MUSISURF_DEBUG__ || location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+      const ts = new Date().toISOString().substring(11, 23);
+      const tag = `[MusiSurf:${category}]`;
+      if (details) {
+        console.log(`%c${ts} ${tag} ${message}`, 'color: #00f260; font-weight: bold;', details);
+      } else {
+        console.log(`%c${ts} ${tag} ${message}`, 'color: #00f260; font-weight: bold;');
+      }
+    }
+  }
+
+  // Central Authoritative Track State Updater
+  // Updates desktop player, mobile player modal, miniplayer, now playing panel, lyrics hero, MediaSession, and dynamic colors in a single atomic call.
+  function applyAuthoritativeTrack(track, options = {}) {
+    if (!track) return;
+
+    state.currentTrack = track;
+    const epoch = ++state.trackEpoch;
+    state.currentTrackEpoch = epoch;
+
+    logPlaybackDiag('TRACK_SET', `Authoritative track set [Epoch #${epoch}]: "${track.title}" - ${track.artist}`, {
+      id: track.id,
+      source: options.source || 'player',
+      duration: track.durationStr || track.duration
+    });
+
+    const coverUrl = track.image || DEFAULT_ALBUM_ART;
+
+    // 1. Desktop Player Bar
+    updatePlayerTitlesWithTick(track);
+    if (elements.playerArtist) elements.playerArtist.textContent = track.artist || '—';
+    if (elements.playerCoverImg) {
+      elements.playerCoverImg.onerror = function() {
+        if (state.currentTrack?.id === track.id) {
+          this.onerror = null;
+          this.src = DEFAULT_ALBUM_ART;
+        }
+      };
+      elements.playerCoverImg.src = coverUrl;
+    }
+    const totalDurStr = track.durationStr || formatTime(track.duration || 0);
+    if (elements.totalDurationLabel) elements.totalDurationLabel.textContent = totalDurStr;
+
+    // 2. Mobile Fullscreen Player
+    if (elements.mobPlayerArtist) elements.mobPlayerArtist.textContent = track.artist || '—';
+    if (elements.mobPlayerCover) {
+      elements.mobPlayerCover.onerror = function() {
+        if (state.currentTrack?.id === track.id) {
+          this.onerror = null;
+          this.src = DEFAULT_ALBUM_ART;
+        }
+      };
+      elements.mobPlayerCover.src = coverUrl;
+    }
+    if (elements.mobTotalDuration) elements.mobTotalDuration.textContent = totalDurStr;
+
+    // 3. Mobile Options Modal Cover & Meta
+    if (elements.mobOptTitle) elements.mobOptTitle.textContent = track.title || 'MusiSurf';
+    if (elements.mobOptArtist) elements.mobOptArtist.textContent = track.artist || '—';
+    if (elements.mobOptCover) {
+      elements.mobOptCover.onerror = function() {
+        if (state.currentTrack?.id === track.id) {
+          this.onerror = null;
+          this.src = DEFAULT_ALBUM_ART;
+        }
+      };
+      elements.mobOptCover.src = coverUrl;
+    }
+
+    // 4. In-App Floating Mini-Player (if present)
+    if (elements.miniplayerCover) {
+      elements.miniplayerCover.onerror = function() {
+        if (state.currentTrack?.id === track.id) {
+          this.onerror = null;
+          this.src = DEFAULT_ALBUM_ART;
+        }
+      };
+      elements.miniplayerCover.src = coverUrl;
+    }
+    if (elements.miniplayerTitle) elements.miniplayerTitle.textContent = track.title || 'MusiSurf';
+    if (elements.miniplayerArtist) elements.miniplayerArtist.textContent = track.artist || '—';
+    if (elements.miniplayerTotalTime) elements.miniplayerTotalTime.textContent = totalDurStr;
+    if (elements.miniHeartBtn) {
+      const isLiked = state.likedSongs && state.likedSongs.some(t => t.id === track.id);
+      elements.miniHeartBtn.classList.toggle('liked', isLiked);
+      elements.miniHeartBtn.classList.toggle('active', isLiked);
+    }
+
+    // 5. Lyrics View Hero Cover & Meta (Strictly Synchronized)
+    if (elements.lyricsTrackTitle) elements.lyricsTrackTitle.textContent = track.title || '';
+    if (elements.lyricsTrackArtist) elements.lyricsTrackArtist.textContent = track.artist || '';
+    if (elements.lyricsAlbumCover) {
+      elements.lyricsAlbumCover.onerror = function() {
+        if (state.currentTrack?.id === track.id) {
+          this.onerror = null;
+          this.src = DEFAULT_ALBUM_ART;
+        }
+      };
+      elements.lyricsAlbumCover.src = coverUrl;
+      elements.lyricsAlbumCover.style.display = 'block';
+    }
+
+    // 6. Right Now Playing Sidebar & Replay Vinyl
+    if (elements.nowPlayingCover) {
+      elements.nowPlayingCover.onerror = function() { this.src = DEFAULT_ALBUM_ART; };
+      elements.nowPlayingCover.src = coverUrl;
+    }
+    if (elements.nowPlayingTitle) elements.nowPlayingTitle.textContent = track.title || 'MusiSurf';
+    if (elements.nowPlayingArtist) elements.nowPlayingArtist.textContent = track.artist || '—';
+    if (elements.nowPlayingArtistBanner) {
+      elements.nowPlayingArtistBanner.onerror = function() { this.src = DEFAULT_ALBUM_ART; };
+      elements.nowPlayingArtistBanner.src = coverUrl;
+    }
+    if (elements.nowPlayingArtistName) elements.nowPlayingArtistName.textContent = track.artist || 'MusiSurf Artist';
+    if (elements.replayVinylArt) {
+      elements.replayVinylArt.onerror = function() { this.src = DEFAULT_ALBUM_ART; };
+      elements.replayVinylArt.src = coverUrl;
+    }
+
+    // 7. System MediaSession Lockscreen & Notification Controls
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: track.title,
+          artist: track.artist,
+          album: track.album || 'MusiSurf',
+          artwork: [
+            { src: coverUrl, sizes: '96x96', type: 'image/jpeg' },
+            { src: coverUrl, sizes: '256x256', type: 'image/jpeg' },
+            { src: coverUrl, sizes: '512x512', type: 'image/jpeg' }
+          ]
+        });
+        navigator.mediaSession.playbackState = 'playing';
+      } catch (e) {}
+    }
+
+    // 8. Like Heart, Table Highlights & Dynamic Atmospheric Background
+    updateHeartIcon(track.id);
+    highlightPlayingTrackInTables(track.id);
+    applyLyricsDynamicBackground(track);
+
+    if (elements.mobilePlayerModal && coverUrl) {
+      extractDominantColor(coverUrl, track.id).then(([r, g, b]) => {
+        if (state.currentTrack?.id !== track.id) return;
+        const darkR = Math.floor(r * 0.28);
+        const darkG = Math.floor(g * 0.28);
+        const darkB = Math.floor(b * 0.28);
+        const topR = Math.min(255, Math.floor(r * 0.72 + 10));
+        const topG = Math.min(255, Math.floor(g * 0.72 + 10));
+        const topB = Math.min(255, Math.floor(b * 0.72 + 14));
+        const midR = Math.min(255, Math.floor(darkR * 0.55 + 8));
+        const midG = Math.min(255, Math.floor(darkG * 0.55 + 9));
+        const midB = Math.min(255, Math.floor(darkB * 0.55 + 11));
+        elements.mobilePlayerModal.style.setProperty(
+          '--mob-player-bg',
+          `linear-gradient(180deg, rgb(${topR}, ${topG}, ${topB}) 0%, rgb(${midR}, ${midG}, ${midB}) 48%, #08090b 100%)`
+        );
+        const lyricsViewEl = document.getElementById('lyricsView');
+        if (lyricsViewEl) {
+          lyricsViewEl.style.setProperty('--lyrics-theme-color', `rgb(${topR}, ${topG}, ${topB})`);
+        }
+      }).catch(() => {});
+    }
+
+    // 9. Reset and Clean Lyrics View Immediately for New Track
+    state.lyrics = [];
+    state.hasSyncedLyrics = false;
+    state.activeLyricIndex = -1;
+    state.currentLyricsData = null;
+    state.currentLyricsTrackId = track.id;
+    if (elements.lyricsLinesContainer) elements.lyricsLinesContainer.innerHTML = '';
+    if (elements.lyricsLoading) {
+      elements.lyricsLoading.style.display = 'flex';
+      const p = elements.lyricsLoading.querySelector('p');
+      if (p) p.textContent = 'Searching for verified lyrics...';
+    }
+    if (elements.lyricsStatusBadge) {
+      elements.lyricsStatusBadge.style.display = 'none';
+      elements.lyricsStatusBadge.textContent = '';
+    }
+    if (elements.lyricsScriptToggleBtn) elements.lyricsScriptToggleBtn.style.display = 'none';
+    if (elements.lyricsSyncControls) elements.lyricsSyncControls.style.display = 'none';
+
+    // 10. Load Lyrics
+    if (!options.skipLyrics) {
+      loadLyricsForTrack(track);
+    }
+  }
+
+  let lastAdvanceCallTime = 0;
+  let lastAdvancedTrackId = null;
+
+  // Idempotent Next-Track Advance Controller
+  // Guarantees monotonic progression, prevents rapid double-advance race conditions,
+  // and eliminates duplicate track replay bugs.
+  function advanceToNextTrack(reason = 'unknown', completedTrackId = null) {
+    const now = Date.now();
+    logPlaybackDiag('ADVANCE_TRIGGER', `Advance requested [Reason: ${reason}]`, {
+      completedTrackId,
+      lastAdvancedTrackId,
+      deltaMs: now - lastAdvanceCallTime
+    });
+
+    if (now - lastAdvanceCallTime < 600) {
+      logPlaybackDiag('ADVANCE_IGNORED', 'Ignored rapid duplicate advance request');
+      return;
+    }
+
+    if (completedTrackId && lastAdvancedTrackId === completedTrackId && (now - lastAdvanceCallTime < 1500)) {
+      logPlaybackDiag('ADVANCE_IGNORED', 'Ignored duplicate advance for already completed track');
+      return;
+    }
+
+    lastAdvanceCallTime = now;
+    if (completedTrackId) lastAdvancedTrackId = completedTrackId;
+
+    transitionToNextSong();
+  }
+
+  // Resilient Stream Error Recovery
+  // Never lets the audio engine freeze indefinitely when a cellular hotspot / slow connection drops or blocks a stream.
+  function handlePlaybackStreamError(track) {
+    if (!track) return;
+    state.consecutivePlaybackErrors = (state.consecutivePlaybackErrors || 0) + 1;
+    logPlaybackDiag('STREAM_ERROR_HANDLER', `Handling playback stream error for "${track.title}" (consecutive errors: ${state.consecutivePlaybackErrors})`);
+
+    if (state.consecutivePlaybackErrors > 4) {
+      logPlaybackDiag('STREAM_ERROR_HALT', 'Too many consecutive stream failures. Pausing queue to avoid infinite loop.');
+      showToast('Network unstable: too many playback errors', '📶');
+      state.isPlaying = false;
+      updatePlayPauseButton();
+      return;
+    }
+
+    showToast(`Skipping unplayable stream: ${track.title}`, '⚠️');
+    setTimeout(() => {
+      advanceToNextTrack('playback_stream_error', track.id);
+    }, 450);
   }
 
   // Real-time update for all in-playlist tick marks across the DOM
@@ -1132,43 +1382,15 @@
         state.isMuted = saved.isMuted;
       }
 
-      // Update Player UI Metadata
-      updatePlayerTitlesWithTick(track);
-      elements.playerArtist.textContent = track.artist;
-      elements.playerCoverImg.src = track.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80';
+      // Update Player UI Metadata through Authoritative Track Engine
+      applyAuthoritativeTrack(track, { isRestoring: true, skipLyrics: true, source: 'restored_session' });
       const strDur = parseDurationToSeconds(track.durationStr);
       const metaDur = parseDurationToSeconds(track.duration);
       const savedDur = parseDurationToSeconds(saved.duration);
       const dur = (strDur > 15 ? strDur : null) || (metaDur > 15 ? metaDur : null) || (savedDur > 15 ? savedDur : null) || strDur || metaDur || savedDur || 0;
-      elements.totalDurationLabel.textContent = track.durationStr || formatTime(dur);
-
-      if (elements.mobPlayerArtist) elements.mobPlayerArtist.textContent = track.artist;
-      if (elements.mobPlayerCover) elements.mobPlayerCover.src = track.image;
+      if (elements.totalDurationLabel) elements.totalDurationLabel.textContent = track.durationStr || formatTime(dur);
       if (elements.mobTotalDuration) elements.mobTotalDuration.textContent = track.durationStr || formatTime(dur);
-
-      updateHeartIcon(track.id);
       updateQueueDrawerUI();
-      highlightPlayingTrackInTables(track.id);
-
-      // Restore dynamic ambient background color immediately on app reload
-      applyLyricsDynamicBackground(track);
-      if (elements.mobilePlayerModal && track.image) {
-        extractDominantColor(track.image, track.id).then(([r, g, b]) => {
-          const darkR = Math.floor(r * 0.28);
-          const darkG = Math.floor(g * 0.28);
-          const darkB = Math.floor(b * 0.28);
-          const topR = Math.min(255, Math.floor(r * 0.72 + 10));
-          const topG = Math.min(255, Math.floor(g * 0.72 + 10));
-          const topB = Math.min(255, Math.floor(b * 0.72 + 14));
-          const midR = Math.min(255, Math.floor(darkR * 0.55 + 8));
-          const midG = Math.min(255, Math.floor(darkG * 0.55 + 9));
-          const midB = Math.min(255, Math.floor(darkB * 0.55 + 11));
-          elements.mobilePlayerModal.style.setProperty(
-            '--mob-player-bg',
-            `linear-gradient(180deg, rgb(${topR}, ${topG}, ${topB}) 0%, rgb(${midR}, ${midG}, ${midB}) 48%, #08090b 100%)`
-          );
-        }).catch(() => {});
-      }
 
       const resumeTime = parseFloat(saved.currentTime) || 0;
       state.restoredResumeTime = resumeTime;
@@ -1186,18 +1408,8 @@
         if (elements.miniPlayerFill) elements.miniPlayerFill.style.width = `${pct}%`;
       }
 
-      // Set MediaSession
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: track.title,
-          artist: track.artist,
-          album: track.album || 'MusiSurf',
-          artwork: [{ src: track.image, sizes: '500x500', type: 'image/jpeg' }]
-        });
-      }
-
-      // Fetch synchronized lyrics
-      loadLyricsForTrack(track.title, track.artist);
+      // Fetch synchronized lyrics with full track object
+      loadLyricsForTrack(track);
 
       // Prepare restored audio WITHOUT autoplay (leaves player strictly paused until user explicitly clicks Play)
       state.isPlaying = false;
@@ -1623,12 +1835,33 @@
           }
 
           updateQueueDrawerUI();
-          schedulePreloadNextTrack(1200);
+
+          if (state.isAwaitingRecommendations && state.recommendationQueue.length > 0) {
+            state.isAwaitingRecommendations = false;
+            const nextReco = state.recommendationQueue.shift();
+            logPlaybackDiag('AUTOPLAY_RESUME', `Resuming playback with newly arrived track: "${nextReco.title}"`);
+            showToast(`Now playing recommendation: "${nextReco.title}"`, '✨');
+            playTrack(nextReco, null, true);
+          } else {
+            schedulePreloadNextTrack(1200);
+          }
         }
       }
     } catch (err) {
       if (err.name !== 'AbortError') {
         console.warn('Recommendation fetch warning:', err.message);
+        if (state.isAwaitingRecommendations) {
+          state.isAwaitingRecommendations = false;
+          const pool = [...(state.sessionProfile?.recentTracks || []), ...(state.likedSongs || [])];
+          const fallbackTrack = pool.find(t => t.id && (!state.currentTrack || t.id !== state.currentTrack.id)) || pool[0];
+          if (fallbackTrack) {
+            logPlaybackDiag('AUTOPLAY_FALLBACK', `Network unstable, using offline/cached fallback: "${fallbackTrack.title}"`);
+            playTrack(fallbackTrack, null, true);
+          } else {
+            state.isPlaying = false;
+            updatePlayPauseButton();
+          }
+        }
       }
     } finally {
       state.isFetchingRecommendations = false;
@@ -1873,6 +2106,7 @@
     state._currentTrackListeningSeconds = 0;
     state._lastTrackedPlaybackTime = null;
     state._tailSilenceStartTime = null;
+    state.consecutivePlaybackErrors = 0;
 
     if (state.userQueue && state.userQueue.length > 0 && isSameTrack(state.userQueue[0], nextTrackObj)) {
       state.userQueue.shift();
@@ -1880,33 +2114,9 @@
       state.contextIndex++;
     }
 
-    state.currentTrack = nextTrackObj;
     recordRecentlyPlayed(nextTrackObj);
-    updatePlayerTitlesWithTick(nextTrackObj);
-    if (elements.playerArtist) elements.playerArtist.textContent = nextTrackObj.artist;
-    if (elements.playerCoverImg) elements.playerCoverImg.src = nextTrackObj.image;
-    if (elements.totalDurationLabel) elements.totalDurationLabel.textContent = nextTrackObj.durationStr || formatTime(nextTrackObj.duration || 0);
-    if (elements.mobPlayerArtist) elements.mobPlayerArtist.textContent = nextTrackObj.artist;
-    if (elements.mobPlayerCover) elements.mobPlayerCover.src = nextTrackObj.image;
-    if (elements.mobTotalDuration) elements.mobTotalDuration.textContent = nextTrackObj.durationStr || formatTime(nextTrackObj.duration || 0);
-    updateHeartIcon(nextTrackObj.id);
+    applyAuthoritativeTrack(nextTrackObj, { source: 'crossfade_finalized' });
     updateQueueDrawerUI();
-    highlightPlayingTrackInTables(nextTrackObj.id);
-    applyLyricsDynamicBackground(nextTrackObj);
-    loadLyricsForTrack(nextTrackObj.title, nextTrackObj.artist);
-
-    if ('mediaSession' in navigator) {
-      try {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: nextTrackObj.title,
-          artist: nextTrackObj.artist,
-          album: nextTrackObj.album || 'MusiSurf',
-          artwork: [{ src: nextTrackObj.image, sizes: '500x500', type: 'image/jpeg' }]
-        });
-        navigator.mediaSession.playbackState = 'playing';
-      } catch (e) {}
-    }
-
     schedulePreloadNextTrack(1500);
   }
 
@@ -2106,7 +2316,14 @@
     if (!nextSong) {
       state.isTransitioning = false;
       if (state.autoplay && state.currentTrack) {
+        state.isAwaitingRecommendations = true;
+        logPlaybackDiag('AUTOPLAY_WAIT', 'Queue exhausted. Waiting for recommendation batch over network...');
+        showToast('Loading next vibe recommendation...', '✨');
         fetchRecommendationBatch(state.currentTrack, true);
+      } else {
+        logPlaybackDiag('PLAYBACK_STOP', 'Queue finished with no autoplay active');
+        state.isPlaying = false;
+        updatePlayPauseButton();
       }
       return;
     }
@@ -2155,7 +2372,6 @@
       elements.audio = getActiveDeck();
       elements.audioSecondary = getSecondaryDeck();
 
-      state.currentTrack = nextSong;
       state.isPlaying = true;
       state.isTrackLoading = false;
       state._currentTrackPlayedRecorded = false;
@@ -2164,33 +2380,11 @@
       state._tailSilenceStartTime = null;
       state.isTransitionPreloaded = false;
       state.preloadedNextTrack = null;
+      state.consecutivePlaybackErrors = 0;
 
       updatePlayPauseButton();
-      updatePlayerTitlesWithTick(nextSong);
-      if (elements.playerArtist) elements.playerArtist.textContent = nextSong.artist;
-      if (elements.playerCoverImg) elements.playerCoverImg.src = nextSong.image;
-      if (elements.totalDurationLabel) elements.totalDurationLabel.textContent = nextSong.durationStr || formatTime(nextSong.duration || 0);
-      if (elements.mobPlayerArtist) elements.mobPlayerArtist.textContent = nextSong.artist;
-      if (elements.mobPlayerCover) elements.mobPlayerCover.src = nextSong.image;
-      if (elements.mobTotalDuration) elements.mobTotalDuration.textContent = nextSong.durationStr || formatTime(nextSong.duration || 0);
-      updateHeartIcon(nextSong.id);
-      highlightPlayingTrackInTables(nextSong.id);
-      applyLyricsDynamicBackground(nextSong);
-      loadLyricsForTrack(nextSong.title, nextSong.artist);
+      applyAuthoritativeTrack(nextSong, { source: 'preloaded_deck_swap' });
       recordRecentlyPlayed(nextSong);
-
-      if ('mediaSession' in navigator) {
-        try {
-          navigator.mediaSession.metadata = new MediaMetadata({
-            title: nextSong.title,
-            artist: nextSong.artist,
-            album: nextSong.album || 'MusiSurf',
-            artwork: [{ src: nextSong.image, sizes: '500x500', type: 'image/jpeg' }]
-          });
-          navigator.mediaSession.playbackState = 'playing';
-        } catch (e) {}
-      }
-
       updateSessionProfile(nextSong);
       schedulePreloadNextTrack(1500);
       state.isTransitioning = false;
@@ -2371,13 +2565,16 @@
       return;
     }
 
+    // Save previous track for history BEFORE assigning new track
+    const previousTrack = state.currentTrack;
+
     // Guard: If clicking the CURRENTLY PLAYING song without explicit custom seek
-    if (state.currentTrack && isSameTrack(track, state.currentTrack) && customStartTime === 0) {
+    if (previousTrack && isSameTrack(track, previousTrack) && customStartTime === 0) {
       if (queueList && Array.isArray(queueList)) {
         state.contextQueue = [...queueList];
         state.contextIndex = state.contextQueue.findIndex(t => isSameTrack(t, track));
         if (state.contextIndex === -1) {
-          state.contextQueue.unshift(state.currentTrack);
+          state.contextQueue.unshift(previousTrack);
           state.contextIndex = 0;
         }
       }
@@ -2394,11 +2591,9 @@
     state._currentTrackListeningSeconds = 0;
     state._lastTrackedPlaybackTime = null;
     state._tailSilenceStartTime = null;
-    applyLyricsDynamicBackground(track);
 
     const currentToken = ++activePlayToken;
     state.isTrackLoading = true;
-    state.currentTrack = track;
 
     // Immediately stop current playback smoothly and reset decoder position
     try {
@@ -2436,9 +2631,9 @@
     recordRecentlyPlayed(track);
 
     // Track playback history for previous song button navigation
-    if (addToHistory && state.currentTrack && state.currentTrack.id !== track.id) {
+    if (addToHistory && previousTrack && previousTrack.id !== track.id) {
       if (!state.history) state.history = [];
-      state.history.push(state.currentTrack);
+      state.history.push(previousTrack);
       if (state.history.length > 50) state.history.shift();
     }
 
@@ -2469,7 +2664,6 @@
       fetchRecommendationBatch(track);
     }
 
-    state.currentTrack = track;
     track._introTrimmed = false;
 
     // Reset playback engine and silence trimmer state for new track
@@ -2479,49 +2673,8 @@
       state.trailingSilenceFrames = 0;
     }
 
-    // Update Player UI Metadata
-    updatePlayerTitlesWithTick(track);
-    elements.playerArtist.textContent = track.artist;
-    elements.playerCoverImg.src = track.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80';
-    elements.totalDurationLabel.textContent = track.durationStr || formatTime(track.duration || 0);
-
-    // Sync Mobile Fullscreen Player UI
-    if (elements.mobPlayerArtist) elements.mobPlayerArtist.textContent = track.artist;
-    if (elements.mobPlayerCover) elements.mobPlayerCover.src = track.image;
-    if (elements.mobTotalDuration) elements.mobTotalDuration.textContent = track.durationStr || formatTime(track.duration || 0);
-
-    // Sync In-App Floating Mini Player UI (Image 1 & 8)
-    if (elements.miniplayerCover) elements.miniplayerCover.src = track.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80';
-    if (elements.miniplayerTitle) elements.miniplayerTitle.textContent = track.title || 'MusiSurf';
-    if (elements.miniplayerArtist) elements.miniplayerArtist.textContent = track.artist || '—';
-    if (elements.miniplayerTotalTime) elements.miniplayerTotalTime.textContent = track.durationStr || formatTime(track.duration || 0);
-    if (elements.miniHeartBtn) {
-      const isLiked = state.likedSongs && state.likedSongs.some(t => t.id === track.id);
-      elements.miniHeartBtn.classList.toggle('liked', isLiked);
-    }
-
-    // Sync Right Now Playing Panel (Image 4 & 5)
-    if (elements.nowPlayingCover) elements.nowPlayingCover.src = track.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80';
-    if (elements.nowPlayingTitle) elements.nowPlayingTitle.textContent = track.title || 'MusiSurf';
-    if (elements.nowPlayingArtist) elements.nowPlayingArtist.textContent = track.artist || '—';
-    if (elements.nowPlayingArtistBanner) elements.nowPlayingArtistBanner.src = track.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80';
-    if (elements.nowPlayingArtistName) elements.nowPlayingArtistName.textContent = track.artist || 'MusiSurf Artist';
-    if (elements.nowPlayingMonthlyListeners) {
-      const listenerCount = track.playCount ? track.playCount.toLocaleString() : '135,420,100';
-      elements.nowPlayingMonthlyListeners.textContent = `${listenerCount} monthly listeners`;
-    }
-    if (elements.nowPlayingArtistBio) {
-      elements.nowPlayingArtistBio.textContent = track.album && track.album !== 'Single'
-        ? `From the studio album "${track.album}". Available ad-free in lossless high-fidelity sound on MusiSurf.`
-        : `Official track by ${track.artist}. Available ad-free in lossless high-fidelity sound on MusiSurf.`;
-    }
-    if (elements.nowPlayingHeartBtn) {
-      const isLiked = state.likedSongs && state.likedSongs.some(t => t.id === track.id);
-      elements.nowPlayingHeartBtn.classList.toggle('liked', isLiked);
-    }
-
-    // Sync Replay Vinyl Record Artwork
-    if (elements.replayVinylArt) elements.replayVinylArt.src = track.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200&auto=format&fit=crop&q=80';
+    // Apply Authoritative Track Metadata Across All Surfaces (Bar, Mobile Modal, Miniplayer, Lyrics View, MediaSession)
+    applyAuthoritativeTrack(track, { source: 'play_track', skipLyrics: true });
 
     const headerTitleWrap = document.querySelector('.mobile-player-header-title');
     const headerSub = document.querySelector('.mob-header-sub');
@@ -2559,47 +2712,6 @@
         if (headerName) headerName.textContent = '';
         headerTitleWrap.style.visibility = 'hidden';
       }
-    }
-
-    // Dynamic Atmospheric Background for Mobile Player Modal (100% Solid Opaque, No Translucency)
-    if (elements.mobilePlayerModal && track.image) {
-      extractDominantColor(track.image, track.id).then(([r, g, b]) => {
-        const darkR = Math.floor(r * 0.28);
-        const darkG = Math.floor(g * 0.28);
-        const darkB = Math.floor(b * 0.28);
-        const topR = Math.min(255, Math.floor(r * 0.72 + 10));
-        const topG = Math.min(255, Math.floor(g * 0.72 + 10));
-        const topB = Math.min(255, Math.floor(b * 0.72 + 14));
-        const midR = Math.min(255, Math.floor(darkR * 0.55 + 8));
-        const midG = Math.min(255, Math.floor(darkG * 0.55 + 9));
-        const midB = Math.min(255, Math.floor(darkB * 0.55 + 11));
-        elements.mobilePlayerModal.style.setProperty(
-          '--mob-player-bg',
-          `linear-gradient(180deg, rgb(${topR}, ${topG}, ${topB}) 0%, rgb(${midR}, ${midG}, ${midB}) 48%, #08090b 100%)`
-        );
-        const lyricsViewEl = document.getElementById('lyricsView');
-        if (lyricsViewEl) {
-          lyricsViewEl.style.setProperty('--lyrics-theme-color', `rgb(${topR}, ${topG}, ${topB})`);
-        }
-      }).catch(() => {});
-    }
-
-    // Update Like Heart
-    updateHeartIcon(track.id);
-
-    // Update Lyrics view headers
-    if (elements.lyricsTrackTitle) elements.lyricsTrackTitle.textContent = track.title;
-    if (elements.lyricsTrackArtist) elements.lyricsTrackArtist.textContent = track.artist;
-    if (elements.lyricsAlbumCover) elements.lyricsAlbumCover.src = track.image || '';
-
-    // Setup MediaSession for lockscreen / headphone controls
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: track.title,
-        artist: track.artist,
-        album: track.album || 'MusiSurf',
-        artwork: [{ src: track.image, sizes: '500x500', type: 'image/jpeg' }]
-      });
     }
 
     // Strict Content Filter Check: Pure Music Only
@@ -2737,6 +2849,7 @@
           const onAudioReady = () => {
             if (currentToken === activePlayToken) {
               state.isTrackLoading = false;
+              state.consecutivePlaybackErrors = 0;
               if (state.isPlaying && elements.audio.paused) {
                 elements.audio.play().catch(() => {});
               }
@@ -2769,12 +2882,12 @@
                 elements.audio.play().catch(directErr => {
                   if (currentToken !== activePlayToken || directErr.name === 'AbortError') return;
                   console.warn('Stream proxy fallback failed:', directErr);
+                  handlePlaybackStreamError(track);
                 });
               } else if (isYtTrack) {
                 // Secondary fallback to YouTube iframe if direct audio extraction fails
                 const ytId = track.ytId || (track.id ? track.id.replace('yt_', '') : '');
                 if (ytId && state.ytReady && state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
-                  // Strict categoryId 10 / Podcast check before YouTube IFrame player loads
                   if (!isContentFilterAllowed(track)) {
                     showToast('Playback Blocked: MusiSurf strictly plays Music and Podcasts only.', '🚫');
                     return;
@@ -2791,8 +2904,13 @@
                     state.ytPlayer.playVideo();
                   } catch (e) {
                     console.warn('YouTube fallback playback error:', e);
+                    handlePlaybackStreamError(track);
                   }
+                } else {
+                  handlePlaybackStreamError(track);
                 }
+              } else {
+                handlePlaybackStreamError(track);
               }
             });
           }
@@ -2800,7 +2918,6 @@
           // Fallback directly to YouTube iframe player if no audioSrc
           const ytId = track.ytId || (track.id ? track.id.replace('yt_', '') : '');
           if (ytId && state.ytReady && state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
-            // Strict categoryId 10 / Podcast check before YouTube IFrame player loads
             if (!isContentFilterAllowed(track)) {
               showToast('Playback Blocked: MusiSurf strictly plays Music and Podcasts only.', '🚫');
               return;
@@ -2814,9 +2931,11 @@
             state.ytPlayer.loadVideoById(ytId);
             state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
             state.ytPlayer.playVideo();
+          } else {
+            handlePlaybackStreamError(track);
           }
         } else {
-          showToast('Audio stream unavailable for this track', '⚠️');
+          handlePlaybackStreamError(track);
         }
       }
     }
@@ -2827,8 +2946,8 @@
     highlightPlayingTrackInTables(track.id);
     savePlaybackState();
 
-    // Fetch synchronized lyrics
-    loadLyricsForTrack(track.title, track.artist);
+    // Fetch synchronized lyrics with full track object
+    loadLyricsForTrack(track);
   }
 
   function togglePlayPause() {
@@ -3220,46 +3339,25 @@
     seekTo(0);
   }
 
-  let isTrackEnding = false;
   function onTrackEnded() {
-    if (isTrackEnding || state.isCrossfading) return;
-    const cur = getCurrentPlaybackTime();
-    const knownDur = getTotalDuration() || parseDurationToSeconds(state.currentTrack?.duration) || parseDurationToSeconds(state.currentTrack?.durationStr) || 0;
-    if (knownDur > 15 && cur < (knownDur - 10)) {
-      console.warn('Preventing premature onTrackEnded: cur=' + cur + ', knownDur=' + knownDur);
-      const isYtTrack = state.currentTrack?.source === 'youtube' || state.currentTrack?.ytId || (state.currentTrack?.id && state.currentTrack.id.startsWith('yt_'));
-      if (isYtTrack && state.ytReady && state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
-        const ytId = state.currentTrack.ytId || (state.currentTrack.id ? state.currentTrack.id.replace('yt_', '') : '');
-        if (ytId) {
-          state.activePlayerEngine = 'youtube';
-          try {
-            elements.audio.pause();
-            elements.audio.removeAttribute('src');
-          } catch (e) {}
-          state.ytPlayer.loadVideoById(ytId, cur);
-          state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
-          state.ytPlayer.playVideo();
-          return;
-        }
-      }
-      if (elements.audio && !elements.audio.seeking) {
-        elements.audio.play().catch(() => {});
-      }
-      return;
-    }
-    isTrackEnding = true;
-    setTimeout(() => { isTrackEnding = false; }, 600);
+    if (state.isCrossfading) return;
+    const completedTrack = state.currentTrack;
+    logPlaybackDiag('TRACK_ENDED', `onTrackEnded fired for "${completedTrack?.title}"`, {
+      id: completedTrack?.id,
+      repeatMode: state.repeatMode
+    });
 
-    if (state.repeatMode === 'one' && state.currentTrack) {
-      if (state.currentTrack._introTrimmed) state.currentTrack._introTrimmed = false;
+    if (state.repeatMode === 'one' && completedTrack) {
+      if (completedTrack._introTrimmed) completedTrack._introTrimmed = false;
       seekTo(0);
       applyCrossfadeIn();
-      if (elements.audio) {
-        elements.audio.play().catch(e => console.warn('Repeat play error:', e));
+      const deck = getActiveDeck();
+      if (deck) {
+        deck.play().catch(e => console.warn('Repeat play error:', e));
       }
       return;
     }
-    transitionToNextSong();
+    advanceToNextTrack('track_ended', completedTrack?.id);
   }
 
   function isYouTubeActive() {
@@ -3574,6 +3672,7 @@
     state.lyricsAbortController = new AbortController();
     const abortSignal = state.lyricsAbortController.signal;
     const reqId = ++state.currentLyricsRequestId;
+    const targetEpoch = state.trackEpoch || 0;
 
     // Reset state & UI immediately (clean previous song's lyrics immediately)
     elements.lyricsLoading.style.display = 'flex';
@@ -3585,6 +3684,7 @@
     state.hasSyncedLyrics = false;
     state.activeLyricIndex = -1;
     state.currentLyricsData = null;
+    state.currentLyricsTrackId = trackId;
 
     if (elements.lyricsStatusBadge) {
       elements.lyricsStatusBadge.style.display = 'none';
@@ -3600,8 +3700,14 @@
     // Update Hero Art & Meta immediately to match currently requested song
     if (elements.lyricsTrackTitle) elements.lyricsTrackTitle.textContent = title;
     if (elements.lyricsTrackArtist) elements.lyricsTrackArtist.textContent = artist;
-    if (elements.lyricsAlbumCover && (trackObj?.image || state.currentTrack?.image)) {
-      elements.lyricsAlbumCover.src = trackObj?.image || state.currentTrack?.image;
+    if (elements.lyricsAlbumCover) {
+      elements.lyricsAlbumCover.onerror = function() {
+        if (state.currentTrack?.id === trackId) {
+          this.onerror = null;
+          this.src = DEFAULT_ALBUM_ART;
+        }
+      };
+      elements.lyricsAlbumCover.src = trackObj?.image || state.currentTrack?.image || DEFAULT_ALBUM_ART;
       elements.lyricsAlbumCover.style.display = 'block';
     }
 
@@ -3609,40 +3715,44 @@
     const cacheKey = `${title.toLowerCase().trim()}___${artist.toLowerCase().trim()}`;
     if (state.lyricsCache && state.lyricsCache[cacheKey]) {
       const cached = state.lyricsCache[cacheKey];
-      elements.lyricsLoading.style.display = 'none';
-
-      if (cached.syncedLyrics) {
-        state.currentLyricsData = cached;
-        const parsed = parseLrc(cached.syncedLyrics, (state.lyricsAutoIntroOffset || 0) + (state.lyricsManualOffset || 0));
-        renderLyricsLines(parsed, cached.language, cached.script, cached);
-        return;
-      } else if (cached.plainLyrics) {
-        state.currentLyricsData = cached;
-        renderPlainLyrics(cached.plainLyrics, cached.language, cached.script, cached);
-        return;
+      // Guard: Only render cached lyrics if STILL the current active track and epoch
+      if (targetEpoch === state.trackEpoch && state.currentTrack?.id === trackId) {
+        elements.lyricsLoading.style.display = 'none';
+        if (cached.syncedLyrics) {
+          state.currentLyricsData = cached;
+          const parsed = parseLrc(cached.syncedLyrics, (state.lyricsAutoIntroOffset || 0) + (state.lyricsManualOffset || 0));
+          renderLyricsLines(parsed, cached.language, cached.script, cached);
+          return;
+        } else if (cached.plainLyrics) {
+          state.currentLyricsData = cached;
+          renderPlainLyrics(cached.plainLyrics, cached.language, cached.script, cached);
+          return;
+        }
       }
     }
 
     // Offline check
     if (!navigator.onLine) {
-      elements.lyricsLoading.style.display = 'none';
-      elements.lyricsLinesContainer.innerHTML = `
-        <div class="lyrics-offline-state" style="text-align: center; color: var(--text-secondary); padding: 80px 20px;">
-          <div style="width: 64px; height: 64px; margin: 0 auto 20px; border-radius: 50%; background: rgba(0, 242, 96, 0.12); border: 1px solid rgba(0, 242, 96, 0.3); display: flex; align-items: center; justify-content: center; color: var(--accent-primary, #00f260);">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 32px; height: 32px;">
-              <line x1="1" y1="1" x2="23" y2="23" />
-              <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
-              <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
-              <path d="M10.71 5.05A16 16 0 0 1 22.56 9" />
-              <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" />
-              <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
-              <line x1="12" y1="20" x2="12.01" y2="20" />
-            </svg>
+      if (targetEpoch === state.trackEpoch && state.currentTrack?.id === trackId) {
+        elements.lyricsLoading.style.display = 'none';
+        elements.lyricsLinesContainer.innerHTML = `
+          <div class="lyrics-offline-state" style="text-align: center; color: var(--text-secondary); padding: 80px 20px;">
+            <div style="width: 64px; height: 64px; margin: 0 auto 20px; border-radius: 50%; background: rgba(0, 242, 96, 0.12); border: 1px solid rgba(0, 242, 96, 0.3); display: flex; align-items: center; justify-content: center; color: var(--accent-primary, #00f260);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 32px; height: 32px;">
+                <line x1="1" y1="1" x2="23" y2="23" />
+                <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
+                <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
+                <path d="M10.71 5.05A16 16 0 0 1 22.56 9" />
+                <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" />
+                <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                <line x1="12" y1="20" x2="12.01" y2="20" />
+              </svg>
+            </div>
+            <h3 style="font-size: 1.35rem; font-weight: 700; color: #fff; margin-bottom: 8px;">Connect to internet to view lyrics</h3>
+            <p style="font-size: 0.92rem; color: var(--text-secondary); max-width: 380px; margin: 0 auto;">Live lyrics stream from verified sources. Connect to internet to sing along.</p>
           </div>
-          <h3 style="font-size: 1.35rem; font-weight: 700; color: #fff; margin-bottom: 8px;">Connect to internet to view lyrics</h3>
-          <p style="font-size: 0.92rem; color: var(--text-secondary); max-width: 380px; margin: 0 auto;">Live lyrics stream from verified sources. Connect to internet to sing along.</p>
-        </div>
-      `;
+        `;
+      }
       return;
     }
 
@@ -3654,9 +3764,11 @@
       const res = await fetch(`/api/lyrics?${queryStr}`, { signal: abortSignal });
       const data = await res.json();
 
-      // Guard against stale response
-      if (reqId !== state.currentLyricsRequestId) return;
-      if (state.currentTrack && state.currentTrack.id && state.currentTrack.id !== trackId) return;
+      // Guard against stale response (network delay over hotspot)
+      if (reqId !== state.currentLyricsRequestId || targetEpoch !== state.trackEpoch || (state.currentTrack && state.currentTrack.id !== trackId)) {
+        logPlaybackDiag('STALE_LYRICS', `Discarded stale lyrics response for "${title}"`, { reqId, targetEpoch, trackId });
+        return;
+      }
 
       elements.lyricsLoading.style.display = 'none';
 
@@ -3705,7 +3817,7 @@
     } catch (err) {
       if (err.name === 'AbortError') return;
       console.warn('Lyrics fetch failed:', err);
-      if (reqId !== state.currentLyricsRequestId) return;
+      if (reqId !== state.currentLyricsRequestId || targetEpoch !== state.trackEpoch || (state.currentTrack && state.currentTrack.id !== trackId)) return;
       elements.lyricsLoading.style.display = 'none';
       renderLyricsUnavailable(title, artist, trackId);
     }
@@ -6344,11 +6456,17 @@
         if (elements.lyricsTrackTitle) elements.lyricsTrackTitle.textContent = state.currentTrack.title || 'Song Title';
         if (elements.lyricsTrackArtist) elements.lyricsTrackArtist.textContent = state.currentTrack.artist || 'Artist';
         if (elements.lyricsAlbumCover) {
-          elements.lyricsAlbumCover.src = state.currentTrack.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80';
+          elements.lyricsAlbumCover.onerror = function() {
+            if (state.currentTrack) {
+              this.onerror = null;
+              this.src = DEFAULT_ALBUM_ART;
+            }
+          };
+          elements.lyricsAlbumCover.src = state.currentTrack.image || DEFAULT_ALBUM_ART;
           elements.lyricsAlbumCover.style.display = 'block';
         }
-        if (!state.lyrics || state.lyrics.length === 0) {
-          loadLyricsForTrack(state.currentTrack.title, state.currentTrack.artist);
+        if (state.currentLyricsTrackId !== state.currentTrack.id || !state.lyrics || state.lyrics.length === 0) {
+          loadLyricsForTrack(state.currentTrack);
         } else {
           state.activeLyricIndex = -1;
           requestAnimationFrame(() => {
@@ -6359,7 +6477,7 @@
         if (elements.lyricsTrackTitle) elements.lyricsTrackTitle.textContent = 'No Song Playing';
         if (elements.lyricsTrackArtist) elements.lyricsTrackArtist.textContent = 'Play a track to view lyrics';
         if (elements.lyricsAlbumCover) {
-          elements.lyricsAlbumCover.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80';
+          elements.lyricsAlbumCover.src = DEFAULT_ALBUM_ART;
         }
       }
     }
@@ -8778,6 +8896,7 @@
         if (deck === getActiveDeck()) {
           state.isPlaying = true;
           state.isTrackLoading = false;
+          state.consecutivePlaybackErrors = 0;
         }
       });
       deck.addEventListener('pause', () => {
@@ -8831,11 +8950,14 @@
         }
         if (deck !== getActiveDeck()) return;
         console.warn('Audio stream error event:', err);
-        const isYtTrack = state.currentTrack?.source === 'youtube' || state.currentTrack?.ytId || (state.currentTrack?.id && state.currentTrack.id.startsWith('yt_'));
+        const currentTrack = state.currentTrack;
+        if (!currentTrack) return;
+
+        const isYtTrack = currentTrack.source === 'youtube' || currentTrack.ytId || (currentTrack.id && currentTrack.id.startsWith('yt_'));
         if (isYtTrack) {
-          const ytId = state.currentTrack.ytId || (state.currentTrack.id ? state.currentTrack.id.replace('yt_', '') : '');
+          const ytId = currentTrack.ytId || (currentTrack.id ? currentTrack.id.replace('yt_', '') : '');
           if (ytId && state.ytReady && state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
-            if (!isContentFilterAllowed(state.currentTrack)) {
+            if (!isContentFilterAllowed(currentTrack)) {
               showToast('Playback Blocked: MusiSurf strictly plays pure Music only.', '🚫');
               return;
             }
@@ -8857,20 +8979,20 @@
             }
           }
         }
-        if (state.currentTrack?.streamUrl && deck.src !== state.currentTrack.streamUrl) {
+        if (currentTrack.streamUrl && deck.src !== currentTrack.streamUrl && !deck._proxyRetried) {
+          deck._proxyRetried = true;
           console.log('Switching to MusiSurf stream proxy after error...');
-          deck.src = state.currentTrack.streamUrl;
+          deck.src = currentTrack.streamUrl;
           deck.volume = state.isMuted ? 0 : state.volume;
           deck.load();
           deck.play().catch(e => {
             console.warn('Proxy retry error:', e);
-            state.isPlaying = false;
-            updatePlayPauseButton();
+            deck._proxyRetried = false;
+            handlePlaybackStreamError(currentTrack);
           });
         } else {
-          console.warn('Audio stream error for track:', state.currentTrack?.title);
-          state.isPlaying = false;
-          updatePlayPauseButton();
+          deck._proxyRetried = false;
+          handlePlaybackStreamError(currentTrack);
         }
       });
     }

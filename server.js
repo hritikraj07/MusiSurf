@@ -1400,6 +1400,11 @@ app.get('/api/stream', async (req, res) => {
     return res.status(400).send('Invalid audio URL');
   }
 
+  const controller = new AbortController();
+  req.on('close', () => {
+    try { controller.abort(); } catch (e) {}
+  });
+
   try {
     const range = req.headers.range;
     const fetchHeaders = {
@@ -1409,7 +1414,10 @@ app.get('/api/stream', async (req, res) => {
       fetchHeaders['Range'] = range;
     }
 
-    const audioRes = await fetch(audioUrl, { headers: fetchHeaders });
+    const audioRes = await fetch(audioUrl, {
+      headers: fetchHeaders,
+      signal: controller.signal
+    });
     if (!audioRes.ok && audioRes.status !== 206) {
       return res.status(audioRes.status).send('Streaming upstream error');
     }
@@ -1431,10 +1439,14 @@ app.get('/api/stream', async (req, res) => {
 
     const { Readable } = require('stream');
     const stream = Readable.fromWeb(audioRes.body);
+    stream.on('error', (err) => {
+      if (!res.headersSent) res.status(500).send('Stream error');
+    });
     stream.pipe(res);
   } catch (err) {
+    if (err.name === 'AbortError') return;
     console.error('Stream proxy error:', err.message);
-    res.status(500).send('Stream error');
+    if (!res.headersSent) res.status(500).send('Stream error');
   }
 });
 
@@ -1501,6 +1513,10 @@ app.get('/api/yt-stream', async (req, res) => {
     res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=3600');
+
+    req.on('close', () => {
+      try { if (stream && typeof stream.destroy === 'function') stream.destroy(); } catch (e) {}
+    });
 
     stream.on('error', (err) => {
       console.warn('YT audio stream pipe note:', err.message);
