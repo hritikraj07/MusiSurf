@@ -339,12 +339,20 @@
     miniPlayerTrack: document.getElementById('miniPlayerTrack'),
     miniPlayerFill: document.getElementById('miniPlayerFill'),
 
-    // PWA & Mobile Navigation (Strictly Home, Search, Library)
+    // PWA & Mobile Navigation (Home, Search, Library, Downloads)
     pwaInstallBtn: document.getElementById('pwaInstallBtn'),
     mobileNavBar: document.getElementById('mobileNavBar'),
+    mobNavSlider: document.getElementById('mobNavSlider'),
     mobNavHome: document.getElementById('mobNavHome'),
     mobNavSearch: document.getElementById('mobNavSearch'),
     mobNavLibrary: document.getElementById('mobNavLibrary'),
+    mobNavDownloads: document.getElementById('mobNavDownloads'),
+
+    // Mobile Top Header Brand & Action Controls
+    mobileTopBrand: document.getElementById('mobileTopBrand'),
+    mobTopSearchBtn: document.getElementById('mobTopSearchBtn'),
+    mobTopProfileBtn: document.getElementById('mobTopProfileBtn'),
+    mobTopAvatar: document.getElementById('mobTopAvatar'),
 
     // Mobile Fullscreen Player Modal
     mobilePlayerModal: document.getElementById('mobilePlayerModal'),
@@ -423,6 +431,7 @@
     settingsModal: document.getElementById('settingsModal'),
     openSettingsBtn: document.getElementById('openSettingsBtn'),
     headerSettingsBtn: document.getElementById('headerSettingsBtn'),
+    sidebarSettingsBtn: document.getElementById('sidebarSettingsBtn'),
     libSettingsBtn: document.getElementById('libSettingsBtn'),
     libFilterPillsBar: document.getElementById('libFilterPillsBar'),
     libHubGrid: document.getElementById('libHubGrid'),
@@ -3362,8 +3371,8 @@
       const localPause = elements.playAllLocalBtn.querySelector('.pause-icon');
       const localText = document.getElementById('playAllLocalBtnText');
       if (localPlay && localPause) {
-        localPlay.style.display = isPlayingLocal ? 'none' : 'block';
-        localPause.style.display = isPlayingLocal ? 'block' : 'none';
+        localPlay.style.display = isPlayingLocal ? 'none' : 'inline-block';
+        localPause.style.display = isPlayingLocal ? 'inline-block' : 'none';
       }
       if (localText) {
         localText.textContent = isPlayingLocal ? 'Pause' : 'Play';
@@ -5766,6 +5775,9 @@
   function renderPlaylistView(playlistId, options = {}) {
     state.viewingPlaylistId = playlistId;
     switchView('playlist', { force: true, pushHistory: options.pushHistory !== false });
+    if (playlistId === 'downloaded' && typeof updateMobNav === 'function') {
+      updateMobNav('mobNavDownloads');
+    }
 
     try {
       localStorage.setItem('musisurf_current_view', JSON.stringify({
@@ -6703,6 +6715,24 @@
 
   let navHistoryStack = ['home'];
 
+  // Mobile Bottom Navigation Tabs Sync with Sliding Indicator
+  const updateMobNav = (btnId) => {
+    const map = {
+      mobNavHome: 0,
+      mobNavSearch: 1,
+      mobNavLibrary: 2,
+      mobNavDownloads: 3
+    };
+    const idx = map[btnId] !== undefined ? map[btnId] : 0;
+    if (elements.mobileNavBar) {
+      elements.mobileNavBar.style.setProperty('--nav-idx', idx);
+    }
+    const allMobBtns = [elements.mobNavHome, elements.mobNavSearch, elements.mobNavLibrary, elements.mobNavDownloads];
+    allMobBtns.forEach(btn => {
+      if (btn) btn.classList.toggle('active', btn.id === btnId);
+    });
+  };
+
   function switchView(viewName, options = {}) {
     const pushHistory = options.pushHistory !== false;
     const force = options.force === true;
@@ -6821,11 +6851,23 @@
       }
     }
 
-    // Sync mobile bottom navigation bar (Home, Search, Library)
-    if (elements.mobNavHome && elements.mobNavSearch && elements.mobNavLibrary) {
-      elements.mobNavHome.classList.toggle('active', viewName === 'home');
-      elements.mobNavSearch.classList.toggle('active', viewName === 'search');
-      elements.mobNavLibrary.classList.toggle('active', ['library', 'playlist', 'localMusic'].includes(viewName));
+    // Sync mobile bottom navigation bar (Home, Search, Library, Downloads)
+    if (typeof updateMobNav === 'function') {
+      if (viewName === 'home') {
+        updateMobNav('mobNavHome');
+      } else if (viewName === 'search') {
+        updateMobNav('mobNavSearch');
+      } else if (viewName === 'library') {
+        updateMobNav('mobNavLibrary');
+      } else if (viewName === 'playlist') {
+        if (state.viewingPlaylistId === 'downloaded' || state.activePlaylistId === 'downloaded') {
+          updateMobNav('mobNavDownloads');
+        } else {
+          updateMobNav('mobNavLibrary');
+        }
+      } else if (viewName === 'localMusic') {
+        updateMobNav('mobNavLibrary');
+      }
     }
 
     // Scroll to top and toggle lyrics active state on content scroll
@@ -8277,14 +8319,24 @@
       if (state.currentTrack) toggleLikeSong(state.currentTrack);
     });
 
-    // Repeat Mode: strictly repeats the currently playing track only (no loop interference or number 1 indicator)
+    // Repeat Mode: 3-way toggle ('off' -> 'all' -> 'one' -> 'off')
     function updateRepeatUI() {
-      const isRepeatOne = state.repeatMode === 'one';
+      const mode = state.repeatMode || 'off';
+      const isAll = mode === 'all';
+      const isOne = mode === 'one';
+      const isActive = isAll || isOne;
 
       [elements.repeatBtn, elements.mobRepeatBtn].forEach(btn => {
         if (!btn) return;
-        btn.classList.toggle('active', isRepeatOne);
-        btn.title = isRepeatOne ? 'Repeat Track: On' : 'Repeat Track: Off';
+        btn.classList.toggle('active', isActive);
+        btn.classList.toggle('repeat-one', isOne);
+        if (isOne) {
+          btn.title = 'Repeat: Current Track (R)';
+        } else if (isAll) {
+          btn.title = 'Repeat: All (R)';
+        } else {
+          btn.title = 'Repeat: Off (R)';
+        }
       });
     }
 
@@ -8293,8 +8345,16 @@
         e.stopPropagation();
         e.preventDefault();
       }
-      state.repeatMode = state.repeatMode === 'one' ? 'off' : 'one';
-      showToast(state.repeatMode === 'one' ? 'Repeat Track: On' : 'Repeat Track: Off', state.repeatMode === 'one' ? '🔂' : '🔁');
+      if (state.repeatMode === 'off') {
+        state.repeatMode = 'all';
+        showToast('Repeat: All', '🔁');
+      } else if (state.repeatMode === 'all') {
+        state.repeatMode = 'one';
+        showToast('Repeat: Current Track', '🔂');
+      } else {
+        state.repeatMode = 'off';
+        showToast('Repeat: Off', '➡️');
+      }
       updateRepeatUI();
     }
 
@@ -8930,6 +8990,7 @@
 
     if (elements.openSettingsBtn) elements.openSettingsBtn.addEventListener('click', openSettingsModal);
     if (elements.headerSettingsBtn) elements.headerSettingsBtn.addEventListener('click', openSettingsModal);
+    if (elements.sidebarSettingsBtn) elements.sidebarSettingsBtn.addEventListener('click', openSettingsModal);
     if (elements.closeSettingsModalBtn) elements.closeSettingsModalBtn.addEventListener('click', closeSettingsModal);
     if (elements.closeSettingsTopRightBtn) elements.closeSettingsTopRightBtn.addEventListener('click', closeSettingsModal);
     if (elements.libHubSettingsBtn) elements.libHubSettingsBtn.addEventListener('click', openSettingsModal);
@@ -9406,13 +9467,7 @@
 
     if (elements.pwaInstallBtn) elements.pwaInstallBtn.addEventListener('click', triggerPwaInstall);
 
-    // Mobile Bottom Navigation Tabs (Strictly: Home, Search, Library)
-    const updateMobNav = (btnId) => {
-      [elements.mobNavHome, elements.mobNavSearch, elements.mobNavLibrary].forEach(btn => {
-        if (btn) btn.classList.toggle('active', btn.id === btnId);
-      });
-    };
-
+    // Mobile Bottom Navigation Tabs (Home, Search, Library, Downloads)
     if (elements.mobNavHome) elements.mobNavHome.addEventListener('click', () => {
       navigateToHomeTop();
     });
@@ -9507,6 +9562,31 @@
       switchView('library');
       updateMobNav('mobNavLibrary');
     });
+
+    if (elements.mobNavDownloads) elements.mobNavDownloads.addEventListener('click', () => {
+      renderPlaylistView('downloaded');
+      updateMobNav('mobNavDownloads');
+    });
+
+    // Mobile Top Bar Header Actions (Brand Logo, Search Icon, Profile Avatar)
+    if (elements.mobileTopBrand) {
+      elements.mobileTopBrand.addEventListener('click', () => {
+        navigateToHomeTop();
+        updateMobNav('mobNavHome');
+      });
+    }
+
+    if (elements.mobTopSearchBtn) {
+      elements.mobTopSearchBtn.addEventListener('click', () => {
+        triggerSearchFocus();
+      });
+    }
+
+    if (elements.mobTopProfileBtn) {
+      elements.mobTopProfileBtn.addEventListener('click', () => {
+        if (typeof openMobileDrawer === 'function') openMobileDrawer();
+      });
+    }
 
     // Library View Hub Card Event Listeners
     if (elements.libSettingsBtn) {

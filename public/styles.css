@@ -1269,6 +1269,36 @@ html, body {
   margin-right: -2px !important;
 }
 
+.sidebar-settings-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #9ea0a8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.sidebar-settings-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  transform: scale(1.08);
+}
+
+.sidebar-settings-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.mobile-top-brand,
+.mobile-top-actions {
+  display: none !important;
+}
+
 
 
 .library-header-actions .create-playlist-btn-text {
@@ -4740,7 +4770,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .control-btn.active {
-  color: var(--accent-primary);
+  color: var(--accent-primary, #ffffff);
 }
 
 .control-btn.active::after {
@@ -4750,16 +4780,40 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background-color: var(--accent-primary);
+  background-color: var(--accent-primary, #ffffff);
 }
 
-.control-btn svg {
-  width: 20px;
-  height: 20px;
+.control-btn.repeat-one {
+  color: var(--accent-primary, #ffffff);
 }
 
-.repeat-one-indicator {
-  display: none !important;
+.repeat-one-badge {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 8.5px;
+  font-weight: 800;
+  line-height: 1;
+  color: #000000;
+  background: #ffffff;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  z-index: 3;
+}
+
+.control-btn.repeat-one .repeat-one-badge {
+  display: flex !important;
+}
+
+.control-btn.repeat-one svg {
+  opacity: 0.85;
 }
 
 .play-pause-btn {
@@ -5956,7 +6010,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     display: none !important;
   }
 
-  /* Show Mobile Bottom Navigation (Full Required Width, Website Theme Matched, Fluid Animated Buttons) */
+  /* Show Mobile Bottom Navigation (Full Required Width, Sliding Tubelight Animation Between Buttons) */
   .mobile-nav-bar {
     display: flex !important;
     position: fixed !important;
@@ -5981,6 +6035,56 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     box-sizing: border-box !important;
   }
 
+  /* Sliding Indicator Pill Behind Active Tab */
+  .mobile-nav-slider {
+    position: absolute !important;
+    top: 6px !important;
+    bottom: 6px !important;
+    left: 8px !important;
+    width: calc((100% - 16px - 18px) / 4) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 12px !important;
+    pointer-events: none !important;
+    z-index: 1 !important;
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    transform: translateX(calc(var(--nav-idx, 0) * (100% + 6px))) !important;
+    will-change: transform;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35) !important;
+  }
+
+  /* Tubelight Lamp Beam on Sliding Indicator */
+  .mobile-nav-slider .tubelight-lamp {
+    display: block !important;
+    position: absolute !important;
+    top: -5px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 32px !important;
+    height: 3px !important;
+    background: #ffffff !important;
+    border-radius: 9999px !important;
+    pointer-events: none !important;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.95),
+                0 0 20px rgba(255, 255, 255, 0.55),
+                0 0 32px rgba(255, 255, 255, 0.3) !important;
+  }
+
+  /* Ambient soft glow blur underneath the sliding lamp */
+  .mobile-nav-slider .tubelight-lamp::after {
+    content: '' !important;
+    position: absolute !important;
+    top: -4px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 48px !important;
+    height: 18px !important;
+    background: rgba(255, 255, 255, 0.35) !important;
+    border-radius: 50% !important;
+    filter: blur(8px) !important;
+    pointer-events: none !important;
+  }
+
   .mobile-nav-item {
     position: relative !important;
     flex: 1 1 0 !important;
@@ -5999,9 +6103,10 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     cursor: pointer !important;
     padding: 8px 4px !important;
     border-radius: 12px !important;
-    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    transition: color 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
     user-select: none !important;
     -webkit-tap-highlight-color: transparent !important;
+    z-index: 2 !important;
   }
 
   /* Interactive Tap / Press Bounce Animation */
@@ -6022,18 +6127,16 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     transition: color 0.2s ease, font-weight 0.2s ease, transform 0.25s ease !important;
   }
 
-  /* Active Button State Matched with Website Theme */
+  /* Active Button State */
   .mobile-nav-item.active {
     color: #ffffff !important;
-    background: rgba(255, 255, 255, 0.08) !important;
-    border-color: rgba(255, 255, 255, 0.08) !important;
-    animation: navItemActivate 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    background: transparent !important;
+    border-color: transparent !important;
   }
 
   .mobile-nav-item.active svg {
     color: #ffffff !important;
     transform: translateY(-2px) scale(1.1) !important;
-    animation: navIconPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
   .mobile-nav-item.active span {
@@ -6041,83 +6144,9 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     font-weight: 700 !important;
   }
 
-  @keyframes navItemActivate {
-    0% {
-      background: rgba(255, 255, 255, 0);
-      transform: scale(0.96);
-    }
-    50% {
-      background: rgba(255, 255, 255, 0.12);
-      transform: scale(1.02);
-    }
-    100% {
-      background: rgba(255, 255, 255, 0.08);
-      transform: scale(1);
-    }
-  }
-
-  @keyframes navIconPop {
-    0% {
-      transform: scale(0.9);
-    }
-    50% {
-      transform: translateY(-3px) scale(1.18);
-    }
-    100% {
-      transform: translateY(-2px) scale(1.1);
-    }
-  }
-
-  /* Tubelight Lamp Beam (Top edge glowing light matching website accent) */
+  /* Hide individual static lamps since sliding indicator owns it */
   .mobile-nav-item .tubelight-lamp {
-    display: none;
-    position: absolute;
-    top: -5px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 32px;
-    height: 3px;
-    background: #ffffff;
-    border-radius: 9999px;
-    pointer-events: none;
-    box-shadow: 0 0 10px rgba(255, 255, 255, 0.9),
-                0 0 20px rgba(255, 255, 255, 0.5),
-                0 0 32px rgba(255, 255, 255, 0.25);
-  }
-
-  /* Ambient soft glow blur underneath the lamp */
-  .mobile-nav-item .tubelight-lamp::after {
-    content: '';
-    position: absolute;
-    top: -4px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 48px;
-    height: 18px;
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    filter: blur(8px);
-    pointer-events: none;
-  }
-
-  .mobile-nav-item.active .tubelight-lamp {
-    display: block !important;
-    animation: tubelightFlickerOn 0.25s ease-out forwards;
-  }
-
-  @keyframes tubelightFlickerOn {
-    0% {
-      opacity: 0;
-      transform: translateX(-50%) scaleX(0.4);
-    }
-    60% {
-      opacity: 0.85;
-      transform: translateX(-50%) scaleX(1.15);
-    }
-    100% {
-      opacity: 1;
-      transform: translateX(-50%) scaleX(1);
-    }
+    display: none !important;
   }
 
   /* Transform Persistent Player Bar into a Spotify-style Mini Player Floating above Nav Bar */
@@ -6355,23 +6384,98 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   }
 
   .top-header {
-    height: 56px;
-    padding: 0 12px !important;
-    gap: 10px !important;
+    height: 56px !important;
+    padding: 0 16px !important;
+    gap: 12px !important;
     border-radius: 0;
     display: flex !important;
     align-items: center !important;
-    justify-content: flex-start !important;
+    justify-content: space-between !important;
     background-color: #121212 !important;
-    border-bottom: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+    z-index: 400 !important;
   }
 
-  .top-header-left {
+  .top-header-left,
+  .top-header-right {
     display: none !important;
   }
 
-  .top-header-left .top-nav-arrows {
-    display: none !important;
+  /* Mobile Top Bar Brand (Official MusiSurf Logo + Text on Far Left) */
+  .mobile-top-brand {
+    display: flex !important;
+    align-items: center !important;
+    gap: 9px !important;
+    cursor: pointer !important;
+    user-select: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  .mobile-top-brand .mobile-brand-logo {
+    width: 26px !important;
+    height: 26px !important;
+    border-radius: 6px !important;
+    object-fit: contain !important;
+  }
+
+  .mobile-top-brand .mobile-brand-name {
+    font-size: 1.22rem !important;
+    font-weight: 800 !important;
+    color: #ffffff !important;
+    letter-spacing: -0.02em !important;
+  }
+
+  /* Mobile Top Bar Actions (Search + Profile on Far Right) */
+  .mobile-top-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  .mobile-top-btn {
+    background: transparent !important;
+    border: none !important;
+    color: #ffffff !important;
+    padding: 6px !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: transform var(--transition-fast) !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  .mobile-top-btn:active {
+    transform: scale(0.9) !important;
+  }
+
+  .mobile-top-btn svg {
+    width: 22px !important;
+    height: 22px !important;
+    stroke-width: 2.2 !important;
+    color: #ffffff !important;
+  }
+
+  .mobile-top-avatar {
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 50% !important;
+    background: #242424 !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #ffffff !important;
+    font-size: 0.8rem !important;
+    font-weight: 700 !important;
+  }
+
+  .mobile-top-avatar svg {
+    width: 16px !important;
+    height: 16px !important;
+    stroke-width: 2 !important;
+    color: #ffffff !important;
   }
 
   .top-home-btn,
@@ -6379,8 +6483,13 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     display: none !important;
   }
 
-  /* By default on mobile (including Home page), do NOT show search bar; only show at search section */
+  /* By default on mobile (including Home page), show the mobile top brand & actions bar; in search view show search pill */
   .top-header-center {
+    display: none !important;
+  }
+
+  body[data-active-view="search"] .mobile-top-brand,
+  body[data-active-view="search"] .mobile-top-actions {
     display: none !important;
   }
 
@@ -6389,6 +6498,20 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     width: 100% !important;
     max-width: none !important;
     flex: 1 !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    position: static !important;
+    transform: none !important;
+    order: 1 !important;
+  }
+
+  /* Remove Download playlist / card from Library on mobile */
+  #libHubDownloadedBtn,
+  [data-lib-filter="downloaded"] {
+    display: none !important;
+  }
     margin: 0 !important;
     gap: 0 !important;
     display: flex !important;
@@ -7057,7 +7180,24 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   white-space: nowrap !important;
   display: inline-flex !important;
   align-items: center !important;
+  justify-content: center !important;
   gap: 8px !important;
+}
+
+#playAllLocalBtn svg {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  fill: currentColor !important;
+  color: #0a0b0d !important;
+  display: inline-block !important;
+  flex-shrink: 0 !important;
+  margin: 0 !important;
+}
+
+#playAllLocalBtn svg.pause-icon {
+  display: none;
 }
 
 #clearAllLocalBtn,
@@ -10769,7 +10909,7 @@ body[data-active-view="lyrics"] .content-scroll {
   width: 100vw;
   height: 100vh;
   z-index: 3000;
-  background: #000000 !important;
+  background: #121212 !important;
   color: #ffffff;
   display: none;
   flex-direction: column;
@@ -10789,6 +10929,7 @@ body[data-active-view="lyrics"] .content-scroll {
   box-sizing: border-box;
   overflow: hidden;
   position: relative !important;
+  background: #121212 !important;
 }
 
 .settings-shell-close-btn {
@@ -11494,7 +11635,7 @@ body[data-active-view="lyrics"] .content-scroll {
     height: 100% !important;
     height: 100dvh !important;
     z-index: 3000 !important;
-    background: #0a0a0c !important;
+    background: #121212 !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch;
@@ -11981,7 +12122,7 @@ body[data-active-view="lyrics"] .content-scroll {
   bottom: 0;
   width: min(85vw, 340px);
   height: 100vh;
-  background: #111215;
+  background: #121212 !important;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.7);
   z-index: 12001;

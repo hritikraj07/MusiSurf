@@ -46,6 +46,12 @@
 
     <!-- Top Navigation & Global Search Header (Modern Spotify Style) -->
     <header class="top-header" id="topHeader">
+      <!-- Mobile Top Bar Left: Website Logo & Name (Shown strictly on Mobile) -->
+      <div class="mobile-top-brand" id="mobileTopBrand" role="button" tabindex="0" title="MusiSurf Home" aria-label="MusiSurf Home">
+        <img src="/icons/icon.svg" class="mobile-brand-logo" alt="MusiSurf" />
+        <span class="mobile-brand-name">MusiSurf</span>
+      </div>
+
       <!-- Left: Mobile Drawer Trigger + Brand Logo & Name + Navigation Arrows -->
       <div class="top-header-left">
         <!-- Mobile Left Sliding Drawer Toggle (Icon + Name on Far Left for Mobile) -->
@@ -117,6 +123,24 @@
           <span class="header-user-name" id="headerUserName">User</span>
         </div>
       </div>
+
+      <!-- Mobile Top Bar Right: Search Icon + Profile/Avatar Icon (Shown strictly on Mobile) -->
+      <div class="mobile-top-actions" id="mobileTopActions">
+        <button class="mobile-top-btn" id="mobTopSearchBtn" type="button" title="Search" aria-label="Search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.3-4.3"/>
+          </svg>
+        </button>
+        <button class="mobile-top-btn mobile-top-profile-btn" id="mobTopProfileBtn" type="button" title="Menu & Settings" aria-label="Open menu and settings">
+          <div class="mobile-top-avatar" id="mobTopAvatar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          </div>
+        </button>
+      </div>
     </header>
 
     <!-- Left Sidebar (Directly Starts with Your Library) -->
@@ -160,6 +184,12 @@
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
               <span class="create-playlist-btn-text">Create</span>
+            </button>
+            <button class="icon-action-btn sidebar-settings-btn" id="sidebarSettingsBtn" title="Settings" aria-label="Settings">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
             </button>
           </div>
         </div>
@@ -907,10 +937,10 @@
               style="display: none;">
 
             <button class="btn-secondary" id="playAllLocalBtn" style="display: none; white-space: nowrap !important;">
-              <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor">
+              <svg class="play-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <polygon points="5 3 19 12 5 21 5 3" />
               </svg>
-              <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+              <svg class="pause-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
                 <rect x="6" y="4" width="4" height="16" />
                 <rect x="14" y="4" width="4" height="16" />
               </svg>
@@ -1244,6 +1274,7 @@
               <polyline points="7 23 3 19 7 15" />
               <path d="M21 13v2a4 4 0 0 1-4 4H3" />
             </svg>
+            <span class="repeat-one-badge" aria-hidden="true">1</span>
           </button>
         </div>
 
@@ -1328,26 +1359,26 @@
       </div>
     </footer>
 
-    <!-- Mobile Bottom Navigation Bar (Phone Screens < 768px - Tubelight Pill) -->
-    <nav class="mobile-nav-bar" id="mobileNavBar">
-      <button class="mobile-nav-item active" id="mobNavHome" data-view="home">
+    <!-- Mobile Bottom Navigation Bar (Phone Screens < 768px - Sliding Tubelight Pill) -->
+    <nav class="mobile-nav-bar" id="mobileNavBar" style="--nav-idx: 0;">
+      <div class="mobile-nav-slider" id="mobNavSlider" aria-hidden="true">
         <span class="tubelight-lamp"></span>
+      </div>
+      <button class="mobile-nav-item active" id="mobNavHome" data-view="home" data-idx="0">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
           <polyline points="9 22 9 12 15 12 15 22" />
         </svg>
         <span>Home</span>
       </button>
-      <button class="mobile-nav-item" id="mobNavSearch" data-view="search">
-        <span class="tubelight-lamp"></span>
+      <button class="mobile-nav-item" id="mobNavSearch" data-view="search" data-idx="1">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8" />
           <path d="m21 21-4.3-4.3" />
         </svg>
         <span>Search</span>
       </button>
-      <button class="mobile-nav-item" id="mobNavLibrary" data-view="library" title="Your Library">
-        <span class="tubelight-lamp"></span>
+      <button class="mobile-nav-item" id="mobNavLibrary" data-view="library" data-idx="2" title="Your Library">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           stroke-linejoin="round">
           <path d="m16 6 4 14" />
@@ -1356,6 +1387,14 @@
           <path d="M4 4v16" />
         </svg>
         <span>Library</span>
+      </button>
+      <button class="mobile-nav-item" id="mobNavDownloads" data-view="downloads" data-idx="3" title="Downloads">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        <span>Downloads</span>
       </button>
     </nav>
 
@@ -1437,6 +1476,7 @@
             <polyline points="7 23 3 19 7 15" />
             <path d="M21 13v2a4 4 0 0 1-4 4H3" />
           </svg>
+          <span class="repeat-one-badge" aria-hidden="true">1</span>
         </button>
       </div>
 
