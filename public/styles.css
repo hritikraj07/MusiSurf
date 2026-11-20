@@ -134,241 +134,6 @@ html, body {
   grid-template-columns: 86px 1fr !important;
 }
 
-.app-layout.sidebar-full-width {
-  grid-template-columns: 1fr 0px !important;
-}
-
-.app-layout.sidebar-full-width .main-wrapper {
-  display: none !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
-
-.app-layout.sidebar-full-width .sidebar {
-  width: calc(100vw - 16px) !important;
-  max-width: 100% !important;
-  margin: 0 8px !important;
-  padding: 16px 24px 32px !important;
-}
-
-/* Fullscreen Mode: Library Header & Actions (Image 4) */
-.app-layout.sidebar-full-width .library-header {
-  padding: 4px 0 16px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-}
-
-/* Hide collapse button when fullscreen - only keep restore full screen button */
-.app-layout.sidebar-full-width #collapseSidebarBtn {
-  display: none !important;
-}
-
-.app-layout.sidebar-full-width .library-header-actions {
-  margin-left: auto !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 12px !important;
-}
-
-/* In fullscreen mode: make + icon instead of writing "+ Create" */
-.app-layout.sidebar-full-width #createPlaylistBtn {
-  background: #242424 !important;
-  color: #ffffff !important;
-  border-radius: 50% !important;
-  width: 36px !important;
-  height: 36px !important;
-  padding: 0 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  cursor: pointer !important;
-  transition: background 0.2s, transform 0.15s !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-}
-
-.app-layout.sidebar-full-width #createPlaylistBtn:hover {
-  background: #333333 !important;
-  transform: scale(1.08) !important;
-}
-
-.app-layout.sidebar-full-width #createPlaylistBtn .create-playlist-btn-text {
-  display: none !important;
-}
-
-/* Fullscreen Mode: Library Search & Sort Row (Search to the right, left of Recents) */
-.app-layout.sidebar-full-width .sidebar-library-search-row {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: flex-end !important;
-  gap: 12px !important;
-  padding: 8px 0 20px !important;
-  margin-bottom: 8px !important;
-}
-
-.app-layout.sidebar-full-width .sidebar-lib-search-box {
-  background: #242424 !important;
-  border-radius: 8px !important;
-  padding: 8px 14px !important;
-  width: 260px !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-}
-
-.app-layout.sidebar-full-width .sidebar-lib-search-input {
-  display: block !important;
-  width: 100% !important;
-  font-size: 0.9rem !important;
-}
-
-.app-layout.sidebar-full-width .sidebar-lib-sort-btn .sort-icon-list {
-  display: none !important;
-}
-
-.app-layout.sidebar-full-width .sidebar-lib-sort-btn .sort-icon-grid {
-  display: block !important;
-}
-
-/* Fullscreen Mode: Responsive Horizontal Card Grid Layout */
-.app-layout.sidebar-full-width .library-content {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
-  gap: 16px !important;
-  padding: 8px 0 40px !important;
-  overflow-y: auto !important;
-}
-
-.app-layout.sidebar-full-width .custom-playlists-container,
-.app-layout.sidebar-full-width #customPlaylistsList {
-  display: contents !important;
-}
-
-/* Equalize Replay, Liked Songs, Local Music, Downloads, and all Playlists to the exact same size & height */
-.app-layout.sidebar-full-width .library-item,
-.app-layout.sidebar-full-width .playlist-list-item,
-.app-layout.sidebar-full-width .liked-songs-item,
-.app-layout.sidebar-full-width .local-music-item,
-.app-layout.sidebar-full-width .downloaded-songs-item,
-.app-layout.sidebar-full-width .replay-nav-item {
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
-  background: #181818 !important;
-  border-radius: 10px !important;
-  padding: 12px 14px !important;
-  gap: 14px !important;
-  transition: background 0.2s ease, transform 0.15s ease !important;
-  position: relative !important;
-  height: 88px !important;
-  min-height: 88px !important;
-  max-height: 88px !important;
-  cursor: pointer !important;
-  box-sizing: border-box !important;
-  border: 1px solid rgba(255, 255, 255, 0.05) !important;
-}
-
-.app-layout.sidebar-full-width .library-item:hover,
-.app-layout.sidebar-full-width .playlist-list-item:hover,
-.app-layout.sidebar-full-width .liked-songs-item:hover,
-.app-layout.sidebar-full-width .local-music-item:hover,
-.app-layout.sidebar-full-width .downloaded-songs-item:hover,
-.app-layout.sidebar-full-width .replay-nav-item:hover {
-  background: #242424 !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
-  transform: translateY(-2px) !important;
-}
-
-.app-layout.sidebar-full-width .replay-cover-art-box,
-.app-layout.sidebar-full-width .liked-icon-box,
-.app-layout.sidebar-full-width .local-icon-box,
-.app-layout.sidebar-full-width .downloaded-icon-box,
-.app-layout.sidebar-full-width .playlist-cover-mini,
-.app-layout.sidebar-full-width .item-cover {
-  width: 64px !important;
-  height: 64px !important;
-  min-width: 64px !important;
-  min-height: 64px !important;
-  max-width: 64px !important;
-  max-height: 64px !important;
-  aspect-ratio: 1 / 1 !important;
-  border-radius: 8px !important;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45) !important;
-  position: relative !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  overflow: hidden !important;
-  flex-shrink: 0 !important;
-}
-
-.app-layout.sidebar-full-width .local-icon-box {
-  background: #121316 !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-}
-
-.app-layout.sidebar-full-width .local-icon-box .local-folder-icon-img {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-}
-
-.app-layout.sidebar-full-width .liked-icon-box svg,
-.app-layout.sidebar-full-width .downloaded-icon-box svg {
-  width: 30px !important;
-  height: 30px !important;
-}
-
-.app-layout.sidebar-full-width .playlist-cover-img,
-.app-layout.sidebar-full-width .item-cover-img,
-.app-layout.sidebar-full-width .replay-cover-art-img {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  border-radius: 8px !important;
-}
-
-.app-layout.sidebar-full-width .library-item-info,
-.app-layout.sidebar-full-width .playlist-item-info {
-  flex: 1 !important;
-  min-width: 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: center !important;
-  gap: 4px !important;
-}
-
-.app-layout.sidebar-full-width .library-item-title,
-.app-layout.sidebar-full-width .playlist-title {
-  font-size: 0.95rem !important;
-  font-weight: 700 !important;
-  color: #ffffff !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-}
-
-.app-layout.sidebar-full-width .library-item-meta,
-.app-layout.sidebar-full-width .playlist-item-meta,
-.app-layout.sidebar-full-width .playlist-subtext {
-  font-size: 0.82rem !important;
-  color: #a7a7a7 !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-}
-
-.app-layout.sidebar-full-width .playlist-cover-play-btn {
-  width: 44px !important;
-  height: 44px !important;
-  bottom: 8px !important;
-  right: 8px !important;
-  background: #ffffff !important;
-  color: #000000 !important;
-  border-radius: 50% !important;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4) !important;
-}
-
 /* ==========================================================================
    LEFT SIDEBAR (Spotify Style)
    ========================================================================== */
@@ -1504,9 +1269,7 @@ html, body {
   margin-right: -2px !important;
 }
 
-.library-header-actions #createPlaylistBtn {
-  margin-left: 6px !important;
-}
+
 
 .library-header-actions .create-playlist-btn-text {
   display: none;
@@ -1750,14 +1513,12 @@ html, body {
 .sidebar.collapsed .library-header-right,
 .sidebar.collapsed .library-header-actions,
 .sidebar.collapsed #createPlaylistBtn,
-.sidebar.collapsed #expandLibraryFullBtn,
 .sidebar.collapsed .sidebar-library-search-row,
 #app.sidebar-collapsed .sidebar .library-nav-btn,
 #app.sidebar-collapsed .sidebar .library-heading,
 #app.sidebar-collapsed .sidebar .library-header-right,
 #app.sidebar-collapsed .sidebar .library-header-actions,
 #app.sidebar-collapsed .sidebar #createPlaylistBtn,
-#app.sidebar-collapsed .sidebar #expandLibraryFullBtn,
 #app.sidebar-collapsed .sidebar .sidebar-library-search-row {
   display: none !important;
 }
@@ -1844,7 +1605,6 @@ html, body {
 .sidebar.collapsed .playlist-item-info,
 .sidebar.collapsed .sidebar-pin-icon,
 .sidebar.collapsed #createPlaylistBtn,
-.sidebar.collapsed #expandLibraryFullBtn,
 .sidebar.collapsed .library-header-actions,
 .sidebar.collapsed .sidebar-library-search-row,
 .sidebar.collapsed .sidebar-footer,
@@ -1856,7 +1616,6 @@ html, body {
 #app.sidebar-collapsed .sidebar .playlist-item-info,
 #app.sidebar-collapsed .sidebar .sidebar-pin-icon,
 #app.sidebar-collapsed .sidebar #createPlaylistBtn,
-#app.sidebar-collapsed .sidebar #expandLibraryFullBtn,
 #app.sidebar-collapsed .sidebar .library-header-actions,
 #app.sidebar-collapsed .sidebar .sidebar-library-search-row,
 #app.sidebar-collapsed .sidebar .sidebar-footer,
@@ -11580,8 +11339,7 @@ body[data-active-view="lyrics"] .content-scroll {
 /* 2. Playlist Cover: Do NOT show play/pause icon on hover */
 .playlist-cover-play-btn,
 .playlist-cover-mini .playlist-cover-play-btn,
-.playlist-list-item:hover .playlist-cover-mini .playlist-cover-play-btn,
-.app-layout.sidebar-full-width .playlist-cover-play-btn {
+.playlist-list-item:hover .playlist-cover-mini .playlist-cover-play-btn {
   display: none !important;
   opacity: 0 !important;
   visibility: hidden !important;

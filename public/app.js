@@ -127,7 +127,6 @@
     streakDaysCount: document.getElementById('streakDaysCount'),
     customPlaylistsList: document.getElementById('customPlaylistsList'),
     createPlaylistBtn: document.getElementById('createPlaylistBtn'),
-    expandLibraryFullBtn: document.getElementById('expandLibraryFullBtn'),
     likedCountMeta: document.getElementById('likedCountMeta'),
     downloadedCountMeta: document.getElementById('downloadedCountMeta'),
     localCountMeta: document.getElementById('localCountMeta'),
@@ -7038,22 +7037,6 @@
           }, 60);
         }
         if (elements.searchAutocompleteDropdown) elements.searchAutocompleteDropdown.style.display = 'none';
-      });
-    }
-
-    // Expand Library Full Width Toggle
-    if (elements.expandLibraryFullBtn) {
-      elements.expandLibraryFullBtn.addEventListener('click', () => {
-        const app = document.getElementById('app') || document.querySelector('.app-layout');
-        if (!app) return;
-        const isFull = app.classList.toggle('sidebar-full-width');
-        const expIcon = elements.expandLibraryFullBtn.querySelector('.icon-lib-expand-full');
-        const colIcon = elements.expandLibraryFullBtn.querySelector('.icon-lib-collapse-full');
-        if (expIcon && colIcon) {
-          expIcon.style.display = isFull ? 'none' : 'block';
-          colIcon.style.display = isFull ? 'block' : 'none';
-        }
-        elements.expandLibraryFullBtn.title = isFull ? 'Collapse Library to Normal' : 'Expand Library Full Width';
       });
     }
 
