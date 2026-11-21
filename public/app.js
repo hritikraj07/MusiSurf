@@ -1563,8 +1563,6 @@
     return audioContextInstance;
   }
 
-  const trackEdgeSilenceCache = new Map();
-
   function getTrackSilenceCacheKey(track) {
     if (!track) return '';
     return String(track.id || track.ytId || track.audioUrl || `${track.title || ''}::${track.artist || ''}`);
@@ -5706,6 +5704,16 @@
 
     // Update in-playlist / library tick mark
     updateAllPlaylistTickBadges(track.id);
+
+    // Neon Postgres Cloud Persistence
+    if (state.currentUser && state.currentUser.id) {
+      fetch('/api/library/likes/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ track })
+      }).catch(err => console.warn('[Neon Likes] Persistence sync error:', err.message));
+    }
   }
 
   function updateHeartIcon(currentTrackId) {
@@ -6490,6 +6498,12 @@
   } catch (e) {}
 
   function executeDeletePlaylist(playlistId, title) {
+    if (state.currentUser && state.currentUser.id && !playlistId.startsWith('pl_')) {
+      fetch(`/api/library/playlists/${playlistId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      }).catch(err => console.warn('[Neon Playlists] Delete error:', err.message));
+    }
     state.customPlaylists = state.customPlaylists.filter(p => p.id !== playlistId);
     saveStoredPlaylists();
     renderSidebarPlaylists();
@@ -7576,11 +7590,25 @@
             pl.tracks = pl.tracks.filter(t => t.id !== track.id);
             chk.classList.remove('checked');
             showToast(`Removed from "${pl.name}"`, 'ℹ');
+            if (state.currentUser && state.currentUser.id && !pl.id.startsWith('pl_')) {
+              fetch(`/api/library/playlists/${pl.id}/tracks/${encodeURIComponent(track.id)}`, {
+                method: 'DELETE',
+                credentials: 'include'
+              }).catch(() => {});
+            }
           } else {
             const trackWithDate = { ...track, addedAt: track.addedAt || Date.now() };
             pl.tracks.push(trackWithDate);
             chk.classList.add('checked');
             showToast(`Added to "${pl.name}"`, '✓');
+            if (state.currentUser && state.currentUser.id && !pl.id.startsWith('pl_')) {
+              fetch(`/api/library/playlists/${pl.id}/tracks`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ track })
+              }).catch(() => {});
+            }
           }
           saveStoredPlaylists();
           updateAllPlaylistTickBadges(track.id);
@@ -9114,21 +9142,53 @@
       elements.createPlaylistModal.style.display = 'none';
     });
 
-    elements.createPlaylistForm.addEventListener('submit', (e) => {
+    elements.createPlaylistForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const name = elements.playlistNameInput.value.trim();
       const desc = elements.playlistDescInput.value.trim();
       if (!name) return;
 
+      let newPlId = 'pl_' + Date.now();
+      const initialTracks = pendingTrackForPlaylist ? [pendingTrackForPlaylist] : [];
+
+      if (state.currentUser && state.currentUser.id) {
+        try {
+          const res = await fetch('/api/library/playlists', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ name, description: desc })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.playlist) {
+              newPlId = data.playlist.id;
+              if (pendingTrackForPlaylist) {
+                fetch(`/api/library/playlists/${newPlId}/tracks`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({ track: pendingTrackForPlaylist })
+                }).catch(() => {});
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('[Neon Playlists] Create error:', err.message);
+        }
+      }
+
       const newPl = {
-        id: 'pl_' + Date.now(),
+        id: newPlId,
         name,
         description: desc,
-        tracks: pendingTrackForPlaylist ? [pendingTrackForPlaylist] : []
+        tracks: initialTracks
       };
 
       state.customPlaylists.push(newPl);
       saveStoredPlaylists();
+      renderSidebarPlaylists();
+      updateLibraryUI();
       elements.createPlaylistModal.style.display = 'none';
       elements.playlistNameInput.value = '';
       elements.playlistDescInput.value = '';
@@ -10879,11 +10939,93 @@
   }
 
   // ==========================================================================
-  // MUSISURF AUTHENTICATION SYSTEM (Desktop Split & Mobile Card)
+  // MUSISURF AUTHENTICATION & NEON CLOUD PERSISTENCE SYSTEM
   // ==========================================================================
+  async function syncLibraryFromServer() {
+    if (!state.currentUser || !state.currentUser.id) return;
+    try {
+      // 1. Sync Liked Tracks
+      const likesRes = await fetch('/api/library/likes', { credentials: 'include' });
+      if (likesRes.ok) {
+        const data = await likesRes.json();
+        if (data.success && Array.isArray(data.tracks)) {
+          state.likedSongs = data.tracks.map(t => ({
+            id: t.track_id || t.id,
+            title: t.title,
+            artist: t.artist,
+            album: t.album || '',
+            image: t.thumbnail_url || '/icons/icon.svg',
+            duration: t.duration_seconds || 0,
+            addedAt: new Date(t.liked_at).getTime()
+          }));
+          saveStoredLikes();
+          updateHeartIcon(state.currentTrack?.id);
+          if (state.currentView === 'liked') {
+            renderPlaylistView('liked');
+          }
+          if (elements.libHubLikedMeta) {
+            elements.libHubLikedMeta.textContent = `${state.likedSongs.length} songs`;
+          }
+        }
+      }
+
+      // 2. Sync Playlists
+      const plRes = await fetch('/api/library/playlists', { credentials: 'include' });
+      if (plRes.ok) {
+        const plData = await plRes.json();
+        if (plData.success && Array.isArray(plData.playlists)) {
+          const fullPlaylists = await Promise.all(plData.playlists.map(async (pl) => {
+            try {
+              const singleRes = await fetch(`/api/library/playlists/${pl.id}`, { credentials: 'include' });
+              if (singleRes.ok) {
+                const sData = await singleRes.json();
+                if (sData.success && sData.playlist) {
+                  return {
+                    id: sData.playlist.id,
+                    name: sData.playlist.name,
+                    description: sData.playlist.description || '',
+                    cover_url: sData.playlist.cover_url,
+                    tracks: (sData.playlist.tracks || []).map(t => ({
+                      id: t.track_id || t.id,
+                      title: t.title,
+                      artist: t.artist,
+                      album: t.album || '',
+                      image: t.thumbnail_url || '/icons/icon.svg',
+                      duration: t.duration_seconds || 0,
+                      addedAt: new Date(t.added_at).getTime()
+                    }))
+                  };
+                }
+              }
+            } catch (err) {}
+            return {
+              id: pl.id,
+              name: pl.name,
+              description: pl.description || '',
+              cover_url: pl.cover_url,
+              tracks: []
+            };
+          }));
+
+          state.customPlaylists = fullPlaylists;
+          saveStoredPlaylists();
+          renderSidebarPlaylists();
+          updateLibraryUI();
+          if (state.activePlaylistId && state.customPlaylists.some(p => p.id === state.activePlaylistId)) {
+            renderPlaylistView(state.activePlaylistId);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Neon Sync] Failed to sync library:', err.message);
+    }
+  }
+
   function initAuthSystem() {
     const authModal = document.getElementById('authModal');
     const closeAuthModalBtn = document.getElementById('closeAuthModalBtn');
+    const authMainContainer = document.getElementById('authMainContainer');
+    const authOtpContainer = document.getElementById('authOtpContainer');
     const authForm = document.getElementById('authForm');
     const authNameGroup = document.getElementById('authNameGroup');
     const authNameInput = document.getElementById('authNameInput');
@@ -10896,10 +11038,26 @@
     const authSwitchBtn = document.getElementById('authSwitchBtn');
     const authSwitchPrompt = document.getElementById('authSwitchPrompt');
     const authForgotLink = document.getElementById('authForgotLink');
+    const authGoogleBtn = document.getElementById('authGoogleBtn');
+    const authTabSignIn = document.getElementById('authTabSignIn');
+    const authTabSignUp = document.getElementById('authTabSignUp');
+    const authAlert = document.getElementById('authAlert');
+
+    const authOtpInput = document.getElementById('authOtpInput');
+    const authOtpSubTitle = document.getElementById('authOtpSubTitle');
+    const authVerifyOtpBtn = document.getElementById('authVerifyOtpBtn');
+    const authResendOtpBtn = document.getElementById('authResendOtpBtn');
+    const authBackToAuthBtn = document.getElementById('authBackToAuthBtn');
 
     const headerUserAvatarBtn = document.getElementById('headerUserAvatarBtn');
     const headerUserIconSvg = document.getElementById('headerUserIconSvg');
-    const headerUserInitial = document.getElementById('headerUserInitial');
+    const userProfileDropdown = document.getElementById('userProfileDropdown');
+    const userDropdownAvatar = document.getElementById('userDropdownAvatar');
+    const userDropdownName = document.getElementById('userDropdownName');
+    const userDropdownEmail = document.getElementById('userDropdownEmail');
+    const userDropdownSettingsBtn = document.getElementById('userDropdownSettingsBtn');
+    const userDropdownSignOutBtn = document.getElementById('userDropdownSignOutBtn');
+
     const mobTopProfileBtn = document.getElementById('mobTopProfileBtn');
     const mobTopAvatar = document.getElementById('mobTopAvatar');
 
@@ -10913,25 +11071,41 @@
     const drawerUserEmail = document.getElementById('drawerUserEmail');
 
     let authMode = 'signin';
+    let pendingVerificationEmail = '';
+
+    function showAlert(message, type = 'error') {
+      if (!authAlert) return;
+      authAlert.className = `auth-alert ${type}`;
+      authAlert.textContent = message;
+      authAlert.style.display = 'flex';
+    }
+
+    function clearAlert() {
+      if (!authAlert) return;
+      authAlert.textContent = '';
+      authAlert.style.display = 'none';
+    }
 
     function updateAuthUI() {
       const user = state.currentUser;
       if (user && user.email) {
-        // Logged In State (Clean single profile avatar button matching Image 1)
         if (headerUserAvatarBtn) {
           headerUserAvatarBtn.title = `${user.name || user.email} (Signed In)`;
           if (headerUserIconSvg) headerUserIconSvg.style.display = 'block';
-          if (headerUserInitial) headerUserInitial.style.display = 'none';
         }
+
+        const initial = ((user.name || user.email || 'U')[0]).toUpperCase();
+        if (userDropdownAvatar) userDropdownAvatar.textContent = initial;
+        if (userDropdownName) userDropdownName.textContent = user.name || user.email.split('@')[0];
+        if (userDropdownEmail) userDropdownEmail.textContent = user.email;
 
         if (mobTopAvatar) {
           mobTopAvatar.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
         }
 
-        // Drawer User Card
-        if (drawerUserAvatar) drawerUserAvatar.innerHTML = `<span style="font-weight:700;font-size:16px;color:#fff;">${(user.name || user.email || 'U')[0].toUpperCase()}</span>`;
+        if (drawerUserAvatar) drawerUserAvatar.innerHTML = `<span style="font-weight:700;font-size:16px;color:#fff;">${initial}</span>`;
         if (drawerUserName) drawerUserName.textContent = user.name || user.email.split('@')[0];
-        if (drawerUserStatus) drawerUserStatus.textContent = 'Signed in';
+        if (drawerUserStatus) drawerUserStatus.textContent = 'Signed in with Neon';
         if (drawerUserEmail) drawerUserEmail.textContent = user.email;
 
         if (drawerTopSignInBtn) drawerTopSignInBtn.style.display = 'none';
@@ -10940,12 +11114,12 @@
         if (drawerSignInBtn) drawerSignInBtn.style.display = 'none';
         if (drawerSignOutBtn) drawerSignOutBtn.style.display = 'flex';
       } else {
-        // Guest State (Clean single profile avatar button matching Image 1)
         if (headerUserAvatarBtn) {
           headerUserAvatarBtn.title = 'Account & Sign In';
           if (headerUserIconSvg) headerUserIconSvg.style.display = 'block';
-          if (headerUserInitial) headerUserInitial.style.display = 'none';
         }
+
+        if (userProfileDropdown) userProfileDropdown.style.display = 'none';
 
         if (mobTopAvatar) {
           mobTopAvatar.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
@@ -10966,6 +11140,15 @@
 
     function openAuthModal(mode = 'signin') {
       authMode = mode;
+      clearAlert();
+      if (authOtpContainer) authOtpContainer.style.display = 'none';
+      if (authMainContainer) authMainContainer.style.display = 'block';
+
+      if (authTabSignIn && authTabSignUp) {
+        authTabSignIn.classList.toggle('active', authMode === 'signin');
+        authTabSignUp.classList.toggle('active', authMode === 'signup');
+      }
+
       if (authMode === 'signup') {
         if (authMainTitle) authMainTitle.textContent = 'Join MusiSurf';
         if (authSubTitle) authSubTitle.textContent = 'Create your free account for high fidelity music';
@@ -10985,7 +11168,7 @@
           if (span) span.textContent = 'Sign In';
         }
         if (authSwitchPrompt) authSwitchPrompt.textContent = "Don't have an account?";
-        if (authSwitchBtn) authSwitchBtn.textContent = 'Sign up';
+        if (authSwitchBtn) authSwitchBtn.textContent = 'Create one';
       }
       if (authModal) authModal.style.display = 'flex';
       try {
@@ -10995,20 +11178,110 @@
 
     function closeAuthModal() {
       if (authModal) authModal.style.display = 'none';
+      clearAlert();
     }
 
-    // Top User Avatar Button (Web / Desktop)
-    if (headerUserAvatarBtn) {
-      headerUserAvatarBtn.addEventListener('click', () => {
-        if (!state.currentUser || !state.currentUser.email) {
-          openAuthModal('signin');
-        } else {
-          openSettingsModal();
+    async function checkActiveSession() {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.authenticated && data.user) {
+            state.currentUser = data.user;
+            localStorage.setItem('musisurf_user', JSON.stringify(data.user));
+            updateAuthUI();
+            syncLibraryFromServer();
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('[Auth] Check session error:', err.message);
+      }
+      try {
+        const local = localStorage.getItem('musisurf_user');
+        if (local) {
+          const parsed = JSON.parse(local);
+          if (parsed && parsed.email) {
+            state.currentUser = parsed;
+            updateAuthUI();
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (authGoogleBtn) {
+      authGoogleBtn.addEventListener('click', async () => {
+        try {
+          const res = await fetch('/api/auth/social-url?provider=google&callbackURL=/');
+          const data = await res.json();
+          if (data && data.url) {
+            window.location.href = data.url;
+          } else {
+            showAlert('Could not initiate Google Sign-in. Please try again.');
+          }
+        } catch (err) {
+          showAlert('Failed to connect to Google Auth: ' + err.message);
         }
       });
     }
 
-    // Top Profile Button (Mobile)
+    if (authTabSignIn) {
+      authTabSignIn.addEventListener('click', () => openAuthModal('signin'));
+    }
+    if (authTabSignUp) {
+      authTabSignUp.addEventListener('click', () => openAuthModal('signup'));
+    }
+
+    if (headerUserAvatarBtn) {
+      headerUserAvatarBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!state.currentUser || !state.currentUser.email) {
+          openAuthModal('signin');
+        } else {
+          if (userProfileDropdown) {
+            const isVisible = userProfileDropdown.style.display !== 'none';
+            userProfileDropdown.style.display = isVisible ? 'none' : 'flex';
+          }
+        }
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      if (userProfileDropdown && userProfileDropdown.style.display !== 'none') {
+        if (!userProfileDropdown.contains(e.target) && !headerUserAvatarBtn.contains(e.target)) {
+          userProfileDropdown.style.display = 'none';
+        }
+      }
+    });
+
+    if (userDropdownSettingsBtn) {
+      userDropdownSettingsBtn.addEventListener('click', () => {
+        if (userProfileDropdown) userProfileDropdown.style.display = 'none';
+        openSettingsModal();
+      });
+    }
+
+    async function handleSignOut() {
+      try {
+        await fetch('/api/auth/sign-out', { method: 'POST', credentials: 'include' });
+      } catch (err) {}
+      state.currentUser = null;
+      try {
+        localStorage.removeItem('musisurf_user');
+      } catch (e) {}
+      if (userProfileDropdown) userProfileDropdown.style.display = 'none';
+      updateAuthUI();
+      showToast('Signed out successfully', '👋');
+      closeMobileDrawer();
+    }
+
+    if (userDropdownSignOutBtn) {
+      userDropdownSignOutBtn.addEventListener('click', handleSignOut);
+    }
+    if (drawerSignOutBtn) {
+      drawerSignOutBtn.addEventListener('click', handleSignOut);
+    }
+
     if (mobTopProfileBtn) {
       mobTopProfileBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -11020,7 +11293,6 @@
       });
     }
 
-    // Drawer Top Card trigger
     if (drawerUserCard) {
       drawerUserCard.addEventListener('click', () => {
         if (!state.currentUser || !state.currentUser.email) {
@@ -11036,8 +11308,6 @@
         openAuthModal('signin');
       });
     }
-
-    // Mobile Drawer Auth buttons
     if (drawerSignInBtn) {
       drawerSignInBtn.addEventListener('click', () => {
         closeMobileDrawer();
@@ -11045,19 +11315,6 @@
       });
     }
 
-    if (drawerSignOutBtn) {
-      drawerSignOutBtn.addEventListener('click', () => {
-        state.currentUser = null;
-        try {
-          localStorage.removeItem('musisurf_user');
-        } catch (e) {}
-        updateAuthUI();
-        showToast('Signed out successfully', '👋');
-        closeMobileDrawer();
-      });
-    }
-
-    // Close Modal
     if (closeAuthModalBtn) {
       closeAuthModalBtn.addEventListener('click', closeAuthModal);
     }
@@ -11067,7 +11324,6 @@
       });
     }
 
-    // Switch between Sign In and Sign Up
     if (authSwitchBtn) {
       authSwitchBtn.addEventListener('click', () => {
         authMode = authMode === 'signin' ? 'signup' : 'signin';
@@ -11075,18 +11331,16 @@
       });
     }
 
-    // Toggle Password Visibility
     if (togglePasswordBtn && authPasswordInput) {
       togglePasswordBtn.addEventListener('click', () => {
         const isPw = authPasswordInput.getAttribute('type') === 'password';
         authPasswordInput.setAttribute('type', isPw ? 'text' : 'password');
         togglePasswordBtn.innerHTML = isPw
           ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`
-          : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+          : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
       });
     }
 
-    // Forgot password
     if (authForgotLink) {
       authForgotLink.addEventListener('click', (e) => {
         e.preventDefault();
@@ -11094,47 +11348,179 @@
         if (email) {
           showToast(`Password reset instructions sent to ${email}`, '✉️');
         } else {
-          showToast('Please enter your email address first', 'ℹ️');
+          showAlert('Please enter your email address first to reset password');
         }
       });
     }
 
-    // Auth Form Submit
     if (authForm) {
-      authForm.addEventListener('submit', (e) => {
+      authForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        clearAlert();
         const email = authEmailInput ? authEmailInput.value.trim() : '';
         const password = authPasswordInput ? authPasswordInput.value.trim() : '';
         const name = (authNameInput && authNameInput.value.trim()) || email.split('@')[0] || 'User';
 
         if (!email) {
-          showToast('Please enter your email or username', '⚠️');
+          showAlert('Please enter your email address');
           return;
         }
-        if (!password || password.length < 4) {
-          showToast('Password must be at least 4 characters long', '⚠️');
+        if (!password || password.length < 6) {
+          showAlert('Password must be at least 6 characters long');
           return;
         }
 
-        const user = {
-          name: name,
-          email: email,
-          signedInAt: Date.now()
-        };
+        const submitBtnText = authSubmitBtn?.querySelector('span');
+        const origText = submitBtnText?.textContent || '';
+        if (submitBtnText) submitBtnText.textContent = 'Please wait...';
+        if (authSubmitBtn) authSubmitBtn.disabled = true;
 
-        state.currentUser = user;
         try {
-          localStorage.setItem('musisurf_user', JSON.stringify(user));
-        } catch (err) {}
+          if (authMode === 'signup') {
+            const res = await fetch('/api/auth/sign-up', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ email, password, name })
+            });
+            const data = await res.json();
+            if (!res.ok || data.error) {
+              showAlert(data.error || 'Failed to create account');
+              return;
+            }
 
-        updateAuthUI();
-        closeAuthModal();
-        showToast(authMode === 'signup' ? `Welcome to MusiSurf, ${name}!` : `Welcome back, ${name}!`, '✓');
+            pendingVerificationEmail = email;
+            if (authMainContainer) authMainContainer.style.display = 'none';
+            if (authOtpContainer) authOtpContainer.style.display = 'flex';
+            if (authOtpSubTitle) authOtpSubTitle.textContent = `Enter the 6-digit code sent to ${email}`;
+            if (authOtpInput) {
+              authOtpInput.value = '';
+              setTimeout(() => authOtpInput.focus(), 100);
+            }
+            showAlert('Verification code sent! Please check your email.', 'success');
+          } else {
+            const res = await fetch('/api/auth/sign-in', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+            if (!res.ok || data.error) {
+              showAlert(data.error || 'Invalid email or password');
+              return;
+            }
+
+            state.currentUser = data.user;
+            localStorage.setItem('musisurf_user', JSON.stringify(data.user));
+            updateAuthUI();
+            closeAuthModal();
+            showToast(`Welcome back, ${data.user.name || email}!`, '✓');
+            syncLibraryFromServer();
+          }
+        } catch (err) {
+          showAlert('Network error: ' + err.message);
+        } finally {
+          if (submitBtnText) submitBtnText.textContent = origText;
+          if (authSubmitBtn) authSubmitBtn.disabled = false;
+        }
       });
     }
 
-    // Initial Auth UI state
+    async function handleVerifyOtp() {
+      clearAlert();
+      const otp = authOtpInput ? authOtpInput.value.trim() : '';
+      const email = pendingVerificationEmail || (authEmailInput ? authEmailInput.value.trim() : '');
+
+      if (!otp || otp.length !== 6) {
+        showAlert('Please enter the complete 6-digit verification code');
+        return;
+      }
+      if (!email) {
+        showAlert('Missing email address for verification');
+        return;
+      }
+
+      const verifyBtnSpan = authVerifyOtpBtn?.querySelector('span');
+      const origText = verifyBtnSpan?.textContent || '';
+      if (verifyBtnSpan) verifyBtnSpan.textContent = 'Verifying...';
+      if (authVerifyOtpBtn) authVerifyOtpBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/auth/verify-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ email, otp })
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) {
+          showAlert(data.error || 'Invalid or expired verification code');
+          return;
+        }
+
+        state.currentUser = data.user;
+        localStorage.setItem('musisurf_user', JSON.stringify(data.user));
+        updateAuthUI();
+        closeAuthModal();
+        showToast(`Account verified! Welcome to MusiSurf, ${data.user.name || email}!`, '✓');
+        syncLibraryFromServer();
+      } catch (err) {
+        showAlert('Network error: ' + err.message);
+      } finally {
+        if (verifyBtnSpan) verifyBtnSpan.textContent = origText;
+        if (authVerifyOtpBtn) authVerifyOtpBtn.disabled = false;
+      }
+    }
+
+    if (authVerifyOtpBtn) {
+      authVerifyOtpBtn.addEventListener('click', handleVerifyOtp);
+    }
+    if (authOtpInput) {
+      authOtpInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleVerifyOtp();
+        }
+      });
+    }
+
+    if (authResendOtpBtn) {
+      authResendOtpBtn.addEventListener('click', async () => {
+        const email = pendingVerificationEmail || (authEmailInput ? authEmailInput.value.trim() : '');
+        if (!email) {
+          showAlert('Missing email address to resend code');
+          return;
+        }
+        try {
+          const res = await fetch('/api/auth/resend-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ email })
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            showAlert('A new verification code has been sent to your email.', 'success');
+          } else {
+            showAlert(data.error || 'Failed to resend verification code');
+          }
+        } catch (err) {
+          showAlert('Failed to resend code: ' + err.message);
+        }
+      });
+    }
+
+    if (authBackToAuthBtn) {
+      authBackToAuthBtn.addEventListener('click', () => {
+        if (authOtpContainer) authOtpContainer.style.display = 'none';
+        if (authMainContainer) authMainContainer.style.display = 'block';
+        clearAlert();
+      });
+    }
+
     updateAuthUI();
+    checkActiveSession();
   }
 
   // ==========================================================================

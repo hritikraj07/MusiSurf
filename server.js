@@ -1,5 +1,7 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
 const CryptoJS = require('crypto-js');
@@ -7,6 +9,8 @@ const { transliterateTextToDevanagari, detectLyricsLanguage } = require('./scrip
 const lyricsDiscoveryEngine = require('./scripts/lyrics_discovery_engine');
 const { cleanTrackTitle, extractArtists, extractSongVersion, computeLyricsMatchScore, validateLrcTimestamps } = require('./scripts/lyrics_matcher');
 const { analyzeTrackSilence } = require('./scripts/silence_detector');
+const { requireAuth, optionalAuth, getAuthenticatedUser } = require('./services/auth');
+const libraryService = require('./services/library');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,9 +29,22 @@ async function getYtdl() {
   }
 }
 
-app.use(cors());
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Legal Pages (Privacy Policy & Terms of Service for Google OAuth & Public Compliance)
+app.get(['/privacy', '/privacy-policy', '/privacy.html'], (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'privacy.html'));
+});
+
+app.get(['/terms', '/terms-of-service', '/terms.html'], (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'terms.html'));
+});
 
 // Helper to decode HTML entities
 function decodeHtmlEntities(str) {
@@ -1779,6 +1796,330 @@ app.get('/api/download', async (req, res) => {
   }
 
   res.status(404).send('Audio stream unavailable for download');
+});
+
+// ==========================================================================
+// NEON BUILT-IN AUTH & USER LIBRARY PERSISTENCE API
+// ==========================================================================
+
+// Client Auth Configuration
+app.get('/api/auth/config', (req, res) => {
+  res.json({
+    authBaseUrl: process.env.NEON_AUTH_BASE_URL || '',
+    jwksUrl: process.env.NEON_AUTH_JWKS_URL || '',
+    googleEnabled: true
+  });
+});
+
+// Current User Session
+app.get('/api/auth/me', async (req, res) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    res.json({
+      authenticated: Boolean(user),
+      user: user || null
+    });
+  } catch (err) {
+    res.json({ authenticated: false, user: null });
+  }
+});
+
+// Proxy Sign-Up to Neon Auth
+app.post('/api/auth/sign-up', async (req, res) => {
+  try {
+    const { email, password, name } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
+    const remoteRes = await fetch(`${process.env.NEON_AUTH_BASE_URL}/sign-up/email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Origin': origin,
+        'User-Agent': req.headers['user-agent'] || 'MusiSurf'
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        name: name || (email ? email.split('@')[0] : 'User'),
+        callbackURL: `${origin}/`
+      })
+    });
+
+    const setCookies = remoteRes.headers.getSetCookie ? remoteRes.headers.getSetCookie() : [remoteRes.headers.get('set-cookie')].filter(Boolean);
+    for (const sc of setCookies) {
+      res.append('Set-Cookie', sc);
+    }
+
+    const data = await remoteRes.json().catch(() => ({}));
+    if (!remoteRes.ok) {
+      return res.status(remoteRes.status).json(data);
+    }
+
+    // Automatically trigger verification OTP email
+    try {
+      await fetch(`${process.env.NEON_AUTH_BASE_URL}/email-otp/send-verification-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Origin': origin
+        },
+        body: JSON.stringify({ email, type: 'email-verification' })
+      });
+    } catch (e) {}
+
+    res.json({
+      success: true,
+      requiresVerification: true,
+      user: data.user || null,
+      message: 'Account created. Please enter the 6-digit verification code sent to your email.'
+    });
+  } catch (err) {
+    console.error('[Auth API] Sign-up error:', err.message);
+    res.status(500).json({ error: 'Sign-up failed. Please try again.' });
+  }
+});
+
+// Proxy Sign-In to Neon Auth
+app.post('/api/auth/sign-in', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
+    const remoteRes = await fetch(`${process.env.NEON_AUTH_BASE_URL}/sign-in/email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Origin': origin,
+        'User-Agent': req.headers['user-agent'] || 'MusiSurf'
+      },
+      body: JSON.stringify({ email, password })
+    });
+
+    const setCookies = remoteRes.headers.getSetCookie ? remoteRes.headers.getSetCookie() : [remoteRes.headers.get('set-cookie')].filter(Boolean);
+    for (const sc of setCookies) {
+      res.append('Set-Cookie', sc);
+    }
+
+    const data = await remoteRes.json().catch(() => ({}));
+    if (!remoteRes.ok) {
+      return res.status(remoteRes.status).json(data);
+    }
+
+    res.json({
+      success: true,
+      user: data.user || null,
+      token: data.token || null
+    });
+  } catch (err) {
+    console.error('[Auth API] Sign-in error:', err.message);
+    res.status(500).json({ error: 'Sign-in failed. Please try again.' });
+  }
+});
+
+// Verify 6-digit Email Verification Code
+app.post('/api/auth/verify-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ error: 'Email and 6-digit OTP code are required' });
+    }
+
+    const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
+    const remoteRes = await fetch(`${process.env.NEON_AUTH_BASE_URL}/email-otp/verify-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Origin': origin,
+        'User-Agent': req.headers['user-agent'] || 'MusiSurf'
+      },
+      body: JSON.stringify({ email, otp: String(otp).trim() })
+    });
+
+    const setCookies = remoteRes.headers.getSetCookie ? remoteRes.headers.getSetCookie() : [remoteRes.headers.get('set-cookie')].filter(Boolean);
+    for (const sc of setCookies) {
+      res.append('Set-Cookie', sc);
+    }
+
+    const data = await remoteRes.json().catch(() => ({}));
+    if (!remoteRes.ok) {
+      return res.status(remoteRes.status).json(data);
+    }
+
+    res.json({
+      success: true,
+      user: data.user || null,
+      token: data.token || null,
+      message: 'Email verified successfully!'
+    });
+  } catch (err) {
+    console.error('[Auth API] Verify OTP error:', err.message);
+    res.status(500).json({ error: 'Verification failed. Please check the code and try again.' });
+  }
+});
+
+// Resend Verification Code
+app.post('/api/auth/resend-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+
+    const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
+    const remoteRes = await fetch(`${process.env.NEON_AUTH_BASE_URL}/email-otp/send-verification-otp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Origin': origin
+      },
+      body: JSON.stringify({ email, type: 'email-verification' })
+    });
+
+    const data = await remoteRes.json().catch(() => ({}));
+    res.status(remoteRes.status).json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to resend code.' });
+  }
+});
+
+// Sign-Out
+app.post('/api/auth/sign-out', async (req, res) => {
+  try {
+    const cookieHeader = req.headers.cookie || '';
+    if (process.env.NEON_AUTH_BASE_URL && cookieHeader) {
+      await fetch(`${process.env.NEON_AUTH_BASE_URL}/sign-out`, {
+        method: 'POST',
+        headers: { cookie: cookieHeader }
+      }).catch(() => {});
+    }
+  } catch (e) {}
+
+  res.clearCookie('better-auth.session_token', { path: '/' });
+  res.clearCookie('session_token', { path: '/' });
+  res.json({ success: true, message: 'Signed out successfully' });
+});
+
+// Social Login URL (Google)
+app.get('/api/auth/social-url', (req, res) => {
+  const provider = req.query.provider || 'google';
+  const callbackUrl = req.query.callbackURL || `${req.protocol}://${req.get('host')}/`;
+  const url = `${process.env.NEON_AUTH_BASE_URL}/sign-in/social?provider=${encodeURIComponent(provider)}&callbackURL=${encodeURIComponent(callbackUrl)}`;
+  res.json({ url });
+});
+
+// --------------------------------------------------------------------------
+// USER LIBRARY PERSISTENCE (LIKED TRACKS & PLAYLISTS)
+// --------------------------------------------------------------------------
+
+// Get Liked Tracks
+app.get('/api/library/likes', requireAuth, async (req, res) => {
+  try {
+    const tracks = await libraryService.getUserLikes(req.user.id);
+    res.json({ success: true, tracks });
+  } catch (err) {
+    console.error('[Library API] Get likes error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Toggle Liked Track
+app.post('/api/library/likes/toggle', requireAuth, async (req, res) => {
+  try {
+    const track = req.body.track || req.body;
+    if (!track) return res.status(400).json({ error: 'Track payload required' });
+
+    const result = await libraryService.toggleUserLike(req.user.id, track);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('[Library API] Toggle like error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get User Playlists
+app.get('/api/library/playlists', requireAuth, async (req, res) => {
+  try {
+    const playlists = await libraryService.getUserPlaylists(req.user.id);
+    res.json({ success: true, playlists });
+  } catch (err) {
+    console.error('[Library API] Get playlists error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Create Playlist
+app.post('/api/library/playlists', requireAuth, async (req, res) => {
+  try {
+    const { name, description, cover_url, is_public } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Playlist name is required' });
+    }
+
+    const playlist = await libraryService.createUserPlaylist(req.user.id, {
+      name,
+      description,
+      cover_url,
+      is_public
+    });
+    res.json({ success: true, playlist });
+  } catch (err) {
+    console.error('[Library API] Create playlist error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get Single Playlist and its Tracks
+app.get('/api/library/playlists/:id', requireAuth, async (req, res) => {
+  try {
+    const playlist = await libraryService.getPlaylistById(req.params.id, req.user.id);
+    if (!playlist) {
+      return res.status(404).json({ success: false, error: 'Playlist not found' });
+    }
+    res.json({ success: true, playlist });
+  } catch (err) {
+    console.error('[Library API] Get playlist error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Add Track to Playlist
+app.post('/api/library/playlists/:id/tracks', requireAuth, async (req, res) => {
+  try {
+    const track = req.body.track || req.body;
+    if (!track) return res.status(400).json({ error: 'Track payload required' });
+
+    const trackRecord = await libraryService.addTrackToPlaylist(req.params.id, req.user.id, track);
+    res.json({ success: true, track: trackRecord });
+  } catch (err) {
+    console.error('[Library API] Add track error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Remove Track from Playlist
+app.delete('/api/library/playlists/:id/tracks/:trackId', requireAuth, async (req, res) => {
+  try {
+    await libraryService.removeTrackFromPlaylist(req.params.id, req.user.id, req.params.trackId);
+    res.json({ success: true, removed: true, trackId: req.params.trackId });
+  } catch (err) {
+    console.error('[Library API] Remove track error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Delete Playlist
+app.delete('/api/library/playlists/:id', requireAuth, async (req, res) => {
+  try {
+    const deleted = await libraryService.deletePlaylist(req.params.id, req.user.id);
+    res.json({ success: true, deleted });
+  } catch (err) {
+    console.error('[Library API] Delete playlist error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // Status and Info

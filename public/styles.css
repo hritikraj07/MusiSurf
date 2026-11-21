@@ -1044,6 +1044,7 @@ html, body {
 }
 
 .top-header-right {
+  position: relative !important;
   display: flex !important;
   align-items: center !important;
   gap: 12px !important;
@@ -1051,6 +1052,122 @@ html, body {
   margin-left: auto !important;
   padding-right: 4px !important;
   order: 2 !important;
+}
+
+/* User Profile Dropdown Menu for Signed In Users */
+.user-profile-dropdown {
+  position: absolute !important;
+  top: calc(100% + 10px) !important;
+  right: 0 !important;
+  width: 240px !important;
+  background: #18191f !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8) !important;
+  padding: 10px !important;
+  z-index: 10000 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  animation: dropdownFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+@keyframes dropdownFadeIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.user-dropdown-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 6px 8px 10px 8px !important;
+}
+
+.user-dropdown-avatar {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  border-radius: 50% !important;
+  background: #252833 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+.user-dropdown-info {
+  min-width: 0 !important;
+  flex: 1 !important;
+}
+
+.user-dropdown-name {
+  font-size: 0.88rem !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.user-dropdown-email {
+  font-size: 0.76rem !important;
+  color: #9ca3af !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.user-dropdown-divider {
+  height: 1px !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  margin: 4px 0 !important;
+}
+
+.user-dropdown-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 9px 12px !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  border: none !important;
+  color: #d1d5db !important;
+  font-size: 0.86rem !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  width: 100% !important;
+  text-align: left !important;
+  transition: all 0.15s ease !important;
+}
+
+.user-dropdown-item svg {
+  width: 16px !important;
+  height: 16px !important;
+  color: #9ca3af !important;
+  flex-shrink: 0 !important;
+  transition: color 0.15s ease !important;
+}
+
+.user-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+.user-dropdown-item:hover svg {
+  color: #ffffff !important;
+}
+
+.user-dropdown-signout:hover {
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #f87171 !important;
+}
+
+.user-dropdown-signout:hover svg {
+  color: #f87171 !important;
 }
 
 /* User Avatar Button (Replaces Sign In button everywhere - Exact Match to Image 1) */
@@ -13004,7 +13121,181 @@ body[data-active-view="lyrics"] .content-scroll {
 .auth-sub-title {
   font-size: 0.92rem;
   color: #8c8f99;
-  margin: 6px 0 24px 0;
+  margin: 6px 0 20px 0;
+}
+
+/* Google Sign-in Button */
+.auth-google-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 18px;
+  background: #1c1e24;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  color: #ffffff;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 6px;
+}
+
+.auth-google-btn:hover {
+  background: #242730;
+  border-color: rgba(255, 255, 255, 0.28);
+  transform: translateY(-1px);
+}
+
+.auth-google-btn:active {
+  transform: translateY(0);
+}
+
+.auth-google-btn svg {
+  flex-shrink: 0;
+}
+
+/* Auth Divider */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  margin: 16px 0;
+  color: #6b7280;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.auth-divider span {
+  padding: 0 12px;
+}
+
+/* Tab Switch */
+.auth-tab-switch {
+  display: flex;
+  background: #101115;
+  border-radius: 10px;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.auth-tab-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: #8c8f99;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.auth-tab-btn.active {
+  background: #22252e;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* Alert Notification */
+.auth-alert {
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auth-alert.error {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.auth-alert.success {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #86efac;
+}
+
+/* 6-Digit Email Verification Code Input (Verify at Sign-up) */
+.auth-otp-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.auth-otp-input-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 6px 0;
+}
+
+.auth-otp-input {
+  width: 100%;
+  max-width: 280px;
+  text-align: center;
+  letter-spacing: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 1.6rem;
+  font-weight: 700;
+  padding: 14px 12px;
+  border-radius: 12px;
+  background: #1a1c23;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.auth-otp-input:focus {
+  border-color: #ffffff;
+  background: #20222a;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15);
+}
+
+.auth-otp-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.auth-link-btn {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  font-size: 0.84rem;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+.auth-link-btn:hover {
+  color: #ffffff;
+}
+
+.auth-dot-sep {
+  color: #4b5563;
+  font-size: 0.8rem;
 }
 
 .auth-form {
