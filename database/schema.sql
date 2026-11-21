@@ -73,3 +73,16 @@ CREATE TABLE IF NOT EXISTS playlist_playback_progress (
 CREATE INDEX IF NOT EXISTS idx_playlist_progress_user ON playlist_playback_progress(user_id);
 CREATE INDEX IF NOT EXISTS idx_playlist_progress_user_updated ON playlist_playback_progress(user_id, updated_at DESC);
 
+-- 5. User Search History Table (Account-Synced Recent Searches)
+CREATE TABLE IF NOT EXISTS user_search_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES neon_auth."user"(id) ON DELETE CASCADE,
+  query VARCHAR(255) NOT NULL,
+  searched_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Index for ordering user search history by newest first
+CREATE INDEX IF NOT EXISTS idx_user_search_history_user_time ON user_search_history(user_id, searched_at DESC);
+CREATE INDEX IF NOT EXISTS idx_user_search_history_user_query ON user_search_history(user_id, query);
+
+

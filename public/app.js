@@ -86,6 +86,16 @@
       durationMinutes: 0
     },
     recentlyPlayed: [],
+    searchHistory: (() => {
+      try {
+        const raw = localStorage.getItem('musisurf_search_history');
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) { return []; }
+    })(),
+    autocompleteCache: new Map(),
+    autocompleteAbortController: null,
+    selectedDropdownIndex: -1,
+    discoveryData: null,
     restoredResumeTime: 0,
     contextTrack: null,
     totalListenedSeconds: (() => {
@@ -5467,110 +5477,466 @@
     return sectionEl;
   }
 
-  function renderSearchRecentDropdown() {
+  // ==========================================================================
+  // SEARCH HISTORY & PERSISTENCE (Account-Synced with Neon DB & Local Fallback)
+  // ==========================================================================
+  async function syncUserSearchHistory() {
+    try {
+      if (state.currentUser && state.currentUser.id) {
+        const res = await fetch('/api/search/history');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.history)) {
+            const merged = Array.from(new Set([...data.history, ...state.searchHistory])).slice(0, 30);
+            state.searchHistory = merged;
+            try { localStorage.setItem('musisurf_search_history', JSON.stringify(merged)); } catch (e) {}
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Search] History sync note:', err.message);
+    }
+  }
+
+  function saveSearchHistoryQuery(query) {
+    const q = (query || '').trim();
+    if (!q || q.length < 2) return;
+    state.searchHistory = [q, ...state.searchHistory.filter(h => h.toLowerCase() !== q.toLowerCase())].slice(0, 30);
+    try { localStorage.setItem('musisurf_search_history', JSON.stringify(state.searchHistory)); } catch (e) {}
+
+    if (state.currentUser && state.currentUser.id) {
+      fetch('/api/search/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q })
+      }).catch(() => {});
+    }
+  }
+
+  function removeSearchHistoryQuery(query) {
+    const q = (query || '').trim();
+    state.searchHistory = state.searchHistory.filter(h => h.toLowerCase() !== q.toLowerCase());
+    try { localStorage.setItem('musisurf_search_history', JSON.stringify(state.searchHistory)); } catch (e) {}
+
+    if (state.currentUser && state.currentUser.id) {
+      fetch('/api/search/history?query=' + encodeURIComponent(q), { method: 'DELETE' }).catch(() => {});
+    }
+  }
+
+  function clearAllSearchHistory() {
+    state.searchHistory = [];
+    try { localStorage.removeItem('musisurf_search_history'); } catch (e) {}
+
+    if (state.currentUser && state.currentUser.id) {
+      fetch('/api/search/history', { method: 'DELETE' }).catch(() => {});
+    }
+  }
+
+  // ==========================================================================
+  // DISCOVERY & LIVE AUTOCOMPLETE SYSTEM
+  // ==========================================================================
+
+  // Empty State Dropdown: Recent Searches, Trending Queries, and Popular Songs
+  async function renderSearchDiscoveryDropdown() {
     if (!elements.searchAutocompleteDropdown) return;
-    const recents = (state.recentlyPlayed || []).slice(0, 6);
-    if (recents.length === 0) {
-      elements.searchAutocompleteDropdown.style.display = 'none';
-      return;
+    state.selectedDropdownIndex = -1;
+
+    // Fetch discovery data if not yet cached
+    if (!state.discoveryData) {
+      try {
+        const res = await fetch('/api/search/discovery');
+        if (res.ok) {
+          const d = await res.json();
+          if (d.success) state.discoveryData = d;
+        }
+      } catch (e) {}
     }
 
-    elements.searchAutocompleteDropdown.innerHTML = recents.map(item => `
-      <div class="search-suggestion-item" data-query="${escapeHtml(item.title || item.name || item)}">
-        <svg class="suggestion-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px !important; height: 16px !important; min-width: 16px !important; min-height: 16px !important; max-width: 16px !important; max-height: 16px !important; flex: 0 0 16px !important; flex-shrink: 0 !important; display: inline-block !important;">
-          <circle cx="12" cy="12" r="10"/>
-          <polyline points="12 6 12 12 16 14"/>
-        </svg>
-        <span class="suggestion-text">${escapeHtml(item.title || item.name || item)}</span>
-        <svg class="suggestion-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px !important; height: 14px !important; min-width: 14px !important; min-height: 14px !important; max-width: 14px !important; max-height: 14px !important; flex: 0 0 14px !important; flex-shrink: 0 !important; display: inline-block !important;">
-          <polyline points="9 18 15 12 9 6"/>
-        </svg>
-      </div>
-    `).join('');
+    const discovery = state.discoveryData || {
+      trendingSearches: ['Arijit Singh', 'Kesariya', 'Pasoori', 'Tu Hai Kahan', 'Sanam Teri Kasam', 'Diljit Dosanjh', 'Coldplay'],
+      popularSongs: [],
+      topArtists: []
+    };
 
+    const recentSearches = (state.searchHistory || []).slice(0, 5);
+    const recentPlayed = (state.recentlyPlayed || []).filter(t => t.type !== 'playlist').slice(0, 3);
+
+    let html = '';
+
+    // 1. Recent Searches with Delete Buttons
+    if (recentSearches.length > 0) {
+      html += `
+        <div class="dropdown-section-title">
+          <span>Recent Searches</span>
+          <button type="button" class="dropdown-clear-all-btn" id="dropdownClearAllSearchesBtn">Clear all</button>
+        </div>
+        <div class="dropdown-section-group">
+      `;
+      recentSearches.forEach(term => {
+        html += `
+          <div class="search-suggestion-item query-item" data-action="search" data-query="${escapeHtml(term)}">
+            <svg class="suggestion-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span class="suggestion-text">${escapeHtml(term)}</span>
+            <button type="button" class="sugg-delete-btn" title="Remove" data-query="${escapeHtml(term)}" aria-label="Remove search">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        `;
+      });
+      html += `</div>`;
+    }
+
+    // 2. Trending Searches
+    if (discovery.trendingSearches && discovery.trendingSearches.length > 0) {
+      html += `
+        <div class="dropdown-section-title">
+          <span>Trending Searches</span>
+        </div>
+        <div class="dropdown-section-group">
+      `;
+      discovery.trendingSearches.slice(0, 5).forEach(term => {
+        html += `
+          <div class="search-suggestion-item query-item" data-action="search" data-query="${escapeHtml(term)}">
+            <svg class="suggestion-search-icon" viewBox="0 0 24 24" fill="currentColor" style="color: #ff5252 !important;">
+              <path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/>
+            </svg>
+            <span class="suggestion-text">${escapeHtml(term)}</span>
+            <svg class="suggestion-arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </div>
+        `;
+      });
+      html += `</div>`;
+    }
+
+    // 3. Recently Played (only when empty and user has listened)
+    if (recentPlayed.length > 0) {
+      html += `
+        <div class="dropdown-section-title">
+          <span>Recently Played</span>
+        </div>
+        <div class="dropdown-section-group">
+      `;
+      recentPlayed.forEach(track => {
+        html += `
+          <div class="search-suggestion-item track-item" data-action="play-track" data-track-id="${escapeHtml(track.id)}" data-query="${escapeHtml(track.title)}">
+            <img src="${track.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=80&auto=format&fit=crop&q=80'}" alt="${escapeHtml(track.title)}" class="sugg-thumb" loading="lazy">
+            <div class="sugg-info">
+              <span class="sugg-title">${escapeHtml(track.title)}</span>
+              <span class="sugg-subtitle">${escapeHtml(track.artist || 'Artist')}</span>
+            </div>
+            <span class="sugg-badge">Song</span>
+          </div>
+        `;
+      });
+      html += `</div>`;
+    }
+
+    elements.searchAutocompleteDropdown.innerHTML = html;
     elements.searchAutocompleteDropdown.style.display = 'block';
 
+    // Clear all button
+    const clearAllBtn = elements.searchAutocompleteDropdown.querySelector('#dropdownClearAllSearchesBtn');
+    if (clearAllBtn) {
+      clearAllBtn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        clearAllSearchHistory();
+        renderSearchDiscoveryDropdown();
+      });
+    }
+
+    // Individual delete buttons
+    elements.searchAutocompleteDropdown.querySelectorAll('.sugg-delete-btn').forEach(btn => {
+      btn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const q = btn.dataset.query;
+        if (q) {
+          removeSearchHistoryQuery(q);
+          renderSearchDiscoveryDropdown();
+        }
+      });
+    });
+
+    // Suggestion selection
     elements.searchAutocompleteDropdown.querySelectorAll('.search-suggestion-item').forEach(el => {
       el.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.sugg-delete-btn')) return;
         e.preventDefault();
-        const selected = el.dataset.query;
-        if (selected) {
-          elements.globalSearchInput.value = selected;
+        const action = el.dataset.action;
+        const query = el.dataset.query;
+        const trackId = el.dataset.trackId;
+
+        if (action === 'play-track' && trackId) {
+          const tr = (state.recentlyPlayed || []).find(t => t.id === trackId);
+          elements.searchAutocompleteDropdown.style.display = 'none';
+          if (tr) playTrack(tr, null);
+        } else if (query) {
+          elements.globalSearchInput.value = query;
           elements.searchAutocompleteDropdown.style.display = 'none';
           switchView('search');
-          performSearch(selected);
+          saveSearchHistoryQuery(query);
+          performSearch(query);
         }
       });
     });
   }
 
-  // Autocomplete Search Suggestions Dropdown (Spotify Desktop Style)
-  function handleSearchAutocomplete(query) {
+  // Live Typeahead Autocomplete Handler with In-Flight Request Cancellation & Debouncing
+  async function handleSearchAutocomplete(query) {
     if (!elements.searchAutocompleteDropdown) return;
     const q = (query || '').trim();
+
+    // If query is empty, immediately show discovery interface
     if (!q) {
-      elements.searchAutocompleteDropdown.innerHTML = '';
-      elements.searchAutocompleteDropdown.style.display = 'none';
+      renderSearchDiscoveryDropdown();
       return;
     }
 
-    const suggestions = [];
-    // 1. Literal query
-    suggestions.push({ text: q, label: q });
+    // Abort previous in-flight autocomplete request
+    if (state.autocompleteAbortController) {
+      state.autocompleteAbortController.abort();
+    }
+    state.autocompleteAbortController = new AbortController();
+    const signal = state.autocompleteAbortController.signal;
 
-    // 2. Matching catalog / available tracks & artists
-    if (state.allAvailableTracks && state.allAvailableTracks.length > 0) {
-      const qLower = q.toLowerCase();
-      const seen = new Set([qLower]);
-      for (const track of state.allAvailableTracks) {
-        if (track.title && track.title.toLowerCase().includes(qLower) && !seen.has(track.title.toLowerCase())) {
-          seen.add(track.title.toLowerCase());
-          suggestions.push({ text: track.title, label: track.title });
-        }
-        if (track.artist && track.artist.toLowerCase().includes(qLower) && !seen.has(track.artist.toLowerCase())) {
-          seen.add(track.artist.toLowerCase());
-          suggestions.push({ text: track.artist, label: track.artist });
-        }
-        if (suggestions.length >= 6) break;
-      }
+    state.selectedDropdownIndex = -1;
+
+    // Check client-side autocomplete cache
+    const cacheKey = q.toLowerCase();
+    if (state.autocompleteCache && state.autocompleteCache.has(cacheKey)) {
+      renderAutocompleteResults(q, state.autocompleteCache.get(cacheKey));
+      return;
     }
 
-    // 3. Category queries
-    const categoryCards = document.querySelectorAll('.category-card');
-    categoryCards.forEach(card => {
-      if (suggestions.length >= 8) return;
-      const cat = card.dataset.query;
-      if (cat && cat.toLowerCase().includes(q.toLowerCase()) && !suggestions.some(s => s.text.toLowerCase() === cat.toLowerCase())) {
-        suggestions.push({ text: cat, label: cat });
+    try {
+      const res = await fetch(`/api/search/autocomplete?q=${encodeURIComponent(q)}`, { signal });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.success || !data.suggestions) return;
+
+      if (!state.autocompleteCache) state.autocompleteCache = new Map();
+      state.autocompleteCache.set(cacheKey, data.suggestions);
+      if (state.autocompleteCache.size > 100) {
+        const first = state.autocompleteCache.keys().next().value;
+        state.autocompleteCache.delete(first);
       }
-    });
 
-    elements.searchAutocompleteDropdown.innerHTML = suggestions.map(item => `
-      <div class="search-suggestion-item" data-query="${escapeHtml(item.text)}">
-        <svg class="suggestion-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px !important; height: 16px !important; min-width: 16px !important; min-height: 16px !important; max-width: 16px !important; max-height: 16px !important; flex: 0 0 16px !important; flex-shrink: 0 !important; display: inline-block !important;">
-          <circle cx="11" cy="11" r="8"/>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        <span class="suggestion-text">${escapeHtml(item.label)}</span>
-        <svg class="suggestion-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px !important; height: 14px !important; min-width: 14px !important; min-height: 14px !important; max-width: 14px !important; max-height: 14px !important; flex: 0 0 14px !important; flex-shrink: 0 !important; display: inline-block !important;">
-          <polyline points="9 18 15 12 9 6"/>
-        </svg>
-      </div>
-    `).join('');
+      // Check input still matches
+      if (elements.globalSearchInput.value.trim().toLowerCase() === q.toLowerCase()) {
+        renderAutocompleteResults(q, data.suggestions);
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.warn('Autocomplete fetch note:', err);
+      }
+    }
+  }
 
+  // Render Categorized Autocomplete Results
+  function renderAutocompleteResults(query, suggestions) {
+    if (!elements.searchAutocompleteDropdown) return;
+    if (!elements.globalSearchInput.value.trim()) return;
+
+    const { songs = [], artists = [], albums = [], lyricsMatches = [], queries = [] } = suggestions;
+    const hasAny = songs.length > 0 || artists.length > 0 || albums.length > 0 || lyricsMatches.length > 0 || queries.length > 0;
+
+    if (!hasAny) {
+      elements.searchAutocompleteDropdown.innerHTML = `
+        <div class="dropdown-empty-state">
+          <p>No matches found for "<strong>${escapeHtml(query)}</strong>"</p>
+          <p style="font-size: 11px; color: #727272; margin-top: 4px;">Try searching for an artist, song title, or lyric line</p>
+        </div>
+      `;
+      elements.searchAutocompleteDropdown.style.display = 'block';
+      return;
+    }
+
+    let html = '';
+
+    // 1. Song Suggestions
+    if (songs.length > 0) {
+      html += `
+        <div class="dropdown-section-title">
+          <span>Songs</span>
+        </div>
+        <div class="dropdown-section-group">
+      `;
+      songs.slice(0, 4).forEach(song => {
+        html += `
+          <div class="search-suggestion-item track-item" data-action="play-song" data-song='${escapeHtml(JSON.stringify(song))}'>
+            <img src="${song.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=80&auto=format&fit=crop&q=80'}" alt="${escapeHtml(song.title)}" class="sugg-thumb" loading="lazy">
+            <div class="sugg-info">
+              <span class="sugg-title">${escapeHtml(song.title)}</span>
+              <span class="sugg-subtitle">${escapeHtml(song.artist || 'Artist')}</span>
+            </div>
+            <span class="sugg-badge">Song</span>
+          </div>
+        `;
+      });
+      html += `</div>`;
+    }
+
+    // 2. Lyrics Match Suggestions
+    if (lyricsMatches.length > 0) {
+      html += `
+        <div class="dropdown-section-title">
+          <span>Lyrics Match</span>
+        </div>
+        <div class="dropdown-section-group">
+      `;
+      lyricsMatches.slice(0, 2).forEach(lyr => {
+        html += `
+          <div class="search-suggestion-item lyric-item" data-action="search" data-query="${escapeHtml(lyr.title)}">
+            <svg class="suggestion-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #1ed760 !important;">
+              <path d="M9 18V5l12-2v13"/>
+              <circle cx="6" cy="18" r="3"/>
+              <circle cx="18" cy="16" r="3"/>
+            </svg>
+            <div class="sugg-info">
+              <span class="sugg-title">${escapeHtml(lyr.title)} <span style="font-weight: 400; color: #a7a7a7;">• ${escapeHtml(lyr.artist)}</span></span>
+              <span class="sugg-lyric-snippet">${escapeHtml(lyr.snippet || lyr.matchedLine)}</span>
+            </div>
+            <span class="sugg-badge lyric-badge">Lyrics match</span>
+          </div>
+        `;
+      });
+      html += `</div>`;
+    }
+
+    // 3. Artist Suggestions
+    if (artists.length > 0) {
+      html += `
+        <div class="dropdown-section-title">
+          <span>Artists</span>
+        </div>
+        <div class="dropdown-section-group">
+      `;
+      artists.slice(0, 2).forEach(artist => {
+        html += `
+          <div class="search-suggestion-item artist-item" data-action="search" data-query="${escapeHtml(artist.name)}">
+            <img src="${artist.image || 'https://www.jiosaavn.com/_i/3.0/artist-default-film.png'}" alt="${escapeHtml(artist.name)}" class="sugg-thumb artist-thumb" loading="lazy">
+            <div class="sugg-info">
+              <span class="sugg-title">${escapeHtml(artist.name)}</span>
+              <span class="sugg-subtitle">Artist</span>
+            </div>
+            <span class="sugg-badge">Artist</span>
+          </div>
+        `;
+      });
+      html += `</div>`;
+    }
+
+    // 4. Query Completions
+    if (queries.length > 0) {
+      html += `
+        <div class="dropdown-section-title">
+          <span>Suggestions</span>
+        </div>
+        <div class="dropdown-section-group">
+      `;
+      queries.slice(0, 4).forEach(qText => {
+        html += `
+          <div class="search-suggestion-item query-item" data-action="search" data-query="${escapeHtml(qText)}">
+            <svg class="suggestion-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <span class="suggestion-text">${escapeHtml(qText)}</span>
+            <svg class="suggestion-arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </div>
+        `;
+      });
+      html += `</div>`;
+    }
+
+    elements.searchAutocompleteDropdown.innerHTML = html;
     elements.searchAutocompleteDropdown.style.display = 'block';
 
+    // Suggestion selection
     elements.searchAutocompleteDropdown.querySelectorAll('.search-suggestion-item').forEach(el => {
       el.addEventListener('mousedown', (e) => {
         e.preventDefault();
-        const selected = el.dataset.query;
-        if (selected) {
-          elements.globalSearchInput.value = selected;
+        const action = el.dataset.action;
+        const queryText = el.dataset.query;
+        const songData = el.dataset.song;
+
+        if (action === 'play-song' && songData) {
+          try {
+            const song = JSON.parse(songData);
+            elements.searchAutocompleteDropdown.style.display = 'none';
+            saveSearchHistoryQuery(song.title);
+            playTrack(song, null);
+          } catch (err) {
+            console.error('Play song from autocomplete error:', err);
+          }
+        } else if (queryText) {
+          elements.globalSearchInput.value = queryText;
           elements.searchAutocompleteDropdown.style.display = 'none';
           switchView('search');
-          performSearch(selected);
+          saveSearchHistoryQuery(queryText);
+          performSearch(queryText);
         }
       });
+    });
+  }
+
+  // Keyboard navigation through suggestions dropdown
+  function handleSearchKeydown(e) {
+    const dropdown = elements.searchAutocompleteDropdown;
+    const isDropdownOpen = dropdown && dropdown.style.display !== 'none';
+    const items = isDropdownOpen ? dropdown.querySelectorAll('.search-suggestion-item') : [];
+
+    if (e.key === 'ArrowDown') {
+      if (items.length > 0) {
+        e.preventDefault();
+        state.selectedDropdownIndex = (state.selectedDropdownIndex + 1) % items.length;
+        updateDropdownSelection(items);
+      }
+    } else if (e.key === 'ArrowUp') {
+      if (items.length > 0) {
+        e.preventDefault();
+        state.selectedDropdownIndex = (state.selectedDropdownIndex - 1 + items.length) % items.length;
+        updateDropdownSelection(items);
+      }
+    } else if (e.key === 'Enter') {
+      if (isDropdownOpen && state.selectedDropdownIndex >= 0 && items[state.selectedDropdownIndex]) {
+        e.preventDefault();
+        items[state.selectedDropdownIndex].dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+      } else {
+        clearTimeout(searchDebounceTimer);
+        const query = elements.globalSearchInput.value.trim();
+        if (query) {
+          if (dropdown) dropdown.style.display = 'none';
+          switchView('search');
+          saveSearchHistoryQuery(query);
+          performSearch(query);
+        }
+      }
+    } else if (e.key === 'Escape') {
+      if (dropdown) dropdown.style.display = 'none';
+      state.selectedDropdownIndex = -1;
+    }
+  }
+
+  function updateDropdownSelection(items) {
+    items.forEach((item, idx) => {
+      if (idx === state.selectedDropdownIndex) {
+        item.classList.add('keyboard-selected');
+        item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else {
+        item.classList.remove('keyboard-selected');
+      }
     });
   }
 
@@ -5599,6 +5965,8 @@
 
         if (filterType === 'podcasts') {
           row.style.display = isPodcast ? '' : 'none';
+        } else if (filterType === 'lyrics') {
+          row.style.display = track.isLyricsMatch ? '' : 'none';
         } else if (filterType === 'songs') {
           row.style.display = !isVideo ? '' : 'none';
         } else if (filterType === 'videos') {
@@ -5623,6 +5991,7 @@
                         Boolean(top.isPodcast);
       let showTop = true;
       if (filterType === 'podcasts' && !isPodcast) showTop = false;
+      if (filterType === 'lyrics' && !top.isLyricsMatch) showTop = false;
       if (filterType === 'songs' && isVideo) showTop = false;
       if (filterType === 'videos' && !isVideo) showTop = false;
       if (filterType === 'playlists') showTop = false;
@@ -5635,24 +6004,28 @@
   // ==========================================================================
   function handleSearchInput(e) {
     const query = e.target.value.trim();
-    handleSearchAutocomplete(query);
 
     if (query.length > 0) {
-      elements.clearSearchBtn.style.display = 'flex';
+      if (elements.clearSearchBtn) elements.clearSearchBtn.style.display = 'flex';
       if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'none';
       switchView('search');
+
+      handleSearchAutocomplete(query);
 
       clearTimeout(searchDebounceTimer);
       searchDebounceTimer = setTimeout(() => {
         performSearch(query);
       }, 300);
     } else {
-      if (elements.searchAutocompleteDropdown) elements.searchAutocompleteDropdown.style.display = 'none';
-      elements.clearSearchBtn.style.display = 'none';
-      elements.searchResultsWrapper.style.display = 'none';
-      elements.searchEmptyState.style.display = 'none';
+      if (state.autocompleteAbortController) {
+        state.autocompleteAbortController.abort();
+      }
+      if (elements.clearSearchBtn) elements.clearSearchBtn.style.display = 'none';
+      if (elements.searchResultsWrapper) elements.searchResultsWrapper.style.display = 'none';
+      if (elements.searchEmptyState) elements.searchEmptyState.style.display = 'none';
       if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'none';
-      elements.searchBrowseSection.style.display = 'block';
+      if (elements.searchBrowseSection) elements.searchBrowseSection.style.display = 'block';
+      renderSearchDiscoveryDropdown();
     }
   }
 
@@ -5664,6 +6037,8 @@
     elements.searchBrowseSection.style.display = 'none';
     elements.searchResultsWrapper.style.display = 'none';
     elements.searchEmptyState.style.display = 'none';
+
+    saveSearchHistoryQuery(query);
 
     if (!navigator.onLine) {
       if (elements.searchLoading) elements.searchLoading.style.display = 'none';
@@ -5686,7 +6061,7 @@
         return;
       }
 
-      renderSearchResults(data.results);
+      renderSearchResults(data.results, data);
     } catch (err) {
       console.warn('Search failed:', err);
       elements.searchLoading.style.display = 'none';
@@ -5694,7 +6069,7 @@
     }
   }
 
-  function renderSearchResults(results) {
+  function renderSearchResults(results, meta = {}) {
     elements.searchResultsWrapper.style.display = 'block';
     elements.resultsCount.textContent = results.length;
 
@@ -5702,6 +6077,8 @@
     const top = results[0];
     const isTopLiked = state.likedSongs.some(s => s.id === top.id);
     const isPlayingThisTop = state.isPlaying && state.currentTrack && state.currentTrack.id === top.id;
+    const isLyricsMatch = Boolean(top.isLyricsMatch);
+    const lyricSnippet = top.matchedLine || null;
 
     elements.topResultCard.dataset.trackId = top.id;
     elements.topResultCard._trackData = top;
@@ -5713,8 +6090,9 @@
           <h4 class="top-result-title">${escapeHtml(top.title)}${getPlaylistTickBadgeHtml(top.id)}${getDownloadedBadgeHtml(top.id)}</h4>
           <div class="top-result-meta">
             <span class="top-result-artist">${escapeHtml(top.artist)}</span>
-            <span class="top-result-pill">Song</span>
+            <span class="top-result-pill ${isLyricsMatch ? 'lyric-pill' : ''}" style="${isLyricsMatch ? 'background: rgba(30, 215, 96, 0.2); color: #1ed760; font-weight: 700;' : ''}">${isLyricsMatch ? 'Lyrics Match' : 'Song'}</span>
           </div>
+          ${isLyricsMatch && lyricSnippet ? `<div class="top-result-lyric-match" style="margin-top: 6px; font-size: 13px; color: #1ed760; font-style: italic;">“${escapeHtml(lyricSnippet)}”</div>` : ''}
         </div>
       </div>
       <div class="top-result-actions">
@@ -9086,26 +9464,17 @@
       if (val) {
         handleSearchAutocomplete(val);
       } else {
-        renderSearchRecentDropdown();
+        renderSearchDiscoveryDropdown();
       }
     });
     elements.globalSearchInput.addEventListener('click', () => {
       const val = elements.globalSearchInput.value.trim();
       if (!val) {
-        renderSearchRecentDropdown();
+        renderSearchDiscoveryDropdown();
       }
     });
     elements.globalSearchInput.addEventListener('input', handleSearchInput);
-    elements.globalSearchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        clearTimeout(searchDebounceTimer);
-        const query = elements.globalSearchInput.value.trim();
-        if (query) {
-          switchView('search');
-          performSearch(query);
-        }
-      }
-    });
+    elements.globalSearchInput.addEventListener('keydown', handleSearchKeydown);
     elements.clearSearchBtn.addEventListener('click', () => {
       elements.globalSearchInput.value = '';
       elements.clearSearchBtn.style.display = 'none';
@@ -9113,7 +9482,18 @@
       elements.searchEmptyState.style.display = 'none';
       if (elements.searchRecentSection) elements.searchRecentSection.style.display = 'none';
       elements.searchBrowseSection.style.display = 'block';
+      renderSearchDiscoveryDropdown();
       elements.globalSearchInput.focus();
+    });
+
+    // Close autocomplete on click outside
+    document.addEventListener('click', (e) => {
+      if (elements.searchAutocompleteDropdown &&
+          elements.globalSearchInput &&
+          !elements.globalSearchInput.contains(e.target) &&
+          !elements.searchAutocompleteDropdown.contains(e.target)) {
+        elements.searchAutocompleteDropdown.style.display = 'none';
+      }
     });
 
     if (elements.clearRecentBtn) {
@@ -11765,6 +12145,7 @@
             updateAuthUI();
             syncLibraryFromServer();
             loadAccountPlaylistProgress();
+            syncUserSearchHistory();
             return;
           }
         }
@@ -12005,6 +12386,7 @@
             showToast(`Welcome back, ${data.user.name || email}!`, '✓');
             syncLibraryFromServer();
             loadAccountPlaylistProgress();
+            syncUserSearchHistory();
           }
         } catch (err) {
           showAlert('Network error: ' + err.message);
@@ -12054,6 +12436,7 @@
         showToast(`Account verified! Welcome to MusiSurf, ${data.user.name || email}!`, '✓');
         syncLibraryFromServer();
         loadAccountPlaylistProgress();
+        syncUserSearchHistory();
       } catch (err) {
         showAlert('Network error: ' + err.message);
       } finally {

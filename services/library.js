@@ -492,6 +492,75 @@ async function savePlaylistProgress(userId, playlistId, data) {
   }
 }
 
+/**
+ * Get recent search queries for a user, newest first.
+ */
+async function getUserSearchHistory(userId, limit = 20) {
+  if (!sql) return [];
+  const rows = await sql`
+    SELECT id, query, searched_at as "searchedAt"
+    FROM user_search_history
+    WHERE user_id = ${userId}
+    ORDER BY searched_at DESC
+    LIMIT ${limit}
+  `;
+  return rows;
+}
+
+/**
+ * Add or update a search query in user history.
+ */
+async function addUserSearchHistory(userId, rawQuery) {
+  if (!sql) return null;
+  const query = (rawQuery || '').trim().slice(0, 255);
+  if (!query) return null;
+
+  // Delete existing entry for this query if present to update timestamp
+  await sql`
+    DELETE FROM user_search_history
+    WHERE user_id = ${userId} AND LOWER(query) = LOWER(${query})
+  `;
+
+  const rows = await sql`
+    INSERT INTO user_search_history (user_id, query, searched_at)
+    VALUES (${userId}, ${query}, NOW())
+    RETURNING id, query, searched_at as "searchedAt"
+  `;
+
+  // Keep at most 50 recent searches per user
+  await sql`
+    DELETE FROM user_search_history
+    WHERE user_id = ${userId} AND id NOT IN (
+      SELECT id FROM user_search_history
+      WHERE user_id = ${userId}
+      ORDER BY searched_at DESC
+      LIMIT 50
+    )
+  `;
+
+  return rows[0];
+}
+
+/**
+ * Remove a specific search query or clear all history.
+ */
+async function removeUserSearchHistory(userId, rawQuery) {
+  if (!sql) return false;
+  if (rawQuery) {
+    const query = String(rawQuery).trim();
+    await sql`
+      DELETE FROM user_search_history
+      WHERE user_id = ${userId} AND LOWER(query) = LOWER(${query})
+    `;
+  } else {
+    await sql`
+      DELETE FROM user_search_history
+      WHERE user_id = ${userId}
+    `;
+  }
+  return true;
+}
+
 module.exports = {
   getUserLikes,
   toggleUserLike,
@@ -503,5 +572,8 @@ module.exports = {
   deletePlaylist,
   getPlaylistProgress,
   getAllPlaylistsProgress,
-  savePlaylistProgress
+  savePlaylistProgress,
+  getUserSearchHistory,
+  addUserSearchHistory,
+  removeUserSearchHistory
 };

@@ -10,6 +10,7 @@ const lyricsDiscoveryEngine = require('./scripts/lyrics_discovery_engine');
 const { cleanTrackTitle, extractArtists, extractSongVersion, computeLyricsMatchScore, validateLrcTimestamps } = require('./scripts/lyrics_matcher');
 const { analyzeTrackSilence } = require('./scripts/silence_detector');
 const { isMashupTrack, isEligibleForRecommendation } = require('./scripts/mashup_detector');
+const searchEngine = require('./scripts/search_engine');
 const { requireAuth, optionalAuth, getAuthenticatedUser } = require('./services/auth');
 const libraryService = require('./services/library');
 
@@ -928,72 +929,185 @@ async function searchYouTube(query, limit = 30) {
   return results;
 }
 
-// Unified Search Route with Spotify-grade Famous Song First Ranking
+// ============================================================================
+// INTELLIGENT SEARCH & AUTOCOMPLETE ROUTES
+// ============================================================================
+
+// Autocomplete suggestions (Sub-100ms with caching & JioSaavn + Lyrics)
+app.get('/api/search/autocomplete', async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    const data = await searchEngine.fetchAutocomplete(q);
+    res.json(data);
+  } catch (err) {
+    console.error('Autocomplete error:', err);
+    res.status(500).json({ success: false, error: 'Autocomplete failed' });
+  }
+});
+
+// Search discovery data for empty search bar focus state
+app.get('/api/search/discovery', (req, res) => {
+  try {
+    const data = searchEngine.getDiscoveryData();
+    res.json(data);
+  } catch (err) {
+    console.error('Discovery error:', err);
+    res.status(500).json({ success: false, error: 'Failed to get discovery data' });
+  }
+});
+
+// User Search History (Account Synced)
+app.get('/api/search/history', optionalAuth, async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.json({ success: true, history: [] });
+    }
+    const history = await libraryService.getUserSearchHistory(req.user.id);
+    res.json({ success: true, history: history.map(h => h.query) });
+  } catch (err) {
+    console.error('Get search history error:', err);
+    res.status(500).json({ success: false, error: 'Failed to get search history' });
+  }
+});
+
+app.post('/api/search/history', optionalAuth, async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.json({ success: true, saved: false, reason: 'guest' });
+    }
+    const query = req.body.query || '';
+    const item = await libraryService.addUserSearchHistory(req.user.id, query);
+    res.json({ success: true, saved: true, item });
+  } catch (err) {
+    console.error('Add search history error:', err);
+    res.status(500).json({ success: false, error: 'Failed to save search history' });
+  }
+});
+
+app.delete('/api/search/history', optionalAuth, async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.json({ success: true, removed: true, reason: 'guest' });
+    }
+    const query = req.query.query;
+    await libraryService.removeUserSearchHistory(req.user.id, query);
+    res.json({ success: true, removed: true });
+  } catch (err) {
+    console.error('Remove search history error:', err);
+    res.status(500).json({ success: false, error: 'Failed to remove search history' });
+  }
+});
+
+// Unified Search Route with 10-Tier Relevance, Lyrics Search & Typo Expansion
 app.get('/api/search', async (req, res) => {
   const query = (req.query.q || '').trim();
   const source = req.query.source || 'all'; // 'all', 'saavn', 'youtube'
 
   if (!query) {
-    return res.json({ success: true, results: [] });
+    return res.json({ success: true, results: [], count: 0 });
   }
 
   try {
-    let results = [];
+    const intent = searchEngine.detectQueryIntent(query);
+    const matchedLyricsMap = new Map();
 
+    // 1. Parallel search: Saavn, YouTube, and Lyrics Search
+    const searchPromises = [];
     if (source === 'saavn') {
-      const saavnSongs = await searchSaavn(query, 30);
-      results = saavnSongs
-        .map(t => ({ ...t, score: calculateRelevanceScore(t, query) }))
-        .sort((a, b) => b.score - a.score);
+      searchPromises.push(searchSaavn(query, 30));
+      searchPromises.push(Promise.resolve([]));
     } else if (source === 'youtube') {
-      const ytSongs = await searchYouTube(query, 30);
-      results = ytSongs
-        .map(t => ({ ...t, score: calculateRelevanceScore(t, query) }))
-        .sort((a, b) => b.score - a.score);
+      searchPromises.push(Promise.resolve([]));
+      searchPromises.push(searchYouTube(query, 30));
     } else {
-      // Parallel Multi-Source Search for 100% Comprehensive Universal Coverage
-      const [saavnRes, ytRes] = await Promise.allSettled([
-        searchSaavn(query, 30),
-        searchYouTube(query, 30)
-      ]);
+      searchPromises.push(searchSaavn(query, 30));
+      searchPromises.push(searchYouTube(query, 30));
+    }
 
-      const saavnSongs = saavnRes.status === 'fulfilled' ? (saavnRes.value || []) : [];
-      const ytSongs = ytRes.status === 'fulfilled' ? (ytRes.value || []) : [];
+    // Include lyrics search for multi-word or lyric-like queries
+    const words = query.split(/\s+/).filter(Boolean);
+    if (intent.type === 'lyrics' || words.length >= 2) {
+      searchPromises.push(searchEngine.searchLyrics(query));
+    } else {
+      searchPromises.push(Promise.resolve([]));
+    }
 
-      // Combine all tracks and calculate relevance score based on:
-      // - Exact title and artist match
-      // - Real stream / view count popularity (millions of plays)
-      // - Verified artist / official record label status
-      // - Penalty for covers / karaoke / remakes unless specifically queried
-      const allTracks = [...saavnSongs, ...ytSongs].map(track => ({
-        ...track,
-        score: calculateRelevanceScore(track, query)
-      }));
+    const [saavnRes, ytRes, lyricsRes] = await Promise.allSettled(searchPromises);
 
-      // Sort by score in descending order (FAMOUS ORIGINAL HITS ALWAYS COME FIRST)
-      allTracks.sort((a, b) => b.score - a.score);
+    let saavnSongs = saavnRes.status === 'fulfilled' ? (saavnRes.value || []) : [];
+    let ytSongs = ytRes.status === 'fulfilled' ? (ytRes.value || []) : [];
+    const lyricsMatches = lyricsRes.status === 'fulfilled' ? (lyricsRes.value || []) : [];
 
-      // Smart deduplication: keep highest-scored version of each unique track
-      const seen = new Map();
-      const deduped = [];
+    // Map lyric matches for quick lookup
+    const lyricsExtraQueries = [];
+    for (const lm of lyricsMatches) {
+      if (lm && lm.title) {
+        lyricsExtraQueries.push(`${lm.title} ${lm.artist || ''}`.trim());
+      }
+    }
 
-      for (const track of allTracks) {
-        if (!track || !track.title) continue;
-        const key = getDedupeKey(track.title, track.artist);
-        if (!seen.has(key)) {
-          seen.set(key, true);
-          deduped.push(track);
+    // If lyrics search identified songs not found in main search, fetch them
+    if (lyricsExtraQueries.length > 0) {
+      const extraFetches = await Promise.allSettled(
+        lyricsExtraQueries.slice(0, 3).map(eq => searchSaavn(eq, 5))
+      );
+      for (const ef of extraFetches) {
+        if (ef.status === 'fulfilled' && Array.isArray(ef.value)) {
+          for (const s of ef.value) {
+            // Find corresponding lyric match
+            const match = lyricsMatches.find(lm => 
+              s.title.toLowerCase().includes(lm.title.toLowerCase()) ||
+              lm.title.toLowerCase().includes(s.title.toLowerCase())
+            );
+            if (match) {
+              s.isLyricsMatch = true;
+              s.matchedLine = match.matchedLine;
+              matchedLyricsMap.set(s.id, match.matchedLine);
+            }
+            saavnSongs.push(s);
+          }
         }
       }
+    }
 
-      results = deduped;
+    // Combine all tracks
+    const allTracks = [...saavnSongs, ...ytSongs];
+
+    // Score all tracks with strict 10-tier scoring
+    const scoredTracks = allTracks.map(track => {
+      const score = searchEngine.scoreTrackRelevance(track, query, matchedLyricsMap);
+      return {
+        ...track,
+        score,
+        isLyricsMatch: track.isLyricsMatch || matchedLyricsMap.has(track.id),
+        matchedLine: track.matchedLine || matchedLyricsMap.get(track.id) || null
+      };
+    });
+
+    // Sort by score in descending order
+    scoredTracks.sort((a, b) => b.score - a.score);
+
+    // Smart deduplication: keep highest-scored version of each unique track
+    const seen = new Map();
+    const deduped = [];
+
+    for (const track of scoredTracks) {
+      if (!track || !track.title) continue;
+      const key = getDedupeKey(track.title, track.artist);
+      if (!seen.has(key)) {
+        seen.set(key, true);
+        deduped.push(track);
+      }
     }
 
     res.json({
       success: true,
       query,
-      count: results.length,
-      results
+      intent: intent.type,
+      count: deduped.length,
+      topResult: deduped[0] || null,
+      results: deduped,
+      lyricsMatches: deduped.filter(t => t.isLyricsMatch)
     });
   } catch (err) {
     console.error('Search error:', err);
