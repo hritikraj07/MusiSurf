@@ -37,6 +37,12 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Google Search Console Site Ownership Verification File
+app.get('/google8877bb5a6dba28c3.html', (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.status(200).send('google-site-verification: google8877bb5a6dba28c3.html');
+});
+
 // Legal Pages (Privacy Policy & Terms of Service for Google OAuth & Public Compliance)
 app.get(['/privacy', '/privacy-policy', '/privacy.html'], (req, res) => {
   const filePath = path.resolve(__dirname, 'public', 'privacy.html');
