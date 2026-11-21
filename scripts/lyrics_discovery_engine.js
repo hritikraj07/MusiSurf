@@ -139,8 +139,20 @@ class LyricsDiscoveryEngine {
     // =========================================================================
     if (this.verifiedDb[dbKey]) {
       const entry = this.verifiedDb[dbKey];
-      memoryCache.set(cacheKey, { data: entry, timestamp: Date.now() });
-      return entry;
+      // STRICT VERIFICATION: Verify that cached entry's artist matches targetMeta
+      const score = computeLyricsMatchScore({
+        title: entry.trackName,
+        artist: entry.artistName,
+        duration: entry.duration
+      }, normMeta);
+      if (score >= 70) {
+        memoryCache.set(cacheKey, { data: entry, timestamp: Date.now() });
+        return entry;
+      } else {
+        // Discard invalid/mismatched cached entry
+        delete this.verifiedDb[dbKey];
+        this.saveVerifiedDb();
+      }
     }
 
     // Check Contributed Database
@@ -294,15 +306,33 @@ class LyricsDiscoveryEngine {
   }
 
   /**
+   * Extract authentic artist string from JioSaavn song object
+   */
+  extractSaavnArtists(s) {
+    if (!s) return '';
+    const mapArtists = [
+      ...(s.more_info?.artistMap?.primary_artists || []),
+      ...(s.more_info?.artistMap?.artists || [])
+    ].map(a => a.name).filter(Boolean);
+    if (mapArtists.length > 0) {
+      return [...new Set(mapArtists)].join(', ');
+    }
+    if (s.subtitle) {
+      const parts = s.subtitle.split(' - ');
+      return parts[0].trim();
+    }
+    return s.more_info?.primary_artists || s.more_info?.singers || s.more_info?.music || '';
+  }
+
+  /**
    * JioSaavn Lyrics API Search
    */
   async searchJioSaavn(meta) {
     const { title, artist, album, duration } = meta;
 
-    const queries = [
-      `${title} ${artist}`.trim(),
-      title
-    ];
+    const queries = [];
+    if (artist) queries.push(`${title} ${artist}`.trim());
+    queries.push(title);
 
     for (const q of queries) {
       try {
@@ -322,14 +352,18 @@ class LyricsDiscoveryEngine {
               const hl = s.more_info?.has_lyrics;
               return hl === true || hl === 'true' || hl === '1' || hl === 1;
             })
-            .map(s => ({
-              song: s,
-              score: computeLyricsMatchScore({
-                title: s.title,
-                artist: s.more_info?.primary_artists || s.more_info?.singers,
-                duration: parseInt(s.more_info?.duration, 10) || null
-              }, meta)
-            }))
+            .map(s => {
+              const candArtist = this.extractSaavnArtists(s);
+              return {
+                song: s,
+                candArtist,
+                score: computeLyricsMatchScore({
+                  title: s.title,
+                  artist: candArtist,
+                  duration: parseInt(s.more_info?.duration, 10) || null
+                }, meta)
+              };
+            })
             .filter(item => item.score >= 70);
 
           if (scored.length > 0) {
@@ -351,7 +385,7 @@ class LyricsDiscoveryEngine {
                   const plainText = this.decodeHtml(rawLyrics.replace(/<br\s*[\/]?>/gi, '\n')).trim();
                   return this.formatVerifiedLyrics({
                     trackName: song.title || title,
-                    artistName: song.more_info?.primary_artists || artist,
+                    artistName: best.candArtist || song.subtitle || artist,
                     albumName: song.more_info?.album || album,
                     duration: parseInt(song.more_info?.duration, 10) || duration,
                     syncedLyrics: null,

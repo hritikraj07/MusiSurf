@@ -10729,49 +10729,53 @@ body[data-active-view="lyrics"] .content-scroll {
 }
 
 #lyricsView .lyric-line {
-  font-size: 1.7rem;
-  font-weight: 700;
-  line-height: 1.35;
+  font-size: 1.65rem;
+  font-weight: 600;
+  line-height: 1.45;
   color: rgba(255, 255, 255, 0.45);
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+  margin-bottom: 20px;
 }
 
 #lyricsView .lyric-line .lyric-word {
   display: inline-block;
-  transition: color 0.15s ease, text-shadow 0.2s ease, transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color 0.2s ease, text-shadow 0.25s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   color: inherit;
 }
 
 #lyricsView .lyric-line:hover {
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 #lyricsView .lyric-line.active {
   font-size: 2.15rem !important;
-  font-weight: 800 !important;
-  color: rgba(255, 255, 255, 0.4) !important;
+  font-weight: 700 !important;
+  color: #fff8eb !important;
   opacity: 1 !important;
   transform: scale(1.02);
   transform-origin: left center;
+  text-shadow: 0 0 16px rgba(251, 191, 36, 0.35), 0 2px 6px rgba(0, 0, 0, 0.6);
 }
 
 #lyricsView .lyric-line.active .lyric-word.glowing,
 #lyricsView .lyric-line.active .lyric-word.sung {
-  color: #ffffff !important;
-  font-weight: 800 !important;
-  text-shadow: 0 0 16px rgba(255, 255, 255, 0.75);
+  color: #fff8eb !important;
+  font-weight: 700 !important;
+  text-shadow: 0 0 14px rgba(251, 191, 36, 0.45);
 }
 
 #lyricsView .lyric-line.active .lyric-word.singing {
-  color: #ffffff !important;
+  color: #ffd27d !important;
   font-weight: 800 !important;
-  text-shadow: 0 0 24px rgba(255, 255, 255, 0.95), 0 0 8px #ffffff;
-  transform: scale(1.06);
+  text-shadow: 0 0 24px rgba(251, 191, 36, 0.75), 0 0 8px #fff8eb;
+  transform: scale(1.05);
 }
 
 #lyricsView .lyric-line.passed {
-  color: rgba(255, 255, 255, 0.25) !important;
+  color: rgba(255, 255, 255, 0.26) !important;
+  transform: scale(0.98);
+  transform-origin: left center;
 }
 
 @media (max-width: 768px) {
@@ -14182,215 +14186,161 @@ body.lyrics-fullscreen-active #lyricsView .lyrics-scroll-body {
   --glow-quaternary: #e76f51;
 }
 
+/* ==========================================================================
+   ADVANCED CINEMATIC LYRIC FRAME & TRAVELING PERIMETER BORDER (Timeline 1.mov)
+   Continuous, seamless, hardware-accelerated SVG perimeter traveling light beam.
+   Subtle warm amber track, luminous amber traveling beam, bright ivory leading tip.
+   Supports Desktop, Mobile, and Fullscreen seamlessly.
+   ========================================================================== */
+
 #lyrics-edge-glow,
 .lyrics-edge-glow {
-  display: none;
+  display: block;
   position: absolute;
-  inset: 0;
+  inset: 6px;
   z-index: 25;
   pointer-events: none;
-  overflow: hidden;
-  border-radius: inherit;
+  overflow: visible;
+  border-radius: 16px;
   box-sizing: border-box;
   opacity: 0;
-  transition: opacity 0.5s ease;
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity;
 }
 
-@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
-  #lyrics-edge-glow.is-active,
-  .lyrics-edge-glow.is-active {
-    display: block;
-    opacity: 0.42; /* subtle resting state when paused */
-  }
-
-  #lyrics-edge-glow.is-active.is-playing,
-  .lyrics-edge-glow.is-active.is-playing {
-    opacity: 1;
-    animation: edgeGlowBreathe 3.6s ease-in-out infinite;
-  }
+#lyrics-edge-glow.is-active,
+.lyrics-edge-glow.is-active {
+  opacity: 0.55; /* Refined resting state when paused */
 }
 
-/* Layer 1: Base Ambient Border & Soft Inset Glow (Single Matching Song Album Color) */
-.edge-glow-ambient {
+#lyrics-edge-glow.is-active.is-playing,
+.lyrics-edge-glow.is-active.is-playing {
+  opacity: 1;
+  animation: edgeGlowBreathe 4s ease-in-out infinite;
+}
+
+/* SVG Frame Container */
+.cinematic-border-svg {
   position: absolute;
   inset: 0;
-  border-radius: inherit;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  border: 1.5px solid rgba(var(--lyrics-theme-rgb, 120, 80, 100), 0.35);
-  box-shadow: inset 0 0 35px rgba(var(--lyrics-theme-rgb, 120, 80, 100), 0.25), 0 0 15px rgba(var(--lyrics-theme-rgb, 120, 80, 100), 0.15);
-  transition: border-color 0.8s ease, box-shadow 0.8s ease;
-  will-change: border-color, box-shadow;
-}
-
-/* Layer 2: Soft Traveling Diffused Bloom (Masked to border, single monochromatic theme color) */
-.edge-glow-bloom {
-  position: absolute;
-  inset: 0;
+  overflow: visible;
   border-radius: inherit;
-  pointer-events: none;
-  padding: 4px;
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  overflow: hidden;
-  filter: blur(8px) drop-shadow(0 0 16px var(--glow-primary, var(--lyrics-theme-color, #e056fd))) drop-shadow(0 0 32px var(--glow-primary, var(--lyrics-theme-color, #e056fd)));
-  opacity: 0.85;
-  transition: filter 0.8s ease, opacity 0.5s ease;
-  will-change: filter, opacity;
 }
 
-.edge-glow-bloom::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 450%;
-  height: 450%;
-  transform: translate(-50%, -50%) rotate(0deg);
-  background: conic-gradient(
-    from 0deg at 50% 50%,
-    transparent 0deg,
-    transparent 20deg,
-    rgba(var(--lyrics-theme-rgb, 120, 80, 100), 0.15) 50deg,
-    rgba(var(--lyrics-theme-rgb, 120, 80, 100), 0.5) 100deg,
-    var(--glow-primary, var(--lyrics-theme-color, rgba(var(--lyrics-theme-rgb, 120, 80, 100), 1))) 180deg,
-    rgba(var(--lyrics-theme-rgb, 120, 80, 100), 0.75) 230deg,
-    rgba(var(--lyrics-theme-rgb, 120, 80, 100), 0.25) 265deg,
-    transparent 285deg,
-    transparent 360deg
-  );
-  animation: rotateBorderBeam 6s linear infinite;
-  will-change: transform;
-  transition: background 0.8s ease;
+/* Common Rect Geometry & Non-scaling stroke */
+.cinematic-track-rect,
+.cinematic-bloom-rect,
+.cinematic-beam-rect,
+.cinematic-tip-rect {
+  fill: none;
+  vector-effect: non-scaling-stroke;
 }
 
-/* Layer 3: Crisp Hairline Border Beam (2px Traveling Light Core, single monochromatic theme color) */
-.edge-glow-beam {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  padding: 2px;
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  overflow: hidden;
-  filter: drop-shadow(0 0 4px var(--glow-primary, var(--lyrics-theme-color, #fff))) drop-shadow(0 0 14px var(--glow-primary, var(--lyrics-theme-color, #e056fd)));
-  transition: filter 0.8s ease;
-  will-change: filter, padding;
-  animation: borderBeamHeightPulse 4s ease-in-out infinite alternate;
+/* 1. Base Perimeter Track (Refined, permanent warm amber rectangular frame) */
+.cinematic-track-rect {
+  stroke: rgba(245, 158, 11, 0.2);
+  stroke-width: 1.5px;
+  transition: stroke 0.6s ease;
 }
 
-.edge-glow-beam::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 450%;
-  height: 450%;
-  transform: translate(-50%, -50%) rotate(0deg);
-  background: conic-gradient(
-    from 0deg at 50% 50%,
-    transparent 0deg,
-    transparent 20deg,
-    rgba(var(--lyrics-theme-rgb, 120, 80, 100), 0.2) 50deg,
-    rgba(var(--lyrics-theme-rgb, 120, 80, 100), 0.6) 110deg,
-    var(--glow-primary, var(--lyrics-theme-color, #ffffff)) 180deg,
-    rgba(var(--lyrics-theme-rgb, 120, 80, 100), 0.85) 225deg,
-    rgba(var(--lyrics-theme-rgb, 120, 80, 100), 0.3) 265deg,
-    transparent 285deg,
-    transparent 360deg
-  );
-  animation: rotateBorderBeam 6s linear infinite;
-  will-change: transform;
-  transition: background 0.8s ease;
+/* 2. Soft Ambient Traveling Glow Bloom (Wide diffused luminous trail) */
+.cinematic-bloom-rect {
+  stroke: rgba(245, 158, 11, 0.52);
+  stroke-width: 5.5px;
+  stroke-linecap: round;
+  stroke-dasharray: 180 820;
+  filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.85)) drop-shadow(0 0 24px rgba(217, 119, 6, 0.5));
+  animation: cinematicPerimeterTravel 5.5s linear infinite;
+  will-change: stroke-dashoffset;
 }
 
-/* Pause beam rotation smoothly when audio is paused */
-.lyrics-edge-glow:not(.is-playing) .edge-glow-beam,
-.lyrics-edge-glow:not(.is-playing) .edge-glow-beam::before,
-.lyrics-edge-glow:not(.is-playing) .edge-glow-bloom::before {
+/* 3. Core Traveling Amber Beam (Crisp, thin 2.2px champagne-amber light segment) */
+.cinematic-beam-rect {
+  stroke: #ffd27d;
+  stroke-width: 2.2px;
+  stroke-linecap: round;
+  stroke-dasharray: 140 860;
+  filter: drop-shadow(0 0 5px #ffd27d) drop-shadow(0 0 12px #f59e0b);
+  animation: cinematicPerimeterTravel 5.5s linear infinite;
+  will-change: stroke-dashoffset;
+}
+
+/* 4. Bright Leading Tip / Head of Beam (Warm Ivory / Gold Spark) */
+.cinematic-tip-rect {
+  stroke: #fff8eb;
+  stroke-width: 2.6px;
+  stroke-linecap: round;
+  stroke-dasharray: 22 978;
+  filter: drop-shadow(0 0 4px #ffffff);
+  animation: cinematicPerimeterTravel 5.5s linear infinite;
+  will-change: stroke-dashoffset;
+}
+
+/* Pause the traveling beam smoothly when audio is paused */
+#lyrics-edge-glow:not(.is-playing) .cinematic-bloom-rect,
+#lyrics-edge-glow:not(.is-playing) .cinematic-beam-rect,
+#lyrics-edge-glow:not(.is-playing) .cinematic-tip-rect {
   animation-play-state: paused;
 }
 
-/* Dynamic perimeter beam height & thickness modulation */
-@keyframes borderBeamHeightPulse {
+/* Continuous 4-Edge Perimeter Traveling Motion (Top -> Right -> Bottom -> Left -> Top) */
+@keyframes cinematicPerimeterTravel {
   0% {
-    padding: 2px;
-    filter: drop-shadow(0 0 4px var(--glow-primary, var(--lyrics-theme-color, #fff))) drop-shadow(0 0 12px var(--glow-primary, var(--lyrics-theme-color, #e056fd)));
-  }
-  50% {
-    padding: 3.5px;
-    filter: drop-shadow(0 0 7px var(--glow-primary, var(--lyrics-theme-color, #fff))) drop-shadow(0 0 22px var(--glow-primary, var(--lyrics-theme-color, #e056fd)));
+    stroke-dashoffset: 0;
   }
   100% {
-    padding: 2px;
-    filter: drop-shadow(0 0 5px var(--glow-primary, var(--lyrics-theme-color, #fff))) drop-shadow(0 0 14px var(--glow-primary, var(--lyrics-theme-color, #e056fd)));
+    stroke-dashoffset: -1000;
   }
 }
 
-/* Continuous Perimeter Traveling Rotation with dynamic line height & length modulation */
-@keyframes rotateBorderBeam {
-  0% {
-    transform: translate(-50%, -50%) rotate(0deg) scale(1.0, 1.0);
-  }
-  25% {
-    transform: translate(-50%, -50%) rotate(90deg) scale(1.08, 0.94);
-  }
-  50% {
-    transform: translate(-50%, -50%) rotate(180deg) scale(0.95, 1.07);
-  }
-  75% {
-    transform: translate(-50%, -50%) rotate(270deg) scale(1.08, 0.94);
-  }
-  100% {
-    transform: translate(-50%, -50%) rotate(360deg) scale(1.0, 1.0);
-  }
-}
-
-/* Dynamic Breathing Pulse (Active Playback) */
+/* Subtle Breathing Glow during playback */
 @keyframes edgeGlowBreathe {
   0%, 100% {
-    opacity: 0.85;
     filter: brightness(1.0);
   }
   50% {
-    opacity: 1.0;
-    filter: brightness(1.2);
+    filter: brightness(1.18);
   }
 }
 
-/* Strictly disable and hide on mobile viewports (<= 768px) and touch layouts */
-@media (max-width: 768px), (hover: none), (pointer: coarse) {
+/* Mobile & Small Screens (<= 768px): Scale frame margins and radii appropriately */
+@media (max-width: 768px) {
   #lyrics-edge-glow,
-  .lyrics-edge-glow,
-  .edge-glow-ambient,
-  .edge-glow-bloom,
-  .edge-glow-bloom::before,
-  .edge-glow-beam,
-  .edge-glow-beam::before {
-    display: none !important;
-    animation: none !important;
-    opacity: 0 !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
+  .lyrics-edge-glow {
+    inset: 4px;
+    border-radius: 12px;
+  }
+  .cinematic-bloom-rect {
+    stroke-width: 4px;
+    stroke-dasharray: 200 800;
+  }
+  .cinematic-beam-rect {
+    stroke-width: 1.8px;
+    stroke-dasharray: 150 850;
+  }
+  .cinematic-tip-rect {
+    stroke-width: 2.2px;
   }
 }
 
-/* Reduced Motion: Show calm, static ambient glow without rotation */
+/* Fullscreen Lyrics: Full bleed with crisp 8px inset */
+body.lyrics-fullscreen-active #lyrics-edge-glow,
+body.lyrics-fullscreen-active .lyrics-edge-glow {
+  inset: 8px;
+  border-radius: 16px;
+}
+
+/* Reduced Motion: Show calm, static illuminated rectangular frame without travel animation */
 @media (prefers-reduced-motion: reduce) {
-  #lyrics-edge-glow.is-active,
-  .lyrics-edge-glow.is-active,
-  .edge-glow-ambient,
-  .edge-glow-bloom,
-  .edge-glow-bloom::before,
-  .edge-glow-beam,
-  .edge-glow-beam::before {
+  .cinematic-bloom-rect,
+  .cinematic-beam-rect,
+  .cinematic-tip-rect {
     animation: none !important;
-    transition: opacity 0.3s ease !important;
+    stroke-dasharray: none !important;
+    opacity: 0.75 !important;
   }
 }
 

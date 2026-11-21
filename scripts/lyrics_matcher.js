@@ -183,8 +183,10 @@ function computeLyricsMatchScore(candidate, target) {
       }
     }
   } else if (!candPrimary && targetPrimary) {
-    // Missing candidate artist: only partial credit
-    score += 15;
+    // Missing candidate artist when target has a known artist:
+    // STRICT ANTI-WRONG-SONG RULE: Cannot verify artist identity.
+    // An artist-less candidate must not qualify on title alone.
+    score += 0;
   }
 
   // ----------------------------------------------------

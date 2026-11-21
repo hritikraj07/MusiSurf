@@ -1826,7 +1826,7 @@ app.get('/api/yt-stream', async (req, res) => {
 // -> 4. JioSaavn Lyrics API -> 5. Lyrics.ovh -> 6. Legitimate Internet Fallback
 // ============================================================================
 app.get('/api/lyrics', async (req, res) => {
-  const track = (req.query.track || '').trim();
+  const track = (req.query.track || req.query.title || '').trim();
   const artist = (req.query.artist || '').trim();
   const album = (req.query.album || '').trim();
   const duration = req.query.duration ? parseInt(req.query.duration, 10) : null;

@@ -73,25 +73,6 @@
     "provider": "lrclib_search",
     "fetchedAt": "2026-11-21T08:56:34.170Z"
   },
-  "tuu__harrdy sandhu__standard": {
-    "success": true,
-    "verified": true,
-    "matchScore": 75,
-    "confidence": "medium",
-    "trackName": "Tuu",
-    "artistName": "Harrdy Sandhu",
-    "syncedLyrics": null,
-    "plainLyrics": "Tune chain chheena\nTune neend chheeni\nMeri zindagi ke\nHar hisse mein tu \n\nTune chain chheena\nTune neend chheeni\nMeri zindagi ke\nHar hisse mein tu \n\nTujh bin nahi jeena, mujhe nahi jeena\nAb saansein gin gin gin ke lena\n\nTuu… meri zindagi hai\nMain nahin ab kuch nahi tere siva\nTuu… meri zindagi hai\nMain nahin ab kuch nahi tere siva\n\nRuk ja zara…\n\nTum bin yun mera dil kyun rota hai\nTanhai mein aksar yeh khota hai\nTum bin yun mera dil kyun rota hai\nTanhai mein aksar yeh khota hai\n\nTune chain chheena\nTune neend chheeni\nMeri zindagi ke\nHar hisse mein tu\n\nTune chain chheena\nTune neend chheeni\nMeri zindagi ke\nHar hisse mein tu\n\nTujh bin nahi jeena, mujhe nahi jeena\nAb to saansein gin gin gin ke lena\n\nTuu… meri zindagi hai\nMain nahi ab kuch nahi tere siva \nTuu… meri zindagi hai\nMain nahi ab kuch nahi tere siva \n\nRuk ja zara…",
-    "romanizedSyncedLyrics": null,
-    "romanizedPlainLyrics": null,
-    "hasDevanagariAlt": false,
-    "language": "English",
-    "script": "Latin",
-    "duration": 176,
-    "version": "standard",
-    "provider": "jiosaavn",
-    "fetchedAt": "2026-11-21T08:58:53.235Z"
-  },
   "backbone__harrdy sandhu__standard": {
     "success": true,
     "verified": true,
@@ -110,5 +91,24 @@
     "version": "standard",
     "provider": "lrclib_exact",
     "fetchedAt": "2026-11-21T09:02:07.999Z"
+  },
+  "tuu__darshan raval__standard": {
+    "success": true,
+    "verified": true,
+    "matchScore": 100,
+    "confidence": "high",
+    "trackName": "Tuu",
+    "artistName": "Darshan Raval",
+    "syncedLyrics": "[00:19.73] तूने चैन छीना तूने नींद छीनी\n[00:23.98] मेरी ज़िन्दगी के हर हिस्से में तू\n[00:29.24] तूने चैन छीना तूने नींद छीनी\n[00:34.15] मेरी ज़िन्दगी के हर हिस्से में तू\n[00:39.45] तुझ बिन नहीं जीना, मुझे नहीं जीना\n[00:44.14] अब तो सांसें गिन गिन गिन के लेना\n[00:49.81] तू ऊ ऊ ऊ मेरी ज़िन्दगी है\n[00:54.88] मैं नहीं अब कुछ नहीं तेरे सिवा\n[01:00.01] तू ऊ ऊ ऊ मेरी ज़िन्दगी है\n[01:04.49] मैं नहीं अब कुछ नहीं तेरे सिवा\n[01:10.15] रुक जा ज़रा\n[01:38.82] तुम बिन यूँ मेरा दिल क्यों रोता है\n[01:42.86] तन्हाई में अक्सर ये होता हे\n[01:48.09] तुम बिन यूँ मेरा दिल क्यों रोता है\n[01:53.11] तन्हाई में अक्सर ये होता हे\n[01:58.47] तूने चैन छीना तूने नींद छीनी\n[02:03.06] मेरी ज़िन्दगी के हर हिस्से में तू\n[02:08.22] तूने चैन छीना तूने नींद छीनी\n[02:12.96] मेरी ज़िन्दगी के हर हिस्से में तू\n[02:18.19] तुझ बिन नहीं जीना, मुझे नहीं जीना\n[02:22.48] अब तो सांसें गिन गिन गिन के लेना\n[02:28.86] तू ऊ ऊ ऊ मेरी ज़िन्दगी है\n[02:33.56] मैं नहीं अब कुछ नहीं तेरे सिवा\n[02:38.80] तू ऊ ऊ ऊ मेरी ज़िन्दगी है\n[02:43.57] मैं नहीं अब कुछ नहीं तेरे सिवा\n[02:47.92] रुक जा ज़रा",
+    "plainLyrics": "तूने चैन छीना तूने नींद छीनी\nमेरी ज़िन्दगी के हर हिस्से में तू\nतूने चैन छीना तूने नींद छीनी\nमेरी ज़िन्दगी के हर हिस्से में तू\nतुझ बिन नहीं जीना, मुझे नहीं जीना\nअब तो सांसें गिन गिन गिन के लेना\nतू ऊ ऊ ऊ मेरी ज़िन्दगी है\nमैं नहीं अब कुछ नहीं तेरे सिवा\nतू ऊ ऊ ऊ मेरी ज़िन्दगी है\nमैं नहीं अब कुछ नहीं तेरे सिवा\nरुक जा ज़रा\nतुम बिन यूँ मेरा दिल क्यों रोता है\nतन्हाई में अक्सर ये होता हे\nतुम बिन यूँ मेरा दिल क्यों रोता है\nतन्हाई में अक्सर ये होता हे\nतूने चैन छीना तूने नींद छीनी\nमेरी ज़िन्दगी के हर हिस्से में तू\nतूने चैन छीना तूने नींद छीनी\nमेरी ज़िन्दगी के हर हिस्से में तू\nतुझ बिन नहीं जीना, मुझे नहीं जीना\nअब तो सांसें गिन गिन गिन के लेना\nतू ऊ ऊ ऊ मेरी ज़िन्दगी है\nमैं नहीं अब कुछ नहीं तेरे सिवा\nतू ऊ ऊ ऊ मेरी ज़िन्दगी है\nमैं नहीं अब कुछ नहीं तेरे सिवा\nरुक जा ज़रा",
+    "romanizedSyncedLyrics": null,
+    "romanizedPlainLyrics": null,
+    "hasDevanagariAlt": false,
+    "language": "Hindi",
+    "script": "Devanagari",
+    "duration": 181,
+    "version": "standard",
+    "provider": "lrclib_search",
+    "fetchedAt": "2026-11-21T14:23:25.533Z"
   }
 }

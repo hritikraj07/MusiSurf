@@ -4660,7 +4660,7 @@
   const VERIFIED_LYRICS_MAX_ENTRIES = 250;
   const VERIFIED_LYRICS_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-  function getPersistentVerifiedLyrics(cacheKey) {
+  function getPersistentVerifiedLyrics(cacheKey, expectedArtist = null) {
     if (!cacheKey) return null;
     try {
       const raw = localStorage.getItem(VERIFIED_LYRICS_STORAGE_KEY);
@@ -4668,6 +4668,19 @@
       const store = JSON.parse(raw);
       const entry = store[cacheKey];
       if (!entry || !entry.data) return null;
+
+      // Anti-wrong-lyrics validation: Verify artist if present in entry
+      if (expectedArtist && entry.data.artistName) {
+        const normExpected = expectedArtist.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const normCand = entry.data.artistName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (normExpected && normCand && !normExpected.includes(normCand) && !normCand.includes(normExpected)) {
+          // Corrupt or mismatched entry detected: purge from client localStorage immediately
+          delete store[cacheKey];
+          try { localStorage.setItem(VERIFIED_LYRICS_STORAGE_KEY, JSON.stringify(store)); } catch (e) {}
+          return null;
+        }
+      }
+
       if (Date.now() - (entry.timestamp || 0) > VERIFIED_LYRICS_TTL_MS) {
         delete store[cacheKey];
         try { localStorage.setItem(VERIFIED_LYRICS_STORAGE_KEY, JSON.stringify(store)); } catch (e) {}
@@ -4775,7 +4788,15 @@
 
     // Check memory cache or persistent verified local store first
     const cacheKey = `${title.toLowerCase().trim()}___${artist.toLowerCase().trim()}`;
-    const cachedData = (state.lyricsCache && state.lyricsCache[cacheKey]) || getPersistentVerifiedLyrics(cacheKey);
+    let cachedData = (state.lyricsCache && state.lyricsCache[cacheKey]) || getPersistentVerifiedLyrics(cacheKey, artist);
+    if (cachedData && cachedData.artistName && artist) {
+      const normExp = artist.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const normCand = cachedData.artistName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (normExp && normCand && !normExp.includes(normCand) && !normCand.includes(normExp)) {
+        if (state.lyricsCache) delete state.lyricsCache[cacheKey];
+        cachedData = null;
+      }
+    }
     if (cachedData) {
       if (!state.lyricsCache) state.lyricsCache = {};
       state.lyricsCache[cacheKey] = cachedData;
@@ -4967,6 +4988,7 @@
     const lines = lrcText.split('\n');
     const result = [];
     const timeReg = /\[(\d{2}):(\d{2})\.?(\d{2,3})?\]/g;
+    const wordTimeReg = /<(\d{2}):(\d{2})\.?(\d{2,3})?>/g;
     let offset = 0;
     const offsetMatch = lrcText.match(/\[offset:\s*([+-]?\d+)\]/i);
     if (offsetMatch) {
@@ -4976,15 +4998,44 @@
 
     for (const line of lines) {
       const matches = [...line.matchAll(timeReg)];
-      let text = line.replace(timeReg, '').replace(/^[\[(][^\])]+[\])]\s*/, '').trim();
+      let rawText = line.replace(timeReg, '').replace(/^[\[(][^\])]+[\])]\s*/, '').trim();
 
-      if (text && !/^[\[(].+[\])]$/.test(text) && !/^(verse|chorus|bridge|outro|intro|hook|मुखड़ा|अंतरा|कोरस|समाप्ति|स्थायी)\s*\d*[:\-]?$/i.test(text)) {
+      if (rawText && !/^[\[(].+[\])]$/.test(rawText) && !/^(verse|chorus|bridge|outro|intro|hook|मुखड़ा|अंतरा|कोरस|समाप्ति|स्थायी)\s*\d*[:\-]?$/i.test(rawText)) {
+        // Extract enhanced word timestamps if available (e.g. <00:12.34> word)
+        let wordsWithTime = null;
+        if (wordTimeReg.test(rawText)) {
+          wordTimeReg.lastIndex = 0;
+          const wordParts = rawText.split(/(<\d{2}:\d{2}\.?\d{0,3}>)/).filter(Boolean);
+          wordsWithTime = [];
+          let curWordTime = null;
+          for (const part of wordParts) {
+            const wm = part.match(/<(\d{2}):(\d{2})\.?(\d{2,3})?>/);
+            if (wm) {
+              const m = parseInt(wm[1], 10);
+              const s = parseInt(wm[2], 10);
+              const ms = wm[3] ? parseInt(wm[3].padEnd(3, '0').slice(0, 3), 10) : 0;
+              curWordTime = Math.max(0, m * 60 + s + (ms / 1000) + combinedOffset);
+            } else if (part.trim()) {
+              wordsWithTime.push({
+                text: part.trim(),
+                time: curWordTime
+              });
+            }
+          }
+        }
+
+        const cleanText = rawText.replace(wordTimeReg, '').trim();
+
         for (const match of matches) {
           const mins = parseInt(match[1], 10);
           const secs = parseInt(match[2], 10);
           const ms = match[3] ? parseInt(match[3].padEnd(3, '0').slice(0, 3), 10) : 0;
           const time = Math.max(0, mins * 60 + secs + (ms / 1000) + combinedOffset);
-          result.push({ time, text });
+          result.push({
+            time,
+            text: cleanText,
+            wordsWithTime: (wordsWithTime && wordsWithTime.length > 0) ? wordsWithTime : null
+          });
         }
       }
     }
@@ -5284,34 +5335,32 @@
       }
     }
 
-    // Word-by-Word Live Glow Karaoke Engine (Desktop & Mobile)
+    // Word-by-Word Synchronization (Only When Genuine Timestamps Exist)
     if (activeIdx >= 0 && state.lyrics[activeIdx]) {
       const activeLineEl = elements.lyricsLinesContainer.querySelector(`.lyric-line[data-index="${activeIdx}"]`);
       if (activeLineEl) {
-        const curLineTime = state.lyrics[activeIdx].time;
-        const nextLineTime = (activeIdx + 1 < state.lyrics.length) ? state.lyrics[activeIdx + 1].time : (curLineTime + 4.5);
-        const lineDuration = Math.max(0.6, Math.min(7.0, nextLineTime - curLineTime));
-        const lineElapsed = Math.max(0, lyricClock - curLineTime);
-        const progress = Math.max(0, Math.min(1, lineElapsed / lineDuration));
-
-        const words = activeLineEl.querySelectorAll('.lyric-word');
-        const numWords = words.length;
-        if (numWords > 0) {
-          const currentWordFloat = progress * numWords;
-          const currentWordIdx = Math.floor(currentWordFloat);
-
-          words.forEach((wEl, wI) => {
-            if (wI < currentWordIdx) {
-              wEl.classList.add('sung', 'glowing');
-              wEl.classList.remove('singing');
-            } else if (wI === currentWordIdx) {
-              wEl.classList.add('singing', 'glowing');
-              wEl.classList.remove('sung');
+        const item = state.lyrics[activeIdx];
+        if (item.wordsWithTime && item.wordsWithTime.length > 0) {
+          const words = activeLineEl.querySelectorAll('.lyric-word');
+          item.wordsWithTime.forEach((wData, wI) => {
+            const wEl = words[wI];
+            if (!wEl) return;
+            const nextWTime = (wI + 1 < item.wordsWithTime.length) ? item.wordsWithTime[wI + 1].time : (wData.time + 1.2);
+            if (wData.time != null && lyricClock >= wData.time) {
+              if (lyricClock < nextWTime) {
+                wEl.classList.add('singing', 'glowing');
+                wEl.classList.remove('sung');
+              } else {
+                wEl.classList.add('sung', 'glowing');
+                wEl.classList.remove('singing');
+              }
             } else {
               wEl.classList.remove('singing', 'glowing', 'sung');
             }
           });
         }
+        // If line has standard line-level timestamps, do NOT fake word division (Part 3 strict rule).
+        // The entire active line is highlighted cleanly with warm ivory text and subtle glow.
       }
     }
   }
@@ -6920,9 +6969,33 @@
     });
   }
 
-  // Desktop Ambient Edge Border Glow Animation Controller (Lyrics Window Only)
+  // Cinematic Moving Border Animation Controller (Timeline 1.mov: Desktop, Mobile & Fullscreen)
   function isDesktopWebGlowEligible() {
-    return window.innerWidth > 768 && (!window.matchMedia || window.matchMedia('(hover: hover) and (pointer: fine)').matches);
+    return true; // Supported and active on all viewports (desktop, mobile, fullscreen)
+  }
+
+  function updateCinematicBorderDimensions() {
+    const glowEl = elements.lyricsEdgeGlow || document.getElementById('lyrics-edge-glow');
+    if (!glowEl) return;
+    const rects = glowEl.querySelectorAll('rect');
+    if (!rects || rects.length === 0) return;
+
+    const w = glowEl.clientWidth;
+    const h = glowEl.clientHeight;
+    if (w > 10 && h > 10) {
+      const rx = w <= 768 ? 12 : 16;
+      const rectW = Math.max(10, w - 6);
+      const rectH = Math.max(10, h - 6);
+      rects.forEach(r => {
+        r.setAttribute('x', '3');
+        r.setAttribute('y', '3');
+        r.setAttribute('width', rectW.toString());
+        r.setAttribute('height', rectH.toString());
+        r.setAttribute('rx', rx.toString());
+        r.setAttribute('ry', rx.toString());
+        r.setAttribute('pathLength', '1000');
+      });
+    }
   }
 
   function updateLyricsEdgeGlowState() {
@@ -6930,14 +7003,14 @@
     if (!glowEl) return;
 
     const isLyricsActive = state.currentView === 'lyrics';
-    const isDesktop = isDesktopWebGlowEligible();
 
-    if (!isLyricsActive || !isDesktop) {
+    if (!isLyricsActive) {
       glowEl.classList.remove('is-active', 'is-playing');
       return;
     }
 
     glowEl.classList.add('is-active');
+    updateCinematicBorderDimensions();
 
     // Playing state: song is actively playing and audio is not paused
     const actDeck = getActiveDeck();
