@@ -137,14 +137,18 @@
             </div>
           </div>
 
-          <!-- Guest: Sign In Option at Top (Matching Website Theme) -->
-          <button type="button" class="user-dropdown-item user-dropdown-signin" id="userDropdownSignInBtn" title="Sign In to MusiSurf">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-              <polyline points="10 17 15 12 10 7"/>
-              <line x1="15" y1="12" x2="3" y2="12"/>
+          <!-- Guest: Sign In Option at Top with FlowButton Animation & Website Theme -->
+          <button type="button" class="user-dropdown-item user-dropdown-signin flow-btn-wrap" id="userDropdownSignInBtn" title="Sign In to MusiSurf">
+            <svg class="flow-arrow flow-arrow-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
             </svg>
-            <span>Sign In</span>
+            <span class="flow-btn-text">Sign In</span>
+            <span class="flow-btn-circle" aria-hidden="true"></span>
+            <svg class="flow-arrow flow-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
           </button>
 
           <div class="user-dropdown-divider" id="userDropdownDivider"></div>
@@ -408,44 +412,6 @@
               </div>
             </div>
           </div>
-
-          <!-- MusiSurf Public Landing Footer with Platform Description & Legal Links -->
-          <footer class="musisurf-public-footer" id="musisurfPublicFooter">
-            <div class="public-footer-inner">
-              <div class="public-footer-brand-col">
-                <div class="public-footer-logo-row">
-                  <img src="/icons/icon.svg" class="public-footer-logo-img" alt="MusiSurf Logo" />
-                  <span class="public-footer-brand-title">MusiSurf</span>
-                </div>
-                <p class="public-footer-description">
-                  MusiSurf is a modern web music streaming and playlist platform. Stream millions of full-length songs with real-time synchronized lyrics, curate personalized playlists, and sync your music library seamlessly across all your devices.
-                </p>
-              </div>
-
-              <div class="public-footer-links-group">
-                <div class="public-footer-links-col">
-                  <span class="public-footer-heading">Legal & Compliance</span>
-                  <ul class="public-footer-nav-list">
-                    <li><a href="/privacy" class="public-footer-link" id="homeFooterPrivacyLink">Privacy Policy</a></li>
-                    <li><a href="/terms" class="public-footer-link" id="homeFooterTermsLink">Terms of Service</a></li>
-                  </ul>
-                </div>
-
-                <div class="public-footer-links-col">
-                  <span class="public-footer-heading">MusiSurf Platform</span>
-                  <ul class="public-footer-nav-list">
-                    <li><a href="/" class="public-footer-link">Home Player</a></li>
-                    <li><a href="/privacy#google-data" class="public-footer-link">Google Data & Limited Use</a></li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <div class="public-footer-bottom-row">
-              <span class="public-footer-copy">&copy; 2026 MusiSurf. All rights reserved.</span>
-              <span class="public-footer-tagline">High-Fidelity Web Audio &bull; Real-Time Synced Lyrics &bull; Secure Cloud Library</span>
-            </div>
-          </footer>
         </section>
 
         <!-- SEARCH VIEW -->
@@ -1506,9 +1472,9 @@
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </button>
-        <div class="mobile-player-header-title" style="visibility: hidden;">
-          <span class="mob-header-sub"></span>
-          <span class="mob-header-main" id="mobHeaderPlaylistName"></span>
+        <div class="mobile-player-header-title">
+          <span class="mob-header-sub">PLAYING FROM PLAYLIST</span>
+          <span class="mob-header-main" id="mobHeaderPlaylistName">NONE</span>
         </div>
         <button class="mobile-player-options-top-btn" id="mobPlayerOptionsBtn" title="More Options" aria-label="More Options">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -2361,22 +2327,6 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="22"/><line x1="6" y1="6" x2="6" y2="18"/><line x1="18" y1="8" x2="18" y2="16"/><line x1="2" y1="10" x2="2" y2="14"/><line x1="22" y1="10" x2="22" y2="14"/></svg>
               <span>Sound</span>
             </button>
-            <button class="settings-cat-btn" data-target="settingsLyricsSection">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
-              <span>Lyrics</span>
-            </button>
-            <button class="settings-cat-btn" data-target="settingsDisplaySection">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
-              <span>Display</span>
-            </button>
-            <button class="settings-cat-btn" data-target="settingsLibrarySection">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/></svg>
-              <span>Library</span>
-            </button>
-            <button class="settings-cat-btn" data-target="settingsDataSection">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-              <span>Your data</span>
-            </button>
             <button class="settings-cat-btn" data-target="settingsAboutSection">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
               <span>About</span>
@@ -2434,64 +2384,6 @@
                   <button type="button" class="sound-pill-btn" data-level="quiet">Quiet</button>
                   <button type="button" class="sound-pill-btn" data-level="normal">Normal</button>
                   <button type="button" class="sound-pill-btn active" data-level="loud">Loud</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Output Device Card -->
-            <div class="settings-section-block">
-              <span class="settings-section-label">Output</span>
-              <div class="sound-card-item">
-                <div class="sound-card-left">
-                  <div class="sound-icon-box">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="12" cy="14" r="4"/><line x1="12" y1="6" x2="12.01" y2="6"/></svg>
-                  </div>
-                  <div class="sound-meta">
-                    <h3 class="sound-title">Output device</h3>
-                    <p class="sound-desc">Following the system default</p>
-                  </div>
-                </div>
-                <div class="sound-select-box">
-                  <select id="settingsAudioOutputSelect" class="sound-device-select">
-                    <option value="default">Speakers (System Default)</option>
-                  </select>
-                </div>
-              </div>
-              <p class="sound-subnote">If the device disappears (a headset unplugged, Bluetooth dropped), playback pauses and goes back to the system default.</p>
-            </div>
-
-            <!-- Equalizer Card -->
-            <div class="settings-section-block">
-              <span class="settings-section-label">Equalizer</span>
-              <div class="sound-card-item">
-                <div class="sound-card-left">
-                  <div class="sound-icon-box">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
-                  </div>
-                  <div class="sound-meta">
-                    <h3 class="sound-title">Equalizer</h3>
-                    <p class="sound-desc">Shape the sound with 10 bands</p>
-                  </div>
-                </div>
-                <label class="sound-toggle-switch">
-                  <input type="checkbox" id="equalizerToggleSwitch">
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-
-              <!-- 10-Band Equalizer Sliders (Expanded when switch is on) -->
-              <div class="equalizer-sliders-container" id="equalizerSlidersWrap" style="display: none;">
-                <div class="eq-bands-row">
-                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="32"><span>32Hz</span></div>
-                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="64"><span>64Hz</span></div>
-                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="125"><span>125Hz</span></div>
-                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="250"><span>250Hz</span></div>
-                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="500"><span>500Hz</span></div>
-                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="1000"><span>1kHz</span></div>
-                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="2000"><span>2kHz</span></div>
-                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="4000"><span>4kHz</span></div>
-                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="8000"><span>8kHz</span></div>
-                  <div class="eq-band-col"><span>+12dB</span><input type="range" class="eq-vertical-slider" min="-12" max="12" value="0" data-freq="16000"><span>16kHz</span></div>
                 </div>
               </div>
             </div>
@@ -2618,7 +2510,53 @@
               <h1 class="settings-tab-title">Account</h1>
               <p class="settings-tab-desc">Your MusiSurf profile and cloud sync</p>
             </div>
+
+            <!-- Guest User: Sign In Prompt & Button -->
+            <div class="settings-section-block" id="settingsAccountGuestBlock">
+              <span class="settings-section-label">Account Access</span>
+              <div class="sound-card-item settings-account-signin-card">
+                <div class="sound-card-left">
+                  <div class="sound-icon-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  </div>
+                  <div class="sound-meta">
+                    <h3 class="sound-title">Sign In to MusiSurf</h3>
+                    <p class="sound-desc">Sign in to sync your playlists across devices, backup your library, and continue listening seamlessly.</p>
+                  </div>
+                </div>
+                <button type="button" class="settings-account-signin-btn flow-btn-wrap" id="settingsAccountSignInBtn" title="Sign In to MusiSurf">
+                  <svg class="flow-arrow flow-arrow-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                    <polyline points="12 5 19 12 12 19"></polyline>
+                  </svg>
+                  <span class="flow-btn-text">Sign In</span>
+                  <span class="flow-btn-circle" aria-hidden="true"></span>
+                  <svg class="flow-arrow flow-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                    <polyline points="12 5 19 12 12 19"></polyline>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Signed-in User: Profile Details & Sign Out -->
+            <div class="settings-section-block" id="settingsAccountUserBlock" style="display: none;">
+              <span class="settings-section-label">Profile</span>
+              <div class="sound-card-item">
+                <div class="sound-card-left">
+                  <div class="user-dropdown-avatar" id="settingsAccountAvatar">U</div>
+                  <div class="sound-meta">
+                    <h3 class="sound-title" id="settingsAccountName">User</h3>
+                    <p class="sound-desc" id="settingsAccountEmail">user@example.com</p>
+                  </div>
+                </div>
+                <button type="button" class="btn-secondary" id="settingsAccountSignOutBtn" style="padding: 6px 14px; font-size: 0.85rem; border-radius: 8px;">Sign Out</button>
+              </div>
+            </div>
+
+            <!-- Subscription Plan -->
             <div class="settings-section-block">
+              <span class="settings-section-label">Subscription</span>
               <div class="sound-card-item">
                 <div class="sound-card-left">
                   <div class="sound-meta">
@@ -2627,94 +2565,6 @@
                   </div>
                 </div>
                 <span class="feat-quality-badge">Active</span>
-              </div>
-            </div>
-          </section>
-
-          <!-- LYRICS TAB CONTENT -->
-          <section class="settings-tab-view" id="settingsLyricsSection">
-            <div class="settings-tab-header">
-              <h1 class="settings-tab-title">Lyrics</h1>
-              <p class="settings-tab-desc">Synchronized lyric display and alignment preferences</p>
-            </div>
-            <div class="settings-section-block">
-              <div class="sound-card-item">
-                <div class="sound-card-left">
-                  <div class="sound-meta">
-                    <h3 class="sound-title">Synchronized Auto-Scroll</h3>
-                    <p class="sound-desc">Scroll lines smoothly in real-time as words are sung</p>
-                  </div>
-                </div>
-                <label class="sound-toggle-switch mini-toggle">
-                  <input type="checkbox" id="lyricsAutoScrollToggle" checked>
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-              <div class="sound-card-item">
-                <div class="sound-card-left">
-                  <div class="sound-meta">
-                    <h3 class="sound-title">Lyrics Fullscreen Shortcut</h3>
-                    <p class="sound-desc">Press <kbd class="ctrl-key-badge">F</kbd> while viewing lyrics on desktop to enter or exit immersive full screen, or press <kbd class="ctrl-key-badge">Esc</kbd> to exit</p>
-                  </div>
-                </div>
-                <span class="feat-quality-badge">F / Esc</span>
-              </div>
-            </div>
-          </section>
-
-          <!-- DISPLAY TAB CONTENT -->
-          <section class="settings-tab-view" id="settingsDisplaySection">
-            <div class="settings-tab-header">
-              <h1 class="settings-tab-title">Display</h1>
-              <p class="settings-tab-desc">Theme, dark mode, animations and visualizer</p>
-            </div>
-            <div class="settings-section-block">
-              <div class="sound-card-item">
-                <div class="sound-card-left">
-                  <div class="sound-meta">
-                    <h3 class="sound-title">Pitch Black OLED Theme</h3>
-                    <p class="sound-desc">Deep obsidian blacks with sleek platinum white accents</p>
-                  </div>
-                </div>
-                <span class="feat-quality-badge">Enabled</span>
-              </div>
-            </div>
-          </section>
-
-          <!-- LIBRARY TAB CONTENT -->
-          <section class="settings-tab-view" id="settingsLibrarySection">
-            <div class="settings-tab-header">
-              <h1 class="settings-tab-title">Library</h1>
-              <p class="settings-tab-desc">Manage local storage, offline cache, and downloads</p>
-            </div>
-            <div class="settings-section-block">
-              <div class="sound-card-item">
-                <div class="sound-card-left">
-                  <div class="sound-meta">
-                    <h3 class="sound-title">Clear Offline Cache</h3>
-                    <p class="sound-desc">Remove locally cached audio files to free up disk space</p>
-                  </div>
-                </div>
-                <button type="button" class="sound-pill-btn" id="clearCacheSettingsBtn">Clear Cache</button>
-              </div>
-            </div>
-          </section>
-
-          <!-- DATA TAB CONTENT -->
-          <section class="settings-tab-view" id="settingsDataSection">
-            <div class="settings-tab-header">
-              <h1 class="settings-tab-title">Your data</h1>
-              <p class="settings-tab-desc">Privacy, listening history and offline data storage</p>
-            </div>
-            <div class="settings-section-block">
-              <div class="sound-card-item">
-                <div class="sound-card-left">
-                  <div class="sound-meta">
-                    <h3 class="sound-title">Local-First Storage</h3>
-                    <p class="sound-desc">Your playlists and liked songs are saved directly on this device.</p>
-                  </div>
-                </div>
-                <span class="feat-quality-badge">Private</span>
               </div>
             </div>
           </section>

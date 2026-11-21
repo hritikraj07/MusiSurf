@@ -3578,9 +3578,9 @@
         if (headerName) headerName.textContent = playlistTitle;
         headerTitleWrap.style.visibility = 'visible';
       } else {
-        if (headerSub) headerSub.textContent = '';
-        if (headerName) headerName.textContent = '';
-        headerTitleWrap.style.visibility = 'hidden';
+        if (headerSub) headerSub.textContent = 'PLAYING FROM PLAYLIST';
+        if (headerName) headerName.textContent = 'NONE';
+        headerTitleWrap.style.visibility = 'visible';
       }
     }
 
@@ -10531,6 +10531,7 @@
         document.querySelectorAll('.settings-tab-view').forEach(view => {
           view.classList.toggle('active', view.id === 'settingsAccountSection');
         });
+        if (typeof updateAuthUI === 'function') updateAuthUI();
         try { window.history.pushState({ modal: 'settings' }, '', window.location.pathname); } catch (e) {}
       }
     };
@@ -12259,6 +12260,18 @@
 
         if (drawerSignInBtn) drawerSignInBtn.style.display = 'none';
         if (drawerSignOutBtn) drawerSignOutBtn.style.display = 'flex';
+
+        // Update Settings Account Tab
+        const settingsGuestBlock = document.getElementById('settingsAccountGuestBlock');
+        const settingsUserBlock = document.getElementById('settingsAccountUserBlock');
+        const settingsAvatar = document.getElementById('settingsAccountAvatar');
+        const settingsName = document.getElementById('settingsAccountName');
+        const settingsEmail = document.getElementById('settingsAccountEmail');
+        if (settingsGuestBlock) settingsGuestBlock.style.setProperty('display', 'none', 'important');
+        if (settingsUserBlock) settingsUserBlock.style.setProperty('display', 'block', 'important');
+        if (settingsAvatar) settingsAvatar.textContent = initial;
+        if (settingsName) settingsName.textContent = user.name || user.email.split('@')[0];
+        if (settingsEmail) settingsEmail.textContent = user.email;
       } else {
         if (headerUserAvatarBtn) {
           headerUserAvatarBtn.title = 'Account & Sign In';
@@ -12284,6 +12297,12 @@
 
         if (drawerSignInBtn) drawerSignInBtn.style.display = 'none';
         if (drawerSignOutBtn) drawerSignOutBtn.style.display = 'none';
+
+        // Update Settings Account Tab for Guest
+        const settingsGuestBlock = document.getElementById('settingsAccountGuestBlock');
+        const settingsUserBlock = document.getElementById('settingsAccountUserBlock');
+        if (settingsGuestBlock) settingsGuestBlock.style.setProperty('display', 'block', 'important');
+        if (settingsUserBlock) settingsUserBlock.style.setProperty('display', 'none', 'important');
       }
     }
 
@@ -12455,6 +12474,24 @@
     }
     if (drawerSignOutBtn) {
       drawerSignOutBtn.addEventListener('click', handleSignOut);
+    }
+
+    const settingsAccountSignInBtn = document.getElementById('settingsAccountSignInBtn');
+    if (settingsAccountSignInBtn) {
+      settingsAccountSignInBtn.addEventListener('click', (e) => {
+        if (e) e.stopPropagation();
+        const settingsModal = document.getElementById('settingsModal');
+        if (settingsModal) settingsModal.style.display = 'none';
+        openAuthModal('signin');
+      });
+    }
+
+    const settingsAccountSignOutBtn = document.getElementById('settingsAccountSignOutBtn');
+    if (settingsAccountSignOutBtn) {
+      settingsAccountSignOutBtn.addEventListener('click', (e) => {
+        if (e) e.stopPropagation();
+        handleSignOut();
+      });
     }
 
     if (drawerUserCard) {
