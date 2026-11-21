@@ -5910,17 +5910,21 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   z-index: 2200 !important;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  padding: calc(env(safe-area-inset-top, 10px) + 8px) 20px calc(env(safe-area-inset-bottom, 16px) + 12px);
-  overflow: hidden !important;
-  overflow-y: hidden !important;
+  padding: calc(env(safe-area-inset-top, 10px) + 8px) 20px calc(env(safe-area-inset-bottom, 16px) + 24px);
+  overflow-y: auto !important;
   overflow-x: hidden !important;
   height: 100dvh !important;
   max-height: 100dvh !important;
-  overscroll-behavior: none !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: none !important;
+  overscroll-behavior-y: contain;
   touch-action: pan-y;
   animation: slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   transition: background 0.5s ease;
+}
+
+.mobile-now-playing-modal::-webkit-scrollbar {
+  display: none !important;
 }
 
 @keyframes slideUpModal {
@@ -5934,6 +5938,9 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   justify-content: space-between;
   margin-bottom: 8px;
   flex-shrink: 0;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 20 !important;
 }
 
 .mobile-player-header-spacer {
@@ -5965,10 +5972,29 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   height: 24px;
 }
 
-.mobile-player-header-placeholder {
+.mobile-player-options-top-btn {
+  background: transparent !important;
+  border: none !important;
+  color: #fff !important;
+  cursor: pointer;
   width: 36px;
   height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
   flex-shrink: 0;
+  padding: 0;
+}
+
+.mobile-player-options-top-btn:active {
+  transform: scale(0.9);
+  opacity: 0.75;
+}
+
+.mobile-player-options-top-btn svg {
+  width: 22px;
+  height: 22px;
 }
 
 .mobile-player-art-wrap {
@@ -6165,6 +6191,102 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   transform: scale(0.92);
   color: #ffffff;
   background: rgba(255, 255, 255, 0.16);
+}
+
+/* Mobile Lyrics Preview Section (Spotify Style - Matching Image 2) */
+.mob-lyrics-preview-card {
+  width: 100%;
+  border-radius: 22px;
+  background: var(--lyrics-theme-color, #751e18);
+  background: linear-gradient(170deg, rgba(var(--lyrics-theme-rgb, 120, 32, 24), 0.96) 0%, rgba(var(--lyrics-theme-rgb, 75, 18, 14), 0.98) 100%);
+  padding: 22px 20px 22px 20px;
+  margin-top: 16px;
+  margin-bottom: 28px;
+  flex-shrink: 0;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.4s ease;
+}
+
+.mob-lyrics-preview-card:active {
+  transform: scale(0.99);
+}
+
+.mob-lyrics-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.mob-lyrics-preview-title {
+  font-size: 1.18rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.mob-lyrics-preview-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 120px;
+  margin-bottom: 20px;
+}
+
+.mob-lyrics-preview-line {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.38;
+  color: rgba(255, 255, 255, 0.7);
+  transition: color 0.2s ease, font-size 0.2s ease;
+  word-break: break-word;
+}
+
+.mob-lyrics-preview-line.active {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 0 16px rgba(255, 255, 255, 0.65);
+}
+
+.mob-lyrics-preview-placeholder {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
+  padding: 18px 0;
+}
+
+.mob-lyrics-show-btn {
+  align-self: flex-start;
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border: none !important;
+  border-radius: 9999px !important;
+  padding: 10px 22px !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.mob-lyrics-show-btn:active {
+  transform: scale(0.95);
+  opacity: 0.85;
+}
+
+@media (min-width: 769px) {
+  .mob-lyrics-preview-card {
+    display: none !important;
+  }
 }
 
 .mob-bottom-icon-btn svg {
@@ -6891,6 +7013,61 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   body[data-active-view="search"] .mobile-top-brand,
   body[data-active-view="search"] .mobile-top-actions {
     display: none !important;
+  }
+
+  /* Mobile Lyrics View: Completely hide top nav bar (brand logo, search icon, user icon) */
+  body[data-active-view="lyrics"] .top-header,
+  body[data-active-view="lyrics"] #topHeader,
+  body[data-active-view="lyrics"] .mobile-top-brand,
+  body[data-active-view="lyrics"] .mobile-top-actions {
+    display: none !important;
+  }
+
+  body[data-active-view="lyrics"] .content-scroll {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  body[data-active-view="lyrics"] #lyricsView {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+
+  body[data-active-view="lyrics"] .lyrics-view-container {
+    height: 100% !important;
+    max-height: calc(100dvh - 80px) !important;
+    padding-top: calc(env(safe-area-inset-top, 12px) + 54px) !important;
+  }
+
+  /* Mobile Lyrics Back Button at top left */
+  .lyrics-mobile-back-btn,
+  #mobLyricsBackBtn {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    cursor: pointer;
+    position: absolute;
+    top: calc(env(safe-area-inset-top, 12px) + 12px);
+    left: 16px;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .lyrics-mobile-back-btn:active {
+    transform: scale(0.9);
+    background: rgba(0, 0, 0, 0.65);
+  }
+  .lyrics-mobile-back-btn svg {
+    width: 22px;
+    height: 22px;
   }
 
   /* On mobile search section: show search bar, taking full width */
@@ -10174,6 +10351,11 @@ body[data-active-view="lyrics"] .content-scroll {
   padding: 0 4px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.lyrics-mobile-back-btn,
+#mobLyricsBackBtn {
+  display: none;
 }
 
 .lyrics-view-close-btn,

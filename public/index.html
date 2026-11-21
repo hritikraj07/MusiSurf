@@ -846,6 +846,13 @@
 
         <!-- SYNCHRONIZED LYRICS VIEW (Exact Match to Image 2 - Dynamic Atmospheric Backdrop) -->
         <section class="view-section" id="lyricsView">
+          <!-- Mobile Back Button (Shown when top nav is hidden on mobile lyrics view) -->
+          <button class="lyrics-mobile-back-btn" id="mobLyricsBackBtn" type="button" title="Back" aria-label="Go Back">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+
           <!-- Album-Themed Ambient Edge Border Glow Animation (Desktop Web Lyrics Window Only) -->
           <div id="lyrics-edge-glow" class="lyrics-edge-glow" aria-hidden="true">
             <div class="edge-glow-ambient"></div>
@@ -1494,7 +1501,13 @@
           <span class="mob-header-sub"></span>
           <span class="mob-header-main" id="mobHeaderPlaylistName"></span>
         </div>
-        <div class="mobile-player-header-placeholder"></div>
+        <button class="mobile-player-options-top-btn" id="mobPlayerOptionsBtn" title="More Options" aria-label="More Options">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="4" y1="7" x2="20" y2="7"/>
+            <line x1="4" y1="12" x2="20" y2="12"/>
+            <line x1="4" y1="17" x2="20" y2="17"/>
+          </svg>
+        </button>
       </div>
 
       <div class="mobile-player-art-wrap">
@@ -1568,7 +1581,7 @@
         </button>
       </div>
 
-      <!-- Spotify-Grade Bottom Feature Bar (Share -> Timer -> Lyrics -> Options) -->
+      <!-- Spotify-Grade Bottom Feature Bar (Share -> Timer -> Lyrics -> Queue) -->
       <div class="mobile-player-bottom-bar">
         <button class="mob-bottom-icon-btn" id="mobPlayerShareBtn" title="Share Song" aria-label="Share Song">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1602,12 +1615,18 @@
             <line x1="3" y1="18" x2="3.01" y2="18"/>
           </svg>
         </button>
-        <button class="mob-bottom-icon-btn" id="mobPlayerOptionsBtn" title="More Options" aria-label="More Options">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-            <line x1="4" y1="7" x2="20" y2="7"/>
-            <line x1="4" y1="12" x2="20" y2="12"/>
-            <line x1="4" y1="17" x2="20" y2="17"/>
-          </svg>
+      </div>
+
+      <!-- Mobile Lyrics Preview Section (Matching Image 2 - Spotify Style) -->
+      <div class="mob-lyrics-preview-card" id="mobLyricsPreviewCard">
+        <div class="mob-lyrics-preview-header">
+          <span class="mob-lyrics-preview-title">Lyrics preview</span>
+        </div>
+        <div class="mob-lyrics-preview-lines" id="mobLyricsPreviewLines">
+          <div class="mob-lyrics-preview-placeholder">Loading lyrics preview...</div>
+        </div>
+        <button type="button" class="mob-lyrics-show-btn" id="mobLyricsShowBtn">
+          <span>Show lyrics</span>
         </button>
       </div>
     </div>
