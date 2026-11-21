@@ -6238,11 +6238,11 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     display: none !important;
   }
 
-  /* Show Mobile Bottom Navigation (Full Required Width, Sliding Tubelight Animation Between Buttons) */
+  /* Show Mobile Bottom Navigation (Compact, Sleek, Sliding Tubelight Animation Between Buttons) */
   .mobile-nav-bar {
     display: flex !important;
     position: fixed !important;
-    bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    bottom: calc(6px + env(safe-area-inset-bottom, 0px)) !important;
     left: 8px !important;
     right: 8px !important;
     width: auto !important;
@@ -6253,12 +6253,12 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     backdrop-filter: blur(24px) saturate(180%) !important;
     -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    border-radius: 16px !important;
-    box-shadow: 0 12px 36px -4px rgba(0, 0, 0, 0.75), 0 0 1px 1px rgba(255, 255, 255, 0.08) !important;
-    padding: 6px 8px !important;
+    border-radius: 14px !important;
+    box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.75), 0 0 1px 1px rgba(255, 255, 255, 0.08) !important;
+    padding: 3px 6px !important;
     align-items: center !important;
     justify-content: stretch !important;
-    gap: 6px !important;
+    gap: 4px !important;
     z-index: 500 !important;
     box-sizing: border-box !important;
   }
@@ -6266,17 +6266,17 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   /* Sliding Indicator Pill Behind Active Tab */
   .mobile-nav-slider {
     position: absolute !important;
-    top: 6px !important;
-    bottom: 6px !important;
-    left: 8px !important;
-    width: calc((100% - 16px - 18px) / 4) !important;
+    top: 3px !important;
+    bottom: 3px !important;
+    left: 6px !important;
+    width: calc((100% - 12px - 12px) / 4) !important;
     background: rgba(255, 255, 255, 0.08) !important;
     border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    border-radius: 12px !important;
+    border-radius: 10px !important;
     pointer-events: none !important;
     z-index: 1 !important;
     transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
-    transform: translateX(calc(var(--nav-idx, 0) * (100% + 6px))) !important;
+    transform: translateX(calc(var(--nav-idx, 0) * (100% + 4px))) !important;
     will-change: transform;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35) !important;
   }
@@ -6285,31 +6285,31 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   .mobile-nav-slider .tubelight-lamp {
     display: block !important;
     position: absolute !important;
-    top: -5px !important;
+    top: -3px !important;
     left: 50% !important;
     transform: translateX(-50%) !important;
-    width: 32px !important;
-    height: 3px !important;
+    width: 26px !important;
+    height: 2.5px !important;
     background: #ffffff !important;
     border-radius: 9999px !important;
     pointer-events: none !important;
-    box-shadow: 0 0 10px rgba(255, 255, 255, 0.95),
-                0 0 20px rgba(255, 255, 255, 0.55),
-                0 0 32px rgba(255, 255, 255, 0.3) !important;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.95),
+                0 0 16px rgba(255, 255, 255, 0.55),
+                0 0 24px rgba(255, 255, 255, 0.3) !important;
   }
 
   /* Ambient soft glow blur underneath the sliding lamp */
   .mobile-nav-slider .tubelight-lamp::after {
     content: '' !important;
     position: absolute !important;
-    top: -4px !important;
+    top: -3px !important;
     left: 50% !important;
     transform: translateX(-50%) !important;
-    width: 48px !important;
-    height: 18px !important;
+    width: 36px !important;
+    height: 14px !important;
     background: rgba(255, 255, 255, 0.35) !important;
     border-radius: 50% !important;
-    filter: blur(8px) !important;
+    filter: blur(6px) !important;
     pointer-events: none !important;
   }
 
@@ -6322,15 +6322,15 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 3px !important;
+    gap: 1px !important;
     background: transparent !important;
     border: 1px solid transparent !important;
     color: var(--text-secondary, #9ea0a8) !important;
-    font-size: 0.72rem !important;
+    font-size: 0.66rem !important;
     font-weight: 600 !important;
     cursor: pointer !important;
-    padding: 8px 4px !important;
-    border-radius: 12px !important;
+    padding: 4px 2px !important;
+    border-radius: 10px !important;
     transition: color 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
     user-select: none !important;
     -webkit-tap-highlight-color: transparent !important;
@@ -6344,9 +6344,9 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   }
 
   .mobile-nav-item svg {
-    width: 22px !important;
-    height: 22px !important;
-    stroke-width: 2.2 !important;
+    width: 19px !important;
+    height: 19px !important;
+    stroke-width: 2 !important;
     color: var(--text-secondary, #9ea0a8) !important;
     transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease !important;
   }
@@ -6380,7 +6380,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   /* Transform Persistent Player Bar into a Spotify-style Mini Player Floating above Nav Bar */
   .player-bar {
     position: fixed;
-    bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
+    bottom: calc(58px + env(safe-area-inset-bottom, 0px)) !important;
     left: 8px;
     right: 8px;
     width: auto;
@@ -6576,8 +6576,13 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   }
 
   .player-controls .control-btn,
+  .player-bar .player-controls .control-btn,
+  .player-bar .player-controls #shuffleBtn,
+  .player-bar .player-controls #prevBtn,
+  .player-bar .player-controls #nextBtn,
+  .player-bar .player-controls #repeatBtn,
   .progress-bar-container {
-    display: none;
+    display: none !important;
   }
 
   .player-controls {
@@ -7424,13 +7429,28 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   min-height: 16px !important;
   fill: currentColor !important;
   color: #0a0b0d !important;
-  display: inline-block !important;
   flex-shrink: 0 !important;
   margin: 0 !important;
 }
 
+#playAllLocalBtn .play-icon,
+#playAllLocalBtn svg.play-icon {
+  display: inline-block !important;
+}
+
+#playAllLocalBtn .pause-icon,
 #playAllLocalBtn svg.pause-icon {
-  display: none;
+  display: none !important;
+}
+
+#playAllLocalBtn.is-playing .play-icon,
+#playAllLocalBtn.is-playing svg.play-icon {
+  display: none !important;
+}
+
+#playAllLocalBtn.is-playing .pause-icon,
+#playAllLocalBtn.is-playing svg.pause-icon {
+  display: inline-block !important;
 }
 
 #clearAllLocalBtn,
@@ -10296,22 +10316,11 @@ body[data-active-view="lyrics"] .content-scroll {
   pointer-events: none !important;
 }
 
-.lyrics-script-toggle-btn {
-  font-size: 0.8rem !important;
-  font-weight: 700 !important;
-  padding: 5px 12px !important;
-  border-radius: 12px !important;
-  background: rgba(0, 242, 96, 0.15) !important;
-  color: #00f260 !important;
-  border: 1px solid rgba(0, 242, 96, 0.35) !important;
-  cursor: pointer !important;
-  transition: all 0.2s ease !important;
-}
-
-.lyrics-script-toggle-btn:hover {
-  background: #00f260 !important;
-  color: #000000 !important;
-  transform: scale(1.05) !important;
+.lyrics-script-toggle-btn,
+#lyricsScriptToggleBtn {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /* Plain Unsynced Lyrics Display (No Fake Timestamps) */
@@ -10431,9 +10440,21 @@ body[data-active-view="lyrics"] .content-scroll {
   height: 16px !important;
 }
 
-/* Mobile: Hide Top Bar exclusively in Library View (Requested by User) */
+/* Mobile: Show Top Bar in Library View & Downloads Section (Requested by User) */
 @media (max-width: 768px) {
-  body[data-active-view="library"] .top-header {
+  body[data-active-view="library"] .top-header,
+  body[data-active-view="library"] #topHeader,
+  body[data-playlist-id="downloaded"] .top-header,
+  body[data-playlist-id="downloaded"] #topHeader {
+    display: flex !important;
+  }
+  body[data-playlist-id="downloaded"] .app-layout {
+    grid-template-rows: auto 1fr var(--player-height, 90px) !important;
+    grid-template-areas: "topbar" "main" !important;
+  }
+  /* Remove top left back option on Downloads section */
+  body[data-playlist-id="downloaded"] .playlist-nav-back-row,
+  body[data-playlist-id="downloaded"] #playlistBackBtn {
     display: none !important;
   }
   .desktop-header-brand-wrap {
@@ -12164,13 +12185,13 @@ body[data-active-view="lyrics"] .content-scroll {
   display: none !important;
 }
 
-/* 4. Inside Playlist: Do NOT show top nav on mobile only */
+/* 4. Inside Playlist: Do NOT show top nav on mobile only (except Downloads section which shows it) */
 @media (max-width: 768px) {
-  body[data-active-view="playlist"] .top-header,
-  body[data-active-view="playlist"] #topHeader {
+  body[data-active-view="playlist"]:not([data-playlist-id="downloaded"]) .top-header,
+  body[data-active-view="playlist"]:not([data-playlist-id="downloaded"]) #topHeader {
     display: none !important;
   }
-  body[data-active-view="playlist"] .app-layout {
+  body[data-active-view="playlist"]:not([data-playlist-id="downloaded"]) .app-layout {
     grid-template-rows: 1fr var(--player-height, 90px) !important;
     grid-template-areas: "main" !important;
   }

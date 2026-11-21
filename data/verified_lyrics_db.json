@@ -1,1 +1,38 @@
-{}
+{
+  "test musisurf song 1795245129273__musisurf artist__standard": {
+    "success": true,
+    "verified": true,
+    "isUserContributed": true,
+    "matchScore": 100,
+    "confidence": "high",
+    "trackName": "Test MusiSurf Song 1795245129273",
+    "artistName": "MusiSurf Artist",
+    "syncedLyrics": "[00:08.50]First line of the test song\n[00:16.20]Second line of the test song\n[00:24.80]Third line of the test song",
+    "plainLyrics": null,
+    "romanizedSyncedLyrics": null,
+    "romanizedPlainLyrics": null,
+    "hasDevanagariAlt": false,
+    "language": "English",
+    "script": "Latin",
+    "provider": "user_contributed",
+    "contributedAt": "2026-11-21T07:12:09.274Z"
+  },
+  "test musisurf song 1795246954446__musisurf artist__standard": {
+    "success": true,
+    "verified": true,
+    "isUserContributed": true,
+    "matchScore": 100,
+    "confidence": "high",
+    "trackName": "Test MusiSurf Song 1795246954446",
+    "artistName": "MusiSurf Artist",
+    "syncedLyrics": "[00:08.50]First line of the test song\n[00:16.20]Second line of the test song\n[00:24.80]Third line of the test song",
+    "plainLyrics": null,
+    "romanizedSyncedLyrics": null,
+    "romanizedPlainLyrics": null,
+    "hasDevanagariAlt": false,
+    "language": "English",
+    "script": "Latin",
+    "provider": "user_contributed",
+    "contributedAt": "2026-11-21T07:42:34.446Z"
+  }
+}

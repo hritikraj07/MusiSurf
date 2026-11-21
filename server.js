@@ -6,6 +6,7 @@ const CryptoJS = require('crypto-js');
 const { transliterateTextToDevanagari, detectLyricsLanguage } = require('./scripts/lyrics_transliteration');
 const lyricsDiscoveryEngine = require('./scripts/lyrics_discovery_engine');
 const { cleanTrackTitle, extractArtists, extractSongVersion, computeLyricsMatchScore, validateLrcTimestamps } = require('./scripts/lyrics_matcher');
+const { analyzeTrackSilence } = require('./scripts/silence_detector');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1448,6 +1449,90 @@ app.get('/api/stream', async (req, res) => {
   } catch (err) {
     if (err.name === 'AbortError') return;
     console.error('Stream proxy error:', err.message);
+    if (!res.headersSent) res.status(500).send('Stream error');
+  }
+});
+
+// Audio Silence Bounds Endpoint (Edge-only dead silence removal)
+app.get('/api/audio/silence-bounds', async (req, res) => {
+  const trackId = (req.query.trackId || req.query.id || '').trim();
+  const url = (req.query.url || '').trim();
+  const duration = parseFloat(req.query.duration) || 0;
+
+  try {
+    const result = await analyzeTrackSilence({
+      trackId,
+      url,
+      duration,
+      ytdlGetter: getYtdl
+    });
+    res.json(result);
+  } catch (err) {
+    console.warn('[SilenceBounds] Endpoint error:', err.message);
+    res.json({
+      success: true,
+      trackId,
+      effectiveStart: 0,
+      effectiveEnd: duration > 0 ? duration : 200,
+      duration: duration > 0 ? duration : 200,
+      source: 'fallback'
+    });
+  }
+});
+
+// Same-Origin Audio Stream Proxy with HTTP Range Support (CORS-enabled Tier A fallback)
+app.get('/api/audio/stream-proxy', async (req, res) => {
+  const audioUrl = req.query.url;
+  if (!audioUrl || !audioUrl.startsWith('http')) {
+    return res.status(400).send('Invalid audio URL');
+  }
+
+  const controller = new AbortController();
+  req.on('close', () => {
+    try { controller.abort(); } catch (e) {}
+  });
+
+  try {
+    const range = req.headers.range;
+    const fetchHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    };
+    if (range) {
+      fetchHeaders['Range'] = range;
+    }
+
+    const audioRes = await fetch(audioUrl, {
+      headers: fetchHeaders,
+      signal: controller.signal
+    });
+    if (!audioRes.ok && audioRes.status !== 206) {
+      return res.status(audioRes.status).send('Streaming upstream error');
+    }
+
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Content-Type', audioRes.headers.get('content-type') || 'audio/mp4');
+
+    if (audioRes.headers.get('content-range')) {
+      res.setHeader('Content-Range', audioRes.headers.get('content-range'));
+      res.status(206);
+    } else {
+      res.status(audioRes.status);
+    }
+
+    if (audioRes.headers.get('content-length')) {
+      res.setHeader('Content-Length', audioRes.headers.get('content-length'));
+    }
+
+    const { Readable } = require('stream');
+    const stream = Readable.fromWeb(audioRes.body);
+    stream.on('error', (err) => {
+      if (!res.headersSent) res.status(500).send('Stream error');
+    });
+    stream.pipe(res);
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    console.error('Audio stream proxy error:', err.message);
     if (!res.headersSent) res.status(500).send('Stream error');
   }
 });

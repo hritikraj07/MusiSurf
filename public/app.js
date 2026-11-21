@@ -1570,9 +1570,16 @@
     return String(track.id || track.ytId || track.audioUrl || `${track.title || ''}::${track.artist || ''}`);
   }
 
+  // ==========================================================================
+  // BULLETPROOF TWO-TIER EDGE SILENCE DETECTION & AUDIO BOUNDS (Start & End Only)
+  // ==========================================================================
+  const trackEdgeSilenceCache = new Map();
+  const SILENCE_CACHE_KEY_V1 = 'musisurf_edge_bounds_v1';
+  const SILENCE_CACHE_KEY_LEGACY = 'musisurf_edge_silence_cache';
+
   function loadEdgeSilenceLocalStorage() {
     try {
-      const raw = localStorage.getItem('musisurf_edge_silence_cache') || localStorage.getItem('musisurf_silence_cache');
+      const raw = localStorage.getItem(SILENCE_CACHE_KEY_V1) || localStorage.getItem(SILENCE_CACHE_KEY_LEGACY);
       if (raw) {
         const parsed = JSON.parse(raw);
         for (const [k, v] of Object.entries(parsed)) {
@@ -1595,12 +1602,42 @@
   function persistEdgeSilenceCache() {
     try {
       const obj = {};
-      const entries = Array.from(trackEdgeSilenceCache.entries()).slice(-200);
+      const entries = Array.from(trackEdgeSilenceCache.entries()).slice(-500);
       for (const [k, v] of entries) {
         obj[k] = v;
       }
-      localStorage.setItem('musisurf_edge_silence_cache', JSON.stringify(obj));
+      localStorage.setItem(SILENCE_CACHE_KEY_V1, JSON.stringify(obj));
     } catch (e) {}
+  }
+
+  function seekToEffectiveStart(audioEl, effectiveStart) {
+    if (!audioEl || typeof effectiveStart !== 'number' || effectiveStart <= 0.05) return;
+    const target = effectiveStart;
+
+    const doSeek = () => {
+      try {
+        if (Math.abs(audioEl.currentTime - target) > 0.08) {
+          audioEl.currentTime = target;
+        }
+      } catch (e) {}
+    };
+
+    if (audioEl.readyState >= 1) { // HAVE_METADATA
+      doSeek();
+    } else {
+      audioEl.addEventListener('loadedmetadata', doSeek, { once: true });
+    }
+
+    // Guard against browser currentTime reset when play() starts
+    const verifySeek = () => {
+      try {
+        if (audioEl.currentTime < target - 0.1) {
+          audioEl.currentTime = target;
+        }
+      } catch (e) {}
+    };
+    audioEl.addEventListener('canplay', verifySeek, { once: true });
+    audioEl.addEventListener('playing', verifySeek, { once: true });
   }
 
   async function getOrAnalyzeTrackEdges(track, streamUrl, audioElem = null) {
@@ -1619,7 +1656,7 @@
 
     const rawDur = track.duration || (audioElem && audioElem.duration) || 0;
 
-    if (!state.settings.removeDeadSilence) {
+    if (state.settings.removeDeadSilence === false) {
       const res = { effectiveStart: 0, effectiveEnd: rawDur, rawDuration: rawDur, analyzed: true };
       trackEdgeSilenceCache.set(key, res);
       track._effectiveStart = 0;
@@ -1628,132 +1665,154 @@
       return res;
     }
 
+    // Tier A: Express Backend Fast Edge-Boundary Endpoint
+    try {
+      const resolvedUrl = streamUrl || track.streamUrl || track.audioUrl || '';
+      const endpoint = `/api/audio/silence-bounds?trackId=${encodeURIComponent(key)}&url=${encodeURIComponent(resolvedUrl)}&duration=${encodeURIComponent(rawDur)}`;
+      
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 6500);
+
+      const resp = await fetch(endpoint, { signal: ctrl.signal });
+      clearTimeout(timer);
+
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && data.success) {
+          const effectiveStart = typeof data.effectiveStart === 'number' ? data.effectiveStart : 0;
+          const effectiveEnd = (typeof data.effectiveEnd === 'number' && data.effectiveEnd > effectiveStart) 
+            ? data.effectiveEnd 
+            : (data.duration || rawDur);
+          const dur = (typeof data.duration === 'number' && data.duration > 0) ? data.duration : rawDur;
+
+          const result = {
+            effectiveStart,
+            effectiveEnd,
+            rawDuration: dur,
+            analyzed: true,
+            source: data.source || 'server'
+          };
+
+          console.log(`[SilenceTrim] Track: "${track.title || key}" | start: ${result.effectiveStart.toFixed(2)}s | end: ${result.effectiveEnd.toFixed(2)}s / raw ${(result.rawDuration || rawDur).toFixed(2)}s`);
+
+          trackEdgeSilenceCache.set(key, result);
+          track._silenceStartOffset = result.effectiveStart;
+          track._effectiveStart = result.effectiveStart;
+          track._effectiveEnd = result.effectiveEnd;
+          persistEdgeSilenceCache();
+
+          // Late-arrival jump if track started playing while server analysis was in flight
+          const actDeck = getActiveDeck();
+          if (actDeck && state.isPlaying && state.currentTrack) {
+            const currentKey = getTrackSilenceCacheKey(state.currentTrack);
+            if (currentKey === key && result.effectiveStart > 0.05 && actDeck.currentTime < result.effectiveStart - 0.15) {
+              try {
+                console.log(`[SilenceTrim] Late-arrival jump from ${actDeck.currentTime.toFixed(2)}s to ${result.effectiveStart.toFixed(2)}s`);
+                actDeck.currentTime = result.effectiveStart;
+              } catch (e) {}
+            }
+          }
+
+          return result;
+        }
+      }
+    } catch (serverErr) {
+      // Backend request aborted or network offline, proceed to fallback
+    }
+
+    // Tier B: Local Buffer / AudioContext Fallback (Zero CORS via stream-proxy or local blob)
     try {
       const ctx = getAudioContext();
       if (!ctx) throw new Error('AudioContext unavailable');
       if (ctx.state === 'suspended') ctx.resume().catch(() => {});
 
       let arrayBuf = null;
-      const abortCtrl = new AbortController();
-      const timeoutTimer = setTimeout(() => abortCtrl.abort(), 4000);
-
       if (track.fileBlob || track.audioBlob) {
-        clearTimeout(timeoutTimer);
         const blob = track.fileBlob || track.audioBlob;
         arrayBuf = await blob.arrayBuffer();
-      } else if (streamUrl) {
-        const res = await fetch(streamUrl, {
-          headers: { Range: 'bytes=0-393216' },
-          signal: abortCtrl.signal
+      } else {
+        const proxyUrl = `/api/audio/stream-proxy?url=${encodeURIComponent(streamUrl || track.audioUrl || '')}`;
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 4000);
+        const res = await fetch(proxyUrl, {
+          headers: { Range: 'bytes=0-450000' },
+          signal: ctrl.signal
         });
-        clearTimeout(timeoutTimer);
+        clearTimeout(t);
         if (res.ok || res.status === 206) {
           arrayBuf = await res.arrayBuffer();
         }
       }
 
-      if (!arrayBuf) throw new Error('No audio buffer data retrieved');
+      if (arrayBuf) {
+        const audioBuffer = await new Promise((resolve, reject) => {
+          ctx.decodeAudioData(arrayBuf, resolve, reject);
+        });
 
-      const audioBuffer = await new Promise((resolve, reject) => {
-        ctx.decodeAudioData(arrayBuf, resolve, reject);
-      });
+        if (audioBuffer) {
+          const sampleRate = audioBuffer.sampleRate;
+          const channelData = audioBuffer.getChannelData(0);
+          const windowSize = Math.max(1, Math.floor(sampleRate * 0.005));
+          const effectiveRawDur = rawDur > 0 ? rawDur : (audioBuffer.duration || 0);
+          const maxStartTrimLimit = Math.min(MAX_START_TRIM, effectiveRawDur > 0 ? effectiveRawDur * 0.18 : MAX_START_TRIM);
+          const maxStartSample = Math.min(channelData.length, Math.floor(sampleRate * maxStartTrimLimit));
 
-      if (!audioBuffer) throw new Error('Audio decoding failed');
+          let firstAudibleSample = 0;
+          let foundAudibleStart = false;
 
-      const sampleRate = audioBuffer.sampleRate;
-      const channelData = audioBuffer.getChannelData(0);
-      const windowSize = Math.max(1, Math.floor(sampleRate * 0.005)); // 5ms window
+          for (let i = 0; i < maxStartSample - windowSize; i += Math.floor(windowSize / 2)) {
+            let sumSq = 0;
+            for (let j = 0; j < windowSize; j++) {
+              const s = channelData[i + j];
+              sumSq += s * s;
+            }
+            const rms = Math.sqrt(sumSq / windowSize);
+            if (rms >= SILENCE_LINEAR_THRESHOLD) {
+              firstAudibleSample = i;
+              foundAudibleStart = true;
+              break;
+            }
+          }
 
-      // 1. LEADING EDGE SCAN (Strictly t = 0 to MAX_START_TRIM)
-      const effectiveRawDur = rawDur > 0 ? rawDur : (audioBuffer.duration || 0);
-      const maxStartTrimLimit = Math.min(MAX_START_TRIM, effectiveRawDur > 0 ? effectiveRawDur * 0.15 : MAX_START_TRIM);
-      const maxStartSample = Math.min(channelData.length, Math.floor(sampleRate * maxStartTrimLimit));
+          let effectiveStart = 0;
+          if (foundAudibleStart) {
+            const firstAudibleSec = firstAudibleSample / sampleRate;
+            if (firstAudibleSec >= 0.12) {
+              effectiveStart = Math.max(0, firstAudibleSec - ANTI_CLICK_PRE_PAD);
+              effectiveStart = Math.round(effectiveStart * 100) / 100;
+            }
+          }
 
-      let firstAudibleSample = 0;
-      let foundAudibleStart = false;
+          const fallbackResult = {
+            effectiveStart,
+            effectiveEnd: rawDur,
+            rawDuration: effectiveRawDur,
+            analyzed: true,
+            source: 'client_fallback'
+          };
 
-      for (let i = 0; i < maxStartSample - windowSize; i += Math.floor(windowSize / 2)) {
-        let sumSq = 0;
-        for (let j = 0; j < windowSize; j++) {
-          const s = channelData[i + j];
-          sumSq += s * s;
-        }
-        const rms = Math.sqrt(sumSq / windowSize);
-        if (rms >= SILENCE_LINEAR_THRESHOLD) {
-          firstAudibleSample = i;
-          foundAudibleStart = true;
-          break;
+          trackEdgeSilenceCache.set(key, fallbackResult);
+          track._silenceStartOffset = fallbackResult.effectiveStart;
+          track._effectiveStart = fallbackResult.effectiveStart;
+          track._effectiveEnd = fallbackResult.effectiveEnd;
+          persistEdgeSilenceCache();
+          return fallbackResult;
         }
       }
+    } catch (e) {}
 
-      let effectiveStart = 0;
-      if (foundAudibleStart) {
-        const firstAudibleSec = firstAudibleSample / sampleRate;
-        if (firstAudibleSec >= 0.15) {
-          effectiveStart = Math.max(0, firstAudibleSec - ANTI_CLICK_PRE_PAD);
-          effectiveStart = Math.round(effectiveStart * 100) / 100;
-        }
-      }
-
-      // 2. TRAILING EDGE SCAN
-      let effectiveEnd = effectiveRawDur;
-      if (audioBuffer.duration >= effectiveRawDur - 1 && audioBuffer.duration > 10) {
-        const maxEndTrimLimit = Math.min(MAX_END_TRIM, effectiveRawDur * 0.20);
-        const minEndSample = Math.max(0, channelData.length - Math.floor(sampleRate * maxEndTrimLimit));
-
-        let lastAudibleSample = channelData.length;
-        let foundAudibleEnd = false;
-
-        for (let i = channelData.length - windowSize; i >= minEndSample; i -= Math.floor(windowSize / 2)) {
-          let sumSq = 0;
-          for (let j = 0; j < windowSize; j++) {
-            const s = channelData[i + j];
-            sumSq += s * s;
-          }
-          const rms = Math.sqrt(sumSq / windowSize);
-          if (rms >= SILENCE_LINEAR_THRESHOLD) {
-            lastAudibleSample = i + windowSize;
-            foundAudibleEnd = true;
-            break;
-          }
-        }
-
-        if (foundAudibleEnd) {
-          const lastAudibleSec = lastAudibleSample / sampleRate;
-          if (effectiveRawDur - lastAudibleSec >= 0.25) {
-            effectiveEnd = Math.min(effectiveRawDur, lastAudibleSec + ANTI_CLICK_POST_PAD);
-            effectiveEnd = Math.round(effectiveEnd * 100) / 100;
-          }
-        }
-      }
-
-      // Strict invariant: Zero scanning or clipping between effectiveStart and effectiveEnd
-      const result = {
-        effectiveStart,
-        effectiveEnd: effectiveEnd > effectiveStart ? effectiveEnd : effectiveRawDur,
-        rawDuration: effectiveRawDur,
-        analyzed: true
-      };
-
-      trackEdgeSilenceCache.set(key, result);
-      track._silenceStartOffset = result.effectiveStart;
-      track._effectiveStart = result.effectiveStart;
-      track._effectiveEnd = result.effectiveEnd;
-      persistEdgeSilenceCache();
-      return result;
-    } catch (err) {
-      const fallback = {
-        effectiveStart: 0,
-        effectiveEnd: rawDur,
-        rawDuration: rawDur,
-        analyzed: true
-      };
-      trackEdgeSilenceCache.set(key, fallback);
-      track._silenceStartOffset = 0;
-      track._effectiveStart = 0;
-      track._effectiveEnd = rawDur;
-      return fallback;
-    }
+    const fallback = {
+      effectiveStart: 0,
+      effectiveEnd: rawDur,
+      rawDuration: rawDur,
+      analyzed: true,
+      source: 'safe_default'
+    };
+    trackEdgeSilenceCache.set(key, fallback);
+    track._silenceStartOffset = 0;
+    track._effectiveStart = 0;
+    track._effectiveEnd = rawDur;
+    return fallback;
   }
 
   // Backward compatibility alias for legacy callers
@@ -2730,6 +2789,11 @@
       if (effectiveTimeLeft <= actualFadeSec && !state.isAutoMixing && !state.isCrossfading && state.preloadedNextTrack) {
         const secDeck = getSecondaryDeck();
         if (secDeck && secDeck.src) {
+          const nextKey = getTrackSilenceCacheKey(state.preloadedNextTrack);
+          const nextEdge = trackEdgeSilenceCache.get(nextKey);
+          if (nextEdge && nextEdge.effectiveStart > 0.05) {
+            seekToEffectiveStart(secDeck, nextEdge.effectiveStart);
+          }
           startDualDeckAutoMix(state.preloadedNextTrack, secDeck.src, actualFadeSec);
         }
       }
@@ -2739,11 +2803,22 @@
         preloadNextTrackForTransition();
       }
       // Instant Hard Cut at effectiveEnd without playing trailing dead air!
-      if (effectiveTimeLeft <= 0.08 && !state.isAutoMixing && !state.isCrossfading && !state.isTransitioning) {
+      if (effectiveTimeLeft <= 0.04 && !state.isAutoMixing && !state.isCrossfading && !state.isTransitioning) {
         transitionToNextSong();
       }
     }
   }
+
+  // Background-safe interval backup for high-precision end cut and AutoMix
+  setInterval(() => {
+    if (state.isPlaying && state.currentTrack && !isYouTubeActive()) {
+      const cur = getCurrentPlaybackTime();
+      const dur = getTotalDuration();
+      if (dur > 0 && Number.isFinite(dur) && Number.isFinite(cur)) {
+        checkPlaybackCrossfadeAndTransitions(cur, dur);
+      }
+    }
+  }, 100);
   // Shuffle Mode & Per-Playlist Shuffle Persistence Controller
   function saveShuffleState() {
     try {
@@ -3062,10 +3137,15 @@
         };
         elements.audio.addEventListener('loadedmetadata', seekStartTime, { once: true });
         elements.audio.addEventListener('canplay', seekStartTime, { once: true });
-      } else if (state.settings.removeDeadSilence) {
+      } else if (state.settings.removeDeadSilence !== false) {
+        const edgeKey = getTrackSilenceCacheKey(track);
+        const cached = trackEdgeSilenceCache.get(edgeKey);
+        if (cached && cached.effectiveStart > 0.05) {
+          seekToEffectiveStart(elements.audio, cached.effectiveStart);
+        }
         getOrAnalyzeTrackEdges(track, blobUrl, elements.audio).then(edges => {
-          if (edges && edges.effectiveStart > 0.05 && elements.audio.currentTime < edges.effectiveStart && state.isPlaying) {
-            try { elements.audio.currentTime = edges.effectiveStart; } catch (e) {}
+          if (edges && edges.effectiveStart > 0.05 && state.isPlaying) {
+            seekToEffectiveStart(elements.audio, edges.effectiveStart);
           }
         }).catch(() => {});
       }
@@ -3122,10 +3202,15 @@
           };
           elements.audio.addEventListener('loadedmetadata', seekStartTime, { once: true });
           elements.audio.addEventListener('canplay', seekStartTime, { once: true });
-        } else if (state.settings.removeDeadSilence) {
+        } else if (state.settings.removeDeadSilence !== false) {
+          const edgeKey = getTrackSilenceCacheKey(track);
+          const cached = trackEdgeSilenceCache.get(edgeKey);
+          if (cached && cached.effectiveStart > 0.05) {
+            seekToEffectiveStart(elements.audio, cached.effectiveStart);
+          }
           getOrAnalyzeTrackEdges(track, blobUrl, elements.audio).then(edges => {
-            if (edges && edges.effectiveStart > 0.05 && elements.audio.currentTime < edges.effectiveStart && state.isPlaying) {
-              try { elements.audio.currentTime = edges.effectiveStart; } catch (e) {}
+            if (edges && edges.effectiveStart > 0.05 && state.isPlaying) {
+              seekToEffectiveStart(elements.audio, edges.effectiveStart);
             }
           }).catch(() => {});
         }
@@ -3178,10 +3263,15 @@
             act.addEventListener('canplay', seekStartTime, { once: true });
           } else {
             try { act.currentTime = 0; } catch (e) {}
-            if (state.settings.removeDeadSilence) {
+            if (state.settings.removeDeadSilence !== false) {
+              const edgeKey = getTrackSilenceCacheKey(track);
+              const cached = trackEdgeSilenceCache.get(edgeKey);
+              if (cached && cached.effectiveStart > 0.05) {
+                seekToEffectiveStart(act, cached.effectiveStart);
+              }
               getOrAnalyzeTrackEdges(track, audioSrc, act).then(edges => {
-                if (edges && edges.effectiveStart > 0.05 && act.currentTime < edges.effectiveStart && state.isPlaying) {
-                  try { act.currentTime = edges.effectiveStart; } catch (e) {}
+                if (edges && edges.effectiveStart > 0.05 && state.isPlaying) {
+                  seekToEffectiveStart(act, edges.effectiveStart);
                 }
               }).catch(() => {});
             }
@@ -3457,12 +3547,13 @@
     // Toggle Play/Pause on Local Files Hero Play Button
     if (elements.playAllLocalBtn) {
       const isPlayingLocal = state.isPlaying && state.currentTrack && state.currentTrack.isLocal;
+      elements.playAllLocalBtn.classList.toggle('is-playing', !!isPlayingLocal);
       const localPlay = elements.playAllLocalBtn.querySelector('.play-icon');
       const localPause = elements.playAllLocalBtn.querySelector('.pause-icon');
       const localText = document.getElementById('playAllLocalBtnText');
       if (localPlay && localPause) {
-        localPlay.style.display = isPlayingLocal ? 'none' : 'inline-block';
-        localPause.style.display = isPlayingLocal ? 'inline-block' : 'none';
+        localPlay.style.setProperty('display', isPlayingLocal ? 'none' : 'inline-block', 'important');
+        localPause.style.setProperty('display', isPlayingLocal ? 'inline-block' : 'none', 'important');
       }
       if (localText) {
         localText.textContent = isPlayingLocal ? 'Pause' : 'Play';
@@ -4393,11 +4484,7 @@
       elements.lyricsStatusBadge.style.display = 'none';
     }
 
-    // Show Script Toggle if Romanized + Devanagari available
-    if (elements.lyricsScriptToggleBtn && data && data.hasDevanagariAlt) {
-      elements.lyricsScriptToggleBtn.textContent = state.lyricsScriptMode === 'latin' ? 'हिन्दी' : 'English / Latin';
-      elements.lyricsScriptToggleBtn.style.display = 'inline-block';
-    } else if (elements.lyricsScriptToggleBtn) {
+    if (elements.lyricsScriptToggleBtn) {
       elements.lyricsScriptToggleBtn.style.display = 'none';
     }
 
@@ -4460,10 +4547,7 @@
       elements.lyricsStatusBadge.style.display = 'none';
     }
 
-    if (elements.lyricsScriptToggleBtn && data && data.hasDevanagariAlt) {
-      elements.lyricsScriptToggleBtn.textContent = state.lyricsScriptMode === 'latin' ? 'हिन्दी' : 'English / Latin';
-      elements.lyricsScriptToggleBtn.style.display = 'inline-block';
-    } else if (elements.lyricsScriptToggleBtn) {
+    if (elements.lyricsScriptToggleBtn) {
       elements.lyricsScriptToggleBtn.style.display = 'none';
     }
 
@@ -6010,6 +6094,7 @@
 
   function renderPlaylistView(playlistId, options = {}) {
     state.viewingPlaylistId = playlistId;
+    document.body.dataset.playlistId = playlistId;
     switchView('playlist', { force: true, pushHistory: options.pushHistory !== false });
     if (playlistId === 'downloaded' && typeof updateMobNav === 'function') {
       updateMobNav('mobNavDownloads');
@@ -6993,6 +7078,7 @@
     if (viewName !== 'playlist') {
       state.viewingPlaylistId = null;
       state.viewingPlaylistTracks = null;
+      delete document.body.dataset.playlistId;
     }
 
     // Persist active view so refreshing page returns to current location
@@ -7543,7 +7629,10 @@
     if (elements.liveCrossfadeSeconds) elements.liveCrossfadeSeconds.textContent = formatAutoMixHeadline(autoMixVal);
     if (elements.crossfadeValueLabel) elements.crossfadeValueLabel.textContent = formatAutoMixLabel(autoMixVal);
 
-    // Skip Silence & Automix
+    // Skip Silence & Automix - Always ON by default for every song unless explicitly toggled off
+    if (state.settings.removeDeadSilence === undefined) {
+      state.settings.removeDeadSilence = true;
+    }
     if (elements.deadSilenceToggleSwitch) {
       elements.deadSilenceToggleSwitch.checked = state.settings.removeDeadSilence !== false;
     }
