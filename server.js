@@ -39,11 +39,33 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Legal Pages (Privacy Policy & Terms of Service for Google OAuth & Public Compliance)
 app.get(['/privacy', '/privacy-policy', '/privacy.html'], (req, res) => {
-  res.sendFile(path.resolve(__dirname, 'public', 'privacy.html'));
+  const filePath = path.resolve(__dirname, 'public', 'privacy.html');
+  res.sendFile(filePath, (err) => {
+    if (err && !res.headersSent) {
+      try {
+        if (fs.existsSync(filePath)) {
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          return res.status(200).send(fs.readFileSync(filePath, 'utf8'));
+        }
+      } catch (e) {}
+      res.status(404).send('Privacy Policy not found');
+    }
+  });
 });
 
 app.get(['/terms', '/terms-of-service', '/terms.html'], (req, res) => {
-  res.sendFile(path.resolve(__dirname, 'public', 'terms.html'));
+  const filePath = path.resolve(__dirname, 'public', 'terms.html');
+  res.sendFile(filePath, (err) => {
+    if (err && !res.headersSent) {
+      try {
+        if (fs.existsSync(filePath)) {
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          return res.status(200).send(fs.readFileSync(filePath, 'utf8'));
+        }
+      } catch (e) {}
+      res.status(404).send('Terms of Service not found');
+    }
+  });
 });
 
 // Helper to decode HTML entities
@@ -2136,10 +2158,30 @@ app.get('/api/status', (req, res) => {
 
 // Fallback all routes to index.html for SPA routing
 app.use((req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  const indexPath = path.resolve(__dirname, 'public', 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err && !res.headersSent) {
+      try {
+        if (fs.existsSync(indexPath)) {
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          return res.status(200).send(fs.readFileSync(indexPath, 'utf8'));
+        }
+      } catch (e) {}
+      res.status(500).send('<h1>MusiSurf</h1><p>Application loading error. Please refresh.</p>');
+    }
+  });
 });
 
-if (require.main === module || !process.env.VERCEL) {
+// Centralized error handler to prevent unhandled 500 FUNCTION_INVOCATION_FAILED on Vercel
+app.use((err, req, res, next) => {
+  console.error('[Unhandled Server Error]:', err);
+  if (!res.headersSent) {
+    res.status(500).json({ error: 'Internal Server Error', message: err.message || 'Unknown error' });
+  }
+});
+
+// Start standalone server locally; never call app.listen() inside Vercel serverless functions
+if (!process.env.VERCEL && require.main === module) {
   app.listen(PORT, () => {
     console.log(`===============================================`);
     console.log(`🌊 MusiSurf Music Streaming Server Active!`);

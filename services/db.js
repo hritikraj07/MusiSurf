@@ -6,8 +6,17 @@ if (!databaseUrl) {
   console.warn('[DB] Warning: DATABASE_URL is not set in environment.');
 }
 
-const sql = databaseUrl ? neon(databaseUrl) : null;
-const pool = databaseUrl ? new Pool({ connectionString: databaseUrl }) : null;
+let sql = null;
+let pool = null;
+
+if (databaseUrl) {
+  try {
+    sql = neon(databaseUrl);
+    pool = new Pool({ connectionString: databaseUrl });
+  } catch (err) {
+    console.warn('[DB] Failed to initialize Neon connection:', err.message);
+  }
+}
 
 module.exports = {
   sql,
