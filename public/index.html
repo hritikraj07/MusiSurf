@@ -134,8 +134,8 @@
             <path d="m21 21-4.3-4.3"/>
           </svg>
         </button>
-        <button class="mobile-top-btn mobile-top-profile-btn" id="mobTopProfileBtn" type="button" title="Menu & Settings" aria-label="Open menu and settings">
-          <div class="mobile-top-avatar" id="mobTopAvatar">
+        <button class="mobile-top-btn mobile-top-profile-btn" id="mobTopProfileBtn" type="button" title="Menu & Settings" aria-label="Open menu and settings" style="display: none !important;">
+          <div class="mobile-top-avatar" id="mobTopAvatar" style="display: none !important;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
               <circle cx="12" cy="7" r="4"/>
@@ -1243,8 +1243,12 @@
       <div class="player-center">
         <div class="player-controls">
           <button class="control-btn" id="shuffleBtn" title="Enable Shuffle (S)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/>
+              <path d="m18 2 4 4-4 4"/>
+              <path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/>
+              <path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/>
+              <path d="m18 14 4 4-4 4"/>
             </svg>
           </button>
 
@@ -1449,8 +1453,12 @@
       <!-- Controls -->
       <div class="mobile-player-controls-row">
         <button class="control-btn" id="mobShuffleBtn" title="Toggle Shuffle">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/>
+            <path d="m18 2 4 4-4 4"/>
+            <path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/>
+            <path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/>
+            <path d="m18 14 4 4-4 4"/>
           </svg>
         </button>
         <button class="control-btn" id="mobPrevBtn" title="Previous Track">

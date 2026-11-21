@@ -1442,14 +1442,16 @@
   // ==========================================================================
   // DUAL-DECK AUDIO CONTROLLER & EQUAL-POWER CROSSFADE ENGINE
   // ==========================================================================
-  let activeDeckIndex = 0; // 0 = elements.audio, 1 = elements.audioSecondary
+  const primaryAudioDeck = document.getElementById('audioPlayer');
+  const secondaryAudioDeck = document.getElementById('audioPlayerSecondary');
+  let activeDeckIndex = 0; // 0 = primaryAudioDeck, 1 = secondaryAudioDeck
 
   function getActiveDeck() {
-    return activeDeckIndex === 0 ? elements.audio : elements.audioSecondary;
+    return activeDeckIndex === 0 ? (primaryAudioDeck || elements.audio) : (secondaryAudioDeck || elements.audioSecondary);
   }
 
   function getSecondaryDeck() {
-    return activeDeckIndex === 0 ? elements.audioSecondary : elements.audio;
+    return activeDeckIndex === 0 ? (secondaryAudioDeck || elements.audioSecondary) : (primaryAudioDeck || elements.audio);
   }
 
   function swapActiveDeck() {
@@ -1831,6 +1833,9 @@
     if (destroyStandby) {
       state.isTransitionPreloaded = false;
       state.preloadedNextTrack = null;
+      activeDeckIndex = 0;
+      elements.audio = getActiveDeck();
+      elements.audioSecondary = getSecondaryDeck();
       const sec = getSecondaryDeck();
       if (sec) {
         sec._fadeHandler = null;
@@ -2288,28 +2293,36 @@
       if (mode !== '1') elements.shufflePlaylistBtn.classList.add('active');
 
       if (mode === '1') {
-        // Mode 1: Plays playlist in order
+        // Mode 1: Plays playlist in order (Matching Image 7)
         elements.shufflePlaylistBtn.innerHTML = `
-          <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="3" y1="6" x2="14" y2="6"/>
-            <line x1="3" y1="12" x2="14" y2="12"/>
-            <line x1="3" y1="18" x2="11" y2="18"/>
-            <polygon points="16 13 21 16 16 19 16 13" fill="currentColor"/>
+          <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6" x2="16" y2="6" stroke-width="2.2"/>
+            <line x1="3" y1="12" x2="11" y2="12" stroke-width="2.2"/>
+            <line x1="3" y1="18" x2="11" y2="18" stroke-width="2.2"/>
+            <polygon points="14 10 21 14.5 14 19" fill="currentColor" stroke="none"/>
           </svg>`;
         elements.shufflePlaylistBtn.title = 'In Order (Plays playlist in order + autoplay) • Click for Random Order';
       } else if (mode === '2') {
         // Mode 2: Plays in random order (Shuffle Once)
         elements.shufflePlaylistBtn.innerHTML = `
-          <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>
+          <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/>
+            <path d="m18 2 4 4-4 4"/>
+            <path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/>
+            <path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/>
+            <path d="m18 14 4 4-4 4"/>
           </svg>`;
         elements.shufflePlaylistBtn.title = 'Random Order (Shuffle once + autoplay) • Click for Random Order with Loop';
       } else if (mode === '3') {
         // Mode 3: Plays in random order with loop (Shuffle & Loop)
         elements.shufflePlaylistBtn.innerHTML = `
-          <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>
-            <circle cx="19" cy="19" r="2.8" fill="currentColor"/>
+          <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/>
+            <path d="m18 2 4 4-4 4"/>
+            <path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/>
+            <path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/>
+            <path d="m18 14 4 4-4 4"/>
+            <circle cx="20" cy="20" r="2.5" fill="currentColor" stroke="none"/>
           </svg>`;
         elements.shufflePlaylistBtn.title = 'Random Order with Loop (Shuffle & Loop) • Click for In Order';
       }
@@ -2853,6 +2866,14 @@
   async function playTrack(track, queueList = null, addToHistory = true, customStartTime = 0) {
     if (!track) return;
 
+    // Synchronously resume AudioContext within user gesture loop to prevent sound hanging
+    try {
+      const ctx = getAudioContext();
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+    } catch (e) {}
+
     // Strict Content Filter check
     if (!isContentFilterAllowed(track)) {
       showToast('⚠️ Content Blocked: MusiSurf strictly plays pure Music only.', '🚫');
@@ -2891,10 +2912,15 @@
     const currentToken = ++activePlayToken;
     state.isTrackLoading = true;
 
+    // Reset deck pointer to primary deck for new user-initiated playback
+    activeDeckIndex = 0;
+    elements.audio = getActiveDeck();
+    elements.audioSecondary = getSecondaryDeck();
+
     // Immediately stop current playback smoothly and reset decoder position
     try {
-      elements.audio.pause();
-      elements.audio.currentTime = customStartTime || 0;
+      getActiveDeck().pause();
+      getActiveDeck().currentTime = customStartTime || 0;
     } catch (e) {}
     if (state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
       try {
@@ -3139,21 +3165,23 @@
 
         if (audioSrc) {
           state.activePlayerEngine = 'audio';
-          elements.audio.src = audioSrc;
-          elements.audio.load();
+          const act = getActiveDeck();
+          if (act.src !== audioSrc) {
+            act.src = audioSrc;
+          }
           if (customStartTime > 0) {
-            try { elements.audio.currentTime = customStartTime; } catch (e) {}
+            try { act.currentTime = customStartTime; } catch (e) {}
             const seekStartTime = () => {
-              try { elements.audio.currentTime = customStartTime; } catch (e) {}
+              try { act.currentTime = customStartTime; } catch (e) {}
             };
-            elements.audio.addEventListener('loadedmetadata', seekStartTime, { once: true });
-            elements.audio.addEventListener('canplay', seekStartTime, { once: true });
+            act.addEventListener('loadedmetadata', seekStartTime, { once: true });
+            act.addEventListener('canplay', seekStartTime, { once: true });
           } else {
-            try { elements.audio.currentTime = 0; } catch (e) {}
+            try { act.currentTime = 0; } catch (e) {}
             if (state.settings.removeDeadSilence) {
-              getOrAnalyzeTrackEdges(track, audioSrc, elements.audio).then(edges => {
-                if (edges && edges.effectiveStart > 0.05 && elements.audio.currentTime < edges.effectiveStart && state.isPlaying) {
-                  try { elements.audio.currentTime = edges.effectiveStart; } catch (e) {}
+              getOrAnalyzeTrackEdges(track, audioSrc, act).then(edges => {
+                if (edges && edges.effectiveStart > 0.05 && act.currentTime < edges.effectiveStart && state.isPlaying) {
+                  try { act.currentTime = edges.effectiveStart; } catch (e) {}
                 }
               }).catch(() => {});
             }
@@ -3162,36 +3190,43 @@
             if (currentToken === activePlayToken) {
               state.isTrackLoading = false;
               state.consecutivePlaybackErrors = 0;
-              if (state.isPlaying && elements.audio.paused) {
-                elements.audio.play().catch(() => {});
+              if (state.isPlaying && act.paused) {
+                act.play().catch(() => {});
               }
               schedulePreloadNextTrack(1500);
             }
           };
-          elements.audio.addEventListener('playing', onAudioReady, { once: true });
-          elements.audio.addEventListener('canplay', onAudioReady, { once: true });
+          act.addEventListener('playing', onAudioReady, { once: true });
+          act.addEventListener('canplay', onAudioReady, { once: true });
           if ((state.settings.autoMixDuration || state.settings.crossfade || 0) > 0) {
             applyCrossfadeIn();
           } else {
-            elements.audio.volume = state.isMuted ? 0 : state.volume;
+            act.volume = state.isMuted ? 0 : state.volume;
           }
-          const playPromise = elements.audio.play();
+          const playPromise = act.play();
           if (playPromise !== undefined) {
-            playPromise.catch(err => {
+            playPromise.then(() => {
+              if (currentToken === activePlayToken) {
+                state.isPlaying = true;
+                state.isTrackLoading = false;
+                updatePlayPauseButton();
+              }
+            }).catch(err => {
               if (currentToken !== activePlayToken) return;
               if (err.name === 'AbortError') {
-                elements.audio.addEventListener('canplay', () => {
+                const retryPlay = () => {
                   if (currentToken === activePlayToken && state.isPlaying) {
-                    elements.audio.play().catch(() => {});
+                    act.play().catch(() => {});
                   }
-                }, { once: true });
+                };
+                act.addEventListener('canplay', retryPlay, { once: true });
+                act.addEventListener('loadeddata', retryPlay, { once: true });
                 return;
               }
               console.warn('Direct stream playback error, checking fallbacks:', err);
-              if (streamUrl && elements.audio.src !== streamUrl) {
-                elements.audio.src = streamUrl;
-                elements.audio.load();
-                elements.audio.play().catch(directErr => {
+              if (streamUrl && act.src !== streamUrl) {
+                act.src = streamUrl;
+                act.play().catch(directErr => {
                   if (currentToken !== activePlayToken || directErr.name === 'AbortError') return;
                   console.warn('Stream proxy fallback failed:', directErr);
                   handlePlaybackStreamError(track);
@@ -3207,9 +3242,8 @@
                   try {
                     state.activePlayerEngine = 'youtube';
                     try {
-                      elements.audio.pause();
-                      elements.audio.removeAttribute('src');
-                      elements.audio.load();
+                      act.pause();
+                      act.removeAttribute('src');
                     } catch (e) {}
                     state.ytPlayer.loadVideoById(ytId);
                     state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
@@ -3263,6 +3297,14 @@
   }
 
   function togglePlayPause() {
+    // Synchronously resume AudioContext within user gesture loop to prevent sound hanging
+    try {
+      const ctx = getAudioContext();
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+    } catch (e) {}
+
     if (!state.currentTrack) {
       // If nothing is playing, play first song from queue or active playlist or shelves
       if (state.viewingPlaylistTracks && state.viewingPlaylistTracks.length > 0) {
@@ -3282,10 +3324,12 @@
       return;
     }
 
+    const currentDeck = getActiveDeck();
+
     // Determine actual playback status from the active engine
     const isActuallyPlaying = isYouTubeActive()
       ? (state.ytPlayer && typeof state.ytPlayer.getPlayerState === 'function' && state.ytPlayer.getPlayerState() === 1)
-      : (!elements.audio.paused && !elements.audio.ended && elements.audio.currentTime > 0);
+      : (currentDeck && !currentDeck.paused && !currentDeck.ended && currentDeck.currentTime > 0);
 
     if (state.isPlaying || isActuallyPlaying) {
       // Smooth fade-out pause or pause dual decks during active AutoMix
@@ -3344,12 +3388,11 @@
         }
 
         const desiredSrc = state.currentTrack.audioUrl || state.currentTrack.streamUrl;
-        if (!elements.audio.src || elements.audio.src === '' || elements.audio.src.startsWith('data:audio') || elements.audio.src.endsWith('/')) {
+        const act = getActiveDeck();
+        if (!act.src || act.src === '' || act.src.startsWith('data:audio') || act.src.endsWith('/')) {
           if (desiredSrc) {
-            elements.audio.src = desiredSrc;
-            elements.audio.volume = state.isMuted ? 0 : (state.volume || 0.8);
-            elements.audio.preload = 'auto';
-            elements.audio.load();
+            act.src = desiredSrc;
+            act.volume = state.isMuted ? 0 : (state.volume || 0.8);
           } else {
             playTrack(state.currentTrack, state.queue, false, resumeTime);
             return;
@@ -3361,22 +3404,22 @@
           clearInterval(crossfadeFadeOutTimer);
           crossfadeFadeOutTimer = null;
         }
-        elements.audio.volume = state.isMuted ? 0 : (state.volume || 0.8);
+        act.volume = state.isMuted ? 0 : (state.volume || 0.8);
 
         if (resumeTime > 0) {
           try {
-            if (Math.abs(elements.audio.currentTime - resumeTime) > 0.5) {
-              elements.audio.currentTime = resumeTime;
+            if (Math.abs(act.currentTime - resumeTime) > 0.5) {
+              act.currentTime = resumeTime;
             }
           } catch (e) {}
         }
 
-        const resumePromise = elements.audio.play();
+        const resumePromise = act.play();
         if (resumePromise !== undefined) {
           resumePromise.then(() => {
-            elements.audio.volume = state.isMuted ? 0 : (state.volume || 0.8);
+            act.volume = state.isMuted ? 0 : (state.volume || 0.8);
             if (resumeTime > 0) {
-              try { elements.audio.currentTime = resumeTime; } catch (e) {}
+              try { act.currentTime = resumeTime; } catch (e) {}
             }
           }).catch(err => {
             console.warn('Audio resume error, attempting full playTrack:', err);
@@ -5895,6 +5938,13 @@
         glowEl.style.setProperty('--glow-tertiary', `rgb(${rgbStr})`);
         glowEl.style.setProperty('--glow-quaternary', `rgb(${rgbStr})`);
       }
+      if (elements.lyricsFullscreenBtn) {
+        elements.lyricsFullscreenBtn.style.setProperty('--lyrics-theme-rgb', rgbStr);
+        elements.lyricsFullscreenBtn.style.setProperty('--lyrics-theme-color', `rgb(${rgbStr})`);
+        elements.lyricsFullscreenBtn.style.background = `rgba(${rgbStr}, 0.55)`;
+        elements.lyricsFullscreenBtn.style.borderColor = `rgba(${rgbStr}, 0.45)`;
+        elements.lyricsFullscreenBtn.style.boxShadow = `0 4px 16px rgba(0, 0, 0, 0.35), 0 0 14px rgba(${rgbStr}, 0.35)`;
+      }
     } catch (e) {
       document.documentElement.style.setProperty('--lyrics-theme-color', '#2d3748');
       document.documentElement.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
@@ -5913,6 +5963,13 @@
         glowEl.style.setProperty('--glow-secondary', '#2d3748');
         glowEl.style.setProperty('--glow-tertiary', '#2d3748');
         glowEl.style.setProperty('--glow-quaternary', '#2d3748');
+      }
+      if (elements.lyricsFullscreenBtn) {
+        elements.lyricsFullscreenBtn.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
+        elements.lyricsFullscreenBtn.style.setProperty('--lyrics-theme-color', '#2d3748');
+        elements.lyricsFullscreenBtn.style.background = 'rgba(45, 55, 72, 0.55)';
+        elements.lyricsFullscreenBtn.style.borderColor = 'rgba(255, 255, 255, 0.35)';
+        elements.lyricsFullscreenBtn.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.35)';
       }
     }
   }
@@ -10597,8 +10654,9 @@
           try { navigator.mediaSession.playbackState = 'playing'; } catch (e) {}
         }
         startBackgroundKeepAlive();
-        if (elements.audio && elements.audio.paused && state.currentTrack?.hasDirectAudio) {
-          elements.audio.play().catch(() => {});
+        const act = getActiveDeck();
+        if (act && act.paused && !state.isTrackLoading && state.currentTrack?.hasDirectAudio) {
+          act.play().catch(() => {});
         } else if (isYouTubeActive() && state.ytPlayer && typeof state.ytPlayer.playVideo === 'function') {
           const pState = typeof state.ytPlayer.getPlayerState === 'function' ? state.ytPlayer.getPlayerState() : -1;
           if (pState === YT.PlayerState.PAUSED || pState === 2 || pState === -1) {
@@ -11020,7 +11078,7 @@
 
     if (savedView && savedView.view === 'playlist' && savedView.playlistId) {
       renderPlaylistView(savedView.playlistId);
-    } else if (savedView && ['library', 'search', 'localMusic', 'liked', 'downloaded'].includes(savedView.view)) {
+    } else if (savedView && ['library', 'search', 'localMusic', 'liked', 'downloaded', 'lyrics'].includes(savedView.view)) {
       switchView(savedView.view);
     } else {
       document.body.dataset.activeView = 'home';
