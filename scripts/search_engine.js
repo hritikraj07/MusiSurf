@@ -16,7 +16,7 @@ const lyricsSearchCache = new Map();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 // Curated Global & Indian Superstars Regex
-const SUPERSTARS_REGEX = /\b(arijit singh|atif aslam|shreya ghoshal|pritam|a\.?\s*r\.?\s*rahman|rahman|kishore kumar|lata mangeshkar|alka yagnik|kumar sanu|udit narayan|sunidhi chauhan|sonu nigam|badshah|diljit dosanjh|sidhu moose wala|honey singh|yo yo honey singh|anirudh ravichander|anirudh|k\.?k\.?|neha kakkar|jubin nautiyal|mohit chauhan|vishal-shekhar|shankar-ehsaan-loy|amit trivedi|armaan malik|darshan raval|guru randhawa|b praak|jaani|himesh reshammiya|lucky ali|prateek kuhad|jasleen royal|the weeknd|weeknd|taylor swift|ed sheeran|drake|eminem|justin bieber|billie eilish|bruno mars|dua lipa|post malone|rihanna|adele|coldplay|imagine dragons|kendrick lamar|travis scott|ariana grande|beyonce|bts|maroon 5|charlie puth|shawn mendes|selena gomez|katy perry|queen|michael jackson|beatles|linkin park)\b/i;
+const SUPERSTARS_REGEX = /\b(arijit singh|atif aslam|shreya ghoshal|pritam|a\.?\s*r\.?\s*rahman|rahman|kishore kumar|lata mangeshkar|alka yagnik|kumar sanu|udit narayan|sunidhi chauhan|sonu nigam|badshah|diljit dosanjh|sidhu moose wala|honey singh|yo yo honey singh|anirudh ravichander|anirudh|k\.?k\.?|neha kakkar|jubin nautiyal|mohit chauhan|vishal-shekhar|shankar-ehsaan-loy|amit trivedi|armaan malik|darshan raval|harrdy sandhu|talwiinder|sanjoy|akanksha bhandari|ap dhillon|shubh|karan aujla|mitraz|zaeden|king|mc stan|divine|emiway|guru randhawa|b praak|jaani|himesh reshammiya|lucky ali|prateek kuhad|jasleen royal|the weeknd|weeknd|taylor swift|ed sheeran|drake|eminem|justin bieber|billie eilish|bruno mars|dua lipa|post malone|rihanna|adele|coldplay|imagine dragons|kendrick lamar|travis scott|ariana grande|beyonce|bts|maroon 5|charlie puth|shawn mendes|selena gomez|katy perry|queen|michael jackson|beatles|linkin park)\b/i;
 
 // Curated Major Official Record Labels Regex
 const MAJOR_LABELS_REGEX = /\b(tips|t-series|tseries|sony|zee|yrf|universal|warner|saregama|speed|times music|columbia|interscope|atlantic|def jam|republic|rca|epic|island|geffen)\b/i;
@@ -650,15 +650,15 @@ async function fetchAutocomplete(rawQuery) {
     queries.push(`${artists[0].name} Songs`);
   }
 
-  // 3. Lyrics Matches
-  const lyricsMatches = lyricsData.slice(0, 4).map(l => ({
+  // 3. Lyrics Matches (Only included when user explicitly searches with lyric phrases)
+  const lyricsMatches = (intent.type === 'lyrics') ? lyricsData.slice(0, 3).map(l => ({
     title: l.title,
     artist: l.artist,
     album: l.album || '',
     matchedLine: l.matchedLine,
     snippet: `“${l.matchedLine}”`,
     isLyricsMatch: true
-  }));
+  })) : [];
 
   const payload = {
     success: true,

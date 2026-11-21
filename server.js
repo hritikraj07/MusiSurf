@@ -1100,6 +1100,47 @@ app.get('/api/search', async (req, res) => {
       }
     }
 
+    // Ensure search page Top Result is strictly synchronized with the search bar autocomplete top song
+    try {
+      const acData = await searchEngine.fetchAutocomplete(query);
+      const topAcSong = acData?.suggestions?.songs?.[0];
+      if (topAcSong && topAcSong.title) {
+        const cleanAcTitle = searchEngine.normalizeSearchText(topAcSong.title);
+        const cleanAcArtist = searchEngine.normalizeSearchText(topAcSong.artist || '');
+        const matchIdx = deduped.findIndex(t => {
+          const tTitle = searchEngine.normalizeSearchText(t.title);
+          const tArtist = searchEngine.normalizeSearchText(t.artist || '');
+          const idMatch = t.id && topAcSong.id && (String(t.id) === String(topAcSong.id) || String(t.id) === `saavn_${topAcSong.id}`);
+          const nameMatch = tTitle === cleanAcTitle && (
+            !cleanAcArtist || !tArtist || tArtist.includes(cleanAcArtist) || cleanAcArtist.includes(tArtist)
+          );
+          return idMatch || nameMatch;
+        });
+
+        if (matchIdx > 0) {
+          const [topTrack] = deduped.splice(matchIdx, 1);
+          topTrack.score = Math.max(topTrack.score || 0, (deduped[0]?.score || 100000) + 1000);
+          deduped.unshift(topTrack);
+        } else if (matchIdx === -1 && topAcSong.id) {
+          const topTrack = {
+            id: String(topAcSong.id).startsWith('saavn_') ? topAcSong.id : `saavn_${topAcSong.id}`,
+            title: topAcSong.title,
+            artist: topAcSong.artist || 'Artist',
+            album: topAcSong.album || '',
+            image: topAcSong.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80',
+            duration: topAcSong.duration || 210,
+            durationStr: topAcSong.duration ? `${Math.floor(topAcSong.duration / 60)}:${String(topAcSong.duration % 60).padStart(2, '0')}` : '3:30',
+            source: 'saavn',
+            score: (deduped[0]?.score || 100000) + 1000,
+            hasDirectAudio: true
+          };
+          deduped.unshift(topTrack);
+        }
+      }
+    } catch (acErr) {
+      // Fallback to scored ranking
+    }
+
     res.json({
       success: true,
       query,

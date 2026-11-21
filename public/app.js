@@ -2494,12 +2494,10 @@
 
       if (resumeBtn && resumeText) {
         resumeText.textContent = `Continue from ${shortTitle} • ${posStr}`;
-        resumeBtn.style.display = 'inline-flex';
-        resumeBtn.title = `Resume playlist from "${savedTrack.title}" at ${posStr}`;
+        resumeBtn.style.display = 'none'; // Hidden as per user request
       }
       if (restartBtn) {
-        restartBtn.style.display = 'inline-flex';
-        restartBtn.title = 'Start playlist from the beginning';
+        restartBtn.style.display = 'none'; // Hidden as per user request
       }
       if (elements.playAllPlaylistBtn && !isPlayingThis) {
         elements.playAllPlaylistBtn.title = `Continue from ${shortTitle} (${posStr})`;
@@ -5901,34 +5899,7 @@
       html += `</div>`;
     }
 
-    // 2. Lyrics Match Suggestions
-    if (lyricsMatches.length > 0) {
-      html += `
-        <div class="dropdown-section-title">
-          <span>Lyrics Match</span>
-        </div>
-        <div class="dropdown-section-group">
-      `;
-      lyricsMatches.slice(0, 2).forEach(lyr => {
-        html += `
-          <div class="search-suggestion-item lyric-item" data-action="search" data-query="${escapeHtml(lyr.title)}">
-            <svg class="suggestion-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #1ed760 !important;">
-              <path d="M9 18V5l12-2v13"/>
-              <circle cx="6" cy="18" r="3"/>
-              <circle cx="18" cy="16" r="3"/>
-            </svg>
-            <div class="sugg-info">
-              <span class="sugg-title">${escapeHtml(lyr.title)} <span style="font-weight: 400; color: #a7a7a7;">• ${escapeHtml(lyr.artist)}</span></span>
-              <span class="sugg-lyric-snippet">${escapeHtml(lyr.snippet || lyr.matchedLine)}</span>
-            </div>
-            <span class="sugg-badge lyric-badge">Lyrics match</span>
-          </div>
-        `;
-      });
-      html += `</div>`;
-    }
-
-    // 3. Artist Suggestions
+    // 2. Artist Suggestions
     if (artists.length > 0) {
       html += `
         <div class="dropdown-section-title">
@@ -6189,7 +6160,22 @@
     elements.searchResultsWrapper.style.display = 'block';
     elements.resultsCount.textContent = results.length;
 
-    // Top Result
+    // Top Result: strictly synchronized with the search bar autocomplete top song
+    const currentQ = (elements.globalSearchInput?.value || meta.query || '').trim().toLowerCase();
+    const acCache = state.autocompleteCache?.get(`ac_${currentQ}`);
+    const topAcSong = acCache?.suggestions?.songs?.[0];
+    if (topAcSong && results && results.length > 1) {
+      const cleanAcTitle = (topAcSong.title || '').toLowerCase().trim();
+      const matchIdx = results.findIndex(t => 
+        (t.id && topAcSong.id && (String(t.id) === String(topAcSong.id) || String(t.id) === `saavn_${topAcSong.id}`)) ||
+        (t.title && t.title.toLowerCase().trim() === cleanAcTitle)
+      );
+      if (matchIdx > 0) {
+        const [matched] = results.splice(matchIdx, 1);
+        results.unshift(matched);
+      }
+    }
+
     const top = results[0];
     const isTopLiked = state.likedSongs.some(s => s.id === top.id);
     const isPlayingThisTop = state.isPlaying && state.currentTrack && state.currentTrack.id === top.id;
