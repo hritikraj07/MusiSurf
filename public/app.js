@@ -11088,6 +11088,10 @@
 
     function updateAuthUI() {
       const user = state.currentUser;
+      const userDropdownHeader = document.getElementById('userDropdownHeader');
+      const userDropdownSignInBtn = document.getElementById('userDropdownSignInBtn');
+      const userDropdownDivider = document.getElementById('userDropdownDivider');
+
       if (user && user.email) {
         if (headerUserAvatarBtn) {
           headerUserAvatarBtn.title = `${user.name || user.email} (Signed In)`;
@@ -11099,8 +11103,13 @@
         if (userDropdownName) userDropdownName.textContent = user.name || user.email.split('@')[0];
         if (userDropdownEmail) userDropdownEmail.textContent = user.email;
 
+        if (userDropdownHeader) userDropdownHeader.style.display = 'flex';
+        if (userDropdownSignInBtn) userDropdownSignInBtn.style.display = 'none';
+        if (userDropdownSignOutBtn) userDropdownSignOutBtn.style.display = 'flex';
+        if (userDropdownDivider) userDropdownDivider.style.display = 'block';
+
         if (mobTopAvatar) {
-          mobTopAvatar.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+          mobTopAvatar.innerHTML = `<span style="font-weight:700;font-size:14px;color:#fff;">${initial}</span>`;
         }
 
         if (drawerUserAvatar) drawerUserAvatar.innerHTML = `<span style="font-weight:700;font-size:16px;color:#fff;">${initial}</span>`;
@@ -11119,7 +11128,10 @@
           if (headerUserIconSvg) headerUserIconSvg.style.display = 'block';
         }
 
-        if (userProfileDropdown) userProfileDropdown.style.display = 'none';
+        if (userDropdownHeader) userDropdownHeader.style.display = 'none';
+        if (userDropdownSignInBtn) userDropdownSignInBtn.style.display = 'flex';
+        if (userDropdownSignOutBtn) userDropdownSignOutBtn.style.display = 'none';
+        if (userDropdownDivider) userDropdownDivider.style.display = 'block';
 
         if (mobTopAvatar) {
           mobTopAvatar.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
@@ -11232,31 +11244,47 @@
       authTabSignUp.addEventListener('click', () => openAuthModal('signup'));
     }
 
-    if (headerUserAvatarBtn) {
-      headerUserAvatarBtn.addEventListener('click', (e) => {
+    function toggleUserProfileDropdown(e) {
+      if (e) {
+        e.preventDefault();
         e.stopPropagation();
-        if (!state.currentUser || !state.currentUser.email) {
-          openAuthModal('signin');
-        } else {
-          if (userProfileDropdown) {
-            const isVisible = userProfileDropdown.style.display !== 'none';
-            userProfileDropdown.style.display = isVisible ? 'none' : 'flex';
-          }
-        }
+      }
+      if (!userProfileDropdown) return;
+      userProfileDropdown.classList.toggle('is-open');
+    }
+
+    if (headerUserAvatarBtn) {
+      headerUserAvatarBtn.addEventListener('click', toggleUserProfileDropdown);
+    }
+
+    if (mobTopProfileBtn) {
+      mobTopProfileBtn.addEventListener('click', toggleUserProfileDropdown);
+    }
+
+    const userDropdownSignInBtn = document.getElementById('userDropdownSignInBtn');
+    if (userDropdownSignInBtn) {
+      userDropdownSignInBtn.addEventListener('click', (e) => {
+        if (e) e.stopPropagation();
+        if (userProfileDropdown) userProfileDropdown.classList.remove('is-open');
+        openAuthModal('signin');
       });
     }
 
     document.addEventListener('click', (e) => {
-      if (userProfileDropdown && userProfileDropdown.style.display !== 'none') {
-        if (!userProfileDropdown.contains(e.target) && !headerUserAvatarBtn.contains(e.target)) {
-          userProfileDropdown.style.display = 'none';
+      if (userProfileDropdown && userProfileDropdown.classList.contains('is-open')) {
+        const isClickInside = userProfileDropdown.contains(e.target) ||
+          (headerUserAvatarBtn && headerUserAvatarBtn.contains(e.target)) ||
+          (mobTopProfileBtn && mobTopProfileBtn.contains(e.target));
+        if (!isClickInside) {
+          userProfileDropdown.classList.remove('is-open');
         }
       }
     });
 
     if (userDropdownSettingsBtn) {
-      userDropdownSettingsBtn.addEventListener('click', () => {
-        if (userProfileDropdown) userProfileDropdown.style.display = 'none';
+      userDropdownSettingsBtn.addEventListener('click', (e) => {
+        if (e) e.stopPropagation();
+        if (userProfileDropdown) userProfileDropdown.classList.remove('is-open');
         openSettingsModal();
       });
     }
@@ -11269,28 +11297,20 @@
       try {
         localStorage.removeItem('musisurf_user');
       } catch (e) {}
-      if (userProfileDropdown) userProfileDropdown.style.display = 'none';
+      if (userProfileDropdown) userProfileDropdown.classList.remove('is-open');
       updateAuthUI();
       showToast('Signed out successfully', '👋');
       closeMobileDrawer();
     }
 
     if (userDropdownSignOutBtn) {
-      userDropdownSignOutBtn.addEventListener('click', handleSignOut);
+      userDropdownSignOutBtn.addEventListener('click', (e) => {
+        if (e) e.stopPropagation();
+        handleSignOut();
+      });
     }
     if (drawerSignOutBtn) {
       drawerSignOutBtn.addEventListener('click', handleSignOut);
-    }
-
-    if (mobTopProfileBtn) {
-      mobTopProfileBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (!state.currentUser || !state.currentUser.email) {
-          openAuthModal('signin');
-        } else {
-          openMobileDrawer();
-        }
-      });
     }
 
     if (drawerUserCard) {

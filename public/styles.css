@@ -1054,7 +1054,7 @@ html, body {
   order: 2 !important;
 }
 
-/* User Profile Dropdown Menu for Signed In Users */
+/* User Profile Dropdown Menu for Signed In & Guest Users */
 .user-profile-dropdown {
   position: absolute !important;
   top: calc(100% + 10px) !important;
@@ -1066,10 +1066,30 @@ html, body {
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8) !important;
   padding: 10px !important;
   z-index: 10000 !important;
-  display: flex !important;
+  display: none !important;
   flex-direction: column !important;
   gap: 4px !important;
+}
+
+.user-profile-dropdown.is-open {
+  display: flex !important;
   animation: dropdownFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+.user-dropdown-signin {
+  font-weight: 600 !important;
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-radius: 8px !important;
+}
+
+.user-dropdown-signin:hover {
+  background: rgba(255, 255, 255, 0.16) !important;
+  color: #ffffff !important;
+}
+
+.user-dropdown-signin svg {
+  color: #10b981 !important;
 }
 
 @keyframes dropdownFadeIn {
@@ -6831,14 +6851,31 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
     color: #ffffff !important;
   }
 
-  /* User Explicit: Remove user icon completely from mobile view */
+  /* Mobile user avatar button enabled so guest/user can open sign-in / profile dropdown */
   .mobile-top-profile-btn,
-  #mobTopProfileBtn,
+  #mobTopProfileBtn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
   .mobile-top-avatar,
-  #mobTopAvatar,
+  #mobTopAvatar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
   .top-user-avatar-btn,
   #headerUserAvatarBtn {
     display: none !important;
+  }
+
+  .user-profile-dropdown {
+    position: fixed !important;
+    top: 60px !important;
+    right: 12px !important;
+    left: auto !important;
+    width: min(280px, calc(100vw - 24px)) !important;
+    z-index: 10000 !important;
   }
 
   .top-home-btn,
