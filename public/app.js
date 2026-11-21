@@ -68,6 +68,7 @@
     trackEpoch: 0,
     currentLyricsRequestId: 0,
     currentLyricsTrackId: null,
+    _lastLyricsScrolledTrackId: null,
     isAwaitingRecommendations: false,
     consecutivePlaybackErrors: 0,
     lastAdvanceTimestamp: 0,
@@ -594,6 +595,65 @@
     }
   }
 
+  // Stable track ID extractor for track change detection and async request validation
+  function getStableTrackId(track) {
+    if (!track) return '';
+    return String(track.id || track.ytId || track.trackId || ((track.title || '').trim() + '__' + (track.artist || '').trim())).trim();
+  }
+
+  /**
+   * Track-Change-Based Lyrics Scroll Reset Engine
+   * Immediately resets the lyrics scroll body to the very top (scrollTop = 0)
+   * whenever a new track becomes active, without waiting for the first active
+   * lyric line, word highlight, or network response.
+   */
+  function resetLyricsScrollToTop(forced = false) {
+    const currentTrack = state.currentTrack;
+    const currentTrackId = getStableTrackId(currentTrack);
+
+    // Guard: Only reset if forced or if active track identity has changed
+    if (!forced && currentTrackId && currentTrackId === state._lastLyricsScrolledTrackId) {
+      return;
+    }
+    if (currentTrackId) {
+      state._lastLyricsScrolledTrackId = currentTrackId;
+    }
+
+    const container = elements.lyricsScrollBody || document.getElementById('lyricsScrollBody');
+    if (container) {
+      // Temporarily override CSS scroll-behavior: smooth to force an instant, zero-lag reset to top
+      const prevBehavior = container.style.scrollBehavior;
+      container.style.scrollBehavior = 'auto';
+      container.scrollTop = 0;
+      container.scrollLeft = 0;
+
+      if (typeof container.scrollTo === 'function') {
+        try {
+          container.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        } catch (e) {
+          container.scrollTo(0, 0);
+        }
+      }
+
+      // Restore scrollBehavior on the next animation frame so future lyric sync is smooth
+      requestAnimationFrame(() => {
+        if (container) {
+          container.style.scrollBehavior = prevBehavior || '';
+        }
+      });
+    }
+
+    // Also reset auxiliary containers if present
+    const byId = document.getElementById('lyricsScrollBody');
+    if (byId && byId !== container) {
+      byId.scrollTop = 0;
+    }
+
+    // Reset previous lyric active highlight index so synchronization starts fresh
+    state.activeLyricIndex = -1;
+  }
+  window.resetLyricsScrollToTop = resetLyricsScrollToTop;
+
   // Central Authoritative Track State Updater
   // Updates desktop player, mobile player modal, miniplayer, now playing panel, lyrics hero, MediaSession, and dynamic colors in a single atomic call.
   function applyAuthoritativeTrack(track, options = {}) {
@@ -770,6 +830,9 @@
     }
     if (elements.lyricsScriptToggleBtn) elements.lyricsScriptToggleBtn.style.display = 'none';
     if (elements.lyricsSyncControls) elements.lyricsSyncControls.style.display = 'none';
+
+    // Track-change immediate lyrics scroll reset to top
+    resetLyricsScrollToTop(true);
 
     // 10. Load Lyrics
     if (!options.skipLyrics) {
@@ -4559,6 +4622,7 @@
     state.currentLyricsData = null;
     state.currentLyricsTrackId = trackId;
     updateMobileLyricsPreview(-3);
+    resetLyricsScrollToTop(true);
 
     if (elements.lyricsStatusBadge) {
       elements.lyricsStatusBadge.style.display = 'none';
@@ -4921,6 +4985,7 @@
     elements.lyricsLinesContainer.appendChild(container);
     state.currentLyricsData = data || { plainLyrics: plainText, language, script };
     updateMobileLyricsPreview(-1);
+    resetLyricsScrollToTop(true);
   }
 
   function renderLyricsUnavailable(title, artist, trackId) {
@@ -4929,6 +4994,7 @@
     state.hasSyncedLyrics = false;
     state.activeLyricIndex = -1;
     state.currentLyricsData = null;
+    resetLyricsScrollToTop(true);
 
     if (elements.lyricsSyncControls) elements.lyricsSyncControls.style.display = 'none';
     if (elements.lyricsStatusBadge) elements.lyricsStatusBadge.style.display = 'none';
@@ -7615,8 +7681,14 @@
           elements.lyricsAlbumCover.style.display = 'block';
         }
         if (state.currentLyricsTrackId !== state.currentTrack.id || !state.lyrics || state.lyrics.length === 0) {
+          resetLyricsScrollToTop(true);
           loadLyricsForTrack(state.currentTrack);
         } else {
+          const curTime = getCurrentPlaybackTime();
+          const firstLineTime = (state.lyrics && state.lyrics[0]) ? state.lyrics[0].time : 999999;
+          if (curTime < firstLineTime) {
+            resetLyricsScrollToTop(true);
+          }
           state.activeLyricIndex = -1;
           requestAnimationFrame(() => {
             syncLyricsWithTime(getCurrentPlaybackTime());
