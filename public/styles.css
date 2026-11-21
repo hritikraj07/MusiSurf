@@ -10863,25 +10863,24 @@ body[data-active-view="lyrics"] .content-scroll {
 #lyricsView .lyric-line.active {
   font-size: 2.15rem !important;
   font-weight: 700 !important;
-  color: #fff8eb !important;
+  color: rgba(255, 255, 255, 0.45) !important;
   opacity: 1 !important;
   transform: scale(1.02);
   transform-origin: left center;
-  text-shadow: 0 0 16px rgba(251, 191, 36, 0.35), 0 2px 6px rgba(0, 0, 0, 0.6);
 }
 
 #lyricsView .lyric-line.active .lyric-word.glowing,
 #lyricsView .lyric-line.active .lyric-word.sung {
-  color: #fff8eb !important;
-  font-weight: 700 !important;
-  text-shadow: 0 0 14px rgba(251, 191, 36, 0.45);
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  text-shadow: 0 0 16px rgba(255, 255, 255, 0.75);
 }
 
 #lyricsView .lyric-line.active .lyric-word.singing {
-  color: #ffd27d !important;
+  color: #ffffff !important;
   font-weight: 800 !important;
-  text-shadow: 0 0 24px rgba(251, 191, 36, 0.75), 0 0 8px #fff8eb;
-  transform: scale(1.05);
+  text-shadow: 0 0 24px rgba(255, 255, 255, 0.95), 0 0 10px var(--lyrics-theme-color, #ffffff);
+  transform: scale(1.08);
 }
 
 #lyricsView .lyric-line.passed {
@@ -10890,54 +10889,112 @@ body[data-active-view="lyrics"] .content-scroll {
   transform-origin: left center;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 960px) {
   .lyrics-main-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
-    padding: 24px 16px 140px;
-    display: flex;
-    flex-direction: column;
-  }
-  .lyrics-hero-col {
-    flex-direction: row;
-    align-items: center;
-    text-align: left;
-    width: 100%;
-    gap: 14px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    padding-right: 48px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: none !important;
+    gap: 16px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 16px 16px 120px !important;
     box-sizing: border-box !important;
-    min-width: 0 !important;
+    overflow-x: hidden !important;
   }
+
+  .lyrics-hero-col {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    gap: 14px !important;
+    padding: 0 0 12px 0 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-sizing: border-box !important;
+    flex-shrink: 0 !important;
+  }
+
   .lyrics-hero-art-wrap {
-    width: 64px;
-    height: 64px;
-    border-radius: 10px;
-    flex-shrink: 0;
+    width: 60px !important;
+    height: 60px !important;
+    min-width: 60px !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
   }
+
+  .lyrics-hero-meta {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    text-align: left !important;
+    gap: 4px !important;
+    min-width: 0 !important;
+    flex: 1 !important;
+    max-width: calc(100% - 74px) !important;
+  }
+
   .lyrics-hero-title {
-    font-size: 1.1rem;
+    font-size: 1.15rem !important;
+    font-weight: 700 !important;
+    text-align: left !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     max-width: 100% !important;
   }
+
   .lyrics-hero-artist {
-    font-size: 0.88rem;
+    font-size: 0.88rem !important;
+    text-align: left !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     max-width: 100% !important;
   }
+
   .lyrics-soundwave-bars {
-    margin-left: auto;
+    display: none !important;
   }
+
+  #lyricsView .lyrics-scroll-body {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 !important;
+    padding: 16px 4px 140px !important;
+    overflow-x: hidden !important;
+    scrollbar-width: none !important;
+  }
+
+  #lyricsView .lyrics-scroll-body::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  #lyricsView .lyrics-lines-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    gap: 18px !important;
+    overflow-x: hidden !important;
+  }
+
   #lyricsView .lyric-line {
-    font-size: 1.35rem !important;
+    font-size: clamp(1.2rem, 4.8vw, 1.55rem) !important;
+    line-height: 1.4 !important;
+    margin-bottom: 14px !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important;
+    text-align: left !important;
   }
+
   #lyricsView .lyric-line.active {
-    font-size: 1.65rem !important;
+    font-size: clamp(1.4rem, 5.6vw, 1.95rem) !important;
+    transform: none !important;
+  }
   }
 }
 
@@ -10958,17 +11015,26 @@ body[data-active-view="lyrics"] .content-scroll {
   line-height: 1.5 !important;
 }
 
-.lyric-line[data-lang="ur"],
-.lyrics-plain-text[data-lang="ur"],
-.lyrics-hero-title[data-lang="ur"],
+.lyric-line[dir="rtl"],
 .lyric-line.rtl-lyrics,
+.lyrics-plain-text[dir="rtl"],
 .lyrics-plain-text.rtl-lyrics,
 .lyrics-lines-container[dir="rtl"],
-.lyrics-plain-container[dir="rtl"] {
+.lyrics-plain-container[dir="rtl"],
+.lyrics-hero-title[dir="rtl"] {
   font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', 'Urdu Typesetting', serif !important;
   direction: rtl !important;
   text-align: right !important;
   line-height: 2.0 !important;
+}
+
+.lyric-line[data-lang="ur"]:not([dir="rtl"]),
+.lyrics-plain-text[data-lang="ur"]:not([dir="rtl"]),
+.lyrics-hero-title[data-lang="ur"]:not([dir="rtl"]) {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  direction: ltr !important;
+  text-align: left !important;
+  line-height: 1.45 !important;
 }
 
 /* Lyrics Top Badges & Script Toggle */
@@ -14351,42 +14417,42 @@ body.lyrics-fullscreen-active #lyricsView .lyrics-scroll-body {
   vector-effect: non-scaling-stroke;
 }
 
-/* 1. Base Perimeter Track (Refined, permanent warm amber rectangular frame) */
+/* 1. Base Perimeter Track (Refined, permanent frame using matching song color) */
 .cinematic-track-rect {
-  stroke: rgba(245, 158, 11, 0.2);
+  stroke: rgba(var(--lyrics-theme-rgb, 255, 255, 255), 0.22);
   stroke-width: 1.5px;
   transition: stroke 0.6s ease;
 }
 
-/* 2. Soft Ambient Traveling Glow Bloom (Wide diffused luminous trail) */
+/* 2. Soft Ambient Traveling Glow Bloom (Wide diffused luminous trail using matching song color) */
 .cinematic-bloom-rect {
-  stroke: rgba(245, 158, 11, 0.52);
+  stroke: rgba(var(--lyrics-theme-rgb, 16, 185, 129), 0.65);
   stroke-width: 5.5px;
   stroke-linecap: round;
   stroke-dasharray: 180 820;
-  filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.85)) drop-shadow(0 0 24px rgba(217, 119, 6, 0.5));
+  filter: drop-shadow(0 0 10px var(--lyrics-theme-color, #10b981)) drop-shadow(0 0 24px var(--lyrics-theme-color, #10b981));
   animation: cinematicPerimeterTravel 5.5s linear infinite;
   will-change: stroke-dashoffset;
 }
 
-/* 3. Core Traveling Amber Beam (Crisp, thin 2.2px champagne-amber light segment) */
+/* 3. Core Traveling Beam (Crisp, thin 2.4px light segment matching song color) */
 .cinematic-beam-rect {
-  stroke: #ffd27d;
-  stroke-width: 2.2px;
+  stroke: var(--lyrics-theme-color, #ffffff);
+  stroke-width: 2.4px;
   stroke-linecap: round;
   stroke-dasharray: 140 860;
-  filter: drop-shadow(0 0 5px #ffd27d) drop-shadow(0 0 12px #f59e0b);
+  filter: drop-shadow(0 0 6px #ffffff) drop-shadow(0 0 14px var(--lyrics-theme-color, #10b981));
   animation: cinematicPerimeterTravel 5.5s linear infinite;
   will-change: stroke-dashoffset;
 }
 
-/* 4. Bright Leading Tip / Head of Beam (Warm Ivory / Gold Spark) */
+/* 4. Bright Leading Tip / Head of Beam (Pure bright spark) */
 .cinematic-tip-rect {
-  stroke: #fff8eb;
-  stroke-width: 2.6px;
+  stroke: #ffffff;
+  stroke-width: 2.8px;
   stroke-linecap: round;
-  stroke-dasharray: 22 978;
-  filter: drop-shadow(0 0 4px #ffffff);
+  stroke-dasharray: 24 976;
+  filter: drop-shadow(0 0 6px #ffffff) drop-shadow(0 0 12px var(--lyrics-theme-color, #ffffff));
   animation: cinematicPerimeterTravel 5.5s linear infinite;
   will-change: stroke-dashoffset;
 }

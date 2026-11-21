@@ -5046,8 +5046,10 @@
 
   function renderLyricsLines(lyrics, language = 'English', script = 'Latin', data = null) {
     elements.lyricsLinesContainer.innerHTML = '';
-    const langCode = (language === 'Hindi' ? 'hi' : (language === 'Punjabi' ? 'pa' : (language === 'Urdu' ? 'ur' : 'en')));
-    const isRtl = language === 'Urdu' || script === 'Urdu (Nastaliq)';
+    const sampleText = lyrics.map(l => l.text).slice(0, 5).join(' ');
+    const hasUrduScript = /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(sampleText);
+    const isRtl = hasUrduScript;
+    const langCode = (hasUrduScript ? 'ur' : (language === 'Hindi' ? 'hi' : (language === 'Punjabi' ? 'pa' : 'en')));
 
     if (isRtl) {
       elements.lyricsLinesContainer.setAttribute('dir', 'rtl');
@@ -5109,8 +5111,9 @@
     state.hasSyncedLyrics = false;
     state.activeLyricIndex = -1;
 
-    const langCode = (language === 'Hindi' ? 'hi' : (language === 'Punjabi' ? 'pa' : (language === 'Urdu' ? 'ur' : 'en')));
-    const isRtl = language === 'Urdu' || script === 'Urdu (Nastaliq)';
+    const hasUrduScript = /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(plainText || '');
+    const isRtl = hasUrduScript;
+    const langCode = (hasUrduScript ? 'ur' : (language === 'Hindi' ? 'hi' : (language === 'Punjabi' ? 'pa' : 'en')));
 
     if (isRtl) {
       elements.lyricsLinesContainer.setAttribute('dir', 'rtl');
@@ -5335,13 +5338,15 @@
       }
     }
 
-    // Word-by-Word Synchronization (Only When Genuine Timestamps Exist)
+    // Word-by-Word Live Glow Karaoke Engine (Desktop & Mobile)
     if (activeIdx >= 0 && state.lyrics[activeIdx]) {
       const activeLineEl = elements.lyricsLinesContainer.querySelector(`.lyric-line[data-index="${activeIdx}"]`);
       if (activeLineEl) {
         const item = state.lyrics[activeIdx];
+        const words = activeLineEl.querySelectorAll('.lyric-word');
+        const numWords = words.length;
+
         if (item.wordsWithTime && item.wordsWithTime.length > 0) {
-          const words = activeLineEl.querySelectorAll('.lyric-word');
           item.wordsWithTime.forEach((wData, wI) => {
             const wEl = words[wI];
             if (!wEl) return;
@@ -5358,9 +5363,29 @@
               wEl.classList.remove('singing', 'glowing', 'sung');
             }
           });
+        } else if (numWords > 0) {
+          // Smooth progressive word interpolation across line duration
+          const curLineTime = item.time;
+          const nextLineTime = (activeIdx + 1 < state.lyrics.length) ? state.lyrics[activeIdx + 1].time : (curLineTime + 4.5);
+          const lineDuration = Math.max(0.6, Math.min(7.0, nextLineTime - curLineTime));
+          const lineElapsed = Math.max(0, lyricClock - curLineTime);
+          const lineProgress = Math.max(0, Math.min(1, lineElapsed / lineDuration));
+
+          const currentWordFloat = lineProgress * numWords;
+          const currentWordIdx = Math.floor(currentWordFloat);
+
+          words.forEach((wEl, wI) => {
+            if (wI < currentWordIdx) {
+              wEl.classList.add('sung', 'glowing');
+              wEl.classList.remove('singing');
+            } else if (wI === currentWordIdx) {
+              wEl.classList.add('singing', 'glowing');
+              wEl.classList.remove('sung');
+            } else {
+              wEl.classList.remove('singing', 'glowing', 'sung');
+            }
+          });
         }
-        // If line has standard line-level timestamps, do NOT fake word division (Part 3 strict rule).
-        // The entire active line is highlighted cleanly with warm ivory text and subtle glow.
       }
     }
   }

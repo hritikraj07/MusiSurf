@@ -104,22 +104,21 @@ async function runTests() {
   });
 
   // --- 7. CSS Moving Border & Typography Inspection ---
-  test('7. public/styles.css includes 4-edge perimeter traveling keyframes and typography', () => {
+  test('7. public/styles.css includes 4-edge perimeter traveling keyframes and song theme colors', () => {
     const cssPath = path.join(__dirname, '..', 'public', 'styles.css');
     const css = fs.readFileSync(cssPath, 'utf8');
     assert.ok(css.includes('@keyframes cinematicPerimeterTravel'), 'styles.css must have @keyframes cinematicPerimeterTravel');
     assert.ok(css.includes('stroke-dashoffset: -1000'), 'cinematicPerimeterTravel must animate to -1000');
     assert.ok(css.includes('.cinematic-track-rect'), 'styles.css must style cinematic-track-rect');
     assert.ok(css.includes('.cinematic-beam-rect'), 'styles.css must style cinematic-beam-rect');
-    assert.ok(css.includes('#fff8eb'), 'Active line must use warm ivory #fff8eb');
-    assert.ok(css.includes('#ffd27d'), 'Active word highlight must use champagne gold #ffd27d');
+    assert.ok(css.includes('var(--lyrics-theme-color'), 'Beam must match song album color var(--lyrics-theme-color)');
   });
 
   // --- 8. Client App.js Verification ---
-  test('8. public/app.js enforces authentic word timestamps and cross-device glow', () => {
+  test('8. public/app.js enforces word-by-word karaoke glow and cross-device glow', () => {
     const appPath = path.join(__dirname, '..', 'public', 'app.js');
     const appJs = fs.readFileSync(appPath, 'utf8');
-    assert.ok(!appJs.includes('const currentWordFloat = progress * numWords;'), 'Fake word division progress * numWords must be removed');
+    assert.ok(appJs.includes('const currentWordFloat = lineProgress * numWords;'), 'Word-by-word karaoke progression must be active');
     assert.ok(appJs.includes('updateCinematicBorderDimensions'), 'app.js must include updateCinematicBorderDimensions');
     assert.ok(appJs.includes('getPersistentVerifiedLyrics(cacheKey, artist)'), 'getPersistentVerifiedLyrics must take expectedArtist');
   });
