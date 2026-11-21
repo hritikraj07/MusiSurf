@@ -1646,6 +1646,39 @@
     return audioContextInstance;
   }
 
+  // ==========================================================================
+  // PLAYBACK LIFECYCLE DIAGNOSTICS & TELEMETRY (Development / Gated Debug)
+  // ==========================================================================
+  window.__playbackDiagnosticsLog = window.__playbackDiagnosticsLog || [];
+  function logPlaybackDiagnostic(event, details = {}) {
+    try {
+      const isDebugActive = Boolean(window.__MUSISURF_PLAYBACK_DEBUG__ || (typeof localStorage !== 'undefined' && localStorage.getItem('musisurf_debug_audio') === 'true'));
+      const act = typeof getActiveDeck === 'function' ? getActiveDeck() : null;
+      const ctx = audioContextInstance;
+      const entry = {
+        event,
+        trackId: details.trackId || state.currentTrack?.id || null,
+        trackTitle: details.trackTitle || state.currentTrack?.title || null,
+        audioContextState: ctx ? ctx.state : 'uninitialized',
+        paused: act ? act.paused : null,
+        readyState: act ? act.readyState : null,
+        currentTime: act ? Number(act.currentTime.toFixed(2)) : null,
+        src: act ? (act.currentSrc || act.src || '') : '',
+        isPlayingState: state.isPlaying,
+        isTrackLoading: state.isTrackLoading,
+        timestamp: Date.now(),
+        ...details
+      };
+      window.__playbackDiagnosticsLog.push(entry);
+      if (window.__playbackDiagnosticsLog.length > 250) {
+        window.__playbackDiagnosticsLog.shift();
+      }
+      if (isDebugActive) {
+        console.debug(`[MusiSurf Audio Engine Diagnostic: ${event}]`, entry);
+      }
+    } catch (e) {}
+  }
+
   function getTrackSilenceCacheKey(track) {
     if (!track) return '';
     return String(track.id || track.ytId || track.audioUrl || `${track.title || ''}::${track.artist || ''}`);
@@ -2010,22 +2043,27 @@
 
   function applyCrossfadeIn() {
     cancelActiveAutoMix(false);
+    if (crossfadeFadeInTimer) {
+      clearInterval(crossfadeFadeInTimer);
+      crossfadeFadeInTimer = null;
+    }
     const act = getActiveDeck();
     const targetVol = state.isMuted ? 0 : (state.volume || 0.8);
     if (targetVol <= 0) {
-      act.volume = 0;
+      if (act) act.volume = 0;
       return;
     }
-    act.volume = 0;
+    if (act) act.volume = 0;
     const startTime = Date.now();
     const rampMs = 350;
     crossfadeFadeInTimer = setInterval(() => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(1, elapsed / rampMs);
-      act.volume = targetVol * progress;
+      if (act) act.volume = targetVol * progress;
       if (progress >= 1) {
         clearInterval(crossfadeFadeInTimer);
         crossfadeFadeInTimer = null;
+        if (act) act.volume = targetVol;
       }
     }, 20);
   }
@@ -3359,7 +3397,12 @@
     const previousTrack = state.currentTrack;
 
     // Guard: If clicking the CURRENTLY PLAYING song without explicit custom seek
-    if (previousTrack && isSameTrack(track, previousTrack) && customStartTime === 0) {
+    const actForGuard = getActiveDeck();
+    const currentDeckSrc = actForGuard ? (actForGuard.currentSrc || actForGuard.src || '') : '';
+    const hasValidDeckSource = Boolean(currentDeckSrc && currentDeckSrc !== '' && !currentDeckSrc.startsWith('data:audio') && !currentDeckSrc.endsWith('/'));
+
+    if (previousTrack && isSameTrack(track, previousTrack) && customStartTime === 0 && hasValidDeckSource && actForGuard && actForGuard.readyState >= 1) {
+      logPlaybackDiagnostic('same-track-resume-guard', { trackId: track.id, hasValidDeckSource, readyState: actForGuard.readyState });
       if (queueList && Array.isArray(queueList)) {
         state.contextQueue = [...queueList];
         state.contextIndex = state.contextQueue.findIndex(t => isSameTrack(t, track));
@@ -3368,11 +3411,24 @@
           state.contextIndex = 0;
         }
       }
-      const act = getActiveDeck();
-      if (!state.isPlaying || (act && act.paused)) {
-        state.isPlaying = true;
+      if (!state.isPlaying || actForGuard.paused) {
+        state.isTrackLoading = true;
         updatePlayPauseButton();
-        if (act && act.paused) act.play().catch(() => {});
+        const playPromise = actForGuard.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            state.isPlaying = true;
+            state.isTrackLoading = false;
+            updatePlayPauseButton();
+            logPlaybackDiagnostic('same-track-resume-success', { trackId: track.id });
+          }).catch(err => {
+            console.warn('Same-track resume play error:', err);
+            logPlaybackDiagnostic('same-track-resume-failed', { trackId: track.id, error: err.message });
+            state.isPlaying = false;
+            state.isTrackLoading = false;
+            updatePlayPauseButton();
+          });
+        }
       }
       return;
     }
@@ -3384,16 +3440,20 @@
 
     const currentToken = ++activePlayToken;
     state.isTrackLoading = true;
+    updatePlayPauseButton();
+    logPlaybackDiagnostic('play-track-start', { trackId: track.id, title: track.title, customStartTime });
 
     // Reset deck pointer to primary deck for new user-initiated playback
     activeDeckIndex = 0;
     elements.audio = getActiveDeck();
     elements.audioSecondary = getSecondaryDeck();
 
-    // Immediately stop current playback smoothly and reset decoder position
+    // Pause active deck smoothly if it is currently playing
     try {
-      getActiveDeck().pause();
-      getActiveDeck().currentTime = customStartTime || 0;
+      const curDeck = getActiveDeck();
+      if (curDeck && !curDeck.paused) {
+        curDeck.pause();
+      }
     } catch (e) {}
     if (state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
       try {
@@ -3666,18 +3726,26 @@
         if (audioSrc) {
           state.activePlayerEngine = 'audio';
           const act = getActiveDeck();
+          logPlaybackDiagnostic('source-assigned', { trackId: track.id, audioSrc });
+
           if (act.src !== audioSrc) {
             act.src = audioSrc;
+            try { act.load(); } catch (e) {}
           }
           if (customStartTime > 0) {
-            try { act.currentTime = customStartTime; } catch (e) {}
             const seekStartTime = () => {
               try { act.currentTime = customStartTime; } catch (e) {}
             };
-            act.addEventListener('loadedmetadata', seekStartTime, { once: true });
-            act.addEventListener('canplay', seekStartTime, { once: true });
+            if (act.readyState >= 1) {
+              seekStartTime();
+            } else {
+              act.addEventListener('loadedmetadata', seekStartTime, { once: true });
+              act.addEventListener('canplay', seekStartTime, { once: true });
+            }
           } else {
-            try { act.currentTime = 0; } catch (e) {}
+            if (act.readyState >= 1) {
+              try { act.currentTime = 0; } catch (e) {}
+            }
             if (state.settings.removeDeadSilence !== false) {
               const edgeKey = getTrackSilenceCacheKey(track);
               const cached = trackEdgeSilenceCache.get(edgeKey);
@@ -3685,7 +3753,7 @@
                 seekToEffectiveStart(act, cached.effectiveStart);
               }
               getOrAnalyzeTrackEdges(track, audioSrc, act).then(edges => {
-                if (edges && edges.effectiveStart > 0.05 && state.isPlaying) {
+                if (edges && edges.effectiveStart > 0.05 && (state.isPlaying || state.isTrackLoading)) {
                   seekToEffectiveStart(act, edges.effectiveStart);
                 }
               }).catch(() => {});
@@ -3693,10 +3761,15 @@
           }
           const onAudioReady = () => {
             if (currentToken === activePlayToken) {
-              state.isTrackLoading = false;
               state.consecutivePlaybackErrors = 0;
-              if (state.isPlaying && act.paused) {
-                act.play().catch(() => {});
+              if (act.paused && (state.isPlaying || state.isTrackLoading)) {
+                act.play().then(() => {
+                  if (currentToken === activePlayToken) {
+                    state.isPlaying = true;
+                    state.isTrackLoading = false;
+                    updatePlayPauseButton();
+                  }
+                }).catch(() => {});
               }
               schedulePreloadNextTrack(1500);
             }
@@ -3708,6 +3781,7 @@
           } else {
             act.volume = state.isMuted ? 0 : state.volume;
           }
+          logPlaybackDiagnostic('play-invoked', { trackId: track.id });
           const playPromise = act.play();
           if (playPromise !== undefined) {
             playPromise.then(() => {
@@ -3715,23 +3789,53 @@
                 state.isPlaying = true;
                 state.isTrackLoading = false;
                 updatePlayPauseButton();
+                logPlaybackDiagnostic('play-resolved', { trackId: track.id });
               }
             }).catch(err => {
               if (currentToken !== activePlayToken) return;
+              logPlaybackDiagnostic('play-rejected', { trackId: track.id, errorName: err.name, errorMessage: err.message });
               if (err.name === 'AbortError') {
                 const retryPlay = () => {
-                  if (currentToken === activePlayToken && state.isPlaying) {
-                    act.play().catch(() => {});
+                  if (currentToken === activePlayToken && act.paused) {
+                    act.play().then(() => {
+                      if (currentToken === activePlayToken) {
+                        state.isPlaying = true;
+                        state.isTrackLoading = false;
+                        updatePlayPauseButton();
+                        logPlaybackDiagnostic('abort-retry-play-resolved', { trackId: track.id });
+                      }
+                    }).catch(retryErr => {
+                      logPlaybackDiagnostic('abort-retry-play-failed', { trackId: track.id, error: retryErr.message });
+                    });
                   }
                 };
-                act.addEventListener('canplay', retryPlay, { once: true });
-                act.addEventListener('loadeddata', retryPlay, { once: true });
+                if (act.readyState >= 2) {
+                  retryPlay();
+                } else {
+                  act.addEventListener('canplay', retryPlay, { once: true });
+                  act.addEventListener('loadeddata', retryPlay, { once: true });
+                }
+                return;
+              }
+              if (err.name === 'NotAllowedError') {
+                console.warn('Autoplay prevented by browser:', err);
+                state.isPlaying = false;
+                state.isTrackLoading = false;
+                updatePlayPauseButton();
+                showToast('Tap play to start audio', '▶');
                 return;
               }
               console.warn('Direct stream playback error, checking fallbacks:', err);
               if (streamUrl && act.src !== streamUrl) {
                 act.src = streamUrl;
-                act.play().catch(directErr => {
+                try { act.load(); } catch (e) {}
+                act.play().then(() => {
+                  if (currentToken === activePlayToken) {
+                    state.isPlaying = true;
+                    state.isTrackLoading = false;
+                    updatePlayPauseButton();
+                  }
+                }).catch(directErr => {
                   if (currentToken !== activePlayToken || directErr.name === 'AbortError') return;
                   console.warn('Stream proxy fallback failed:', directErr);
                   handlePlaybackStreamError(track);
@@ -3753,6 +3857,9 @@
                     state.ytPlayer.loadVideoById(ytId);
                     state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
                     state.ytPlayer.playVideo();
+                    state.isPlaying = true;
+                    state.isTrackLoading = false;
+                    updatePlayPauseButton();
                   } catch (e) {
                     console.warn('YouTube fallback playback error:', e);
                     handlePlaybackStreamError(track);
@@ -3782,6 +3889,9 @@
             state.ytPlayer.loadVideoById(ytId);
             state.ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
             state.ytPlayer.playVideo();
+            state.isPlaying = true;
+            state.isTrackLoading = false;
+            updatePlayPauseButton();
           } else {
             handlePlaybackStreamError(track);
           }
@@ -3791,7 +3901,9 @@
       }
     }
 
-    state.isPlaying = true;
+    if (!state.isPlaying) {
+      state.isTrackLoading = true;
+    }
     updatePlayPauseButton();
     updateQueueDrawerUI();
     highlightPlayingTrackInTables(track.id);
@@ -3857,9 +3969,7 @@
       }
       updatePlayPauseButton();
     } else {
-      // Resume playback
-      state.isPlaying = true;
-      updatePlayPauseButton();
+      logPlaybackDiagnostic('togglePlayPause-resume-initiated');
 
       if (state.isAutoMixing && autoMixState && autoMixState.paused) {
         const pauseDuration = performance.now() - (autoMixState.pausedAt || performance.now());
@@ -3871,6 +3981,8 @@
         if (autoMixState.incomingDeck) {
           autoMixState.incomingDeck.play().catch(() => {});
         }
+        state.isPlaying = true;
+        updatePlayPauseButton();
         return;
       }
 
@@ -3878,30 +3990,24 @@
 
       if (isYouTubeActive() || state.activePlayerEngine === 'youtube') {
         if (state.ytReady && state.ytPlayer && typeof state.ytPlayer.playVideo === 'function') {
-          try { state.ytPlayer.playVideo(); } catch (e) {}
+          try {
+            state.ytPlayer.playVideo();
+            state.isPlaying = true;
+            state.isTrackLoading = false;
+            updatePlayPauseButton();
+          } catch (e) {}
         }
       } else {
-        // Ensure direct streamUrl exists for YouTube tracks
-        const isYtTrack = state.currentTrack.source === 'youtube' || state.currentTrack.ytId || (state.currentTrack.id && state.currentTrack.id.startsWith('yt_'));
-        if (isYtTrack && !state.currentTrack.streamUrl) {
-          const ytId = state.currentTrack.ytId || state.currentTrack.id.replace('yt_', '');
-          if (ytId) {
-            state.currentTrack.streamUrl = `/api/yt-stream?id=${encodeURIComponent(ytId)}`;
-            state.currentTrack.audioUrl = state.currentTrack.audioUrl || state.currentTrack.streamUrl;
-            state.currentTrack.hasDirectAudio = true;
-          }
-        }
-
-        const desiredSrc = state.currentTrack.audioUrl || state.currentTrack.streamUrl;
         const act = getActiveDeck();
-        if (!act.src || act.src === '' || act.src.startsWith('data:audio') || act.src.endsWith('/')) {
-          if (desiredSrc) {
-            act.src = desiredSrc;
-            act.volume = state.isMuted ? 0 : (state.volume || 0.8);
-          } else {
-            playTrack(state.currentTrack, state.queue, false, resumeTime);
-            return;
-          }
+        const currentSrc = act ? (act.currentSrc || act.src || '') : '';
+        const hasValidSrc = Boolean(currentSrc && currentSrc !== '' && !currentSrc.startsWith('data:audio') && !currentSrc.endsWith('/'));
+
+        // If active audio deck has no loaded source or is uninitialized (e.g. freshly restored after page refresh),
+        // route to full authoritative playTrack with resume position!
+        if (!hasValidSrc || act.readyState === 0) {
+          logPlaybackDiagnostic('togglePlayPause-delegating-to-playTrack', { resumeTime, hasValidSrc, readyState: act ? act.readyState : null });
+          playTrack(state.currentTrack, state.queue, false, resumeTime);
+          return;
         }
 
         // Clear any lingering fadeout timer and restore playback volume immediately
@@ -3911,7 +4017,7 @@
         }
         act.volume = state.isMuted ? 0 : (state.volume || 0.8);
 
-        if (resumeTime > 0) {
+        if (resumeTime > 0 && act.readyState >= 1) {
           try {
             if (Math.abs(act.currentTime - resumeTime) > 0.5) {
               act.currentTime = resumeTime;
@@ -3919,16 +4025,26 @@
           } catch (e) {}
         }
 
+        state.isTrackLoading = true;
+        updatePlayPauseButton();
+
+        logPlaybackDiagnostic('togglePlayPause-resume-play', { resumeTime });
         const resumePromise = act.play();
         if (resumePromise !== undefined) {
           resumePromise.then(() => {
+            state.isPlaying = true;
+            state.isTrackLoading = false;
             act.volume = state.isMuted ? 0 : (state.volume || 0.8);
-            if (resumeTime > 0) {
+            if (resumeTime > 0 && act.readyState >= 1) {
               try { act.currentTime = resumeTime; } catch (e) {}
             }
+            updatePlayPauseButton();
+            logPlaybackDiagnostic('togglePlayPause-resume-success');
           }).catch(err => {
             console.warn('Audio resume error, attempting full playTrack:', err);
+            logPlaybackDiagnostic('togglePlayPause-resume-failed', { error: err.message });
             state.isPlaying = false;
+            state.isTrackLoading = false;
             updatePlayPauseButton();
             playTrack(state.currentTrack, state.queue, false, resumeTime);
           });
@@ -10704,6 +10820,7 @@
           state.isPlaying = true;
           state.isTrackLoading = false;
           updatePlayPauseButton();
+          logPlaybackDiagnostic('native-deck-play');
         }
       });
       deck.addEventListener('playing', () => {
@@ -10711,15 +10828,35 @@
           state.isPlaying = true;
           state.isTrackLoading = false;
           state.consecutivePlaybackErrors = 0;
+          updatePlayPauseButton();
+          logPlaybackDiagnostic('native-deck-playing');
         }
       });
       deck.addEventListener('pause', () => {
         state._lastTrackedPlaybackTime = null;
         if (deck === getActiveDeck() && !state.isCrossfading) {
           state.isPlaying = false;
+          state.isTrackLoading = false;
           updatePlayPauseButton();
           savePlaybackState();
           saveCurrentPlaylistProgress({ immediate: true });
+          logPlaybackDiagnostic('native-deck-pause');
+        }
+      });
+      deck.addEventListener('waiting', () => {
+        if (deck === getActiveDeck()) {
+          state.isTrackLoading = true;
+          logPlaybackDiagnostic('native-deck-waiting');
+        }
+      });
+      deck.addEventListener('stalled', () => {
+        if (deck === getActiveDeck()) {
+          logPlaybackDiagnostic('native-deck-stalled');
+        }
+      });
+      deck.addEventListener('canplay', () => {
+        if (deck === getActiveDeck()) {
+          logPlaybackDiagnostic('native-deck-canplay');
         }
       });
       deck.addEventListener('timeupdate', () => {

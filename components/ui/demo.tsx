@@ -1,12 +1,14 @@
-import { Home, Search, Library } from 'lucide-react'
-import { NavBar } from "@/components/ui/tubelight-navbar"
+'use client';
 
-export function NavBarDemo() {
-  const navItems = [
-    { name: 'Home', url: '#home', icon: Home },
-    { name: 'Search', url: '#search', icon: Search },
-    { name: 'Library', url: '#library', icon: Library }
-  ]
+import React from 'react';
+import { FlowButton } from "./flow-button";
 
-  return <NavBar items={navItems} className="rounded-full" />
-}
+export const FlowButtonDemo = () => {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
+      <FlowButton text="Flow Button" />
+    </div>
+  );
+};
+
+export default { FlowButtonDemo };

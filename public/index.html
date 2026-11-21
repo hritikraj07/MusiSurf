@@ -137,14 +137,25 @@
             </div>
           </div>
 
-          <!-- Guest: Sign In Option at Top (Shown when user is NOT signed in) -->
-          <button type="button" class="user-dropdown-item user-dropdown-signin" id="userDropdownSignInBtn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-              <polyline points="10 17 15 12 10 7"/>
-              <line x1="15" y1="12" x2="3" y2="12"/>
+          <!-- Guest: Flow Sign In Button at Top (Shown when user is NOT signed in) -->
+          <button type="button" class="user-dropdown-item user-dropdown-signin flow-button-signin" id="userDropdownSignInBtn" title="Sign In to MusiSurf">
+            <!-- Left arrow (arr-2) -->
+            <svg class="flow-btn-arrow flow-btn-arr-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
             </svg>
-            <span>Sign In</span>
+
+            <!-- Text -->
+            <span class="flow-btn-text">Sign In</span>
+
+            <!-- Expanding Circle Animation on hover -->
+            <span class="flow-btn-circle"></span>
+
+            <!-- Right arrow (arr-1) -->
+            <svg class="flow-btn-arrow flow-btn-arr-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
           </button>
 
           <div class="user-dropdown-divider" id="userDropdownDivider"></div>
@@ -1785,8 +1796,8 @@
     </div>
 
     <!-- Native Audio Elements for Dual-Deck Equal-Power Crossfading (Configured for background & mobile playback) -->
-    <audio id="audioPlayer" preload="none" playsinline webkit-playsinline crossorigin="anonymous"></audio>
-    <audio id="audioPlayerSecondary" preload="none" playsinline webkit-playsinline crossorigin="anonymous"></audio>
+    <audio id="audioPlayer" preload="metadata" playsinline webkit-playsinline crossorigin="anonymous"></audio>
+    <audio id="audioPlayerSecondary" preload="metadata" playsinline webkit-playsinline crossorigin="anonymous"></audio>
     <!-- Dedicated Silent Audio Element for Browser Background Throttling Prevention (Never interferes with main audio) -->
     <audio id="keepAliveAudio" style="display: none;" preload="none"></audio>
 

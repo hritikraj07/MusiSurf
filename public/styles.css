@@ -1076,20 +1076,118 @@ html, body {
   animation: dropdownFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
 }
 
-.user-dropdown-signin {
+/* ==========================================================================
+   FLOW BUTTON ANIMATION FOR SIGN IN (Matching Website Dark Emerald Theme)
+   ========================================================================== */
+.user-dropdown-signin,
+.flow-button-signin {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  overflow: hidden !important;
+  border-radius: 100px !important;
+  border: 1.5px solid rgba(0, 242, 150, 0.45) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  padding: 8px 24px !important;
+  font-size: 0.88rem !important;
   font-weight: 600 !important;
   color: #ffffff !important;
-  background: rgba(255, 255, 255, 0.08) !important;
-  border-radius: 8px !important;
+  cursor: pointer !important;
+  transition: all 600ms cubic-bezier(0.23, 1, 0.32, 1) !important;
+  text-decoration: none !important;
+  box-sizing: border-box !important;
+  margin-bottom: 4px !important;
+  width: 100% !important;
 }
 
-.user-dropdown-signin:hover {
-  background: rgba(255, 255, 255, 0.16) !important;
-  color: #ffffff !important;
+.user-dropdown-signin:hover,
+.flow-button-signin:hover {
+  border-color: transparent !important;
+  color: #08090b !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 18px rgba(0, 242, 150, 0.32) !important;
 }
 
-.user-dropdown-signin svg {
-  color: #10b981 !important;
+.user-dropdown-signin:active,
+.flow-button-signin:active {
+  transform: scale(0.96) !important;
+}
+
+/* Left arrow: hidden to left by default, slides into view on hover */
+.flow-button-signin .flow-btn-arr-left {
+  position: absolute !important;
+  width: 15px !important;
+  height: 15px !important;
+  left: -25% !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  stroke: #ffffff !important;
+  fill: none !important;
+  z-index: 9 !important;
+  transition: all 800ms cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.flow-button-signin:hover .flow-btn-arr-left {
+  left: 14px !important;
+  stroke: #08090b !important;
+}
+
+/* Text: shifts smoothly to the right on hover */
+.flow-button-signin .flow-btn-text {
+  position: relative !important;
+  z-index: 2 !important;
+  transform: translateX(-4px) !important;
+  transition: all 800ms ease-out !important;
+  color: inherit !important;
+  font-weight: 600 !important;
+}
+
+.flow-button-signin:hover .flow-btn-text {
+  transform: translateX(8px) !important;
+  color: #08090b !important;
+}
+
+/* Expanding circle: animates from center on hover with MusiSurf emerald gradient */
+.flow-button-signin .flow-btn-circle {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 50% !important;
+  background: linear-gradient(135deg, #00f296, #00d2ff) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+  transition: all 800ms cubic-bezier(0.19, 1, 0.22, 1) !important;
+}
+
+.flow-button-signin:hover .flow-btn-circle {
+  width: 280px !important;
+  height: 280px !important;
+  opacity: 1 !important;
+}
+
+/* Right arrow: visible by default, slides out to right on hover */
+.flow-button-signin .flow-btn-arr-right {
+  position: absolute !important;
+  width: 15px !important;
+  height: 15px !important;
+  right: 14px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  stroke: #00f296 !important;
+  fill: none !important;
+  z-index: 9 !important;
+  transition: all 800ms cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.flow-button-signin:hover .flow-btn-arr-right {
+  right: -25% !important;
+  stroke: #08090b !important;
 }
 
 @keyframes dropdownFadeIn {
