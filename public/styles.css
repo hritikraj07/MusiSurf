@@ -1098,78 +1098,85 @@ html, body {
 }
 
 .user-dropdown-header {
-  display: flex !important;
-  align-items: center !important;
-  gap: 12px !important;
-  padding: 6px 8px 10px 8px !important;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px 10px 8px;
+}
+
+.user-profile-dropdown [style*="display: none"],
+.user-profile-dropdown .user-dropdown-header[style*="display: none"],
+.user-profile-dropdown .user-dropdown-item[style*="display: none"],
+.user-profile-dropdown .user-dropdown-divider[style*="display: none"] {
+  display: none !important;
 }
 
 .user-dropdown-avatar {
-  width: 36px !important;
-  height: 36px !important;
-  min-width: 36px !important;
-  border-radius: 50% !important;
-  background: #252833 !important;
-  color: #ffffff !important;
-  font-weight: 700 !important;
-  font-size: 0.95rem !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 50%;
+  background: #252833;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .user-dropdown-info {
-  min-width: 0 !important;
-  flex: 1 !important;
+  min-width: 0;
+  flex: 1;
 }
 
 .user-dropdown-name {
-  font-size: 0.88rem !important;
-  font-weight: 700 !important;
-  color: #ffffff !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .user-dropdown-email {
-  font-size: 0.76rem !important;
-  color: #9ca3af !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
+  font-size: 0.76rem;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .user-dropdown-divider {
-  height: 1px !important;
-  background: rgba(255, 255, 255, 0.08) !important;
-  margin: 4px 0 !important;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 0;
 }
 
 .user-dropdown-item {
-  display: flex !important;
-  align-items: center !important;
-  gap: 10px !important;
-  padding: 9px 12px !important;
-  border-radius: 8px !important;
-  background: transparent !important;
-  border: none !important;
-  color: #d1d5db !important;
-  font-size: 0.86rem !important;
-  font-weight: 500 !important;
-  cursor: pointer !important;
-  width: 100% !important;
-  text-align: left !important;
-  transition: all 0.15s ease !important;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: #d1d5db;
+  font-size: 0.86rem;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: all 0.15s ease;
 }
 
 .user-dropdown-item svg {
-  width: 16px !important;
-  height: 16px !important;
-  color: #9ca3af !important;
-  flex-shrink: 0 !important;
-  transition: color 0.15s ease !important;
+  width: 16px;
+  height: 16px;
+  color: #9ca3af;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
 }
 
 .user-dropdown-item:hover {
@@ -1600,10 +1607,11 @@ html, body {
 .library-header-actions {
   display: flex !important;
   align-items: center !important;
+  justify-content: flex-end !important;
   gap: 10px !important;
   flex-shrink: 0 !important;
   margin-left: auto !important;
-  padding-left: 20px !important;
+  padding-left: 12px !important;
   margin-right: -2px !important;
 }
 
@@ -14181,12 +14189,13 @@ body.lyrics-fullscreen-active #lyricsView .lyrics-scroll-body {
    MUSISURF PUBLIC HOMEPAGE FOOTER (Search Console & OAuth Compliance)
    ========================================================================== */
 .musisurf-public-footer {
-  margin-top: 64px;
-  margin-bottom: 96px;
-  padding: 40px 24px 28px;
-  background: linear-gradient(180deg, rgba(20, 21, 26, 0.4) 0%, rgba(14, 15, 18, 0.8) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
+  margin-top: 48px;
+  margin-bottom: 24px;
+  padding: 32px 0 20px 0;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
   color: #9ca3af;
   position: relative;
   z-index: 2;
@@ -14294,9 +14303,13 @@ body.lyrics-fullscreen-active #lyricsView .lyrics-scroll-body {
 
 @media (max-width: 768px) {
   .musisurf-public-footer {
-    margin-top: 48px;
-    margin-bottom: 130px;
-    padding: 28px 18px 20px;
+    margin-top: 36px;
+    margin-bottom: 84px;
+    padding: 24px 0 16px;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
   }
   .public-footer-links-group {
     gap: 28px;

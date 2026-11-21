@@ -9511,10 +9511,6 @@
     // Settings Modal
     const openSettingsModal = () => {
       loadSettings();
-      if (window.innerWidth <= 768) {
-        if (typeof openMobileDrawer === 'function') openMobileDrawer();
-        return;
-      }
       if (elements.settingsModal) {
         elements.settingsModal.style.display = 'flex';
         // Select Account tab by default as requested
@@ -9527,6 +9523,7 @@
         try { window.history.pushState({ modal: 'settings' }, '', window.location.pathname); } catch (e) {}
       }
     };
+    window.openSettingsModal = openSettingsModal;
     const closeSettingsModal = () => {
       if (elements.settingsModal) elements.settingsModal.style.display = 'none';
     };
@@ -11198,10 +11195,10 @@
         if (userDropdownName) userDropdownName.textContent = user.name || user.email.split('@')[0];
         if (userDropdownEmail) userDropdownEmail.textContent = user.email;
 
-        if (userDropdownHeader) userDropdownHeader.style.display = 'flex';
-        if (userDropdownSignInBtn) userDropdownSignInBtn.style.display = 'none';
-        if (userDropdownSignOutBtn) userDropdownSignOutBtn.style.display = 'flex';
-        if (userDropdownDivider) userDropdownDivider.style.display = 'block';
+        if (userDropdownHeader) userDropdownHeader.style.setProperty('display', 'flex', 'important');
+        if (userDropdownSignInBtn) userDropdownSignInBtn.style.setProperty('display', 'none', 'important');
+        if (userDropdownSignOutBtn) userDropdownSignOutBtn.style.setProperty('display', 'flex', 'important');
+        if (userDropdownDivider) userDropdownDivider.style.setProperty('display', 'block', 'important');
 
         if (mobTopAvatar) {
           mobTopAvatar.innerHTML = `<span style="font-weight:700;font-size:14px;color:#fff;">${initial}</span>`;
@@ -11223,10 +11220,10 @@
           if (headerUserIconSvg) headerUserIconSvg.style.display = 'block';
         }
 
-        if (userDropdownHeader) userDropdownHeader.style.display = 'none';
-        if (userDropdownSignInBtn) userDropdownSignInBtn.style.display = 'flex';
-        if (userDropdownSignOutBtn) userDropdownSignOutBtn.style.display = 'none';
-        if (userDropdownDivider) userDropdownDivider.style.display = 'block';
+        if (userDropdownHeader) userDropdownHeader.style.setProperty('display', 'none', 'important');
+        if (userDropdownSignInBtn) userDropdownSignInBtn.style.setProperty('display', 'flex', 'important');
+        if (userDropdownSignOutBtn) userDropdownSignOutBtn.style.setProperty('display', 'none', 'important');
+        if (userDropdownDivider) userDropdownDivider.style.setProperty('display', 'block', 'important');
 
         if (mobTopAvatar) {
           mobTopAvatar.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
@@ -11380,7 +11377,11 @@
       userDropdownSettingsBtn.addEventListener('click', (e) => {
         if (e) e.stopPropagation();
         if (userProfileDropdown) userProfileDropdown.classList.remove('is-open');
-        openSettingsModal();
+        if (typeof window.openSettingsModal === 'function') {
+          window.openSettingsModal();
+        } else if (typeof openSettingsModal === 'function') {
+          openSettingsModal();
+        }
       });
     }
 
