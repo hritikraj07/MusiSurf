@@ -51,3 +51,25 @@ CREATE TABLE IF NOT EXISTS liked_tracks (
 
 -- Index for querying liked tracks ordered by newest first
 CREATE INDEX IF NOT EXISTS idx_liked_tracks_user_liked_at ON liked_tracks(user_id, liked_at DESC);
+
+-- 4. Playlist Playback Progress Table (Account-Synced Resume System)
+CREATE TABLE IF NOT EXISTS playlist_playback_progress (
+  user_id UUID NOT NULL REFERENCES neon_auth."user"(id) ON DELETE CASCADE,
+  playlist_id VARCHAR(64) NOT NULL,
+  track_id VARCHAR(64) NOT NULL,
+  track_index INTEGER NOT NULL DEFAULT 0,
+  position_seconds DOUBLE PRECISION NOT NULL DEFAULT 0,
+  duration_seconds INTEGER NOT NULL DEFAULT 0,
+  playback_mode VARCHAR(32) NOT NULL DEFAULT '1',
+  shuffle_state JSONB DEFAULT NULL,
+  is_completed BOOLEAN NOT NULL DEFAULT FALSE,
+  version INTEGER NOT NULL DEFAULT 1,
+  last_played_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, playlist_id)
+);
+
+-- Index for querying playlist playback progress by owner
+CREATE INDEX IF NOT EXISTS idx_playlist_progress_user ON playlist_playback_progress(user_id);
+CREATE INDEX IF NOT EXISTS idx_playlist_progress_user_updated ON playlist_playback_progress(user_id, updated_at DESC);
+

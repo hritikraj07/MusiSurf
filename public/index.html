@@ -723,6 +723,17 @@
                   <rect x="14" y="4" width="4" height="16" />
                 </svg>
               </button>
+              <!-- Continue Listening / Resume Playlist Indicator -->
+              <button class="playlist-resume-indicator-btn" id="playlistResumeIndicatorBtn" style="display: none;" title="Resume playlist from saved position" type="button">
+                <span class="resume-icon">↺</span>
+                <span class="resume-text" id="playlistResumeIndicatorText">Continue listening</span>
+              </button>
+              <button class="playlist-action-icon-btn restart-playlist-btn" id="restartPlaylistBtn" title="Start playlist from the beginning" aria-label="Start from start" style="display: none;" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="1 4 1 10 7 10"/>
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                </svg>
+              </button>
               <button class="playlist-shuffle-btn" id="shufflePlaylistBtn" title="Mode 1: In Order + Autoplay • Click to cycle modes" aria-label="Playback order mode">
                 <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="3" y1="6" x2="14" y2="6"/>

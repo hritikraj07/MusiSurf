@@ -317,12 +317,179 @@ async function removeTrackFromPlaylist(playlistId, userId, trackId) {
 async function deletePlaylist(playlistId, userId) {
   if (!sql) throw new Error('Database not configured');
 
+  try {
+    await sql`
+      DELETE FROM playlist_playback_progress
+      WHERE playlist_id = ${playlistId} AND user_id = ${userId}
+    `;
+  } catch (e) {}
+
   const res = await sql`
     DELETE FROM playlists 
     WHERE id = ${playlistId} AND user_id = ${userId}
     RETURNING id
   `;
   return res.length > 0;
+}
+
+/**
+ * Fetches playback progress for a specific playlist.
+ */
+async function getPlaylistProgress(userId, playlistId) {
+  if (!sql) throw new Error('Database not configured');
+  const pid = String(playlistId).slice(0, 64);
+  const rows = await sql`
+    SELECT 
+      playlist_id as "playlistId",
+      track_id as "trackId",
+      track_index as "trackIndex",
+      position_seconds as "positionSeconds",
+      duration_seconds as "durationSeconds",
+      playback_mode as "playbackMode",
+      shuffle_state as "shuffleState",
+      is_completed as "isCompleted",
+      version,
+      last_played_at as "lastPlayedAt",
+      updated_at as "updatedAt"
+    FROM playlist_playback_progress
+    WHERE user_id = ${userId} AND playlist_id = ${pid}
+    LIMIT 1
+  `;
+  return rows[0] || null;
+}
+
+/**
+ * Fetches playback progress for all playlists of a user.
+ */
+async function getAllPlaylistsProgress(userId) {
+  if (!sql) throw new Error('Database not configured');
+  const rows = await sql`
+    SELECT 
+      playlist_id as "playlistId",
+      track_id as "trackId",
+      track_index as "trackIndex",
+      position_seconds as "positionSeconds",
+      duration_seconds as "durationSeconds",
+      playback_mode as "playbackMode",
+      shuffle_state as "shuffleState",
+      is_completed as "isCompleted",
+      version,
+      last_played_at as "lastPlayedAt",
+      updated_at as "updatedAt"
+    FROM playlist_playback_progress
+    WHERE user_id = ${userId}
+    ORDER BY updated_at DESC
+  `;
+  const map = {};
+  for (const r of rows) {
+    map[r.playlistId] = r;
+  }
+  return map;
+}
+
+/**
+ * Saves playback progress for a user's playlist.
+ */
+async function savePlaylistProgress(userId, playlistId, data) {
+  if (!sql) throw new Error('Database not configured');
+  const pid = String(playlistId).slice(0, 64);
+  const trackId = String(data.trackId || data.track_id || '').slice(0, 64);
+  if (!trackId) {
+    throw new Error('trackId is required to save playback progress');
+  }
+
+  const trackIndex = Math.max(0, parseInt(data.trackIndex ?? data.track_index ?? 0, 10) || 0);
+  const positionSeconds = Math.max(0, parseFloat(data.positionSeconds ?? data.position_seconds ?? 0) || 0);
+  const durationSeconds = Math.max(0, parseInt(data.durationSeconds ?? data.duration_seconds ?? 0, 10) || 0);
+  const playbackMode = String(data.playbackMode ?? data.playback_mode ?? '1').slice(0, 32);
+  const shuffleState = data.shuffleState ?? data.shuffle_state ?? null;
+  const isCompleted = Boolean(data.isCompleted ?? data.is_completed ?? false);
+  const clientVersion = parseInt(data.version || 1, 10) || 1;
+
+  // Concurrency check
+  const existing = await sql`
+    SELECT version, updated_at 
+    FROM playlist_playback_progress
+    WHERE user_id = ${userId} AND playlist_id = ${pid}
+    LIMIT 1
+  `;
+
+  if (existing.length > 0) {
+    const currentVersion = existing[0].version;
+    const nextVersion = Math.max(currentVersion + 1, clientVersion + 1);
+
+    const rows = await sql`
+      UPDATE playlist_playback_progress
+      SET
+        track_id = ${trackId},
+        track_index = ${trackIndex},
+        position_seconds = ${positionSeconds},
+        duration_seconds = ${durationSeconds},
+        playback_mode = ${playbackMode},
+        shuffle_state = ${shuffleState ? JSON.stringify(shuffleState) : null},
+        is_completed = ${isCompleted},
+        version = ${nextVersion},
+        last_played_at = NOW(),
+        updated_at = NOW()
+      WHERE user_id = ${userId} AND playlist_id = ${pid}
+      RETURNING 
+        playlist_id as "playlistId",
+        track_id as "trackId",
+        track_index as "trackIndex",
+        position_seconds as "positionSeconds",
+        duration_seconds as "durationSeconds",
+        playback_mode as "playbackMode",
+        shuffle_state as "shuffleState",
+        is_completed as "isCompleted",
+        version,
+        last_played_at as "lastPlayedAt",
+        updated_at as "updatedAt"
+    `;
+    return rows[0];
+  } else {
+    const rows = await sql`
+      INSERT INTO playlist_playback_progress (
+        user_id,
+        playlist_id,
+        track_id,
+        track_index,
+        position_seconds,
+        duration_seconds,
+        playback_mode,
+        shuffle_state,
+        is_completed,
+        version,
+        last_played_at,
+        updated_at
+      ) VALUES (
+        ${userId},
+        ${pid},
+        ${trackId},
+        ${trackIndex},
+        ${positionSeconds},
+        ${durationSeconds},
+        ${playbackMode},
+        ${shuffleState ? JSON.stringify(shuffleState) : null},
+        ${isCompleted},
+        1,
+        NOW(),
+        NOW()
+      )
+      RETURNING 
+        playlist_id as "playlistId",
+        track_id as "trackId",
+        track_index as "trackIndex",
+        position_seconds as "positionSeconds",
+        duration_seconds as "durationSeconds",
+        playback_mode as "playbackMode",
+        shuffle_state as "shuffleState",
+        is_completed as "isCompleted",
+        version,
+        last_played_at as "lastPlayedAt",
+        updated_at as "updatedAt"
+    `;
+    return rows[0];
+  }
 }
 
 module.exports = {
@@ -333,5 +500,8 @@ module.exports = {
   getPlaylistById,
   addTrackToPlaylist,
   removeTrackFromPlaylist,
-  deletePlaylist
+  deletePlaylist,
+  getPlaylistProgress,
+  getAllPlaylistsProgress,
+  savePlaylistProgress
 };

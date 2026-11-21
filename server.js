@@ -9,6 +9,7 @@ const { transliterateTextToDevanagari, detectLyricsLanguage } = require('./scrip
 const lyricsDiscoveryEngine = require('./scripts/lyrics_discovery_engine');
 const { cleanTrackTitle, extractArtists, extractSongVersion, computeLyricsMatchScore, validateLrcTimestamps } = require('./scripts/lyrics_matcher');
 const { analyzeTrackSilence } = require('./scripts/silence_detector');
+const { isMashupTrack, isEligibleForRecommendation } = require('./scripts/mashup_detector');
 const { requireAuth, optionalAuth, getAuthenticatedUser } = require('./services/auth');
 const libraryService = require('./services/library');
 
@@ -1349,9 +1350,9 @@ app.get('/api/recommendations', async (req, res) => {
       // Do not recommend the exact same song
       if (normTitle === seedNormTitle && seedNormTitle.length > 2) continue;
 
-      // Validation check
-      const valid = validateMusicContent(track);
-      if (!valid.isMusic) continue;
+      // Strict Music & Mashup-Exclusion Eligibility Validation
+      const eligibility = isEligibleForRecommendation(track, validateMusicContent);
+      if (!eligibility.eligible) continue;
 
       // Calculate Vibe Matching Score (out of 100)
       let score = 50;
@@ -1414,6 +1415,8 @@ app.get('/api/recommendations', async (req, res) => {
         const fallbackSongs = await searchSaavn(`${language} top hits`, limit);
         for (const fb of fallbackSongs) {
           if (!excludeSet.has((fb.id || '').toLowerCase()) && !finalResults.some(t => t.id === fb.id)) {
+            const fbEligible = isEligibleForRecommendation(fb, validateMusicContent);
+            if (!fbEligible.eligible) continue;
             finalResults.push(fb);
             if (finalResults.length >= limit) break;
           }
@@ -2149,6 +2152,52 @@ app.delete('/api/library/playlists/:id', requireAuth, async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// --------------------------------------------------------------------------
+// ACCOUNT-SYNCED PLAYLIST PLAYBACK PROGRESS (CONTINUE LISTENING / RESUME)
+// --------------------------------------------------------------------------
+
+// Get progress for all user playlists in a single batch
+app.get('/api/library/playlists-progress', requireAuth, async (req, res) => {
+  try {
+    const progressMap = await libraryService.getAllPlaylistsProgress(req.user.id);
+    res.json({ success: true, progress: progressMap });
+  } catch (err) {
+    console.error('[Progress API] Get all progress error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get playback progress for a specific playlist
+app.get('/api/library/playlists/:id/progress', requireAuth, async (req, res) => {
+  try {
+    const progress = await libraryService.getPlaylistProgress(req.user.id, req.params.id);
+    res.json({ success: true, progress });
+  } catch (err) {
+    console.error('[Progress API] Get playlist progress error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Save / update playback progress for a specific playlist
+const handleSaveProgress = async (req, res) => {
+  try {
+    const playlistId = req.params.id;
+    const data = req.body || {};
+    if (!data.trackId && !data.track_id) {
+      return res.status(400).json({ success: false, error: 'trackId is required' });
+    }
+
+    const saved = await libraryService.savePlaylistProgress(req.user.id, playlistId, data);
+    res.json({ success: true, progress: saved });
+  } catch (err) {
+    console.error('[Progress API] Save playlist progress error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+app.post('/api/library/playlists/:id/progress', requireAuth, handleSaveProgress);
+app.put('/api/library/playlists/:id/progress', requireAuth, handleSaveProgress);
 
 // Status and Info
 app.get('/api/status', (req, res) => {

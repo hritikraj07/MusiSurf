@@ -34,6 +34,9 @@
     autoplay: localStorage.getItem('musisurf_autoplay_enabled') !== 'false',
     playlistMode: localStorage.getItem('musisurf_playlist_playback_mode') || '1', // '1': In Order + Autoplay, '2': Shuffle Once + Autoplay, '3': Shuffle & Repeat Playlist
     recommendationQueue: [],
+    rejectedRecommendationIds: new Set(),
+    playbackContext: { type: 'idle', playlistId: null, trackId: null },
+    playlistProgressMap: {},
     sessionHistory: [],
     sessionProfile: { languages: [], artists: [], moods: [], recentTracks: [] },
     recommendationSeed: null,
@@ -247,6 +250,9 @@
     playlistTracksBody: document.getElementById('playlistTracksBody'),
     playlistEmptyState: document.getElementById('playlistEmptyState'),
     playAllPlaylistBtn: document.getElementById('playAllPlaylistBtn'),
+    playlistResumeIndicatorBtn: document.getElementById('playlistResumeIndicatorBtn'),
+    playlistResumeIndicatorText: document.getElementById('playlistResumeIndicatorText'),
+    restartPlaylistBtn: document.getElementById('restartPlaylistBtn'),
     shufflePlaylistBtn: document.getElementById('shufflePlaylistBtn'),
     playlistModeBadge: document.getElementById('playlistModeBadge'),
     pinPlaylistBtn: document.getElementById('pinPlaylistBtn'),
@@ -1370,6 +1376,9 @@
         savedAt: Date.now()
       };
       localStorage.setItem('musisurf_last_state', JSON.stringify(data));
+      if (state.playbackContext && state.playbackContext.type === 'playlist') {
+        saveCurrentPlaylistProgress({ immediate: true });
+      }
     } catch (e) {
       console.warn('Playback state save warning:', e);
     }
@@ -2180,6 +2189,299 @@
     if (state.sessionProfile.recentTracks.length > 5) state.sessionProfile.recentTracks.pop();
   }
 
+  // ==========================================================================
+  // CENTRALIZED MASHUP DETECTION & RECOMMENDATION ELIGIBILITY ENGINE
+  // ==========================================================================
+  function isMashupTrack(track) {
+    if (!track) return false;
+    const rawTitle = track.title || '';
+    const rawArtist = track.artist || track.singers || '';
+    const rawAlbum = track.album || '';
+    const rawDesc = track.description || '';
+
+    const normalize = (s) => (s || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').trim();
+    const title = normalize(rawTitle);
+    const artist = normalize(rawArtist);
+    const album = normalize(rawAlbum);
+    const desc = normalize(rawDesc);
+    const combined = `${title} ${artist} ${album} ${desc}`;
+
+    // 1. Explicit mashup keywords in title or album
+    if (/\b(dj\s+)?mash[\s\-_]*up(s)?\b/i.test(title)) return true;
+    if (/\b(dj\s+)?mash[\s\-_]*up(s)?\b/i.test(album)) return true;
+    if (/\bmash[\s\-_]*up(s)?\b/i.test(artist)) return true;
+
+    // 2. Specific mashup phrase combinations
+    if (/\bmash[\s\-_]*up\s+(mix|version|edit|compilation|medley|cover|session|special)\b/i.test(combined)) return true;
+    if (/\b(mashup\s+medley|medley\s+mashup|mega\s*mashup)\b/i.test(combined)) return true;
+
+    // 3. Theme/Genre mashup combinations (e.g. "Bollywood Mashup", "Romantic Mashup")
+    if (/\b(romantic|bollywood|punjabi|hindi|love|lo[\-_]?fi|chill|acoustic|wedding|dance|party|club|retro|90s|80s|2000s|monsoon|sad|breakup|heartbreak)\s+mash[\s\-_]*up\b/i.test(combined)) return true;
+
+    // 4. Multi-song "Song A vs Song B" collision pattern
+    if (/\b[\w\s]{2,}\s+vs\.?\s+[\w\s]{2,}/i.test(title)) return true;
+
+    // 5. Multi-song collision title pattern (e.g. 3+ songs combined by slashes)
+    if (/^[\w\s]{2,}\s*\/\s*[\w\s]{2,}\s*\/\s*[\w\s]{2,}/i.test(title) && !title.includes('ost') && !title.includes('soundtrack')) return true;
+
+    // 6. Explicit multi-song mashup brackets
+    if (/([\w\s]{2,})\s+(x|vs\.?)\s+([\w\s]{2,})\s+[\(\[](.*?mash[\s\-_]*up.*?)[\]\)]/i.test(rawTitle)) return true;
+
+    // NOT a mashup: Official remixes, live, acoustic, extended mixes
+    return false;
+  }
+
+  function isEligibleForRecommendation(track) {
+    if (!track) return false;
+    const trackId = track.id || track.trackId || track.ytId;
+    const title = track.title;
+    if (!trackId || !title || String(title).trim().length === 0) return false;
+    if (isMashupTrack(track)) return false;
+    return true;
+  }
+
+  function cleanRecommendationQueue() {
+    if (!Array.isArray(state.recommendationQueue)) return;
+    state.recommendationQueue = state.recommendationQueue.filter(t => isEligibleForRecommendation(t));
+  }
+
+  // ==========================================================================
+  // ACCOUNT-SYNCED PLAYLIST PLAYBACK PROGRESS & RESUME ENGINE
+  // ==========================================================================
+  let playlistProgressDebounceTimer = null;
+  let lastSavedProgressTimestamp = 0;
+
+  async function loadAccountPlaylistProgress() {
+    if (state.currentUser && state.currentUser.email) {
+      try {
+        const res = await fetch('/api/library/playlists-progress', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success && data.progress) {
+            state.playlistProgressMap = data.progress;
+            if (state.currentView === 'playlist' && state.viewingPlaylistId) {
+              updatePlaylistResumeUI(state.viewingPlaylistId);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Progress] Failed to fetch account progress:', err.message);
+      }
+    } else {
+      try {
+        const raw = localStorage.getItem('musisurf_guest_playlist_progress');
+        if (raw) {
+          state.playlistProgressMap = JSON.parse(raw) || {};
+          if (state.currentView === 'playlist' && state.viewingPlaylistId) {
+            updatePlaylistResumeUI(state.viewingPlaylistId);
+          }
+        }
+      } catch (e) {}
+    }
+  }
+
+  function saveCurrentPlaylistProgress({ immediate = false, isCompleted = false } = {}) {
+    if (!state.playbackContext || state.playbackContext.type !== 'playlist') return;
+    const playlistId = state.playbackContext.playlistId || state.activePlaylistId;
+    if (!playlistId || !state.currentTrack) return;
+
+    const doSave = async () => {
+      const curTime = getCurrentPlaybackTime();
+      const totalDur = getTotalDuration() || state.currentTrack.duration || 0;
+
+      let trackIndex = 0;
+      if (state.activePlaylistTracks && Array.isArray(state.activePlaylistTracks)) {
+        trackIndex = Math.max(0, state.activePlaylistTracks.findIndex(t => String(t.id) === String(state.currentTrack.id)));
+      } else if (typeof state.contextIndex === 'number') {
+        trackIndex = state.contextIndex;
+      }
+
+      const existing = (state.playlistProgressMap && state.playlistProgressMap[playlistId]) || {};
+      const nextVersion = (existing.version || 0) + 1;
+
+      const payload = {
+        playlistId: String(playlistId),
+        trackId: String(state.currentTrack.id),
+        trackIndex,
+        positionSeconds: Math.max(0, parseFloat(curTime) || 0),
+        durationSeconds: Math.max(0, parseInt(totalDur, 10) || 0),
+        playbackMode: String(state.playlistMode || '1'),
+        shuffleState: {
+          playlistCycle: (state.playlistCycle || []).map(t => String(t.id)),
+          playlistCycleIndex: state.playlistCycleIndex || 0
+        },
+        isCompleted: Boolean(isCompleted),
+        version: nextVersion,
+        lastPlayedAt: new Date().toISOString()
+      };
+
+      if (!state.playlistProgressMap) state.playlistProgressMap = {};
+      state.playlistProgressMap[playlistId] = payload;
+      lastSavedProgressTimestamp = Date.now();
+
+      if (state.currentView === 'playlist' && state.viewingPlaylistId === playlistId) {
+        updatePlaylistResumeUI(playlistId);
+      }
+
+      if (state.currentUser && state.currentUser.email) {
+        try {
+          if (immediate && typeof navigator !== 'undefined' && navigator.sendBeacon) {
+            const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+            navigator.sendBeacon(`/api/library/playlists/${encodeURIComponent(playlistId)}/progress`, blob);
+          } else {
+            fetch(`/api/library/playlists/${encodeURIComponent(playlistId)}/progress`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify(payload),
+              keepalive: immediate
+            }).catch(() => {});
+          }
+        } catch (e) {}
+      } else {
+        try {
+          localStorage.setItem('musisurf_guest_playlist_progress', JSON.stringify(state.playlistProgressMap));
+        } catch (e) {}
+      }
+    };
+
+    if (immediate) {
+      if (playlistProgressDebounceTimer) clearTimeout(playlistProgressDebounceTimer);
+      doSave();
+    } else {
+      if (Date.now() - lastSavedProgressTimestamp < 5000) return;
+      if (playlistProgressDebounceTimer) clearTimeout(playlistProgressDebounceTimer);
+      playlistProgressDebounceTimer = setTimeout(doSave, 1200);
+    }
+  }
+
+  function updatePlaylistResumeUI(playlistId) {
+    const progress = state.playlistProgressMap && state.playlistProgressMap[playlistId];
+    const listToPlay = state.viewingPlaylistTracks || [];
+    const resumeBtn = document.getElementById('playlistResumeIndicatorBtn');
+    const resumeText = document.getElementById('playlistResumeIndicatorText');
+    const restartBtn = document.getElementById('restartPlaylistBtn');
+
+    if (!progress || !progress.trackId || !listToPlay.length) {
+      if (resumeBtn) resumeBtn.style.display = 'none';
+      if (restartBtn) restartBtn.style.display = 'none';
+      if (elements.playAllPlaylistBtn) elements.playAllPlaylistBtn.title = 'Play All';
+      return;
+    }
+
+    const savedTrack = listToPlay.find(t => String(t.id) === String(progress.trackId));
+    const isPlayingThis = (
+      state.isPlaying &&
+      String(state.activePlaylistId) === String(playlistId) &&
+      state.currentTrack &&
+      String(state.currentTrack.id) === String(progress.trackId)
+    );
+
+    if (savedTrack && !progress.isCompleted) {
+      const posStr = formatTime(progress.positionSeconds || 0);
+      const shortTitle = savedTrack.title.length > 20 ? savedTrack.title.slice(0, 18) + '...' : savedTrack.title;
+
+      if (resumeBtn && resumeText) {
+        resumeText.textContent = `Continue from ${shortTitle} • ${posStr}`;
+        resumeBtn.style.display = 'inline-flex';
+        resumeBtn.title = `Resume playlist from "${savedTrack.title}" at ${posStr}`;
+      }
+      if (restartBtn) {
+        restartBtn.style.display = 'inline-flex';
+        restartBtn.title = 'Start playlist from the beginning';
+      }
+      if (elements.playAllPlaylistBtn && !isPlayingThis) {
+        elements.playAllPlaylistBtn.title = `Continue from ${shortTitle} (${posStr})`;
+      }
+    } else {
+      if (resumeBtn) resumeBtn.style.display = 'none';
+      if (restartBtn) restartBtn.style.display = 'none';
+      if (elements.playAllPlaylistBtn) elements.playAllPlaylistBtn.title = 'Play All';
+    }
+  }
+
+  function startPlaylistPlaybackFromTrack(playlistId, listToPlay, startIndex = 0) {
+    if (!listToPlay || listToPlay.length === 0) return;
+    state.activePlaylistTracks = [...listToPlay];
+    state.activePlaylistId = playlistId;
+    state.viewingPlaylistId = playlistId;
+    state.playbackContext = {
+      type: 'playlist',
+      playlistId: playlistId,
+      trackId: listToPlay[startIndex]?.id
+    };
+
+    const plObj = state.customPlaylists?.find(p => String(p.id) === String(playlistId));
+    if (plObj) {
+      plObj.lastPlayedAt = Date.now();
+      saveStoredPlaylists();
+    }
+
+    initPlaylistCycle(listToPlay, startIndex);
+    const startingTrack = (state.playlistCycle && state.playlistCycle.length > 0) ? state.playlistCycle[0] : listToPlay[startIndex];
+    saveCurrentPlaylistProgress({ immediate: true });
+    playTrack(startingTrack, state.contextQueue);
+    updatePlayPauseButton();
+    updatePlaylistResumeUI(playlistId);
+  }
+
+  function resumePlaylistPlayback(playlistId, listToPlay, progress) {
+    if (!listToPlay || listToPlay.length === 0) return;
+    state.activePlaylistTracks = [...listToPlay];
+    state.activePlaylistId = playlistId;
+    state.viewingPlaylistId = playlistId;
+
+    let targetIndex = listToPlay.findIndex(t => String(t.id) === String(progress.trackId));
+    if (targetIndex === -1) {
+      targetIndex = (progress.trackIndex >= 0 && progress.trackIndex < listToPlay.length) ? progress.trackIndex : 0;
+    }
+    const targetTrack = listToPlay[targetIndex] || listToPlay[0];
+    if (!targetTrack) return;
+
+    state.playbackContext = {
+      type: 'playlist',
+      playlistId: playlistId,
+      trackId: targetTrack.id
+    };
+
+    if (progress.playbackMode) {
+      state.playlistMode = String(progress.playbackMode);
+      localStorage.setItem('musisurf_playlist_playback_mode', state.playlistMode);
+      updatePlaylistModeUI();
+    }
+
+    const mode = state.playlistMode || '1';
+    if (mode === '1') {
+      state.contextQueue = [...listToPlay];
+      state.contextIndex = targetIndex;
+      state.playlistCycle = [...listToPlay];
+      state.playlistCycleIndex = targetIndex;
+    } else {
+      if (progress.shuffleState && Array.isArray(progress.shuffleState.playlistCycle) && progress.shuffleState.playlistCycle.length > 0) {
+        const idMap = new Map(listToPlay.map(t => [String(t.id), t]));
+        const restoredCycle = progress.shuffleState.playlistCycle.map(id => idMap.get(String(id))).filter(Boolean);
+        for (const t of listToPlay) {
+          if (!restoredCycle.some(rc => String(rc.id) === String(t.id))) {
+            restoredCycle.push(t);
+          }
+        }
+        state.playlistCycle = restoredCycle.length > 0 ? restoredCycle : [...listToPlay];
+        state.playlistCycleIndex = Math.max(0, state.playlistCycle.findIndex(t => String(t.id) === String(targetTrack.id)));
+        if (state.playlistCycleIndex === -1) state.playlistCycleIndex = 0;
+        state.contextQueue = [...state.playlistCycle];
+        state.contextIndex = state.playlistCycleIndex;
+      } else {
+        initPlaylistCycle(listToPlay, targetIndex);
+      }
+    }
+
+    const resumePos = Math.max(0, parseFloat(progress.positionSeconds) || 0);
+    playTrack(targetTrack, state.contextQueue, true, resumePos);
+    updatePlayPauseButton();
+    updatePlaylistResumeUI(playlistId);
+    showToast(`Resumed "${targetTrack.title}" (${formatTime(resumePos)}) ↺`, '▶️');
+  }
+
   let recommendationFetchAbort = null;
   async function fetchRecommendationBatch(seedTrack = null, force = false) {
     if (!state.autoplay && !force) return;
@@ -2225,6 +2527,11 @@
           const newTracks = [];
           for (const t of data.results) {
             if (!t || !t.id || existingIds.has(t.id)) continue;
+            if (state.rejectedRecommendationIds && state.rejectedRecommendationIds.has(t.id)) continue;
+            if (!isEligibleForRecommendation(t)) {
+              if (state.rejectedRecommendationIds) state.rejectedRecommendationIds.add(t.id);
+              continue;
+            }
             existingIds.add(t.id);
             newTracks.push(t);
           }
@@ -2257,7 +2564,7 @@
         if (state.isAwaitingRecommendations) {
           state.isAwaitingRecommendations = false;
           const pool = [...(state.sessionProfile?.recentTracks || []), ...(state.likedSongs || [])];
-          const fallbackTrack = pool.find(t => t.id && (!state.currentTrack || t.id !== state.currentTrack.id)) || pool[0];
+          const fallbackTrack = pool.find(t => t.id && (!state.currentTrack || t.id !== state.currentTrack.id) && isEligibleForRecommendation(t)) || pool.find(t => isEligibleForRecommendation(t));
           if (fallbackTrack) {
             logPlaybackDiag('AUTOPLAY_FALLBACK', `Network unstable, using offline/cached fallback: "${fallbackTrack.title}"`);
             playTrack(fallbackTrack, null, true);
@@ -2601,10 +2908,16 @@
           if (state.contextQueue && state.contextIndex + 1 < state.contextQueue.length) {
             state.contextIndex++;
             nextSong = state.contextQueue[state.contextIndex];
+            if (state.playbackContext && state.playbackContext.type === 'playlist') {
+              state.playbackContext.trackId = nextSong?.id;
+              saveCurrentPlaylistProgress({ immediate: true });
+            }
           } else if (state.autoplay) {
-            // End of playlist -> Switch to recommendations!
+            // End of playlist -> Mark completed and Switch to recommendations!
+            saveCurrentPlaylistProgress({ immediate: true, isCompleted: true });
             state.activePlaylistTracks = null;
             state.activePlaylistId = null;
+            state.playbackContext = { type: 'recommendation', playlistId: null, trackId: null };
             if (state.recommendationQueue && state.recommendationQueue.length > 0) {
               nextSong = state.recommendationQueue.shift();
               switchedToRecommendations = true;
@@ -2618,10 +2931,16 @@
             state.playlistCycleIndex++;
             nextSong = state.playlistCycle[state.playlistCycleIndex];
             state.contextIndex = state.playlistCycleIndex;
+            if (state.playbackContext && state.playbackContext.type === 'playlist') {
+              state.playbackContext.trackId = nextSong?.id;
+              saveCurrentPlaylistProgress({ immediate: true });
+            }
           } else if (state.autoplay) {
-            // End of shuffled playlist -> Switch to recommendations!
+            // End of shuffled playlist -> Mark completed and Switch to recommendations!
+            saveCurrentPlaylistProgress({ immediate: true, isCompleted: true });
             state.activePlaylistTracks = null;
             state.activePlaylistId = null;
+            state.playbackContext = { type: 'recommendation', playlistId: null, trackId: null };
             if (state.recommendationQueue && state.recommendationQueue.length > 0) {
               nextSong = state.recommendationQueue.shift();
               switchedToRecommendations = true;
@@ -2644,6 +2963,10 @@
             state.contextIndex = 0;
             nextSong = state.playlistCycle[0];
             loopedPlaylist = true;
+          }
+          if (state.playbackContext && state.playbackContext.type === 'playlist') {
+            state.playbackContext.trackId = nextSong?.id;
+            saveCurrentPlaylistProgress({ immediate: true });
           }
         }
       }
@@ -2956,7 +3279,10 @@
       return;
     }
 
-    // Save previous track for history BEFORE assigning new track
+    // Save previous track progress if belonging to a playlist BEFORE assigning new track
+    if (state.playbackContext && state.playbackContext.type === 'playlist') {
+      saveCurrentPlaylistProgress({ immediate: true });
+    }
     const previousTrack = state.currentTrack;
 
     // Guard: If clicking the CURRENTLY PLAYING song without explicit custom seek
@@ -3043,16 +3369,33 @@
         state.contextQueue.unshift(track);
         state.contextIndex = 0;
       }
+      if (state.activePlaylistId || state.viewingPlaylistId) {
+        state.playbackContext = {
+          type: 'playlist',
+          playlistId: state.activePlaylistId || state.viewingPlaylistId,
+          trackId: track.id
+        };
+      }
     } else if (queueList === null) {
-      // Standalone track played (e.g. from search results) - does NOT pollute upcoming queue
+      // Standalone track played (e.g. from search results) - does NOT pollute upcoming queue or overwrite playlist progress
       state.activePlaylistTracks = null;
       state.activePlaylistId = null;
+      state.playbackContext = {
+        type: state.currentView === 'search' ? 'search' : 'standalone',
+        playlistId: null,
+        trackId: track.id
+      };
       state.contextQueue = [track];
       state.contextIndex = 0;
       state.recommendationSeed = track;
     }
     state.queue = [track, ...state.userQueue, ...state.contextQueue.slice(state.contextIndex + 1)];
     state.queueIndex = 0;
+
+    // Immediately record updated progress if in playlist context
+    if (state.playbackContext && state.playbackContext.type === 'playlist') {
+      saveCurrentPlaylistProgress({ immediate: true });
+    }
 
     // Update Session Profile and initiate background recommendation fetching
     updateSessionProfile(track);
@@ -4954,11 +5297,12 @@
       const data = await res.json();
 
       if (!data.success || !data.sections) {
-        elements.shelvesContainer.innerHTML = '<p style="padding: 40px; color: var(--text-secondary);">Trending music loaded.</p>';
+        if (elements.quickPicksGrid) elements.quickPicksGrid.innerHTML = '';
+        if (elements.shelvesContainer) elements.shelvesContainer.innerHTML = '<p style="padding: 40px; color: var(--text-secondary);">Trending music loaded.</p>';
         return;
       }
 
-      elements.shelvesContainer.innerHTML = '';
+      if (elements.shelvesContainer) elements.shelvesContainer.innerHTML = '';
 
       // Populate Quick Picks with 6 songs from distinct albums and distinct thumbnails
       const allTracks = [];
@@ -4974,7 +5318,8 @@
       });
     } catch (err) {
       console.warn('Failed to load trending shelves:', err);
-      elements.shelvesContainer.innerHTML = '<p style="padding: 40px; color: var(--text-secondary);">Unable to load trending catalog. Use Search to play any song!</p>';
+      if (elements.quickPicksGrid) elements.quickPicksGrid.innerHTML = '';
+      if (elements.shelvesContainer) elements.shelvesContainer.innerHTML = '<p style="padding: 40px; color: var(--text-secondary);">Unable to load trending catalog. Use Search to play any song!</p>';
     } finally {
       dismissSplashScreen();
     }
@@ -5539,14 +5884,26 @@
       if (state.currentView === 'search' || state.currentView === 'home') {
         state.activePlaylistId = null;
         state.activePlaylistTracks = null;
+        state.playbackContext = {
+          type: state.currentView === 'search' ? 'search' : 'standalone',
+          playlistId: null,
+          trackId: track.id
+        };
       } else if (state.currentView === 'playlist' && state.viewingPlaylistId) {
         state.activePlaylistId = state.viewingPlaylistId;
         state.activePlaylistTracks = queueList;
+        state.playbackContext = {
+          type: 'playlist',
+          playlistId: state.viewingPlaylistId,
+          trackId: track.id
+        };
         const plObj = state.customPlaylists?.find(p => p.id === state.viewingPlaylistId);
         if (plObj) {
           plObj.lastPlayedAt = Date.now();
           saveStoredPlaylists();
         }
+        initPlaylistCycle(queueList, queueList.findIndex(t => String(t.id) === String(track.id)));
+        saveCurrentPlaylistProgress({ immediate: true });
       }
       playTrack(track, queueList);
     });
@@ -5652,14 +6009,26 @@
       if (state.currentView === 'search' || state.currentView === 'home') {
         state.activePlaylistId = null;
         state.activePlaylistTracks = null;
+        state.playbackContext = {
+          type: state.currentView === 'search' ? 'search' : 'standalone',
+          playlistId: null,
+          trackId: track.id
+        };
       } else if (state.currentView === 'playlist' && state.viewingPlaylistId) {
         state.activePlaylistId = state.viewingPlaylistId;
         state.activePlaylistTracks = queueList;
+        state.playbackContext = {
+          type: 'playlist',
+          playlistId: state.viewingPlaylistId,
+          trackId: track.id
+        };
         const plObj = state.customPlaylists?.find(p => p.id === state.viewingPlaylistId);
         if (plObj) {
           plObj.lastPlayedAt = Date.now();
           saveStoredPlaylists();
         }
+        initPlaylistCycle(queueList, queueList.findIndex(t => String(t.id) === String(track.id)));
+        saveCurrentPlaylistProgress({ immediate: true });
       }
       playTrack(track, queueList);
     });
@@ -6412,7 +6781,7 @@
     state.viewingPlaylistId = playlistId;
     state.viewingPlaylistTracks = [...sortedTracks];
 
-    // Play All Click (plays playlist in sequential order, or toggles pause if already playing)
+    // Play / Resume Playlist Click
     elements.playAllPlaylistBtn.onclick = (e) => {
       if (e) e.stopPropagation();
       const listToPlay = (sortedTracks && sortedTracks.length > 0) ? sortedTracks : tracks;
@@ -6430,25 +6799,40 @@
       if (isCurrentPlaylistTrack) {
         togglePlayPause();
       } else {
-        state.activePlaylistTracks = [...listToPlay];
-        state.activePlaylistId = playlistId;
-        state.viewingPlaylistId = playlistId;
-        const plObj = state.customPlaylists.find(p => String(p.id) === String(playlistId));
-        if (plObj) {
-          plObj.lastPlayedAt = Date.now();
-          saveStoredPlaylists();
+        const progress = state.playlistProgressMap && state.playlistProgressMap[playlistId];
+        if (progress && progress.trackId && !progress.isCompleted) {
+          resumePlaylistPlayback(playlistId, listToPlay, progress);
+        } else {
+          startPlaylistPlaybackFromTrack(playlistId, listToPlay, 0);
         }
-        const playlistCover = (listToPlay && listToPlay[0]?.image) || (tracks && tracks[0]?.image) || '';
-        try {
-          recordRecentlyPlayedPlaylist({ id: playlistId, name: title, image: playlistCover, tracks: listToPlay });
-        } catch (e) {}
-
-        initPlaylistCycle(listToPlay, 0);
-        const startingTrack = state.playlistCycle && state.playlistCycle.length > 0 ? state.playlistCycle[0] : listToPlay[0];
-        playTrack(startingTrack, state.contextQueue);
-        updatePlayPauseButton();
       }
     };
+
+    // Restart playlist button (explicit start fresh from song 1)
+    if (elements.restartPlaylistBtn) {
+      elements.restartPlaylistBtn.onclick = (e) => {
+        if (e) e.stopPropagation();
+        const listToPlay = (sortedTracks && sortedTracks.length > 0) ? sortedTracks : tracks;
+        startPlaylistPlaybackFromTrack(playlistId, listToPlay, 0);
+        showToast('Starting playlist from beginning ↺', '↺');
+      };
+    }
+
+    // Resume indicator button click
+    if (elements.playlistResumeIndicatorBtn) {
+      elements.playlistResumeIndicatorBtn.onclick = (e) => {
+        if (e) e.stopPropagation();
+        const listToPlay = (sortedTracks && sortedTracks.length > 0) ? sortedTracks : tracks;
+        const progress = state.playlistProgressMap && state.playlistProgressMap[playlistId];
+        if (progress && progress.trackId && !progress.isCompleted) {
+          resumePlaylistPlayback(playlistId, listToPlay, progress);
+        } else {
+          startPlaylistPlaybackFromTrack(playlistId, listToPlay, 0);
+        }
+      };
+    }
+
+    updatePlaylistResumeUI(playlistId);
 
     // 3-Mode Playback Button (Mode 1: In Order + Autoplay, Mode 2: Shuffle Once + Autoplay, Mode 3: Shuffle & Repeat Playlist)
     updatePlaylistModeUI();
@@ -9883,6 +10267,7 @@
           state.isPlaying = false;
           updatePlayPauseButton();
           savePlaybackState();
+          saveCurrentPlaylistProgress({ immediate: true });
         }
       });
       deck.addEventListener('timeupdate', () => {
@@ -9892,6 +10277,9 @@
 
         if (deck !== getActiveDeck() || isYouTubeActive() || state.isTrackLoading) return;
         accumulatePlaybackTime(deck);
+        if (state.playbackContext && state.playbackContext.type === 'playlist') {
+          saveCurrentPlaylistProgress({ immediate: false });
+        }
         if (state.isPlaying && !state.isDraggingProgress && state.currentTrack) {
           const cur = getCurrentPlaybackTime();
           if (state.restoredResumeTime > 0 && cur >= 0.5) {
@@ -9979,8 +10367,14 @@
     if (elements.audioSecondary) attachAudioDeckListeners(elements.audioSecondary);
 
     // Save playback position on tab close or page unload
-    window.addEventListener('beforeunload', savePlaybackState);
-    window.addEventListener('pagehide', savePlaybackState);
+    window.addEventListener('beforeunload', () => {
+      savePlaybackState();
+      saveCurrentPlaylistProgress({ immediate: true });
+    });
+    window.addEventListener('pagehide', () => {
+      savePlaybackState();
+      saveCurrentPlaylistProgress({ immediate: true });
+    });
 
     // PWA Install Prompt Handling
     let deferredPrompt = null;
@@ -10890,6 +11284,9 @@
 
     // Uninterrupted Background Tab & Mobile Lockscreen Playback Handler
     document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        saveCurrentPlaylistProgress({ immediate: true });
+      }
       if (state.isPlaying) {
         if ('mediaSession' in navigator) {
           try { navigator.mediaSession.playbackState = 'playing'; } catch (e) {}
@@ -11295,6 +11692,7 @@
             localStorage.setItem('musisurf_user', JSON.stringify(data.user));
             updateAuthUI();
             syncLibraryFromServer();
+            loadAccountPlaylistProgress();
             return;
           }
         }
@@ -11390,6 +11788,7 @@
         await fetch('/api/auth/sign-out', { method: 'POST', credentials: 'include' });
       } catch (err) {}
       state.currentUser = null;
+      state.playlistProgressMap = {};
       try {
         localStorage.removeItem('musisurf_user');
       } catch (e) {}
@@ -11533,6 +11932,7 @@
             closeAuthModal();
             showToast(`Welcome back, ${data.user.name || email}!`, '✓');
             syncLibraryFromServer();
+            loadAccountPlaylistProgress();
           }
         } catch (err) {
           showAlert('Network error: ' + err.message);
@@ -11581,6 +11981,7 @@
         closeAuthModal();
         showToast(`Account verified! Welcome to MusiSurf, ${data.user.name || email}!`, '✓');
         syncLibraryFromServer();
+        loadAccountPlaylistProgress();
       } catch (err) {
         showAlert('Network error: ' + err.message);
       } finally {
@@ -11659,6 +12060,8 @@
     renderSearchRecentUI();
     restoreLastPlayedState();
     updateProgress();
+    loadAccountPlaylistProgress();
+    cleanRecommendationQueue();
 
     // Restore previous active view / playlist if user refreshed while browsing
     let savedView = null;
