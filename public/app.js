@@ -1547,14 +1547,20 @@
   function isSameTrack(t1, t2) {
     if (!t1 || !t2) return false;
     if (t1 === t2) return true;
-    if (t1.id && t2.id && String(t1.id) === String(t2.id)) return true;
+    const id1 = t1.id ? String(t1.id) : '';
+    const id2 = t2.id ? String(t2.id) : '';
+    if (id1 && id2) {
+      if (id1 === id2) return true;
+      if (id1.replace(/^saavn_/, '') === id2.replace(/^saavn_/, '')) return true;
+    }
     if (t1.ytId && t2.ytId && String(t1.ytId) === String(t2.ytId)) return true;
     if (t1.audioUrl && t2.audioUrl && t1.audioUrl === t2.audioUrl) return true;
-    const title1 = (t1.title || '').trim().toLowerCase();
-    const title2 = (t2.title || '').trim().toLowerCase();
+    const cleanTitle = (s) => (s || '').trim().toLowerCase().replace(/\s*\(.*?\)/g, '').replace(/[^\w\s]/g, '').trim();
+    const title1 = cleanTitle(t1.title);
+    const title2 = cleanTitle(t2.title);
     const artist1 = (t1.artist || '').trim().toLowerCase();
     const artist2 = (t2.artist || '').trim().toLowerCase();
-    if (title1 && title1 === title2 && artist1 && artist1 === artist2) return true;
+    if (title1 && title1 === title2 && artist1 && (artist1 === artist2 || artist1.includes(artist2) || artist2.includes(artist1))) return true;
     return false;
   }
 
@@ -2760,65 +2766,99 @@
   }
 
   function updatePlaylistModeUI() {
-    const mode = state.playlistMode || '1';
-    if (elements.shufflePlaylistBtn) {
-      elements.shufflePlaylistBtn.classList.remove('mode-1', 'mode-2', 'mode-3', 'active');
-      elements.shufflePlaylistBtn.classList.add(`mode-${mode}`);
-      if (mode !== '1') elements.shufflePlaylistBtn.classList.add('active');
+    const mode = String(state.playlistMode || '1');
+    state.isShuffled = (mode !== '1');
+    state.isPlaylistShuffle = state.isShuffled;
 
-      if (mode === '1') {
-        // Mode 1: Plays playlist in order (Matching Image 7)
-        elements.shufflePlaylistBtn.innerHTML = `
-          <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="3" y1="6" x2="16" y2="6" stroke-width="2.2"/>
-            <line x1="3" y1="12" x2="11" y2="12" stroke-width="2.2"/>
-            <line x1="3" y1="18" x2="11" y2="18" stroke-width="2.2"/>
-            <polygon points="14 10 21 14.5 14 19" fill="currentColor" stroke="none"/>
-          </svg>`;
-        elements.shufflePlaylistBtn.title = 'In Order (Plays playlist in order + autoplay) • Click for Random Order';
-      } else if (mode === '2') {
-        // Mode 2: Plays in random order (Shuffle Once)
-        elements.shufflePlaylistBtn.innerHTML = `
-          <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/>
-            <path d="m18 2 4 4-4 4"/>
-            <path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/>
-            <path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/>
-            <path d="m18 14 4 4-4 4"/>
-          </svg>`;
-        elements.shufflePlaylistBtn.title = 'Random Order (Shuffle once + autoplay) • Click for Random Order with Loop';
-      } else if (mode === '3') {
-        // Mode 3: Plays in random order with loop (Shuffle & Loop)
-        elements.shufflePlaylistBtn.innerHTML = `
-          <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/>
-            <path d="m18 2 4 4-4 4"/>
-            <path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/>
-            <path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/>
-            <path d="m18 14 4 4-4 4"/>
-            <circle cx="20" cy="20" r="2.5" fill="currentColor" stroke="none"/>
-          </svg>`;
-        elements.shufflePlaylistBtn.title = 'Random Order with Loop (Shuffle & Loop) • Click for In Order';
-      }
+    const shuffleBtns = [
+      elements.shufflePlaylistBtn,
+      elements.shuffleBtn,
+      elements.mobShuffleBtn,
+      elements.miniShuffleBtn
+    ].filter(Boolean);
+
+    let iconSvg = '';
+    let modeTitle = '';
+
+    if (mode === '1') {
+      // Mode 1: Plays playlist in order (Shuffle: Off)
+      iconSvg = `
+        <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 3h5v5"/>
+          <path d="M4 20L21 3"/>
+          <path d="M21 16v5h-5"/>
+          <path d="M15 15l6 6"/>
+          <path d="M4 4l5 5"/>
+        </svg>`;
+      modeTitle = 'Shuffle: Off (Plays in order) • Click to Shuffle';
+    } else if (mode === '2') {
+      // Mode 2: Plays in random order (Shuffle Once)
+      iconSvg = `
+        <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 3h5v5"/>
+          <path d="M4 20L21 3"/>
+          <path d="M21 16v5h-5"/>
+          <path d="M15 15l6 6"/>
+          <path d="M4 4l5 5"/>
+          <circle cx="12" cy="21" r="1.8" fill="currentColor" stroke="none"/>
+        </svg>`;
+      modeTitle = 'Shuffle: On (Random order) • Click for Shuffle & Loop';
+    } else if (mode === '3') {
+      // Mode 3: Plays in random order with loop (Shuffle & Loop)
+      iconSvg = `
+        <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 3h5v5"/>
+          <path d="M4 20L21 3"/>
+          <path d="M21 16v5h-5"/>
+          <path d="M15 15l6 6"/>
+          <path d="M4 4l5 5"/>
+          <path d="M19 11a4 4 0 0 0-3.5-3.8" stroke-width="1.8" stroke-dasharray="1.5 1.5"/>
+          <circle cx="12" cy="21" r="1.8" fill="currentColor" stroke="none"/>
+        </svg>`;
+      modeTitle = 'Shuffle: Loop & Repeat • Click for In Order';
     }
+
+    shuffleBtns.forEach(btn => {
+      btn.innerHTML = iconSvg;
+      btn.title = modeTitle;
+      btn.classList.remove('mode-1', 'mode-2', 'mode-3', 'active');
+      btn.classList.add(`mode-${mode}`);
+      if (mode !== '1') {
+        btn.classList.add('active');
+      }
+    });
   }
 
   function cyclePlaylistMode() {
     let modeNum = parseInt(state.playlistMode || '1', 10);
     modeNum = (modeNum % 3) + 1;
     state.playlistMode = String(modeNum);
+    state.isShuffled = (modeNum !== 1);
+    state.isPlaylistShuffle = state.isShuffled;
     localStorage.setItem('musisurf_playlist_playback_mode', state.playlistMode);
+    saveShuffleState();
 
-    // Bidirectionally synchronize bottom player repeat mode with playlist playback mode
     if (state.playlistMode === '1') {
       state.repeatMode = 'off';
       updateRepeatUI();
+      showToast('Shuffle: Off (In Order) 📋', '📋');
+    } else if (state.playlistMode === '2') {
+      showToast('Shuffle: On (Random) 🔀', '🔀');
     } else if (state.playlistMode === '3') {
       state.repeatMode = 'all';
       updateRepeatUI();
+      showToast('Shuffle: Loop & Repeat 🔁', '🔁');
     }
 
     updatePlaylistModeUI();
+
+    if (state.isShuffled && state.queue.length > 1) {
+      const current = state.currentTrack;
+      const remaining = state.queue.filter(t => t.id !== current?.id);
+      remaining.sort(() => Math.random() - 0.5);
+      state.queue = current ? [current, ...remaining] : remaining;
+      state.queueIndex = 0;
+    }
 
     // If currently playing a playlist, gracefully adapt upcoming cycle
     if (state.activePlaylistTracks && state.activePlaylistTracks.length > 0 && state.currentTrack) {
@@ -2828,28 +2868,21 @@
         state.contextIndex = Math.max(0, state.activePlaylistTracks.findIndex(t => t.id === curId));
         state.playlistCycle = [...state.activePlaylistTracks];
         state.playlistCycleIndex = state.contextIndex;
-        showToast('Playback Mode: In Order + Autoplay 📋✨', '📋');
       } else if (state.playlistMode === '2') {
         const remaining = state.activePlaylistTracks.filter(t => t.id !== curId);
         state.playlistCycle = [state.currentTrack, ...generateShuffledPlaylistCycle(remaining)];
         state.playlistCycleIndex = 0;
         state.contextQueue = [...state.playlistCycle];
         state.contextIndex = 0;
-        showToast('Playback Mode: Shuffle Once + Autoplay 🔀✨', '🔀');
       } else if (state.playlistMode === '3') {
         const remaining = state.activePlaylistTracks.filter(t => t.id !== curId);
         state.playlistCycle = [state.currentTrack, ...generateShuffledPlaylistCycle(remaining)];
         state.playlistCycleIndex = 0;
         state.contextQueue = [...state.playlistCycle];
         state.contextIndex = 0;
-        showToast('Playback Mode: Shuffle & Repeat Active Playlist 🔀🔁', '🔁');
       }
-      updateQueueDrawerUI();
-    } else {
-      if (state.playlistMode === '1') showToast('Mode 1: In Order + Autoplay 📋✨', '📋');
-      else if (state.playlistMode === '2') showToast('Mode 2: Shuffle Once + Autoplay 🔀✨', '🔀');
-      else if (state.playlistMode === '3') showToast('Mode 3: Shuffle & Repeat Playlist 🔀🔁', '🔁');
     }
+    updateQueueDrawerUI();
   }
 
   function toggleAutoplay() {
@@ -3265,15 +3298,14 @@
 
   function loadShuffleState() {
     try {
-      const raw = localStorage.getItem('musisurf_shuffle_mode');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        state.isShuffled = !!parsed.isShuffled;
-        state.isPlaylistShuffle = !!parsed.isPlaylistShuffle;
-        if (elements.shuffleBtn) elements.shuffleBtn.classList.toggle('active', state.isShuffled);
-        if (elements.mobShuffleBtn) elements.mobShuffleBtn.classList.toggle('active', state.isShuffled);
-        if (elements.shufflePlaylistBtn) elements.shufflePlaylistBtn.classList.toggle('active', state.isPlaylistShuffle);
+      const savedMode = localStorage.getItem('musisurf_playlist_playback_mode');
+      if (savedMode) {
+        state.playlistMode = savedMode;
+        state.isShuffled = (savedMode !== '1');
+        state.isPlaylistShuffle = state.isShuffled;
       }
+      updatePlaylistModeUI();
+
       const rawMap = localStorage.getItem('musisurf_playlist_shuffle_map');
       if (rawMap) {
         state.playlistShuffleMap = JSON.parse(rawMap);
@@ -3369,7 +3401,7 @@
   }
 
   let activePlayToken = 0;
-  async function playTrack(track, queueList = null, addToHistory = true, customStartTime = 0) {
+  async function playTrack(track, queueList = null, addToHistory = true, customStartTime = 0, forceReload = false) {
     if (!track) return;
 
     // Synchronously resume AudioContext within user gesture loop to prevent sound hanging
@@ -3397,9 +3429,9 @@
     // Guard: If clicking the CURRENTLY PLAYING song without explicit custom seek
     const actForGuard = getActiveDeck();
     const currentDeckSrc = actForGuard ? (actForGuard.currentSrc || actForGuard.src || '') : '';
-    const hasValidDeckSource = Boolean(currentDeckSrc && currentDeckSrc !== '' && !currentDeckSrc.startsWith('data:audio') && !currentDeckSrc.endsWith('/'));
+    const hasValidDeckSource = Boolean(currentDeckSrc && currentDeckSrc !== '' && !currentDeckSrc.startsWith('data:audio') && !currentDeckSrc.endsWith('/') && !actForGuard.error);
 
-    if (previousTrack && isSameTrack(track, previousTrack) && customStartTime === 0 && hasValidDeckSource && actForGuard && actForGuard.readyState >= 1) {
+    if (!forceReload && previousTrack && isSameTrack(track, previousTrack) && customStartTime === 0 && hasValidDeckSource && actForGuard && actForGuard.readyState >= 1) {
       logPlaybackDiagnostic('same-track-resume-guard', { trackId: track.id, hasValidDeckSource, readyState: actForGuard.readyState });
       if (queueList && Array.isArray(queueList)) {
         state.contextQueue = [...queueList];
@@ -3417,14 +3449,16 @@
           playPromise.then(() => {
             state.isPlaying = true;
             state.isTrackLoading = false;
+            actForGuard.volume = state.isMuted ? 0 : (state.volume || 0.8);
             updatePlayPauseButton();
             logPlaybackDiagnostic('same-track-resume-success', { trackId: track.id });
           }).catch(err => {
-            console.warn('Same-track resume play error:', err);
+            console.warn('Same-track resume play error, recovering with full playTrack:', err);
             logPlaybackDiagnostic('same-track-resume-failed', { trackId: track.id, error: err.message });
             state.isPlaying = false;
             state.isTrackLoading = false;
             updatePlayPauseButton();
+            playTrack(track, queueList, false, (actForGuard && actForGuard.currentTime > 0) ? actForGuard.currentTime : 0, true);
           });
         }
       }
@@ -3726,7 +3760,7 @@
           const act = getActiveDeck();
           logPlaybackDiagnostic('source-assigned', { trackId: track.id, audioSrc });
 
-          if (act.src !== audioSrc) {
+          if (forceReload || act.src !== audioSrc) {
             act.src = audioSrc;
             try { act.load(); } catch (e) {}
           }
@@ -3998,22 +4032,29 @@
       } else {
         const act = getActiveDeck();
         const currentSrc = act ? (act.currentSrc || act.src || '') : '';
-        const hasValidSrc = Boolean(currentSrc && currentSrc !== '' && !currentSrc.startsWith('data:audio') && !currentSrc.endsWith('/'));
+        const hasValidSrc = Boolean(currentSrc && currentSrc !== '' && !currentSrc.startsWith('data:audio') && !currentSrc.endsWith('/') && !act.error);
+        const currentDeckTime = (act && Number.isFinite(act.currentTime) && act.currentTime > 0) ? act.currentTime : (getCurrentPlaybackTime() || 0);
+        const resumeTime = state.restoredResumeTime || currentDeckTime || 0;
 
         // If active audio deck has no loaded source or is uninitialized (e.g. freshly restored after page refresh),
         // route to full authoritative playTrack with resume position!
-        if (!hasValidSrc || act.readyState === 0) {
+        if (!hasValidSrc || act.readyState === 0 || act.error) {
           logPlaybackDiagnostic('togglePlayPause-delegating-to-playTrack', { resumeTime, hasValidSrc, readyState: act ? act.readyState : null });
-          playTrack(state.currentTrack, state.queue, false, resumeTime);
+          playTrack(state.currentTrack, state.queue, false, resumeTime, true);
           return;
         }
 
         // Clear any lingering fadeout timer and restore playback volume immediately
+        if (crossfadeFadeInTimer) {
+          clearInterval(crossfadeFadeInTimer);
+          crossfadeFadeInTimer = null;
+        }
         if (crossfadeFadeOutTimer) {
           clearInterval(crossfadeFadeOutTimer);
           crossfadeFadeOutTimer = null;
         }
-        act.volume = state.isMuted ? 0 : (state.volume || 0.8);
+        const masterVol = state.isMuted ? 0 : (state.volume || 0.8);
+        act.volume = masterVol;
 
         if (resumeTime > 0 && act.readyState >= 1) {
           try {
@@ -4032,19 +4073,16 @@
           resumePromise.then(() => {
             state.isPlaying = true;
             state.isTrackLoading = false;
-            act.volume = state.isMuted ? 0 : (state.volume || 0.8);
-            if (resumeTime > 0 && act.readyState >= 1) {
-              try { act.currentTime = resumeTime; } catch (e) {}
-            }
+            act.volume = masterVol;
             updatePlayPauseButton();
             logPlaybackDiagnostic('togglePlayPause-resume-success');
           }).catch(err => {
-            console.warn('Audio resume error, attempting full playTrack:', err);
+            console.warn('Audio resume error, attempting full recovery playTrack:', err);
             logPlaybackDiagnostic('togglePlayPause-resume-failed', { error: err.message });
             state.isPlaying = false;
             state.isTrackLoading = false;
             updatePlayPauseButton();
-            playTrack(state.currentTrack, state.queue, false, resumeTime);
+            playTrack(state.currentTrack, state.queue, false, resumeTime, true);
           });
         }
       }
@@ -5973,7 +6011,34 @@
       html += `</div>`;
     }
 
-    // 2. Artist Suggestions
+    // 2. Lyrics Match Suggestions (Styled with website monochrome theme)
+    if (lyricsMatches.length > 0) {
+      html += `
+        <div class="dropdown-section-title">
+          <span>Lyrics Match</span>
+        </div>
+        <div class="dropdown-section-group">
+      `;
+      lyricsMatches.slice(0, 3).forEach(lyr => {
+        html += `
+          <div class="search-suggestion-item lyric-item" data-action="search" data-query="${escapeHtml(lyr.title)}">
+            <svg class="suggestion-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #ffffff !important;">
+              <path d="M9 18V5l12-2v13"/>
+              <circle cx="6" cy="18" r="3"/>
+              <circle cx="18" cy="16" r="3"/>
+            </svg>
+            <div class="sugg-info">
+              <span class="sugg-title">${escapeHtml(lyr.title)} <span style="font-weight: 400; color: #a7a7a7;">• ${escapeHtml(lyr.artist)}</span></span>
+              <span class="sugg-lyric-snippet">“${escapeHtml(lyr.snippet || lyr.matchedLine)}”</span>
+            </div>
+            <span class="sugg-badge lyric-badge">Lyrics match</span>
+          </div>
+        `;
+      });
+      html += `</div>`;
+    }
+
+    // 3. Artist Suggestions
     if (artists.length > 0) {
       html += `
         <div class="dropdown-section-title">
@@ -6236,12 +6301,12 @@
 
     // Top Result: strictly synchronized with the search bar autocomplete top song
     const currentQ = (elements.globalSearchInput?.value || meta.query || '').trim().toLowerCase();
-    const acCache = state.autocompleteCache?.get(`ac_${currentQ}`);
-    const topAcSong = acCache?.suggestions?.songs?.[0];
+    const acCache = state.autocompleteCache?.get(currentQ) || state.autocompleteCache?.get(`ac_${currentQ}`);
+    const topAcSong = (acCache?.songs && acCache.songs[0]) || (acCache?.suggestions?.songs && acCache.suggestions.songs[0]);
     if (topAcSong && results && results.length > 1) {
       const cleanAcTitle = (topAcSong.title || '').toLowerCase().trim();
       const matchIdx = results.findIndex(t => 
-        (t.id && topAcSong.id && (String(t.id) === String(topAcSong.id) || String(t.id) === `saavn_${topAcSong.id}`)) ||
+        (t.id && topAcSong.id && (String(t.id) === String(topAcSong.id) || String(t.id) === `saavn_${topAcSong.id}` || String(t.id).replace(/^saavn_/, '') === String(topAcSong.id).replace(/^saavn_/, ''))) ||
         (t.title && t.title.toLowerCase().trim() === cleanAcTitle)
       );
       if (matchIdx > 0) {
@@ -6266,9 +6331,9 @@
           <h4 class="top-result-title">${escapeHtml(top.title)}${getPlaylistTickBadgeHtml(top.id)}${getDownloadedBadgeHtml(top.id)}</h4>
           <div class="top-result-meta">
             <span class="top-result-artist">${escapeHtml(top.artist)}</span>
-            <span class="top-result-pill ${isLyricsMatch ? 'lyric-pill' : ''}" style="${isLyricsMatch ? 'background: rgba(30, 215, 96, 0.2); color: #1ed760; font-weight: 700;' : ''}">${isLyricsMatch ? 'Lyrics Match' : 'Song'}</span>
+            <span class="top-result-pill ${isLyricsMatch ? 'lyric-pill' : ''}" style="${isLyricsMatch ? 'background: rgba(255, 255, 255, 0.15); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.25); font-weight: 700;' : ''}">${isLyricsMatch ? 'Lyrics Match' : 'Song'}</span>
           </div>
-          ${isLyricsMatch && lyricSnippet ? `<div class="top-result-lyric-match" style="margin-top: 6px; font-size: 13px; color: #1ed760; font-style: italic;">“${escapeHtml(lyricSnippet)}”</div>` : ''}
+          ${isLyricsMatch && lyricSnippet ? `<div class="top-result-lyric-match" style="margin-top: 6px; font-size: 13px; color: rgba(255, 255, 255, 0.85); font-style: italic;">“${escapeHtml(lyricSnippet)}”</div>` : ''}
         </div>
       </div>
       <div class="top-result-actions">
@@ -6365,6 +6430,9 @@
 
     elements.fullSongsTable.appendChild(table);
     applySearchFilter(state.activeSearchFilter || 'all');
+    if (state.currentTrack) {
+      highlightPlayingTrackInTables(state.currentTrack.id);
+    }
   }
 
   // Universal Track Options Modal Sheet (Spotify-grade ⋮ menu)
@@ -6461,8 +6529,10 @@
   function createSongRow(track, queueList) {
     const row = document.createElement('div');
     const isDownloaded = isTrackDownloaded(track.id);
-    row.className = `song-row ${state.currentTrack?.id === track.id ? 'playing' : ''} ${isDownloaded ? 'is-downloaded' : ''}`;
+    const isPlaying = Boolean(state.currentTrack && isSameTrack(state.currentTrack, track));
+    row.className = `song-row ${isPlaying ? 'playing' : ''} ${isDownloaded ? 'is-downloaded' : ''}`;
     row.dataset.trackId = track.id;
+    row._trackData = track;
 
     const badgeHtml = getDownloadedBadgeHtml(track.id);
     const tickHtml = getPlaylistTickBadgeHtml(track.id);
@@ -6552,8 +6622,10 @@
   function createTableRow(track, index, queueList, isPlaylistTable = false, isCustomSort = false) {
     const tr = document.createElement('tr');
     const isDownloaded = isTrackDownloaded(track.id);
-    tr.className = `${state.currentTrack?.id === track.id ? 'playing' : ''} ${isDownloaded ? 'is-downloaded' : ''}`;
+    const isPlaying = Boolean(state.currentTrack && isSameTrack(state.currentTrack, track));
+    tr.className = `${isPlaying ? 'playing' : ''} ${isDownloaded ? 'is-downloaded' : ''}`;
     tr.dataset.trackId = track.id;
+    tr._trackData = track;
 
     const badgeHtml = getDownloadedBadgeHtml(track.id);
     const tickHtml = getPlaylistTickBadgeHtml(track.id);
@@ -6657,8 +6729,21 @@
   }
 
   function highlightPlayingTrackInTables(trackId) {
+    const targetIdStr = trackId ? String(trackId) : null;
     document.querySelectorAll('[data-track-id]').forEach(el => {
-      if (el.dataset.trackId === trackId) {
+      const elId = el.dataset.trackId;
+      const isMatch = Boolean(
+        targetIdStr && (
+          elId === targetIdStr ||
+          `saavn_${elId}` === targetIdStr ||
+          elId === `saavn_${targetIdStr}` ||
+          (state.currentTrack && (
+            (el._trackData && isSameTrack(el._trackData, state.currentTrack)) ||
+            (el.dataset.trackId && String(state.currentTrack.id) === String(el.dataset.trackId))
+          ))
+        )
+      );
+      if (isMatch) {
         el.classList.add('playing');
       } else {
         el.classList.remove('playing');
@@ -9818,27 +9903,8 @@
     elements.repeatBtn.addEventListener('click', toggleRepeatMode);
     if (elements.mobRepeatBtn) elements.mobRepeatBtn.addEventListener('click', toggleRepeatMode);
 
-    // Shuffle Mode Toggle
-    elements.shuffleBtn.addEventListener('click', () => {
-      state.isShuffled = !state.isShuffled;
-      state.isPlaylistShuffle = state.isShuffled;
-      saveShuffleState();
-      elements.shuffleBtn.classList.toggle('active', state.isShuffled);
-      if (elements.mobShuffleBtn) elements.mobShuffleBtn.classList.toggle('active', state.isShuffled);
-      if (elements.shufflePlaylistBtn) elements.shufflePlaylistBtn.classList.toggle('active', state.isShuffled);
-
-      if (state.isShuffled && state.queue.length > 1) {
-        const current = state.currentTrack;
-        const remaining = state.queue.filter(t => t.id !== current?.id);
-        remaining.sort(() => Math.random() - 0.5);
-        state.queue = current ? [current, ...remaining] : remaining;
-        state.queueIndex = 0;
-        showToast('Shuffle Mode: Random', '🔀');
-      } else {
-        showToast('Shuffle Mode: In Order', '📋');
-      }
-      updateQueueDrawerUI();
-    });
+    // Shuffle Mode Toggle (Synchronized 3-Mode Shuffle Engine)
+    elements.shuffleBtn.addEventListener('click', cyclePlaylistMode);
 
     // Interactive Draggable Scrubber Engine (Desktop & Mobile, Mouse & Touch)
     function setupDraggableScrubber(barEl, fillEl, timeLabelEl, isMobileScrubber = false) {

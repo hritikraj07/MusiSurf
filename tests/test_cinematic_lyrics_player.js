@@ -91,16 +91,12 @@ async function runTests() {
     assert.ok(!db['tuu__harrdy sandhu__standard'], 'tuu__harrdy sandhu must not exist in verified_db');
   });
 
-  // --- 6. HTML Moving Border SVG Inspection ---
-  test('6. public/index.html includes Cinematic Border SVG with pathLength 1000', () => {
+  // --- 6. Lyrics Window Inside Border Animation Cleanly Removed as Requested ---
+  test('6. Inside lyrics window border animation removed cleanly', () => {
     const htmlPath = path.join(__dirname, '..', 'public', 'index.html');
     const html = fs.readFileSync(htmlPath, 'utf8');
-    assert.ok(html.includes('cinematic-border-svg'), 'index.html must have cinematic-border-svg');
-    assert.ok(html.includes('cinematic-track-rect'), 'index.html must have cinematic-track-rect');
-    assert.ok(html.includes('cinematic-bloom-rect'), 'index.html must have cinematic-bloom-rect');
-    assert.ok(html.includes('cinematic-beam-rect'), 'index.html must have cinematic-beam-rect');
-    assert.ok(html.includes('cinematic-tip-rect'), 'index.html must have cinematic-tip-rect');
-    assert.ok(html.includes('pathLength="1000"'), 'Rects must specify pathLength="1000"');
+    assert.ok(!html.includes('id="lyrics-edge-glow"'), 'lyrics-edge-glow div must be removed from index.html');
+    assert.ok(!html.includes('cinematic-border-svg'), 'cinematic-border-svg must be removed from index.html');
   });
 
   // --- 7. CSS Moving Border & Typography Inspection ---

@@ -1099,9 +1099,9 @@ html, body {
 
 .flow-btn-wrap:hover {
   border-color: transparent !important;
-  color: #ffffff !important;
+  color: #000000 !important;
   border-radius: 12px !important;
-  box-shadow: 0 4px 18px rgba(16, 185, 129, 0.35) !important;
+  box-shadow: 0 4px 18px rgba(255, 255, 255, 0.25) !important;
 }
 
 .flow-btn-wrap:active {
@@ -1122,7 +1122,7 @@ html, body {
 
 .flow-btn-wrap:hover .flow-arrow-left {
   left: 14px !important;
-  stroke: #ffffff !important;
+  stroke: #000000 !important;
 }
 
 /* Text: starts slightly offset to left (-10px), glides to right (+10px) on hover */
@@ -1137,10 +1137,10 @@ html, body {
 
 .flow-btn-wrap:hover .flow-btn-text {
   transform: translateX(10px) !important;
-  color: #ffffff !important;
+  color: #000000 !important;
 }
 
-/* Circle: centered point, expands into pill on hover with MusiSurf's current emerald brand gradient */
+/* Circle: centered point, expands into pill on hover with MusiSurf's clean website theme */
 .flow-btn-wrap .flow-btn-circle {
   position: absolute !important;
   top: 50% !important;
@@ -1148,7 +1148,7 @@ html, body {
   transform: translate(-50%, -50%) !important;
   width: 14px !important;
   height: 14px !important;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  background: #ffffff !important;
   border-radius: 50% !important;
   opacity: 0 !important;
   pointer-events: none !important;
@@ -1604,14 +1604,15 @@ html, body {
 }
 
 .sugg-badge.lyric-badge {
-  background: rgba(30, 215, 96, 0.15) !important;
-  color: #1ed760 !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
   font-weight: 700;
 }
 
 .sugg-lyric-snippet {
   font-size: 11px;
-  color: #1ed760;
+  color: rgba(255, 255, 255, 0.8) !important;
   font-style: italic;
   white-space: nowrap !important;
   overflow: hidden !important;
@@ -3584,7 +3585,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .song-row:hover {
-  background-color: var(--bg-card-hover);
+  background-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 .song-row.playing {
@@ -3592,7 +3593,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .song-row.playing:hover {
-  background-color: var(--bg-card-hover) !important;
+  background-color: rgba(255, 255, 255, 0.12) !important;
 }
 
 .song-row.playing .song-title-text {
@@ -3755,7 +3756,11 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 }
 
 .tracks-table tbody tr:hover {
-  background-color: var(--bg-card-hover);
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.tracks-table tbody tr.playing:hover {
+  background-color: rgba(255, 255, 255, 0.12) !important;
 }
 
 .tracks-table tbody tr.playing {
@@ -3985,7 +3990,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   vertical-align: middle !important;
 }
 
-/* Hover reveal 3-dots on far right of song rows & always clearly visible on currently playing song */
+/* Hover reveal 3-dots on far right of song rows */
 .tracks-table tbody tr .song-more-trigger,
 .song-row .song-more-trigger {
   opacity: 0;
@@ -3993,24 +3998,44 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
   transition: opacity var(--transition-fast), transform var(--transition-fast);
 }
 
-/* Three dots options button: hidden by default even on currently playing song, visible strictly on hover */
-.tracks-table tbody tr.playing:not(:hover) .song-more-trigger,
-.song-row.playing:not(:hover) .song-more-trigger {
-  opacity: 0 !important;
-  visibility: hidden !important;
+/* Playing row: always clearly reveal the 3 dots options button as shown in reference */
+.tracks-table tbody tr.playing .song-more-trigger,
+.song-row.playing .song-more-trigger,
+tr[data-track-id].playing .song-more-trigger,
+div[data-track-id].playing .song-more-trigger {
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: inline-flex !important;
+  color: #ffffff !important;
+  pointer-events: auto !important;
 }
 
 /* Fully illuminated on hover across all rows (including the currently playing row) */
 .tracks-table tbody tr:hover .song-more-trigger,
 .tracks-table tbody tr.playing:hover .song-more-trigger,
 .song-row:hover .song-more-trigger,
-.song-row.playing:hover .song-more-trigger {
+.song-row.playing:hover .song-more-trigger,
+#fullSongsTable tr:hover .song-more-trigger,
+#fullSongsTable tr.playing:hover .song-more-trigger,
+#topSongsList .song-row:hover .song-more-trigger,
+#topSongsList .song-row.playing:hover .song-more-trigger,
+tr[data-track-id]:hover .song-more-trigger,
+tr[data-track-id].playing:hover .song-more-trigger,
+div[data-track-id]:hover .song-more-trigger,
+div[data-track-id].playing:hover .song-more-trigger {
   opacity: 1 !important;
   visibility: visible !important;
   display: inline-flex !important;
   color: #ffffff !important;
   cursor: pointer !important;
   z-index: 10 !important;
+  pointer-events: auto !important;
+}
+
+.tracks-table tbody tr td.col-actions,
+#fullSongsTable tr td.col-actions {
+  display: table-cell !important;
+  visibility: visible !important;
 }
 
 /* Hide Resume Playlist Indicator Button as requested by user */
@@ -14372,18 +14397,13 @@ body.lyrics-fullscreen-active #lyricsView .lyrics-scroll-body {
    ========================================================================== */
 
 #lyrics-edge-glow,
-.lyrics-edge-glow {
-  display: block;
-  position: absolute;
-  inset: 6px;
-  z-index: 25;
-  pointer-events: none;
-  overflow: visible;
-  border-radius: 16px;
-  box-sizing: border-box;
-  opacity: 0;
-  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: opacity;
+.lyrics-edge-glow,
+.cinematic-lyric-frame,
+.cinematic-border-svg {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 #lyrics-edge-glow.is-active,
