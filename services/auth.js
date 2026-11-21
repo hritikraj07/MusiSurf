@@ -1,16 +1,28 @@
 require('dotenv').config();
 const { sql } = require('./db');
-const { createRemoteJWKSet, jwtVerify } = require('jose');
 
 const NEON_AUTH_BASE_URL = process.env.NEON_AUTH_BASE_URL;
 const NEON_AUTH_JWKS_URL = process.env.NEON_AUTH_JWKS_URL;
 
+let joseLib = null;
 let remoteJWKS = null;
-if (NEON_AUTH_JWKS_URL) {
+
+// Lazy dynamic import of 'jose' to avoid ERR_REQUIRE_ESM on Node 18/20 in CommonJS runtimes (Vercel)
+async function getJose() {
+  if (joseLib) return joseLib;
   try {
-    remoteJWKS = createRemoteJWKSet(new URL(NEON_AUTH_JWKS_URL));
-  } catch (e) {
-    console.warn('[Auth] JWKS init note:', e.message);
+    joseLib = await import('jose');
+    if (NEON_AUTH_JWKS_URL && !remoteJWKS) {
+      try {
+        remoteJWKS = joseLib.createRemoteJWKSet(new URL(NEON_AUTH_JWKS_URL));
+      } catch (e) {
+        console.warn('[Auth] JWKS init note:', e.message);
+      }
+    }
+    return joseLib;
+  } catch (err) {
+    console.warn('[Auth] Dynamic jose import note:', err.message);
+    return null;
   }
 }
 
@@ -99,16 +111,19 @@ async function getAuthenticatedUser(req) {
   }
 
   // 3. JWKS Verification Fallback for signed JWTs
-  if (token && remoteJWKS) {
+  if (token && NEON_AUTH_JWKS_URL) {
     try {
-      const { payload } = await jwtVerify(token, remoteJWKS);
-      if (payload && (payload.sub || payload.userId || payload.id)) {
-        return {
-          id: payload.sub || payload.userId || payload.id,
-          name: payload.name || 'User',
-          email: payload.email || '',
-          image: payload.image || null
-        };
+      const jose = await getJose();
+      if (jose && remoteJWKS) {
+        const { payload } = await jose.jwtVerify(token, remoteJWKS);
+        if (payload && (payload.sub || payload.userId || payload.id)) {
+          return {
+            id: payload.sub || payload.userId || payload.id,
+            name: payload.name || 'User',
+            email: payload.email || '',
+            image: payload.image || null
+          };
+        }
       }
     } catch (jwtErr) {
       // Not a valid JWT or expired
