@@ -33,5 +33,15 @@
     "effectiveStart": 2.91,
     "effectiveEnd": 174.64,
     "duration": 175
+  },
+  "saavn_jcqlPB3b": {
+    "effectiveStart": 0.8,
+    "effectiveEnd": 256.9,
+    "duration": 260
+  },
+  "saavn_TC5PSqsJ": {
+    "effectiveStart": 0,
+    "effectiveEnd": 468,
+    "duration": 468
   }
 }
