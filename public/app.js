@@ -8090,8 +8090,8 @@
       }
       const mobLyricsCard = document.getElementById('mobLyricsPreviewCard');
       if (mobLyricsCard) {
-        mobLyricsCard.style.setProperty('--lyrics-theme-rgb', rgbStr);
-        mobLyricsCard.style.setProperty('--lyrics-theme-color', `rgb(${rgbStr})`);
+        mobLyricsCard.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
+        mobLyricsCard.style.setProperty('--lyrics-theme-color', '#2d3748');
       }
       if (elements.lyricsFullscreenBtn) {
         elements.lyricsFullscreenBtn.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
@@ -10998,14 +10998,9 @@
       });
     }
 
-    // Lyrics Fullscreen Mode Controller (Web Only)
+    // Lyrics Fullscreen Mode Controller (Web Fullscreen Mode)
     function enterLyricsFullscreen() {
       document.body.classList.add('lyrics-fullscreen-active');
-      const mobLyricsCard = document.getElementById('mobLyricsPreviewCard');
-      if (mobLyricsCard) {
-        mobLyricsCard.style.setProperty('--lyrics-theme-rgb', rgbStr);
-        mobLyricsCard.style.setProperty('--lyrics-theme-color', `rgb(${rgbStr})`);
-      }
       if (elements.lyricsFullscreenBtn) {
         elements.lyricsFullscreenBtn.title = 'Exit full screen';
         elements.lyricsFullscreenBtn.setAttribute('aria-label', 'Exit full screen');
@@ -11014,11 +11009,6 @@
         if (enterIcon) enterIcon.style.display = 'none';
         if (exitIcon) exitIcon.style.display = 'block';
       }
-      try {
-        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-          document.documentElement.requestFullscreen().catch(() => {});
-        }
-      } catch (e) {}
 
       if (typeof syncLyricsWithTime === 'function' && typeof getCurrentPlaybackTime === 'function') {
         requestAnimationFrame(() => {
@@ -11029,11 +11019,6 @@
 
     function exitLyricsFullscreen() {
       document.body.classList.remove('lyrics-fullscreen-active');
-      const mobLyricsCard = document.getElementById('mobLyricsPreviewCard');
-      if (mobLyricsCard) {
-        mobLyricsCard.style.setProperty('--lyrics-theme-rgb', rgbStr);
-        mobLyricsCard.style.setProperty('--lyrics-theme-color', `rgb(${rgbStr})`);
-      }
       if (elements.lyricsFullscreenBtn) {
         elements.lyricsFullscreenBtn.title = 'Full screen';
         elements.lyricsFullscreenBtn.setAttribute('aria-label', 'Full screen');
@@ -11042,11 +11027,6 @@
         if (enterIcon) enterIcon.style.display = 'block';
         if (exitIcon) exitIcon.style.display = 'none';
       }
-      try {
-        if (document.fullscreenElement && document.exitFullscreen) {
-          document.exitFullscreen().catch(() => {});
-        }
-      } catch (e) {}
 
       if (typeof syncLyricsWithTime === 'function' && typeof getCurrentPlaybackTime === 'function') {
         requestAnimationFrame(() => {
