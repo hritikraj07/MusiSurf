@@ -4795,12 +4795,12 @@ div[data-track-id].playing:hover .song-more-trigger {
   position: fixed;
   top: 0;
   right: 0;
-  width: 360px;
+  width: 380px;
   max-width: 90vw;
   height: calc(100vh - var(--player-height));
   background: #131418;
   border-left: 1px solid rgba(255, 255, 255, 0.08);
-  z-index: 100;
+  z-index: 2500 !important;
   display: flex;
   flex-direction: column;
   transform: translate3d(100%, 0, 0);
@@ -4809,7 +4809,7 @@ div[data-track-id].playing:hover .song-more-trigger {
   will-change: transform;
   transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.28s ease;
   box-shadow: -12px 0 40px rgba(0, 0, 0, 0.7);
-  padding: 22px;
+  padding: calc(env(safe-area-inset-top, 0px) + 20px) 24px calc(env(safe-area-inset-bottom, 0px) + 20px) !important;
   overflow-x: hidden !important;
   box-sizing: border-box;
   contain: layout paint;
@@ -4825,7 +4825,7 @@ div[data-track-id].playing:hover .song-more-trigger {
   position: fixed;
   inset: 0;
   background-color: rgba(0, 0, 0, 0.65);
-  z-index: 99;
+  z-index: 2490 !important;
   opacity: 0;
   pointer-events: none;
   will-change: opacity;
@@ -4843,6 +4843,7 @@ div[data-track-id].playing:hover .song-more-trigger {
   justify-content: space-between;
   padding-bottom: 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
 }
 
 .queue-title {
@@ -6541,13 +6542,14 @@ div[data-track-id].playing:hover .song-more-trigger {
   display: flex;
   flex-direction: column;
   padding: calc(env(safe-area-inset-top, 10px) + 8px) 20px calc(env(safe-area-inset-bottom, 16px) + 60px) !important;
-  overflow-y: scroll !important;
+  overflow-y: auto !important;
   overflow-x: hidden !important;
   height: 100dvh !important;
   max-height: 100dvh !important;
   -webkit-overflow-scrolling: touch !important;
   scrollbar-width: none !important;
   overscroll-behavior-y: contain;
+  scroll-behavior: smooth;
   touch-action: pan-y;
   transform: translateY(0);
   transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), background 0.5s ease;
@@ -6642,10 +6644,10 @@ div[data-track-id].playing:hover .song-more-trigger {
 }
 
 .mobile-player-art-wrap {
-  width: min(84vw, 360px) !important;
+  width: min(88vw, 360px) !important;
   aspect-ratio: 1 / 1 !important;
-  max-height: 42vh !important;
-  margin: 6px auto 14px !important;
+  max-height: none !important;
+  margin: 10px auto 16px !important;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 16px 44px rgba(0, 0, 0, 0.75);
@@ -6842,9 +6844,9 @@ div[data-track-id].playing:hover .song-more-trigger {
   border-radius: 22px;
   background: var(--lyrics-theme-color, #751e18);
   background: linear-gradient(170deg, rgba(var(--lyrics-theme-rgb, 120, 32, 24), 0.96) 0%, rgba(var(--lyrics-theme-rgb, 75, 18, 14), 0.98) 100%);
-  padding: 22px 20px 22px 20px;
-  margin-top: 16px;
-  margin-bottom: 28px;
+  padding: 24px 20px 24px 20px;
+  margin-top: 48px;
+  margin-bottom: 56px;
   flex-shrink: 0;
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -8223,9 +8225,9 @@ div[data-track-id].playing:hover .song-more-trigger {
     max-width: 100% !important;
     right: 0 !important;
     height: 100dvh !important;
-    z-index: 2400 !important;
+    z-index: 2500 !important;
     border-left: none !important;
-    padding: calc(env(safe-area-inset-top, 12px) + 12px) 20px calc(env(safe-area-inset-bottom, 16px) + 16px) !important;
+    padding: calc(env(safe-area-inset-top, 16px) + 16px) 20px calc(env(safe-area-inset-bottom, 20px) + 20px) !important;
     transform: translate3d(100%, 0, 0) !important;
     transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.28s ease !important;
   }
@@ -8233,10 +8235,12 @@ div[data-track-id].playing:hover .song-more-trigger {
     transform: translate3d(0, 0, 0) !important;
   }
   .queue-backdrop {
-    z-index: 2390 !important;
+    z-index: 2490 !important;
   }
 
-  /* On mobile: Hide the bulky wide text Delete Playlist button */
+  /* On mobile: Hide playlist desktop icon buttons (they live inside the 3 horizontal lines) */
+  #playlistAddToQueueBtn,
+  #playlistDownloadAllBtn,
   #deletePlaylistBtn {
     display: none !important;
   }

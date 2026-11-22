@@ -65,7 +65,8 @@ console.log('✅ PASS: 7. playTrack initial seek prevents AbortError race condit
 // 3. Test HTTP Range support on running server
 (async () => {
   try {
-    const ytRes = await fetch('http://localhost:3000/api/yt-stream?id=dQw4w9WgXcQ', {
+    const port = process.env.PORT || 3000;
+    const ytRes = await fetch(`http://localhost:${port}/api/yt-stream?id=dQw4w9WgXcQ`, {
       headers: { 'Range': 'bytes=50000-100000' }
     });
     assert.strictEqual(ytRes.status, 206, 'Endpoint /api/yt-stream must return HTTP 206 for Range requests');

@@ -2597,12 +2597,27 @@ app.use((err, req, res, next) => {
 // Start standalone server locally; never call app.listen() inside Vercel serverless functions
 if (!process.env.VERCEL && require.main === module) {
   initDailyTrendingScheduler();
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`===============================================`);
     console.log(`🌊 MusiSurf Music Streaming Server Active!`);
     console.log(`🎵 Ad-Free & Full-Length Song Streaming Ready`);
     console.log(`🌐 Local URL: http://localhost:${PORT}`);
     console.log(`===============================================`);
+  });
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      const altPort = Number(PORT) === 3000 ? 3005 : Number(PORT) + 1;
+      console.warn(`⚠️ Port ${PORT} is in use. Trying fallback port ${altPort}...`);
+      app.listen(altPort, () => {
+        console.log(`===============================================`);
+        console.log(`🌊 MusiSurf Music Streaming Server Active!`);
+        console.log(`🎵 Ad-Free & Full-Length Song Streaming Ready`);
+        console.log(`🌐 Local URL: http://localhost:${altPort}`);
+        console.log(`===============================================`);
+      });
+    } else {
+      console.error('Server error:', err);
+    }
   });
 }
 

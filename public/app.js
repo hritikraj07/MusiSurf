@@ -290,9 +290,13 @@
     playlistTracksSortSelect: document.getElementById('playlistTracksSortSelect'),
     deletePlaylistBtn: document.getElementById('deletePlaylistBtn'),
     exportPlaylistBtn: document.getElementById('exportPlaylistBtn'),
+    playlistAddToQueueBtn: document.getElementById('playlistAddToQueueBtn'),
+    playlistDownloadAllBtn: document.getElementById('playlistDownloadAllBtn'),
     mobilePlaylistMoreBtn: document.getElementById('mobilePlaylistMoreBtn'),
     mobilePlaylistOptionsModal: document.getElementById('mobilePlaylistOptionsModal'),
     closeMobPlaylistOptionsBtn: document.getElementById('closeMobPlaylistOptionsBtn'),
+    mobOptAddPlaylistToQueueBtn: document.getElementById('mobOptAddPlaylistToQueueBtn'),
+    mobOptDownloadPlaylistBtn: document.getElementById('mobOptDownloadPlaylistBtn'),
     mobOptPinPlaylistBtn: document.getElementById('mobOptPinPlaylistBtn'),
     mobOptPinPlaylistText: document.getElementById('mobOptPinPlaylistText'),
     mobOptRenamePlaylistBtn: document.getElementById('mobOptRenamePlaylistBtn'),
@@ -1201,9 +1205,25 @@
   }
 
   function updateLikedCountUI() {
+    const count = Array.isArray(state.likedSongs) ? state.likedSongs.length : 0;
     if (elements.likedCountMeta) {
-      elements.likedCountMeta.textContent = `${state.likedSongs.length} song${state.likedSongs.length === 1 ? '' : 's'} • Auto-saved`;
+      elements.likedCountMeta.textContent = `${count} song${count === 1 ? '' : 's'} • Auto-saved`;
     }
+    if (elements.libHubLikedMeta) {
+      elements.libHubLikedMeta.textContent = `${count} song${count === 1 ? '' : 's'}`;
+    }
+    const navLiked = document.getElementById('navLikedBtn') || elements.navLiked;
+    if (navLiked) {
+      navLiked.style.display = count > 0 ? 'flex' : 'none';
+    }
+    const libHubLikedBtn = document.getElementById('libHubLikedBtn') || elements.libHubLikedBtn;
+    if (libHubLikedBtn) {
+      libHubLikedBtn.style.display = count > 0 ? '' : 'none';
+    }
+    const likedPills = document.querySelectorAll('.lib-pill[data-lib-filter="liked"]');
+    likedPills.forEach(pill => {
+      pill.style.display = count > 0 ? '' : 'none';
+    });
   }
 
   // ==========================================================================
@@ -8305,6 +8325,54 @@
     document.body.style.setProperty('--playlist-dynamic-gradient', gradient);
   }
 
+  function addEntirePlaylistToQueue(tracks, playlistTitle) {
+    if (!tracks || tracks.length === 0) {
+      showToast('Playlist has no songs to queue', 'ℹ');
+      return;
+    }
+    if (!state.currentTrack) {
+      playTrack(tracks[0], tracks);
+      showToast(`Playing "${tracks[0].title}" & queued ${tracks.length - 1} songs`, '▶');
+      return;
+    }
+    let addedCount = 0;
+    tracks.forEach(track => {
+      if (!state.currentTrack || track.id !== state.currentTrack.id) {
+        state.userQueue.push(track);
+        if (window.MusiSurfPlayback && window.MusiSurfPlayback.coordinator && window.MusiSurfPlayback.coordinator.isNativeActive) {
+          window.MusiSurfPlayback.coordinator.queueManager.addToQueue(track);
+        }
+        addedCount++;
+      }
+    });
+    state.queue = [state.currentTrack, ...state.userQueue, ...state.contextQueue.slice(state.contextIndex + 1)];
+    updateQueueDrawerUI();
+    showToast(`Added ${addedCount} song${addedCount === 1 ? '' : 's'} to queue`, '➕');
+  }
+
+  async function downloadEntirePlaylist(tracks, playlistTitle) {
+    if (!tracks || tracks.length === 0) {
+      showToast('Playlist has no songs to download', 'ℹ');
+      return;
+    }
+    const toDownload = tracks.filter(t => !isTrackDownloaded(t.id));
+    if (toDownload.length === 0) {
+      showToast('All songs in this playlist are already downloaded!', '✓');
+      return;
+    }
+    showToast(`Starting download of ${toDownload.length} song${toDownload.length === 1 ? '' : 's'}...`, '⬇');
+    let downloadedCount = 0;
+    for (const track of toDownload) {
+      try {
+        await downloadSong(track);
+        downloadedCount++;
+      } catch (err) {
+        console.warn(`Failed downloading "${track.title}":`, err);
+      }
+    }
+    showToast(`✓ Downloaded ${downloadedCount} song${downloadedCount === 1 ? '' : 's'} for offline playback!`, '✓');
+  }
+
   function renderPlaylistView(playlistId, options = {}) {
     state.viewingPlaylistId = playlistId;
     document.body.dataset.playlistId = playlistId;
@@ -8333,7 +8401,7 @@
       elements.deletePlaylistBtn.style.display = 'none';
       if (elements.pinPlaylistBtn) elements.pinPlaylistBtn.style.display = 'none';
       if (elements.renamePlaylistBtn) elements.renamePlaylistBtn.style.display = 'none';
-      if (elements.mobilePlaylistMoreBtn) elements.mobilePlaylistMoreBtn.style.display = 'none';
+      if (elements.mobilePlaylistMoreBtn) elements.mobilePlaylistMoreBtn.style.display = tracks.length > 0 ? 'inline-flex' : 'none';
       elements.playlistCoverArt.innerHTML = createPlaylistCollageHtml(
         state.likedSongs,
         `<svg viewBox="0 0 24 24" fill="currentColor" style="width: 75px; height: 75px; color: #fff;">
@@ -8348,7 +8416,7 @@
       elements.deletePlaylistBtn.style.display = 'none';
       if (elements.pinPlaylistBtn) elements.pinPlaylistBtn.style.display = 'none';
       if (elements.renamePlaylistBtn) elements.renamePlaylistBtn.style.display = 'none';
-      if (elements.mobilePlaylistMoreBtn) elements.mobilePlaylistMoreBtn.style.display = 'none';
+      if (elements.mobilePlaylistMoreBtn) elements.mobilePlaylistMoreBtn.style.display = tracks.length > 0 ? 'inline-flex' : 'none';
       elements.playlistCoverArt.innerHTML = createPlaylistCollageHtml(
         state.offlineTracks,
         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 75px; height: 75px; color: #fff;">
@@ -8364,7 +8432,7 @@
       elements.deletePlaylistBtn.style.display = 'none';
       if (elements.pinPlaylistBtn) elements.pinPlaylistBtn.style.display = 'none';
       if (elements.renamePlaylistBtn) elements.renamePlaylistBtn.style.display = 'none';
-      if (elements.mobilePlaylistMoreBtn) elements.mobilePlaylistMoreBtn.style.display = 'none';
+      if (elements.mobilePlaylistMoreBtn) elements.mobilePlaylistMoreBtn.style.display = tracks.length > 0 ? 'inline-flex' : 'none';
       elements.playlistCoverArt.innerHTML = createPlaylistCollageHtml(
         state.localTracks || [],
         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 75px; height: 75px; color: #fff;">
@@ -8649,6 +8717,27 @@
       promptDeleteCurrentPlaylist(playlistId, title);
     };
 
+    // Add Entire Playlist to Queue (Desktop Icon)
+    if (elements.playlistAddToQueueBtn) {
+      elements.playlistAddToQueueBtn.style.display = tracks.length > 0 ? 'inline-flex' : 'none';
+      elements.playlistAddToQueueBtn.onclick = (e) => {
+        if (e) e.stopPropagation();
+        const listToQueue = (sortedTracks && sortedTracks.length > 0) ? sortedTracks : tracks;
+        addEntirePlaylistToQueue(listToQueue, title);
+      };
+    }
+
+    // Download Entire Playlist (Desktop Icon)
+    if (elements.playlistDownloadAllBtn) {
+      const canDownload = playlistId !== 'downloaded' && playlistId !== 'local' && tracks.length > 0;
+      elements.playlistDownloadAllBtn.style.display = canDownload ? 'inline-flex' : 'none';
+      elements.playlistDownloadAllBtn.onclick = (e) => {
+        if (e) e.stopPropagation();
+        const listToDownload = (sortedTracks && sortedTracks.length > 0) ? sortedTracks : tracks;
+        downloadEntirePlaylist(listToDownload, title);
+      };
+    }
+
     // Mobile 3-horizontal-bars button to open playlist options bottom sheet
     if (elements.mobilePlaylistMoreBtn) {
       elements.mobilePlaylistMoreBtn.onclick = (e) => {
@@ -8657,29 +8746,58 @@
           const titleEl = document.getElementById('mobPlaylistOptionsTitle');
           const subEl = document.getElementById('mobPlaylistOptionsSub');
           if (titleEl) titleEl.textContent = title;
-          if (subEl) subEl.textContent = `${tracks.length} songs • Custom Playlist`;
+          if (subEl) {
+            subEl.textContent = `${tracks.length} songs • ${isCustom ? 'Custom Playlist' : 'Playlist'}`;
+          }
+
+          const listToActOn = (sortedTracks && sortedTracks.length > 0) ? sortedTracks : tracks;
+
+          if (elements.mobOptAddPlaylistToQueueBtn) {
+            elements.mobOptAddPlaylistToQueueBtn.style.display = tracks.length > 0 ? 'flex' : 'none';
+            elements.mobOptAddPlaylistToQueueBtn.onclick = () => {
+              elements.mobilePlaylistOptionsModal.style.display = 'none';
+              addEntirePlaylistToQueue(listToActOn, title);
+            };
+          }
+
+          if (elements.mobOptDownloadPlaylistBtn) {
+            const canDownload = playlistId !== 'downloaded' && playlistId !== 'local' && tracks.length > 0;
+            elements.mobOptDownloadPlaylistBtn.style.display = canDownload ? 'flex' : 'none';
+            elements.mobOptDownloadPlaylistBtn.onclick = () => {
+              elements.mobilePlaylistOptionsModal.style.display = 'none';
+              downloadEntirePlaylist(listToActOn, title);
+            };
+          }
+
           if (elements.mobOptRenamePlaylistBtn) {
-            elements.mobOptRenamePlaylistBtn.style.display = window.innerWidth <= 768 ? 'none' : 'flex';
+            elements.mobOptRenamePlaylistBtn.style.display = isCustom ? 'flex' : 'none';
+          }
+
+          if (elements.mobOptDeletePlaylistBtn) {
+            elements.mobOptDeletePlaylistBtn.style.display = isCustom ? 'flex' : 'none';
           }
 
           const pl = state.customPlaylists.find(p => p.id === playlistId);
-          if (elements.mobOptPinPlaylistBtn && pl) {
-            if (elements.mobOptPinPlaylistText) {
-              elements.mobOptPinPlaylistText.textContent = pl.isPinned ? 'Unpin Playlist' : 'Pin Playlist';
+          if (elements.mobOptPinPlaylistBtn) {
+            elements.mobOptPinPlaylistBtn.style.display = pl ? 'flex' : 'none';
+            if (pl) {
+              if (elements.mobOptPinPlaylistText) {
+                elements.mobOptPinPlaylistText.textContent = pl.isPinned ? 'Unpin Playlist' : 'Pin Playlist';
+              }
+              elements.mobOptPinPlaylistBtn.onclick = () => {
+                if (elements.mobilePlaylistOptionsModal) {
+                  elements.mobilePlaylistOptionsModal.style.display = 'none';
+                }
+                pl.isPinned = !pl.isPinned;
+                saveStoredPlaylists();
+                renderSidebarPlaylists();
+                if (elements.pinPlaylistBtn) {
+                  elements.pinPlaylistBtn.classList.toggle('active', Boolean(pl.isPinned));
+                  elements.pinPlaylistBtn.title = pl.isPinned ? 'Unpin Playlist' : 'Pin Playlist';
+                }
+                showToast(pl.isPinned ? '📌 Playlist pinned to Library' : 'Playlist unpinned from Library', '📌');
+              };
             }
-            elements.mobOptPinPlaylistBtn.onclick = () => {
-              if (elements.mobilePlaylistOptionsModal) {
-                elements.mobilePlaylistOptionsModal.style.display = 'none';
-              }
-              pl.isPinned = !pl.isPinned;
-              saveStoredPlaylists();
-              renderSidebarPlaylists();
-              if (elements.pinPlaylistBtn) {
-                elements.pinPlaylistBtn.classList.toggle('active', Boolean(pl.isPinned));
-                elements.pinPlaylistBtn.title = pl.isPinned ? 'Unpin Playlist' : 'Pin Playlist';
-              }
-              showToast(pl.isPinned ? '📌 Playlist pinned to Library' : 'Playlist unpinned from Library', '📌');
-            };
           }
 
           elements.mobilePlaylistOptionsModal.style.display = 'flex';

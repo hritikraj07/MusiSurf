@@ -285,7 +285,7 @@
           </div>
 
           <!-- Liked Songs (Directly below Local Music) -->
-          <div class="library-item liked-songs-item" id="navLikedBtn" data-view="liked" title="Liked Songs">
+          <div class="library-item liked-songs-item" id="navLikedBtn" data-view="liked" title="Liked Songs" style="display: none;">
             <div class="liked-icon-box">
               <svg viewBox="0 0 24 24" fill="currentColor">
                 <path
@@ -709,6 +709,25 @@
                   <path d="M21 7h-5a4.978 4.978 0 0 0 -3 1m-4 8a4.984 4.984 0 0 1 -3 1h-3"/>
                 </svg>
               </button>
+              <button class="playlist-action-icon-btn playlist-add-queue-btn" id="playlistAddToQueueBtn" title="Add all songs to queue" aria-label="Add all songs to queue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="8" y1="6" x2="21" y2="6"/>
+                  <line x1="8" y1="12" x2="21" y2="12"/>
+                  <line x1="8" y1="18" x2="15" y2="18"/>
+                  <polyline points="3 6 4 6 4 6.01"/>
+                  <polyline points="3 12 4 12 4 12.01"/>
+                  <polyline points="3 18 4 18 4 18.01"/>
+                  <line x1="19" y1="15" x2="19" y2="21"/>
+                  <line x1="16" y1="18" x2="22" y2="18"/>
+                </svg>
+              </button>
+              <button class="playlist-action-icon-btn playlist-download-all-btn" id="playlistDownloadAllBtn" title="Download playlist" aria-label="Download playlist">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </button>
               <button class="playlist-action-icon-btn pin-playlist-btn" id="pinPlaylistBtn" title="Pin Playlist" style="display: none;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M15 4.5l-4 4l-4 1.5l-1.5 1.5l7 7l1.5 -1.5l1.5 -4l4 -4"/>
@@ -1064,7 +1083,7 @@
             <!-- Library Hub Quick Cards (Row 1: Liked + Your Soundtrack; Row 2: Local Files + Downloaded Songs) -->
             <div class="library-hub-grid" id="libHubGrid">
               <!-- Liked Songs Card -->
-              <div class="library-hub-card" id="libHubLikedBtn">
+              <div class="library-hub-card" id="libHubLikedBtn" style="display: none;">
                 <div class="lib-hub-icon liked-icon-box">
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <path
@@ -1698,6 +1717,31 @@
           </button>
         </div>
         <div class="mob-options-list">
+          <button class="mob-option-item" id="mobOptAddPlaylistToQueueBtn">
+            <div class="mob-option-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="8" y1="6" x2="21" y2="6"/>
+                <line x1="8" y1="12" x2="21" y2="12"/>
+                <line x1="8" y1="18" x2="15" y2="18"/>
+                <polyline points="3 6 4 6 4 6.01"/>
+                <polyline points="3 12 4 12 4 12.01"/>
+                <polyline points="3 18 4 18 4 18.01"/>
+                <line x1="19" y1="15" x2="19" y2="21"/>
+                <line x1="16" y1="18" x2="22" y2="18"/>
+              </svg>
+            </div>
+            <span>Add to Queue</span>
+          </button>
+          <button class="mob-option-item" id="mobOptDownloadPlaylistBtn">
+            <div class="mob-option-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </div>
+            <span>Download Playlist</span>
+          </button>
           <button class="mob-option-item" id="mobOptRenamePlaylistBtn">
             <div class="mob-option-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
