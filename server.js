@@ -1214,6 +1214,12 @@ function deduplicateAndShuffle(tracks, max = 10) {
 // Curated 100% Bollywood Trending & Home Categories with Poetic Expressions
 const TRENDING_CATEGORIES = [
   {
+    id: 'bollywood-acoustic',
+    title: "Chai & Acoustic — Unplugged Bollywood Chill",
+    subtitle: "Gentle acoustic guitars, cozy sunset breeze, and soft intimate unplugged melodies",
+    queries: ["Bollywood Acoustic Love Songs", "Arijit Singh Acoustic Unplugged", "Jasleen Royal Soft Melodies", "Prateek Kuhad Hindi", "Anuv Jain Melodies", "Sanam Acoustic Hits", "Pritam Unplugged Melodies"]
+  },
+  {
     id: 'bollywood-romantic',
     title: "Ishq Sufiyana — Bollywood Romance",
     subtitle: "Timeless melodies of pure love, monsoon sparks, and unspoken promises",
@@ -1247,13 +1253,7 @@ const TRENDING_CATEGORIES = [
     id: 'bollywood-sufi',
     title: "Roohani Sukoon — Sufi & Spiritual Reverie",
     subtitle: "Soul-elevating poetry, divine acoustic warmth, and serene peaceful contemplation",
-    queries: ["Rahat Fateh Ali Khan Romantic Sufi", "Javed Ali Sufi Hits", "A.R. Rahman Sufi Melodies", "Nusrat Fateh Ali Khan Bollywood", "Kailash Kher Bollywood Hits"]
-  },
-  {
-    id: 'bollywood-acoustic',
-    title: "Chai & Acoustic — Unplugged Bollywood Chill",
-    subtitle: "Gentle acoustic guitars, cozy sunset breeze, and soft intimate unplugged melodies",
-    queries: ["Bollywood Acoustic Love Songs", "Arijit Singh Acoustic Unplugged", "Jasleen Royal Soft Melodies", "Prateek Kuhad Hindi", "Anuv Jain Melodies", "Sanam Acoustic Hits"]
+    queries: ["Kun Faya Kun A.R. Rahman", "Khwaja Mere Khwaja Jodhaa Akbar", "Arziyan Delhi 6", "Tere Rashke Qamar Rahat Fateh Ali Khan", "Javed Ali Sufi Hits", "Maula Mere Maula Anwar", "Sajdaa My Name Is Khan", "Kailash Kher Bollywood Hits"]
   }
 ];
 
@@ -1300,10 +1300,12 @@ app.get('/api/trending', async (req, res) => {
 
   let dailyTopTracks = [];
   try {
-    dailyTopTracks = await getDailyTrendingHindiTracks(6);
+    const rawDaily = await getDailyTrendingHindiTracks(24);
+    // Shuffle daily tracks on every request so home page rotates after every refresh
+    dailyTopTracks = [...rawDaily].sort(() => Math.random() - 0.5);
   } catch (e) {}
 
-  if (!forceRefresh && trendingSectionsCache && now - trendingCacheTime < 1000 * 60 * 5) {
+  if (!forceRefresh && trendingSectionsCache && now - trendingCacheTime < 1000 * 60 * 3) {
     // Return a fresh shuffle of the distinct album tracks so home page is always dynamic
     const dynamicSections = trendingSectionsCache.map(sec => ({
       ...sec,
@@ -1327,7 +1329,11 @@ app.get('/api/trending', async (req, res) => {
   } catch (err) {
     console.error('Trending fetch error:', err);
     if (trendingSectionsCache) {
-      return res.json({ success: true, sections: trendingSectionsCache, dailyTopTracks });
+      const dynamicSections = trendingSectionsCache.map(sec => ({
+        ...sec,
+        tracks: [...sec.tracks].sort(() => Math.random() - 0.5)
+      }));
+      return res.json({ success: true, sections: dynamicSections, dailyTopTracks });
     }
     res.status(500).json({ success: false, error: 'Failed to load trending music' });
   }

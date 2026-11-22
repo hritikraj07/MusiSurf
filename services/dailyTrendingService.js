@@ -125,24 +125,45 @@ const SOUTH_INDIAN_KEYWORDS = [
 ];
 
 const DEVOTIONAL_KEYWORDS = [
+  // Hindu Devotional / Bhakti / Aarti / Chalisa
   'bhajan', 'bhajans', 'aarti', 'aarati', 'arti', 'chalisa', 'stotram', 'stotra',
   'stuti', 'mantra', 'shloka', 'sloka', 'ashtakam', 'sivastakam', 'shivastakam',
   'katha', 'satsang', 'kirtan', 'keertan', 'dhun', 'bhakti', 'devotional',
-  'tulsi vivah', 'tulsi mata', 'tulsi pooja', 'tulsi aarti', 'tulsa ki aayi',
+  'tulsi vivah', 'tulsi माता', 'tulsi pooja', 'tulsi aarti', 'tulsa ki aayi',
   'shiv tandav', 'hanuman chalisa', 'mata rani', 'khatu shyam', 'har har shambhu',
   'om namah shivay', 'jai ganesh', 'jai shree ram', 'ram siya ram', 'ram aayenge',
   'krishna bhajan', 'shyam teri bansi', 'radha rani bhajan', 'durga aarti',
-  'laxmi aarti', 'ganesh aarti', 'bholenath bhajan', 'amritwani', 'vrindavan dham'
+  'laxmi aarti', 'ganesh aarti', 'bholenath bhajan', 'amritwani', 'vrindavan dham',
+  'shri krishna', 'govind', 'gopala', 'radhe radhe', 'hare rama', 'hare krishna',
+
+  // Islamic Devotional / Qawwali / Naat / Hamd / Dua
+  'qawwali', 'qawali', 'kawwali', 'kawali', 'naat', 'naat sharif', 'hamd',
+  'duaa', 'dua', 'ya allah', 'allah', 'khwaja', 'ajmer sharif', 'pir', 'peer',
+  'sufiana kalam', 'kalam', 'manqabat', 'marsiya', 'nohay', 'tasbeeh',
+  'mere aansuon', 'sada sun le', 'dil ki duaa', 'ya nabi', 'subhanallah', 'alhamdulillah',
+
+  // Sikh Devotional
+  'gurbani', 'shabad', 'waheguru', 'ardas', 'simran', 'japji sahib', 'rehras sahib',
+  'sukhmani sahib', 'darbar sahib', 'golden temple',
+
+  // Christian Devotional
+  'christian prayer', 'gospel song', 'jesus song', 'yeshu bhajan', 'masih song',
+
+  // AI Slop & Fake Compilation Keywords
+  'best qawwali 202', 'best bhajan 202', 'superhit qawwali', 'superhit bhajan',
+  'top 10 qawwali', 'top 10 bhajan', 'ai cover', 'ai generated', 'ai song',
+  'ai voice', 'reels viral audio', 'status video'
 ];
 
 const DEVOTIONAL_ARTISTS = [
   'bhajan', 'bhakti', 'bajao bhakti', 't-series bhakti', 'bhajan india',
   'shemaroo bhakti', 'spiritual', 'iskcon', 'divine chants', 'anup jalota',
   'anuradha paudwal - devotional', 'lakhbir singh lakha', 'kanhiya mittal',
-  'the quantum souls'
+  'the quantum souls', 'fan of', 'fans of', 'tribute to', 'ai cover', 'ai generated',
+  'suno', 'udio', 'soundraw', 'afternight vibes', 'qawwali junction'
 ];
 
-const DEVOTIONAL_DEVANAGARI = /(भजन|आरती|चालीसा|स्तोत्र|स्तुति|मंत्र|श्लोक|कथा|कीर्तन|धुन|भक्ति|तुलसी विवाह|तुलसी माता|तुलसी पूजा|हनुमान चालीसा|माता रानी|खाटू श्याम|भोलेनाथ)/;
+const DEVOTIONAL_DEVANAGARI = /(भजन|आरती|चालीसा|स्तोत्र|स्तुति|मंत्र|श्लोक|कथा|कीर्तन|धुन|भक्ति|तुलसी|हनुमान|माता रानी|खाटू श्याम|भोलेनाथ|कव्वाली|नात|दुआ|अल्लाह|ख्वाजा|सदा सुन ले|आंसुओं|मदीना|मक्का)/i;
 
 function isDevotionalOrBhajan(track) {
   if (!track) return false;
@@ -152,15 +173,23 @@ function isDevotionalOrBhajan(track) {
   const channel = (track.metrics?.channel || '').toLowerCase();
   const text = `${title} ${artist} ${album} ${channel}`;
 
+  // 1. AI Slop & Fake Fan Mill Filter (e.g. "Fan Of Nusrat Fateh Ali Khan", "AI Cover")
+  if (/^(?:fan|fans)\s+of\b/i.test(artist) || /\b(?:tribute to|ai cover|ai music|ai voice|ai version)\b/i.test(artist)) {
+    return true;
+  }
+
+  // 2. Devanagari Devotional Regex
   if (DEVOTIONAL_DEVANAGARI.test(track.title || track.rawTitle || '') || 
       DEVOTIONAL_DEVANAGARI.test(track.artist || track.cleanArtist || '')) {
     return true;
   }
 
+  // 3. Keywords in Title, Artist, Album, Channel
   for (const kw of DEVOTIONAL_KEYWORDS) {
     if (text.includes(kw)) return true;
   }
 
+  // 4. Artist / Channel Match
   for (const art of DEVOTIONAL_ARTISTS) {
     if (artist.includes(art) || channel.includes(art)) return true;
   }
@@ -1008,7 +1037,7 @@ function initDailyTrendingScheduler() {
 /**
  * Public getter for top daily trending Hindi tracks (for homepage quick picks)
  */
-async function getDailyTrendingHindiTracks(limit = 6) {
+async function getDailyTrendingHindiTracks(limit = 24) {
   const song = await getDailyTrendingHindiSong(false);
   if (song && Array.isArray(song.top_tracks) && song.top_tracks.length > 0) {
     const seen = new Set();
