@@ -545,7 +545,7 @@
   // Generate downloaded badge HTML indicator (Crisp Spotify-grade solid disc offline badge)
   function getDownloadedBadgeHtml(trackId) {
     if (isTrackDownloaded(trackId)) {
-      return `<span class="downloaded-badge" title="Downloaded • 100% Offline Ready" aria-label="Downloaded"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="8" fill="var(--accent-primary, #00f260)"/><path d="M8 3.8v6.2m0 0l-2.4-2.4m2.4 2.4l2.4-2.4M4.8 12.2h6.4" stroke="#040e08" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+      return `<span class="downloaded-badge" title="Downloaded • 100% Offline Ready" aria-label="Downloaded"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="8" fill="var(--accent-cyan, #38bdf8)"/><path d="M8 3.8v6.2m0 0l-2.4-2.4m2.4 2.4l2.4-2.4M4.8 12.2h6.4" stroke="#040e08" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
     }
     return '';
   }
@@ -617,9 +617,9 @@
       const ts = new Date().toISOString().substring(11, 23);
       const tag = `[MusiSurf:${category}]`;
       if (details) {
-        console.log(`%c${ts} ${tag} ${message}`, 'color: #00f260; font-weight: bold;', details);
+        console.log(`%c${ts} ${tag} ${message}`, 'color: #38bdf8; font-weight: bold;', details);
       } else {
-        console.log(`%c${ts} ${tag} ${message}`, 'color: #00f260; font-weight: bold;');
+        console.log(`%c${ts} ${tag} ${message}`, 'color: #38bdf8; font-weight: bold;');
       }
     }
   }
@@ -5528,7 +5528,7 @@
         elements.lyricsLoading.style.display = 'none';
         elements.lyricsLinesContainer.innerHTML = `
           <div class="lyrics-offline-state" style="text-align: center; color: var(--text-secondary); padding: 80px 20px;">
-            <div style="width: 64px; height: 64px; margin: 0 auto 20px; border-radius: 50%; background: rgba(0, 242, 96, 0.12); border: 1px solid rgba(0, 242, 96, 0.3); display: flex; align-items: center; justify-content: center; color: var(--accent-primary, #00f260);">
+            <div style="width: 64px; height: 64px; margin: 0 auto 20px; border-radius: 50%; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); display: flex; align-items: center; justify-content: center; color: var(--accent-cyan, #38bdf8);">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 32px; height: 32px;">
                 <line x1="1" y1="1" x2="23" y2="23" />
                 <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
@@ -6119,9 +6119,9 @@
           const barHeight = (dataArray[i] / 255) * h * 0.85;
 
           const grad = ctx.createLinearGradient(0, h, 0, h - barHeight);
-          grad.addColorStop(0, '#1db954');
-          grad.addColorStop(0.5, '#00f2fe');
-          grad.addColorStop(1, '#ff2a85');
+          grad.addColorStop(0, '#0284c7');
+          grad.addColorStop(0.5, '#38bdf8');
+          grad.addColorStop(1, '#ec4899');
 
           ctx.fillStyle = grad;
           ctx.fillRect(x, h - barHeight, barWidth - 2, barHeight);
@@ -10236,7 +10236,7 @@
       const isLiked = state.likedSongs && state.likedSongs.some(s => s.id === track.id);
       if (elements.miniHeartBtn) {
         elements.miniHeartBtn.classList.toggle('active', isLiked);
-        elements.miniHeartBtn.style.color = isLiked ? '#1ed760' : '';
+        elements.miniHeartBtn.style.color = isLiked ? '#38bdf8' : '';
       }
     } else {
       if (elements.miniplayerCover) elements.miniplayerCover.src = '';
