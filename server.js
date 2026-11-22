@@ -1247,13 +1247,13 @@ const TRENDING_CATEGORIES = [
     id: 'bollywood-sufi',
     title: "Roohani Sukoon — Sufi & Spiritual Reverie",
     subtitle: "Soul-elevating poetry, divine acoustic warmth, and serene peaceful contemplation",
-    queries: ["Rahat Fateh Ali Khan Sufi", "Kailash Kher Soulful", "Javed Ali Sufi Hits", "A.R. Rahman Sufi Melodies", "Nusrat Fateh Ali Khan Bollywood"]
+    queries: ["Rahat Fateh Ali Khan Romantic Sufi", "Javed Ali Sufi Hits", "A.R. Rahman Sufi Melodies", "Nusrat Fateh Ali Khan Bollywood", "Kailash Kher Bollywood Hits"]
   },
   {
     id: 'bollywood-acoustic',
     title: "Chai & Acoustic — Unplugged Bollywood Chill",
     subtitle: "Gentle acoustic guitars, cozy sunset breeze, and soft intimate unplugged melodies",
-    queries: ["Bollywood Acoustic Unplugged", "Jasleen Royal Soft Melodies", "Prateek Kuhad Hindi", "Anuv Jain Melodies", "Sanam Acoustic Hits"]
+    queries: ["Bollywood Acoustic Love Songs", "Arijit Singh Acoustic Unplugged", "Jasleen Royal Soft Melodies", "Prateek Kuhad Hindi", "Anuv Jain Melodies", "Sanam Acoustic Hits"]
   }
 ];
 
@@ -1269,7 +1269,9 @@ async function fetchTrendingData() {
       const resultsArray = await Promise.all(queryPromises);
       const combinedTracks = resultsArray.flat();
 
-      const uniqueTracks = deduplicateAndShuffle(combinedTracks, 12);
+      // Strictly exclude any devotional or bhajan tracks from all homepage shelves
+      const nonDevotional = combinedTracks.filter(t => !isDevotionalOrBhajan(t));
+      const uniqueTracks = deduplicateAndShuffle(nonDevotional, 12);
       return {
         id: cat.id,
         title: cat.title,
@@ -1296,13 +1298,18 @@ app.get('/api/trending', async (req, res) => {
   const now = Date.now();
   const forceRefresh = req.query.refresh === '1';
 
+  let dailyTopTracks = [];
+  try {
+    dailyTopTracks = await getDailyTrendingHindiTracks(6);
+  } catch (e) {}
+
   if (!forceRefresh && trendingSectionsCache && now - trendingCacheTime < 1000 * 60 * 5) {
     // Return a fresh shuffle of the distinct album tracks so home page is always dynamic
     const dynamicSections = trendingSectionsCache.map(sec => ({
       ...sec,
       tracks: [...sec.tracks].sort(() => Math.random() - 0.5)
     }));
-    return res.json({ success: true, sections: dynamicSections });
+    return res.json({ success: true, sections: dynamicSections, dailyTopTracks });
   }
 
   try {
@@ -1316,11 +1323,11 @@ app.get('/api/trending', async (req, res) => {
       ...sec,
       tracks: [...sec.tracks].sort(() => Math.random() - 0.5)
     }));
-    res.json({ success: true, sections: dynamicSections });
+    res.json({ success: true, sections: dynamicSections, dailyTopTracks });
   } catch (err) {
     console.error('Trending fetch error:', err);
     if (trendingSectionsCache) {
-      return res.json({ success: true, sections: trendingSectionsCache });
+      return res.json({ success: true, sections: trendingSectionsCache, dailyTopTracks });
     }
     res.status(500).json({ success: false, error: 'Failed to load trending music' });
   }
@@ -1331,9 +1338,11 @@ app.get('/api/trending', async (req, res) => {
 // ============================================================================
 const {
   getDailyTrendingHindiSong,
+  getDailyTrendingHindiTracks,
   executeDailyDiscoveryPipeline,
   getDailyTrendingDebugInfo,
-  initDailyTrendingScheduler
+  initDailyTrendingScheduler,
+  isDevotionalOrBhajan
 } = require('./services/dailyTrendingService');
 
 // Public endpoint for homepage: returns verified #1 trending Hindi song for Asia/Kolkata date

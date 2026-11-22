@@ -6214,6 +6214,49 @@
     elements.greetingHeading.textContent = greeting;
   }
 
+  // Strict Devotional / Bhajan Filter (User Rule: Never show bhajans or devotional songs on homepage)
+  const DEVOTIONAL_KEYWORDS = [
+    'bhajan', 'bhajans', 'aarti', 'aarati', 'arti', 'chalisa', 'stotram', 'stotra',
+    'stuti', 'mantra', 'shloka', 'sloka', 'ashtakam', 'sivastakam', 'shivastakam',
+    'katha', 'satsang', 'kirtan', 'keertan', 'dhun', 'bhakti', 'devotional',
+    'tulsi vivah', 'tulsi mata', 'tulsi pooja', 'tulsi aarti', 'tulsa ki aayi',
+    'shiv tandav', 'hanuman chalisa', 'mata rani', 'khatu shyam', 'har har shambhu',
+    'om namah shivay', 'jai ganesh', 'jai shree ram', 'ram siya ram', 'ram aayenge',
+    'krishna bhajan', 'shyam teri bansi', 'radha rani bhajan', 'durga aarti',
+    'laxmi aarti', 'ganesh aarti', 'bholenath bhajan', 'amritwani', 'vrindavan dham'
+  ];
+
+  const DEVOTIONAL_ARTISTS = [
+    'bhajan', 'bhakti', 'bajao bhakti', 't-series bhakti', 'bhajan india',
+    'shemaroo bhakti', 'spiritual', 'iskcon', 'divine chants', 'anup jalota',
+    'anuradha paudwal - devotional', 'lakhbir singh lakha', 'kanhiya mittal',
+    'the quantum souls'
+  ];
+
+  const DEVOTIONAL_DEVANAGARI = /(भजन|आरती|चालीसा|स्तोत्र|स्तुति|मंत्र|श्लोक|कथा|कीर्तन|धुन|भक्ति|तुलसी विवाह|तुलसी माता|तुलसी पूजा|हनुमान चालीसा|माता रानी|खाटू श्याम|भोलेनाथ)/;
+
+  function isDevotionalOrBhajan(track) {
+    if (!track) return false;
+    const title = (track.title || '').toLowerCase();
+    const artist = (track.artist || '').toLowerCase();
+    const album = (track.album || '').toLowerCase();
+    const text = `${title} ${artist} ${album}`;
+
+    if (DEVOTIONAL_DEVANAGARI.test(track.title || '') || DEVOTIONAL_DEVANAGARI.test(track.artist || '')) {
+      return true;
+    }
+
+    for (const kw of DEVOTIONAL_KEYWORDS) {
+      if (text.includes(kw)) return true;
+    }
+
+    for (const art of DEVOTIONAL_ARTISTS) {
+      if (artist.includes(art)) return true;
+    }
+
+    return false;
+  }
+
   // Deduplicate and Shuffle to ensure no identical album thumbnails on home page
   function deduplicateAndShuffleAlbums(tracks, max = 10) {
     if (!tracks || !Array.isArray(tracks)) return [];
@@ -6224,7 +6267,7 @@
     const unique = [];
 
     for (const t of shuffled) {
-      if (!t || !t.audioUrl) continue;
+      if (!t || (!t.audioUrl && !t.streamUrl) || isDevotionalOrBhajan(t)) continue;
       const albumKey = (t.album || '').trim().toLowerCase();
       const isSingle = !albumKey || albumKey === 'single' || albumKey === 'singles';
       const titleKey = (t.title || '').trim().toLowerCase().replace(/\(.*\)|\[.*\]|- .*/g, '').trim();
@@ -6409,7 +6452,6 @@
   }
 
   async function loadTrendingShelves() {
-    loadDailyTrendingHindiSong();
     try {
       const res = await fetch(`/api/trending?t=${Date.now()}&refresh=1`);
       const data = await res.json();
@@ -6422,15 +6464,27 @@
 
       if (elements.shelvesContainer) elements.shelvesContainer.innerHTML = '';
 
-      // Populate Quick Picks with 6 songs from distinct albums and distinct thumbnails
-      const allTracks = [];
-      data.sections.forEach(sec => allTracks.push(...sec.tracks));
-      const quickPicks = deduplicateAndShuffleAlbums(allTracks, 6);
-      renderQuickPicks(quickPicks);
+      // Cache daily top trending tracks (strictly non-bhajan) for homepage quick picks
+      if (Array.isArray(data.dailyTopTracks) && data.dailyTopTracks.length > 0) {
+        state.dailyTopTracks = data.dailyTopTracks.filter(t => !isDevotionalOrBhajan(t));
+      } else {
+        state.dailyTopTracks = [];
+      }
 
-      // Populate Curated Shelves - strictly unique albums & shuffled on each home load
+      // Populate Quick Picks with daily trending songs on initial/default view
+      if (state.dailyTopTracks.length >= 6) {
+        renderQuickPicks(state.dailyTopTracks.slice(0, 6));
+      } else {
+        const allTracks = [];
+        data.sections.forEach(sec => allTracks.push(...sec.tracks));
+        const quickPicks = deduplicateAndShuffleAlbums(allTracks, 6);
+        renderQuickPicks(quickPicks);
+      }
+
+      // Populate Curated Shelves - strictly unique albums & non-devotional
       data.sections.forEach(section => {
-        const distinctTracks = deduplicateAndShuffleAlbums(section.tracks, 10);
+        const filteredTracks = (section.tracks || []).filter(t => !isDevotionalOrBhajan(t));
+        const distinctTracks = deduplicateAndShuffleAlbums(filteredTracks, 10);
         const shelf = createShelfElement({ ...section, tracks: distinctTracks });
         elements.shelvesContainer.appendChild(shelf);
       });
@@ -10656,7 +10710,9 @@
         });
 
         // Dynamically update Quick Picks at the top of the Home page with songs matching the chosen category!
-        if (visibleTracks.length > 0) {
+        if (filter === 'all' && state.dailyTopTracks && state.dailyTopTracks.length >= 6) {
+          renderQuickPicks(state.dailyTopTracks.slice(0, 6));
+        } else if (visibleTracks.length > 0) {
           renderQuickPicks(deduplicateAndShuffleAlbums(visibleTracks, 6));
         } else if (state.allAvailableTracks && state.allAvailableTracks.length > 0) {
           renderQuickPicks(deduplicateAndShuffleAlbums(state.allAvailableTracks, 6));

@@ -124,6 +124,50 @@ const SOUTH_INDIAN_KEYWORDS = [
   'arun srinivasan', 'saurav srisan', 'tanisha gnanavel', 'tamilindie'
 ];
 
+const DEVOTIONAL_KEYWORDS = [
+  'bhajan', 'bhajans', 'aarti', 'aarati', 'arti', 'chalisa', 'stotram', 'stotra',
+  'stuti', 'mantra', 'shloka', 'sloka', 'ashtakam', 'sivastakam', 'shivastakam',
+  'katha', 'satsang', 'kirtan', 'keertan', 'dhun', 'bhakti', 'devotional',
+  'tulsi vivah', 'tulsi mata', 'tulsi pooja', 'tulsi aarti', 'tulsa ki aayi',
+  'shiv tandav', 'hanuman chalisa', 'mata rani', 'khatu shyam', 'har har shambhu',
+  'om namah shivay', 'jai ganesh', 'jai shree ram', 'ram siya ram', 'ram aayenge',
+  'krishna bhajan', 'shyam teri bansi', 'radha rani bhajan', 'durga aarti',
+  'laxmi aarti', 'ganesh aarti', 'bholenath bhajan', 'amritwani', 'vrindavan dham'
+];
+
+const DEVOTIONAL_ARTISTS = [
+  'bhajan', 'bhakti', 'bajao bhakti', 't-series bhakti', 'bhajan india',
+  'shemaroo bhakti', 'spiritual', 'iskcon', 'divine chants', 'anup jalota',
+  'anuradha paudwal - devotional', 'lakhbir singh lakha', 'kanhiya mittal',
+  'the quantum souls'
+];
+
+const DEVOTIONAL_DEVANAGARI = /(भजन|आरती|चालीसा|स्तोत्र|स्तुति|मंत्र|श्लोक|कथा|कीर्तन|धुन|भक्ति|तुलसी विवाह|तुलसी माता|तुलसी पूजा|हनुमान चालीसा|माता रानी|खाटू श्याम|भोलेनाथ)/;
+
+function isDevotionalOrBhajan(track) {
+  if (!track) return false;
+  const title = (track.title || track.rawTitle || track.cleanTitle || '').toLowerCase();
+  const artist = (track.artist || track.cleanArtist || track.rawSubtitle || '').toLowerCase();
+  const album = (track.album || '').toLowerCase();
+  const channel = (track.metrics?.channel || '').toLowerCase();
+  const text = `${title} ${artist} ${album} ${channel}`;
+
+  if (DEVOTIONAL_DEVANAGARI.test(track.title || track.rawTitle || '') || 
+      DEVOTIONAL_DEVANAGARI.test(track.artist || track.cleanArtist || '')) {
+    return true;
+  }
+
+  for (const kw of DEVOTIONAL_KEYWORDS) {
+    if (text.includes(kw)) return true;
+  }
+
+  for (const art of DEVOTIONAL_ARTISTS) {
+    if (artist.includes(art) || channel.includes(art)) return true;
+  }
+
+  return false;
+}
+
 const VERIFIED_HINDI_ARTISTS = [
   'arijit', 'arijit singh', 'shreya ghoshal', 'vishal mishra', 'darshan raval',
   'pritam', 'sachin-jigar', 'sachin jigar', 'jubin', 'jubin nautiyal', 'atif aslam',
@@ -137,7 +181,7 @@ const VERIFIED_HINDI_ARTISTS = [
 const HINDI_COMMON_WORDS = [
   'dil', 'ishq', 'mohabbat', 'tere', 'mera', 'meri', 'pyaar', 'hum', 'tum',
   'zindagi', 'saath', 'deewana', 'sanam', 'raatein', 'chaha', 'khoya', 'humsafar',
-  'bewafa', 'kasam', 'bhajan', 'aarti', 'mata', 'ji ji', 'barsaat', 'gulabi'
+  'bewafa', 'kasam', 'ji ji', 'barsaat', 'gulabi'
 ];
 
 /**
@@ -152,6 +196,25 @@ function isVerifiedHindiSong(candidate, providerTrack = null) {
   const rawArtist = (candidate.cleanArtist || candidate.rawSubtitle || candidate.artist || '').toLowerCase();
   const channel = (candidate.metrics?.channel || '').toLowerCase();
   const text = `${rawTitle} ${cleanTitle} ${rawArtist} ${channel}`;
+
+  // 0. Strict Devotional / Bhajan Filter (User Rule: Never feature bhajans on homepage)
+  if (isDevotionalOrBhajan(candidate)) {
+    return {
+      isHindi: false,
+      confidence: 0,
+      detectedLanguage: 'devotional',
+      reasons: ['Devotional / Bhajan / Spiritual track strictly rejected from trending Hindi feature']
+    };
+  }
+
+  if (providerTrack && isDevotionalOrBhajan(providerTrack)) {
+    return {
+      isHindi: false,
+      confidence: 0,
+      detectedLanguage: 'devotional',
+      reasons: ['Matched provider track identified as Devotional / Bhajan / Spiritual']
+    };
+  }
 
   // 1. Provider Explicit Language Check (Authoritative)
   if (providerTrack && providerTrack.language) {
@@ -844,6 +907,7 @@ async function executeDailyDiscoveryPipeline(forceRefresh = false) {
         scoreBreakdown: topCandidate.scoreDetails
       },
       matched_track: topCandidate.matchedTrack,
+      top_tracks: eligibleCandidates.slice(0, 10).map(c => c.matchedTrack),
       selection_timestamp: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       is_active: true
@@ -941,12 +1005,39 @@ function initDailyTrendingScheduler() {
   scheduleNextMidnightRun();
 }
 
+/**
+ * Public getter for top daily trending Hindi tracks (for homepage quick picks)
+ */
+async function getDailyTrendingHindiTracks(limit = 6) {
+  const song = await getDailyTrendingHindiSong(false);
+  if (song && Array.isArray(song.top_tracks) && song.top_tracks.length > 0) {
+    const seen = new Set();
+    const unique = [];
+    for (const t of song.top_tracks) {
+      if (!t || isDevotionalOrBhajan(t)) continue;
+      const key = (t.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(t);
+      }
+      if (unique.length >= limit) break;
+    }
+    return unique;
+  }
+  if (song && song.matched_track && !isDevotionalOrBhajan(song.matched_track)) {
+    return [song.matched_track];
+  }
+  return [];
+}
+
 module.exports = {
   getDailyTrendingHindiSong,
+  getDailyTrendingHindiTracks,
   executeDailyDiscoveryPipeline,
   getDailyTrendingDebugInfo,
   initDailyTrendingScheduler,
   isVerifiedHindiSong,
+  isDevotionalOrBhajan,
   calculateTrendScore,
   matchPlayableMusiSurfTrack,
   getTodayISTString

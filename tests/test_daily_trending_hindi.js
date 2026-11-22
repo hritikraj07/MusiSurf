@@ -401,6 +401,29 @@ async function runAllTests() {
     assert.strictEqual(formatted, '2026-11-22', '18:45 UTC on Nov 21 is Nov 22 in Asia/Kolkata');
   });
 
+  // --------------------------------------------------------------------------
+  // Test 16: Devotional songs, bhajans, aartis, and stotrams strictly rejected
+  // --------------------------------------------------------------------------
+  runTest('Test 16 — Devotional songs, bhajans, aartis, and stotrams are strictly rejected from homepage', () => {
+    const devotionalTracks = [
+      { rawTitle: 'तुलसा की आई है बारात मेरे आंगन में | Tulsa Ki Aayi Hai Barat | तुलसी माता भजन | Tulsi Vivah Bhajan', cleanArtist: 'Bajao Bhakti' },
+      { rawTitle: 'जय जय तुलसी माता आरती | Jai Jai Tulsi Mata Aarti', cleanArtist: 'Bhajan India' },
+      { rawTitle: 'Sivastakam (Modern Rock Acoustic Version)', cleanArtist: 'The Quantum Souls' },
+      { rawTitle: 'Shri Hanuman Chalisa (Super Fast)', cleanArtist: 'Hariharan' }
+    ];
+
+    for (const track of devotionalTracks) {
+      const result = isVerifiedHindiSong(track);
+      assert.strictEqual(result.isHindi, false, `Track "${track.rawTitle}" must be rejected as devotional`);
+      assert.strictEqual(result.detectedLanguage, 'devotional', 'Detected language must be devotional');
+    }
+
+    // Verify regular Bollywood track is NOT rejected
+    const bollywoodTrack = { rawTitle: 'Ji Ji Re Ji (From "Eetha")', cleanArtist: 'Shreya Ghoshal, Ajay Gogavale' };
+    const validResult = isVerifiedHindiSong(bollywoodTrack);
+    assert.strictEqual(validResult.isHindi, true, 'Bollywood track must be verified as valid Hindi');
+  });
+
   console.log(`\n========================================`);
   console.log(`Results: ${passedTests}/${totalTests} tests passed.`);
   console.log(`========================================\n`);
