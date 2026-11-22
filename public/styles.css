@@ -6293,8 +6293,8 @@ div[data-track-id].playing:hover .song-more-trigger {
   z-index: 2200 !important;
   display: flex;
   flex-direction: column;
-  padding: calc(env(safe-area-inset-top, 10px) + 8px) 20px calc(env(safe-area-inset-bottom, 16px) + 24px);
-  overflow-y: auto !important;
+  padding: calc(env(safe-area-inset-top, 10px) + 8px) 20px calc(env(safe-area-inset-bottom, 16px) + 60px) !important;
+  overflow-y: scroll !important;
   overflow-x: hidden !important;
   height: 100dvh !important;
   max-height: 100dvh !important;
@@ -6302,8 +6302,17 @@ div[data-track-id].playing:hover .song-more-trigger {
   scrollbar-width: none !important;
   overscroll-behavior-y: contain;
   touch-action: pan-y;
-  animation: slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  transition: background 0.5s ease;
+  transform: translateY(0);
+  transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), background 0.5s ease;
+}
+
+.mobile-now-playing-modal.modal-opening {
+  animation: slideUpModal 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.mobile-now-playing-modal.modal-closing {
+  animation: slideDownModal 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  pointer-events: none !important;
 }
 
 .mobile-now-playing-modal::-webkit-scrollbar {
@@ -6313,6 +6322,11 @@ div[data-track-id].playing:hover .song-more-trigger {
 @keyframes slideUpModal {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
+}
+
+@keyframes slideDownModal {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
 }
 
 .mobile-player-header {
@@ -6381,19 +6395,18 @@ div[data-track-id].playing:hover .song-more-trigger {
 }
 
 .mobile-player-art-wrap {
-  width: 100%;
-  max-width: 380px;
-  aspect-ratio: 1;
-  max-height: 46vh;
-  margin: 0 auto;
-  border-radius: 8px;
+  width: min(84vw, 360px) !important;
+  aspect-ratio: 1 / 1 !important;
+  max-height: 42vh !important;
+  margin: 6px auto 14px !important;
+  border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 16px 44px rgba(0, 0, 0, 0.75);
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 1;
-  min-height: 0;
+  flex: none !important;
+  flex-shrink: 0 !important;
 }
 
 .mobile-player-art {
@@ -10089,7 +10102,30 @@ body[data-active-view="lyrics"] .content-scroll {
 
 @media (max-width: 768px) {
   #lyricsView {
-    max-height: calc(100vh - var(--top-header-height) - var(--player-height)) !important;
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 2300 !important;
+    width: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    transform: translateY(100%);
+    transition: transform 0.34s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: var(--lyrics-theme-color, #121212) !important;
+  }
+
+  body[data-active-view="lyrics"] #lyricsView {
+    display: block !important;
+    transform: translateY(0) !important;
+    pointer-events: auto !important;
+  }
+
+  #lyricsView.lyrics-closing {
+    transform: translateY(100%) !important;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    pointer-events: none !important;
   }
 }
 
@@ -12105,6 +12141,19 @@ body[data-active-view="lyrics"] .content-scroll {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  position: relative;
+}
+
+.settings-nav-slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 8px;
+  background: #242424;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), width 0.22s ease, height 0.22s ease, opacity 0.2s ease;
 }
 
 .settings-cat-btn {
@@ -12112,7 +12161,7 @@ body[data-active-view="lyrics"] .content-scroll {
   align-items: center;
   gap: 14px;
   padding: 10px 14px;
-  background: transparent;
+  background: transparent !important;
   border: none;
   border-radius: 8px;
   color: #a7a7a7;
@@ -12120,16 +12169,17 @@ body[data-active-view="lyrics"] .content-scroll {
   font-weight: 600;
   cursor: pointer;
   text-align: left;
-  transition: all 0.15s ease;
+  transition: color 0.18s ease;
+  position: relative;
+  z-index: 2;
 }
 
 .settings-cat-btn:hover {
   color: #ffffff;
-  background: rgba(255, 255, 255, 0.05);
 }
 
 .settings-cat-btn.active {
-  background: #242424;
+  background: transparent !important;
   color: #ffffff;
 }
 
@@ -12137,6 +12187,7 @@ body[data-active-view="lyrics"] .content-scroll {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
+  transition: color 0.18s ease, stroke 0.18s ease;
 }
 
 /* Settings Main Panel */
@@ -12770,24 +12821,33 @@ body[data-active-view="lyrics"] .content-scroll {
     padding-bottom: 6px !important;
     scrollbar-width: none !important;
     width: 100% !important;
+    position: relative !important;
   }
 
   .settings-category-nav::-webkit-scrollbar {
     display: none !important;
   }
 
+  .settings-category-nav .settings-nav-slider {
+    border-radius: 500px !important;
+    background: #ffffff !important;
+  }
+
   .settings-cat-btn {
     white-space: nowrap !important;
     padding: 8px 14px !important;
     border-radius: 500px !important;
-    background: #181818 !important;
+    background: transparent !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
     font-size: 0.86rem !important;
     flex-shrink: 0 !important;
+    position: relative !important;
+    z-index: 2 !important;
+    transition: color 0.2s ease, border-color 0.2s ease !important;
   }
 
   .settings-cat-btn.active {
-    background: #ffffff !important;
+    background: transparent !important;
     color: #000000 !important;
     border-color: #ffffff !important;
   }

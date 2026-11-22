@@ -11165,10 +11165,30 @@
       const returnToModal = state.openedLyricsFromMobilePlayer;
       state.openedLyricsFromMobilePlayer = false;
       const targetView = state.previousView && state.previousView !== 'lyrics' ? state.previousView : 'home';
-      switchView(targetView);
-      if (returnToModal && elements.mobilePlayerModal) {
-        elements.mobilePlayerModal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
+
+      const isMobile = window.innerWidth <= 768;
+      const lyricsEl = document.getElementById('lyricsView');
+
+      if (isMobile && lyricsEl) {
+        lyricsEl.classList.add('lyrics-closing');
+        setTimeout(() => {
+          lyricsEl.classList.remove('lyrics-closing');
+          switchView(targetView);
+          if (returnToModal && elements.mobilePlayerModal) {
+            if (typeof openMobilePlayerModal === 'function') {
+              openMobilePlayerModal();
+            } else {
+              elements.mobilePlayerModal.style.display = 'flex';
+              document.body.style.overflow = 'hidden';
+            }
+          }
+        }, 270);
+      } else {
+        switchView(targetView);
+        if (returnToModal && elements.mobilePlayerModal) {
+          elements.mobilePlayerModal.style.display = 'flex';
+          document.body.style.overflow = 'hidden';
+        }
       }
     };
 
@@ -11544,6 +11564,31 @@
       });
     }
 
+    // Settings Sliding Background Pill Indicator
+    function updateSettingsNavSlider(activeBtn) {
+      const slider = document.getElementById('settingsNavSlider');
+      const nav = document.querySelector('.settings-category-nav');
+      if (!slider || !nav) return;
+      const target = activeBtn || nav.querySelector('.settings-cat-btn.active');
+      if (!target || target.offsetParent === null) {
+        slider.style.opacity = '0';
+        return;
+      }
+      const navRect = nav.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+
+      const left = targetRect.left - navRect.left + nav.scrollLeft;
+      const top = targetRect.top - navRect.top + nav.scrollTop;
+      const width = targetRect.width;
+      const height = targetRect.height;
+
+      slider.style.width = `${width}px`;
+      slider.style.height = `${height}px`;
+      slider.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+      slider.style.opacity = '1';
+    }
+    window.updateSettingsNavSlider = updateSettingsNavSlider;
+
     // Settings Modal
     const openSettingsModal = () => {
       loadSettings();
@@ -11557,6 +11602,8 @@
           view.classList.toggle('active', view.id === 'settingsAccountSection');
         });
         if (typeof updateAuthUI === 'function') updateAuthUI();
+        requestAnimationFrame(() => updateSettingsNavSlider());
+        setTimeout(() => updateSettingsNavSlider(), 60);
         try { window.history.pushState({ modal: 'settings' }, '', window.location.pathname); } catch (e) {}
       }
     };
@@ -11572,6 +11619,12 @@
     if (elements.closeSettingsTopRightBtn) elements.closeSettingsTopRightBtn.addEventListener('click', closeSettingsModal);
     if (elements.libHubSettingsBtn) elements.libHubSettingsBtn.addEventListener('click', openSettingsModal);
 
+    window.addEventListener('resize', () => {
+      if (elements.settingsModal && elements.settingsModal.style.display !== 'none') {
+        updateSettingsNavSlider();
+      }
+    });
+
     // Initialize History Buttons State
     appHistory.updateButtons();
 
@@ -11586,11 +11639,12 @@
       });
     }
 
-    // Two-Pane Settings Category Navigation (Image 1)
+    // Two-Pane Settings Category Navigation (Image 1) with Sliding Pill Animation
     document.querySelectorAll('.settings-cat-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.settings-cat-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
+        updateSettingsNavSlider(btn);
         const targetId = btn.dataset.target;
         document.querySelectorAll('.settings-tab-view').forEach(view => {
           view.classList.toggle('active', view.id === targetId);
@@ -12265,22 +12319,56 @@
       elements.libHeaderAddPlaylistBtn.addEventListener('click', openCreatePlaylistModal);
     }
 
-    // Mobile Mini-Player Bar Click -> Opens Fullscreen Mobile Player
+    // Mobile Player Modal Smooth Sliding Open / Close Handlers
+    function openMobilePlayerModal() {
+      if (!elements.mobilePlayerModal) return;
+      const modal = elements.mobilePlayerModal;
+      modal.classList.remove('modal-closing');
+      modal.classList.add('modal-opening');
+      modal.style.display = 'flex';
+      modal.style.transform = '';
+      document.body.style.overflow = 'hidden';
+      try { window.history.pushState({ modal: 'mobilePlayer' }, '', window.location.pathname); } catch (e) {}
+    }
+    window.openMobilePlayerModal = openMobilePlayerModal;
+
+    function closeMobilePlayerModal(callback) {
+      if (!elements.mobilePlayerModal) {
+        if (typeof callback === 'function') callback();
+        return;
+      }
+      const modal = elements.mobilePlayerModal;
+      if (modal.style.display === 'none') {
+        if (typeof callback === 'function') callback();
+        return;
+      }
+      modal.classList.remove('modal-opening');
+      modal.classList.add('modal-closing');
+      setTimeout(() => {
+        modal.style.display = 'none';
+        modal.classList.remove('modal-closing');
+        modal.style.transform = '';
+        document.body.style.overflow = '';
+        if (typeof callback === 'function') callback();
+      }, 270);
+    }
+    window.closeMobilePlayerModal = closeMobilePlayerModal;
+
+    // Mobile Mini-Player Bar Click -> Opens Fullscreen Mobile Player with Slide Up Animation
     elements.playerBar.addEventListener('click', (e) => {
       if (window.innerWidth <= 768) {
         if (e.target.closest('#miniPlayerTrack') || e.target.closest('#playPauseBtn') || e.target.closest('#playerHeartBtn') || e.target.closest('#playerDownloadBtn')) {
           return;
         }
         if (state.currentTrack) {
-          elements.mobilePlayerModal.style.display = 'flex';
-          try { window.history.pushState({ modal: 'mobilePlayer' }, '', window.location.pathname); } catch (e) {}
+          openMobilePlayerModal();
         }
       }
     });
 
     if (elements.closeMobilePlayerBtn) {
       elements.closeMobilePlayerBtn.addEventListener('click', () => {
-        elements.mobilePlayerModal.style.display = 'none';
+        closeMobilePlayerModal();
       });
     }
 
@@ -12403,7 +12491,6 @@
         showToast('Connect to internet to view lyrics', '⚡');
       }
       state.openedLyricsFromMobilePlayer = true;
-      if (elements.mobilePlayerModal) elements.mobilePlayerModal.style.display = 'none';
       switchView('lyrics');
     }
 
@@ -12675,7 +12762,7 @@
         return;
       }
       if (elements.mobilePlayerModal && elements.mobilePlayerModal.style.display !== 'none') {
-        elements.mobilePlayerModal.style.display = 'none';
+        closeMobilePlayerModal();
         return;
       }
       if (elements.settingsModal && elements.settingsModal.style.display !== 'none') {
@@ -12733,8 +12820,8 @@
       const modalEl = elements.mobilePlayerModal;
 
       modalEl.addEventListener('touchstart', (e) => {
-        // Trigger swipe down when starting near top handle or header
-        if (modalEl.scrollTop <= 5 && e.touches[0].clientY < 260) {
+        // Trigger swipe down when starting near top handle or header only (prevents scroll conflict on artwork/cards)
+        if (modalEl.scrollTop <= 5 && (e.target.closest('.mobile-player-header') || e.touches[0].clientY < 80)) {
           isDraggingModal = true;
           startY = e.touches[0].clientY;
           currentY = startY;
@@ -12756,14 +12843,10 @@
         if (!isDraggingModal) return;
         isDraggingModal = false;
         const deltaY = currentY - startY;
-        modalEl.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
         if (deltaY > 80) {
-          modalEl.style.transform = 'translateY(100%)';
-          setTimeout(() => {
-            modalEl.style.display = 'none';
-            modalEl.style.transform = 'translateY(0)';
-          }, 240);
+          closeMobilePlayerModal();
         } else {
+          modalEl.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
           modalEl.style.transform = 'translateY(0)';
         }
       });
@@ -13298,11 +13381,13 @@
         // Update Settings Account Tab
         const settingsGuestBlock = document.getElementById('settingsAccountGuestBlock');
         const settingsUserBlock = document.getElementById('settingsAccountUserBlock');
+        const settingsSubBlock = document.getElementById('settingsAccountSubscriptionBlock');
         const settingsAvatar = document.getElementById('settingsAccountAvatar');
         const settingsName = document.getElementById('settingsAccountName');
         const settingsEmail = document.getElementById('settingsAccountEmail');
         if (settingsGuestBlock) settingsGuestBlock.style.setProperty('display', 'none', 'important');
         if (settingsUserBlock) settingsUserBlock.style.setProperty('display', 'block', 'important');
+        if (settingsSubBlock) settingsSubBlock.style.setProperty('display', 'block', 'important');
         if (settingsAvatar) settingsAvatar.textContent = initial;
         if (settingsName) settingsName.textContent = user.name || user.email.split('@')[0];
         if (settingsEmail) settingsEmail.textContent = user.email;
@@ -13332,11 +13417,13 @@
         if (drawerSignInBtn) drawerSignInBtn.style.display = 'none';
         if (drawerSignOutBtn) drawerSignOutBtn.style.display = 'none';
 
-        // Update Settings Account Tab for Guest
+        // Update Settings Account Tab for Guest (Hide subscription before sign-in)
         const settingsGuestBlock = document.getElementById('settingsAccountGuestBlock');
         const settingsUserBlock = document.getElementById('settingsAccountUserBlock');
+        const settingsSubBlock = document.getElementById('settingsAccountSubscriptionBlock');
         if (settingsGuestBlock) settingsGuestBlock.style.setProperty('display', 'block', 'important');
         if (settingsUserBlock) settingsUserBlock.style.setProperty('display', 'none', 'important');
+        if (settingsSubBlock) settingsSubBlock.style.setProperty('display', 'none', 'important');
       }
     }
 

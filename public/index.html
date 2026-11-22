@@ -2293,6 +2293,7 @@
           </div>
 
           <nav class="settings-category-nav">
+            <div class="settings-nav-slider" id="settingsNavSlider"></div>
             <button class="settings-cat-btn active" data-target="settingsAccountSection">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               <span>Account</span>
@@ -2532,8 +2533,8 @@
               </div>
             </div>
 
-            <!-- Subscription Plan -->
-            <div class="settings-section-block">
+            <!-- Subscription Plan (Shown strictly after sign in) -->
+            <div class="settings-section-block" id="settingsAccountSubscriptionBlock" style="display: none;">
               <span class="settings-section-label">Subscription</span>
               <div class="sound-card-item">
                 <div class="sound-card-left">
