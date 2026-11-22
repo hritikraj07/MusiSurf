@@ -4597,7 +4597,8 @@
               }
             });
           }
-        } else if (isYtTrack) {
+        }
+      } else if (isYtTrack) {
           // Fallback directly to YouTube iframe player if no audioSrc
           const ytId = track.ytId || (track.id ? track.id.replace('yt_', '') : '');
           if (ytId && state.ytReady && state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
