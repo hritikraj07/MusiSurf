@@ -1,0 +1,22 @@
+{
+  "appId": "com.musisurf.app",
+  "appName": "MusiSurf",
+  "webDir": "public",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true
+  },
+  "plugins": {
+    "MusiSurfMediaPlugin": {
+      "enableMedia3": true,
+      "notificationChannelName": "MusiSurf Playback",
+      "notificationChannelDescription": "Active background music playback and controls"
+    }
+  }
+}

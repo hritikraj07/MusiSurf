@@ -3250,6 +3250,9 @@
     try {
       localStorage.setItem('musisurf_repeat_mode', state.repeatMode);
     } catch (err) {}
+    if (window.MusiSurfPlayback && window.MusiSurfPlayback.coordinator && window.MusiSurfPlayback.coordinator.isNativeActive) {
+      window.MusiSurfPlayback.coordinator.setRepeatMode(state.repeatMode);
+    }
     updateRepeatUI();
   }
 
@@ -4062,6 +4065,35 @@
     }
     const previousTrack = state.currentTrack;
 
+    // Android Native Media3 ExoPlayer delegation if running inside Capacitor Android APK
+    if (window.MusiSurfPlayback && window.MusiSurfPlayback.coordinator && window.MusiSurfPlayback.coordinator.isNativeActive) {
+      state.currentTrack = track;
+      state.isPlaying = true;
+      state.isTrackLoading = false;
+      if (queueList && Array.isArray(queueList)) {
+        state.contextQueue = [...queueList];
+        state.contextIndex = state.contextQueue.findIndex(t => areTracksIdentical(t, track));
+        if (state.contextIndex === -1) {
+          state.contextQueue = [track];
+          state.contextIndex = 0;
+        }
+        state.queue = [track, ...state.userQueue, ...state.contextQueue.slice(state.contextIndex + 1)];
+      }
+      if (addToHistory && (!state.history.length || state.history[0]?.id !== track.id)) {
+        state.history.unshift(track);
+        if (state.history.length > 50) state.history.pop();
+      }
+      updatePlayerUI(track);
+      updateMediaSession(track);
+      updatePlayPauseButton();
+      updateQueueDrawerUI();
+      highlightPlayingTrackInTables(track.id);
+      savePlaybackState();
+      loadLyricsForTrack(track);
+      await window.MusiSurfPlayback.coordinator.playTrack(track, state.queue, { startTime: customStartTime });
+      return;
+    }
+
     // Guard: If clicking the CURRENTLY PLAYING song without explicit custom seek
     const actForGuard = getActiveDeck();
     const currentDeckSrc = actForGuard ? (actForGuard.currentSrc || actForGuard.src || '') : '';
@@ -4648,6 +4680,23 @@
       }
     } catch (e) {}
 
+    if (window.MusiSurfPlayback && window.MusiSurfPlayback.coordinator && window.MusiSurfPlayback.coordinator.isNativeActive) {
+      if (!state.currentTrack) {
+        if (state.viewingPlaylistTracks && state.viewingPlaylistTracks.length > 0) {
+          state.activePlaylistId = state.viewingPlaylistId;
+          state.activePlaylistTracks = [...state.viewingPlaylistTracks];
+          playTrack(state.viewingPlaylistTracks[0], state.viewingPlaylistTracks);
+        } else if (state.activePlaylistTracks && state.activePlaylistTracks.length > 0) {
+          playTrack(state.activePlaylistTracks[0], state.activePlaylistTracks);
+        } else if (state.queue && state.queue.length > 0) {
+          playTrack(state.queue[0]);
+        }
+        return;
+      }
+      window.MusiSurfPlayback.coordinator.togglePlayPause();
+      return;
+    }
+
     if (!state.currentTrack) {
       // If nothing is playing, play first song from queue or active playlist or shelves
       if (state.viewingPlaylistTracks && state.viewingPlaylistTracks.length > 0) {
@@ -4937,6 +4986,19 @@
       return;
     }
 
+    if (window.MusiSurfPlayback && window.MusiSurfPlayback.coordinator && window.MusiSurfPlayback.coordinator.isNativeActive) {
+      try {
+        showToast(`Downloading "${track.title}" for offline playback...`, '⬇');
+        await window.MusiSurfPlayback.coordinator.downloadManager.download(track);
+        addToDownloadedPlaylist(track);
+        showToast(`✓ "${track.title}" downloaded for offline playback!`, '✓');
+      } catch (err) {
+        console.error('[DownloadManager Native] Error downloading song:', err);
+        showToast('Download failed. Please check network connection.', '⚠️');
+      }
+      return;
+    }
+
     const cleanTitle = (track.title || 'Track').replace(/[\\/:*?"<>|]/g, '').trim();
     const cleanArtist = (track.artist || 'MusiSurf').replace(/[\\/:*?"<>|]/g, '').trim();
     const downloadFilename = `${cleanTitle} - ${cleanArtist}.mp3`;
@@ -5039,6 +5101,9 @@
     }
     state.userQueue.push(track);
     state.queue = [state.currentTrack, ...state.userQueue, ...state.contextQueue.slice(state.contextIndex + 1)];
+    if (window.MusiSurfPlayback && window.MusiSurfPlayback.coordinator && window.MusiSurfPlayback.coordinator.isNativeActive) {
+      window.MusiSurfPlayback.coordinator.queueManager.addToQueue(track);
+    }
     updateQueueDrawerUI();
     showToast(`Added to queue: "${track.title}"`, '➕');
   }
@@ -5052,6 +5117,9 @@
     }
     state.userQueue.unshift(track);
     state.queue = [state.currentTrack, ...state.userQueue, ...state.contextQueue.slice(state.contextIndex + 1)];
+    if (window.MusiSurfPlayback && window.MusiSurfPlayback.coordinator && window.MusiSurfPlayback.coordinator.isNativeActive) {
+      window.MusiSurfPlayback.coordinator.queueManager.playNext(track);
+    }
     updateQueueDrawerUI();
     showToast(`Will play next: "${track.title}"`, '⏭');
   }
@@ -5154,6 +5222,9 @@
   let lastKnownPlaybackTime = 0;
 
   function getCurrentPlaybackTime() {
+    if (window.MusiSurfPlayback && window.MusiSurfPlayback.coordinator && window.MusiSurfPlayback.coordinator.isNativeActive) {
+      return window.MusiSurfPlayback.coordinator.getCurrentTime();
+    }
     const act = (typeof getActiveDeck === 'function') ? getActiveDeck() : elements.audio;
     if (act && Number.isFinite(act.currentTime) && act.currentTime > 0) {
       return act.currentTime;
@@ -5225,6 +5296,10 @@
   }
 
   function getTotalDuration() {
+    if (window.MusiSurfPlayback && window.MusiSurfPlayback.coordinator && window.MusiSurfPlayback.coordinator.isNativeActive) {
+      const natDur = window.MusiSurfPlayback.coordinator.getDuration();
+      if (Number.isFinite(natDur) && natDur > 0) return natDur;
+    }
     // 1. Check all valid sources of duration
     const strDur = parseDurationToSeconds(state.currentTrack?.durationStr);
     const metaDur = parseDurationToSeconds(state.currentTrack?.duration);
@@ -5269,6 +5344,12 @@
     const total = getTotalDuration();
     const targetSeconds = Math.max(0, Math.min(total > 0 ? total : 99999, Number(seconds) || 0));
     lastKnownPlaybackTime = targetSeconds;
+
+    if (window.MusiSurfPlayback && window.MusiSurfPlayback.coordinator && window.MusiSurfPlayback.coordinator.isNativeActive) {
+      window.MusiSurfPlayback.coordinator.seek(targetSeconds);
+      return;
+    }
+
     if (isYouTubeActive() || state.activePlayerEngine === 'youtube') {
       if (state.ytPlayer && typeof state.ytPlayer.seekTo === 'function') {
         state.ytPlayer.seekTo(targetSeconds, true);
@@ -13855,6 +13936,102 @@
   }
 
   // ==========================================================================
+  // PLAYBACK COORDINATOR (Bridge Web Browser & Native Android Media3 ExoPlayer)
+  // ==========================================================================
+  function initPlaybackCoordinator() {
+    if (!window.MusiSurfPlayback || !window.MusiSurfPlayback.coordinator) return;
+    const coord = window.MusiSurfPlayback.coordinator;
+
+    coord.setWebEngineDelegate({
+      loadTrackWeb: async (track, options) => {
+        return await playTrack(track, null, true, options?.startTime || 0, false, options);
+      },
+      playWeb: async () => {
+        const act = getActiveDeck();
+        if (act && act.paused) {
+          state.isPlaying = true;
+          updatePlayPauseButton();
+          return await act.play();
+        }
+      },
+      pauseWeb: async () => {
+        const act = getActiveDeck();
+        if (act && !act.paused) {
+          state.isPlaying = false;
+          updatePlayPauseButton();
+          act.pause();
+        }
+      },
+      resumeWeb: async () => {
+        const act = getActiveDeck();
+        if (act && act.paused) {
+          state.isPlaying = true;
+          updatePlayPauseButton();
+          return await act.play();
+        }
+      },
+      seekWeb: async (pos) => {
+        seekTo(pos);
+      },
+      setVolumeWeb: (vol) => {
+        setVolume(vol);
+      },
+      setMutedWeb: (muted) => {
+        state.isMuted = muted;
+        setVolume(muted ? 0 : (state.volume || 0.8));
+      },
+      getPositionWeb: () => {
+        return getCurrentPlaybackTime();
+      },
+      getDurationWeb: () => {
+        return getTotalDuration();
+      },
+      stopWeb: () => {
+        const act = getActiveDeck();
+        if (act) {
+          act.pause();
+          act.currentTime = 0;
+        }
+      }
+    });
+
+    // Wire up events emitted from coordinator (including native Android Media3 ExoPlayer callbacks)
+    coord.on('playbackStateChanged', (e) => {
+      if (typeof e?.isPlaying === 'boolean' && state.isPlaying !== e.isPlaying) {
+        state.isPlaying = e.isPlaying;
+        updatePlayPauseButton();
+      }
+    });
+
+    coord.on('trackChanged', (e) => {
+      if (e?.track && (!state.currentTrack || state.currentTrack.id !== e.track.id)) {
+        state.currentTrack = e.track;
+        updatePlayerUI(e.track);
+        updateMediaSession(e.track);
+        highlightPlayingTrackInTables(e.track.id);
+        loadLyricsForTrack(e.track);
+        updateQueueDrawerUI();
+      }
+    });
+
+    coord.on('repeatChanged', (e) => {
+      if (e?.mode && state.repeatMode !== e.mode) {
+        state.repeatMode = e.mode;
+        updateRepeatUI();
+      }
+    });
+
+    coord.on('shuffleChanged', (e) => {
+      if (typeof e?.enabled === 'boolean' && state.isShuffled !== e.enabled) {
+        state.isShuffled = e.enabled;
+        updatePlaylistModeUI();
+      }
+    });
+
+    console.log('[MusiSurf] Playback Coordinator initialized. Engine:', coord.isNativeActive ? 'Native Android (Media3)' : 'Web Browser');
+  }
+
+  // ==========================================================================
   // INITIALIZE APP
   // ==========================================================================
   function init() {
@@ -13870,6 +14047,7 @@
     updatePlaylistModeUI();
     updateQueueDrawerUI();
     setupEventListeners();
+    initPlaybackCoordinator();
     loadTrendingShelves();
     renderSearchRecentUI();
     restoreLastPlayedState();
