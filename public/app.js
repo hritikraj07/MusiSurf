@@ -5346,9 +5346,15 @@
   state.lyricsLoadingTimers = [];
 
   // Persistent Verified Lyrics Database (Client-Side LocalStorage, 250 items, 7-day TTL)
-  const VERIFIED_LYRICS_STORAGE_KEY = 'musisurf_verified_lyrics_v2';
+  const VERIFIED_LYRICS_STORAGE_KEY = 'musisurf_verified_lyrics_v3';
   const VERIFIED_LYRICS_MAX_ENTRIES = 250;
   const VERIFIED_LYRICS_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+  // Clear previous version storage keys on startup to ensure no stale/corrupted entries persist
+  try {
+    localStorage.removeItem('musisurf_verified_lyrics_v1');
+    localStorage.removeItem('musisurf_verified_lyrics_v2');
+  } catch (e) {}
 
   function getPersistentVerifiedLyrics(cacheKey, expectedArtist = null) {
     if (!cacheKey) return null;
@@ -5360,7 +5366,12 @@
       if (!entry || !entry.data) return null;
 
       // Anti-wrong-lyrics validation: Verify artist if present in entry
-      if (expectedArtist && entry.data.artistName) {
+      if (expectedArtist) {
+        if (!entry.data.artistName) {
+          delete store[cacheKey];
+          try { localStorage.setItem(VERIFIED_LYRICS_STORAGE_KEY, JSON.stringify(store)); } catch (e) {}
+          return null;
+        }
         const normExpected = expectedArtist.toLowerCase().replace(/[^a-z0-9]/g, '');
         const normCand = entry.data.artistName.toLowerCase().replace(/[^a-z0-9]/g, '');
         if (normExpected && normCand && !normExpected.includes(normCand) && !normCand.includes(normExpected)) {
@@ -5831,18 +5842,6 @@
     container.className = 'lyrics-plain-container' + (isRtl ? ' rtl-lyrics' : '');
     if (isRtl) container.setAttribute('dir', 'rtl');
 
-    const notice = document.createElement('div');
-    notice.className = 'lyrics-plain-notice';
-    notice.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
-        <circle cx="12" cy="12" r="10"/>
-        <line x1="12" y1="8" x2="12" y2="12"/>
-        <line x1="12" y1="16" x2="12.01" y2="16"/>
-      </svg>
-      <span>Verified plain lyrics • Synchronization not available for this recording</span>
-    `;
-    container.appendChild(notice);
-
     const pre = document.createElement('div');
     pre.className = 'lyrics-plain-text' + (isRtl ? ' rtl-lyrics' : '');
     pre.dataset.lang = langCode;
@@ -5965,10 +5964,10 @@
       if (slice.length > 0) {
         container.innerHTML = slice.map((line, i) => `<div class="mob-lyrics-preview-line ${i === 0 ? 'active' : ''}">${escapeHtml(line)}</div>`).join('');
       } else {
-        container.innerHTML = '<div class="mob-lyrics-preview-placeholder">Verified plain lyrics available</div>';
+        container.innerHTML = '';
       }
     } else {
-      container.innerHTML = '<div class="mob-lyrics-preview-placeholder">Loading lyrics preview...</div>';
+      container.innerHTML = '';
     }
   }
 

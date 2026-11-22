@@ -24,6 +24,13 @@ async function runTests() {
   console.log('🧪 TESTING MUSISURF ADVANCED CINEMATIC LYRICS PLAYER');
   console.log('====================================================\n');
 
+  const app = require('../server');
+  const server = await new Promise(resolve => {
+    const s = app.listen(0, () => resolve(s));
+  });
+  const port = server.address().port;
+  const baseUrl = `http://localhost:${port}`;
+
   let passed = 0;
   let total = 0;
 
@@ -50,18 +57,21 @@ async function runTests() {
   }
 
   // --- 1. Functional Anti-Wrong-Lyrics Test ---
-  await asyncTest('1. Harrdy Sandhu "Tuu" must NOT return Darshan Raval lyrics (Honest Unavailable)', async () => {
-    const res = await fetchJson('http://localhost:3000/api/lyrics?title=Tuu&artist=Harrdy%20Sandhu');
+  await asyncTest('1. Harrdy Sandhu "Tuu" returns authentic lyrics and NEVER Darshan Raval lyrics', async () => {
+    const res = await fetchJson(`${baseUrl}/api/lyrics?title=Tuu&artist=Harrdy%20Sandhu`);
     assert.strictEqual(res.status, 200, 'HTTP status should be 200');
-    assert.strictEqual(res.body.success, false, 'Should report success: false when lyrics unavailable');
-    assert.strictEqual(res.body.verified, false, 'Should not claim verified lyrics');
+    assert.strictEqual(res.body.success, true, 'Should find authentic Harrdy Sandhu lyrics');
+    assert.strictEqual(res.body.verified, true, 'Should be verified');
+    const artist = (res.body.artistName || '').toLowerCase();
+    assert.ok(artist.includes('harrdy'), `Artist should be Harrdy Sandhu, got: ${res.body.artistName}`);
     const lyricsContent = (res.body.plainLyrics || res.body.syncedLyrics || '').toLowerCase();
     assert.ok(!lyricsContent.includes('tune chain chheena'), 'Must NEVER include Darshan Raval lyrics');
+    assert.ok(lyricsContent.includes('phullan ton vi puchheya'), 'Must include authentic Harrdy Sandhu lyrics');
   });
 
   // --- 2. Darshan Raval "Tuu" Test ---
   await asyncTest('2. Darshan Raval "Tuu" must return Darshan Raval lyrics', async () => {
-    const res = await fetchJson('http://localhost:3000/api/lyrics?title=Tuu&artist=Darshan%20Raval');
+    const res = await fetchJson(`${baseUrl}/api/lyrics?title=Tuu&artist=Darshan%20Raval`);
     assert.strictEqual(res.status, 200, 'HTTP status should be 200');
     assert.strictEqual(res.body.success, true, 'Should find Darshan Raval lyrics');
     const artist = (res.body.artistName || '').toLowerCase();
@@ -70,7 +80,7 @@ async function runTests() {
 
   // --- 3. Hindi Song "Yeh Fitoor Mera" Test ---
   await asyncTest('3. Hindi Song "Yeh Fitoor Mera" by Arijit Singh returns Devanagari lyrics', async () => {
-    const res = await fetchJson('http://localhost:3000/api/lyrics?title=Yeh%20Fitoor%20Mera&artist=Arijit%20Singh');
+    const res = await fetchJson(`${baseUrl}/api/lyrics?title=Yeh%20Fitoor%20Mera&artist=Arijit%20Singh`);
     assert.strictEqual(res.status, 200, 'HTTP status should be 200');
     assert.strictEqual(res.body.success, true, 'Should find verified lyrics');
     assert.strictEqual(res.body.script, 'Devanagari', 'Script should be Devanagari');
@@ -78,17 +88,19 @@ async function runTests() {
 
   // --- 4. Punjabi Song "Backbone" Test ---
   await asyncTest('4. Punjabi Song "Backbone" by Harrdy Sandhu returns Gurmukhi lyrics', async () => {
-    const res = await fetchJson('http://localhost:3000/api/lyrics?title=Backbone&artist=Harrdy%20Sandhu');
+    const res = await fetchJson(`${baseUrl}/api/lyrics?title=Backbone&artist=Harrdy%20Sandhu`);
     assert.strictEqual(res.status, 200, 'HTTP status should be 200');
     assert.strictEqual(res.body.success, true, 'Should find verified lyrics');
     assert.strictEqual(res.body.script, 'Gurmukhi', 'Script should be Gurmukhi');
   });
 
   // --- 5. Verified Database Audit ---
-  test('5. verified_lyrics_db.json contains zero corrupted entries', () => {
+  test('5. verified_lyrics_db.json contains authentic Harrdy Sandhu and zero corrupted entries', () => {
     const dbPath = path.join(__dirname, '..', 'data', 'verified_lyrics_db.json');
     const db = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-    assert.ok(!db['tuu__harrdy sandhu__standard'], 'tuu__harrdy sandhu must not exist in verified_db');
+    assert.ok(db['tuu__harrdy sandhu__standard'], 'tuu__harrdy sandhu must exist in verified_db with authentic Punjabi lyrics');
+    assert.ok(!db['tuu____standard'], 'tuu____standard without artist must be permanently removed');
+    assert.ok(db['tuu__darshan raval__standard'], 'tuu__darshan raval must exist in verified_db for Darshan Raval');
   });
 
   // --- 6. Lyrics Window Inside Border Animation Cleanly Removed as Requested ---
@@ -123,9 +135,12 @@ async function runTests() {
   console.log(`🏁 TEST RESULTS: ${passed}/${total} TESTS PASSED`);
   console.log(`====================================================\n`);
 
+  server.close();
+
   if (passed !== total) {
     process.exit(1);
   }
+  process.exit(0);
 }
 
 runTests();

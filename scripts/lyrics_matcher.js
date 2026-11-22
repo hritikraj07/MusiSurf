@@ -94,6 +94,16 @@ function normalizeLyricsText(str) {
     .trim();
 }
 
+const GENERIC_ARTIST_TOKENS = new Set([
+  'singh', 'kumar', 'music', 'records', 'official', 'the', 'band', 'productions', 
+  'audio', 'entertainment', 'dj', 'mc', 'dr', 'and', 'feat', 'ft', 'x', 
+  'featuring', 'ali', 'khan', 'sharma', 'verma', 'gupta', 'brothers', 'studios', 'sound'
+]);
+
+function filterGenericTokens(tokens) {
+  return tokens.filter(t => !GENERIC_ARTIST_TOKENS.has(t) && t.length > 1);
+}
+
 /**
  * Strict Multi-Parameter Candidate Verification Score (0 - 100)
  * Evaluates candidate song from any provider or internet source against the target song.
@@ -135,11 +145,16 @@ function computeLyricsMatchScore(candidate, target) {
   // ----------------------------------------------------
   // 1. Title Similarity (up to 50 pts)
   // ----------------------------------------------------
+  const isShortTitle = targetTitle.length <= 3;
   if (candTitle === targetTitle) {
     score += 50;
-  } else if (candTitle.startsWith(targetTitle + ' ') || targetTitle.startsWith(candTitle + ' ')) {
+  } else if (!isShortTitle && (candTitle.startsWith(targetTitle + ' ') || targetTitle.startsWith(candTitle + ' '))) {
     score += 44;
   } else {
+    if (isShortTitle) {
+      // Short titles (e.g. "Tu", "Tuu", "Ta", "Wo") must match exactly, never via token overlap
+      return 0;
+    }
     const targetTokens = targetTitle.split(' ').filter(Boolean);
     const candTokens = candTitle.split(' ').filter(Boolean);
     if (targetTokens.length === 0 || candTokens.length === 0) return 0;
@@ -148,7 +163,7 @@ function computeLyricsMatchScore(candidate, target) {
     const tokenOverlap = common.length / Math.max(targetTokens.length, candTokens.length);
 
     // Hard reject if title similarity is too low
-    if (tokenOverlap < 0.40 && !candTitle.includes(targetTitle) && !targetTitle.includes(candTitle)) {
+    if (tokenOverlap < 0.45 && !candTitle.includes(targetTitle) && !targetTitle.includes(candTitle)) {
       return 0; // Hard reject: mismatched song title
     }
     score += Math.round(tokenOverlap * 44);
@@ -157,36 +172,58 @@ function computeLyricsMatchScore(candidate, target) {
   // ----------------------------------------------------
   // 2. Artist Similarity (up to 35 pts)
   // ----------------------------------------------------
+  if (!candPrimary && targetPrimary) {
+    // Missing candidate artist when target has a known artist:
+    // HARD REJECT: An artist-less candidate must NEVER qualify on title alone!
+    return 0;
+  }
+  if (candPrimary && !targetPrimary) {
+    // Missing target artist when candidate has an artist:
+    // HARD REJECT to prevent false matching generic/short titles
+    return 0;
+  }
+
   if (targetPrimary && candPrimary) {
-    // Check if primary artist matches exactly
+    // 1. Direct primary match
     if (candPrimary === targetPrimary || candPrimary.includes(targetPrimary) || targetPrimary.includes(candPrimary)) {
       score += 35;
     } else {
-      // Check if candidate matches ANY artist in target's artist list (or vice versa)
-      const targetAllNorm = targetArtistObj.allArtists.map(a => normalizeLyricsText(a));
-      const candAllNorm = candArtistObj.allArtists.map(a => normalizeLyricsText(a));
+      // 2. Cross-artist list match (handling collaborations e.g. Harrdy Sandhu feat Mix Singh vs Mix Singh)
+      const targetAllNorm = targetArtistObj.allArtists.map(a => normalizeLyricsText(a)).filter(Boolean);
+      const candAllNorm = candArtistObj.allArtists.map(a => normalizeLyricsText(a)).filter(Boolean);
 
-      const hasCrossMatch = targetAllNorm.some(ta => candAllNorm.some(ca => ta === ca || ta.includes(ca) || ca.includes(ta)));
+      const hasCrossMatch = targetAllNorm.some(ta => candAllNorm.some(ca => {
+        if (ta === ca) return true;
+        // Check containment if length is sufficient (> 3) and not just a generic token
+        if (ta.length > 3 && ca.length > 3 && (ta.includes(ca) || ca.includes(ta))) {
+          const taDistinct = filterGenericTokens(ta.split(' '));
+          const caDistinct = filterGenericTokens(ca.split(' '));
+          const commonDistinct = taDistinct.filter(t => caDistinct.includes(t));
+          return commonDistinct.length > 0;
+        }
+        return false;
+      }));
+
       if (hasCrossMatch) {
         score += 30;
       } else {
+        // Token comparison: Filter out generic tokens like 'singh', 'kumar', 'music'
         const targetTokens = targetPrimary.split(' ').filter(Boolean);
         const candTokens = candPrimary.split(' ').filter(Boolean);
-        const commonTokens = targetTokens.filter(t => candTokens.includes(t));
+        const distinctTarget = filterGenericTokens(targetTokens);
+        const distinctCand = filterGenericTokens(candTokens);
 
-        if (commonTokens.length === 0) {
-          // STRICT RULE: Different artist -> Instant Hard Reject!
-          // e.g. "Tuu by Darshan Raval" vs "Tuu by Harrdy Sandhu" -> REJECTED
+        const commonDistinct = distinctTarget.filter(t => distinctCand.includes(t));
+
+        if (commonDistinct.length === 0) {
+          // STRICT RULE: Different artist (no distinct non-generic tokens match) -> Instant Hard Reject!
+          // e.g. "Tuu by Darshan Raval" vs "Tuu by Harrdy Sandhu" -> REJECTED (score = 0)
+          // e.g. "Tuu by Mix Singh" vs "Tuu by Arijit Singh" -> REJECTED (score = 0)
           return 0;
         }
-        score += Math.round((commonTokens.length / Math.max(targetTokens.length, 1)) * 25);
+        score += Math.round((commonDistinct.length / Math.max(distinctTarget.length, 1)) * 25);
       }
     }
-  } else if (!candPrimary && targetPrimary) {
-    // Missing candidate artist when target has a known artist:
-    // STRICT ANTI-WRONG-SONG RULE: Cannot verify artist identity.
-    // An artist-less candidate must not qualify on title alone.
-    score += 0;
   }
 
   // ----------------------------------------------------
@@ -206,10 +243,14 @@ function computeLyricsMatchScore(candidate, target) {
   // ----------------------------------------------------
   if (target.duration && candidate.duration && candidate.duration > 0 && target.duration > 0) {
     const diff = Math.abs(target.duration - candidate.duration);
+    if (diff > 45) {
+      // Severe duration difference (> 45s) -> HARD REJECT
+      return 0;
+    }
     if (diff <= 4) score += 15;
     else if (diff <= 10) score += 12;
     else if (diff <= 20) score += 6;
-    else if (diff > 35) score -= 30; // Severe duration difference penalty
+    else if (diff > 35) score -= 20;
   }
 
   // ----------------------------------------------------

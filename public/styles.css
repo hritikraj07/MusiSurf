@@ -11094,17 +11094,9 @@ body[data-active-view="lyrics"] .content-scroll {
   box-sizing: border-box !important;
 }
 
-.lyrics-plain-notice {
-  font-size: 0.82rem !important;
-  color: rgba(255, 255, 255, 0.5) !important;
-  background: rgba(255, 255, 255, 0.05) !important;
-  padding: 8px 14px !important;
-  border-radius: 8px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  width: fit-content !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+.lyrics-plain-notice,
+.mob-lyrics-preview-placeholder {
+  display: none !important;
 }
 
 .lyrics-plain-text {

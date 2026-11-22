@@ -253,10 +253,10 @@ class LyricsDiscoveryEngine {
     }
 
     // Strategy 2: Scored Search Queries
-    const searchQueries = [
-      `${title} ${artist}`.trim(),
-      title
-    ];
+    const searchQueries = [];
+    if (artist) searchQueries.push(`${title} ${artist}`.trim());
+    if (artist) searchQueries.push(`${artist} ${title}`.trim());
+    if (title.length > 3) searchQueries.push(title);
 
     for (const q of searchQueries) {
       try {
@@ -332,7 +332,7 @@ class LyricsDiscoveryEngine {
 
     const queries = [];
     if (artist) queries.push(`${title} ${artist}`.trim());
-    queries.push(title);
+    if (title && title.length > 3) queries.push(title);
 
     for (const q of queries) {
       try {
@@ -535,9 +535,11 @@ class LyricsDiscoveryEngine {
   }
 
   storeVerifiedResult(dbKey, cacheKey, result) {
-    // 1. Store in Persistent Verified DB
-    this.verifiedDb[dbKey] = result;
-    this.saveVerifiedDb();
+    // 1. Store in Persistent Verified DB ONLY IF key contains a non-empty verified artist
+    if (dbKey && !dbKey.includes('____') && result && result.artistName) {
+      this.verifiedDb[dbKey] = result;
+      this.saveVerifiedDb();
+    }
 
     // 2. Store in Memory Cache
     if (memoryCache.size >= MEMORY_CACHE_MAX) {
