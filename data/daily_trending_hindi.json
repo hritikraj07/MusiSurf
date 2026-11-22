@@ -1,0 +1,112 @@
+{
+  "current": {
+    "date_ist": "2026-11-22",
+    "canonical_id": "yt_TkgID59s8cI",
+    "matched_track_id": "yt_TkgID59s8cI",
+    "title": "तुलसा की आई है बारात मेरे आंगन में | Tulsa Ki Aayi Hai Barat | तुलसी माता भजन | Tulsi Vivah Bhajan",
+    "artist": "Bajao Bhakti",
+    "album": "YouTube India Trending",
+    "language": "hindi",
+    "thumbnail_url": "https://i.ytimg.com/vi/TkgID59s8cI/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3nSRWgP-termwpsFu9cKs1gYEK-vQ",
+    "platform_source": "youtube",
+    "source_label": "Trending on YouTube",
+    "youtube_video_id": "TkgID59s8cI",
+    "instagram_audio_id": null,
+    "trend_score": 80.3,
+    "trend_rank": 1,
+    "verified_metrics": {
+      "viewCount": 1635274,
+      "chartRank": 1,
+      "chartName": "Trending 20 India",
+      "channel": "Bajao Bhakti",
+      "hindiConfidence": 0.85,
+      "scoreBreakdown": {
+        "finalScore": 80.3,
+        "rankScore": 100.75,
+        "viewScore": 78,
+        "repetitionPenalty": 0,
+        "breakdown": {
+          "rankScore": 100.75,
+          "viewScore": 78,
+          "platformScore": 85,
+          "crossPlatformScore": 0,
+          "repetitionPenalty": 0
+        }
+      }
+    },
+    "matched_track": {
+      "id": "yt_TkgID59s8cI",
+      "originalId": "TkgID59s8cI",
+      "title": "तुलसा की आई है बारात मेरे आंगन में | Tulsa Ki Aayi Hai Barat | तुलसी माता भजन | Tulsi Vivah Bhajan",
+      "artist": "Bajao Bhakti",
+      "album": "YouTube India Trending",
+      "duration": 329,
+      "image": "https://i.ytimg.com/vi/TkgID59s8cI/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3nSRWgP-termwpsFu9cKs1gYEK-vQ",
+      "thumbnailUrl": "https://i.ytimg.com/vi/TkgID59s8cI/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3nSRWgP-termwpsFu9cKs1gYEK-vQ",
+      "source": "youtube",
+      "streamUrl": "/api/yt-stream?v=TkgID59s8cI",
+      "hasDirectAudio": false,
+      "matchConfidence": 0.9,
+      "matchMethod": "youtube_verified"
+    },
+    "selection_timestamp": "2026-11-22T04:34:34.159Z",
+    "updated_at": "2026-11-22T04:34:34.159Z",
+    "is_active": true
+  },
+  "history": [
+    {
+      "date_ist": "2026-11-22",
+      "canonical_id": "yt_TkgID59s8cI",
+      "matched_track_id": "yt_TkgID59s8cI",
+      "title": "तुलसा की आई है बारात मेरे आंगन में | Tulsa Ki Aayi Hai Barat | तुलसी माता भजन | Tulsi Vivah Bhajan",
+      "artist": "Bajao Bhakti",
+      "album": "YouTube India Trending",
+      "language": "hindi",
+      "thumbnail_url": "https://i.ytimg.com/vi/TkgID59s8cI/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3nSRWgP-termwpsFu9cKs1gYEK-vQ",
+      "platform_source": "youtube",
+      "source_label": "Trending on YouTube",
+      "youtube_video_id": "TkgID59s8cI",
+      "instagram_audio_id": null,
+      "trend_score": 80.3,
+      "trend_rank": 1,
+      "verified_metrics": {
+        "viewCount": 1635274,
+        "chartRank": 1,
+        "chartName": "Trending 20 India",
+        "channel": "Bajao Bhakti",
+        "hindiConfidence": 0.85,
+        "scoreBreakdown": {
+          "finalScore": 80.3,
+          "rankScore": 100.75,
+          "viewScore": 78,
+          "repetitionPenalty": 0,
+          "breakdown": {
+            "rankScore": 100.75,
+            "viewScore": 78,
+            "platformScore": 85,
+            "crossPlatformScore": 0,
+            "repetitionPenalty": 0
+          }
+        }
+      },
+      "matched_track": {
+        "id": "yt_TkgID59s8cI",
+        "originalId": "TkgID59s8cI",
+        "title": "तुलसा की आई है बारात मेरे आंगन में | Tulsa Ki Aayi Hai Barat | तुलसी माता भजन | Tulsi Vivah Bhajan",
+        "artist": "Bajao Bhakti",
+        "album": "YouTube India Trending",
+        "duration": 329,
+        "image": "https://i.ytimg.com/vi/TkgID59s8cI/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3nSRWgP-termwpsFu9cKs1gYEK-vQ",
+        "thumbnailUrl": "https://i.ytimg.com/vi/TkgID59s8cI/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3nSRWgP-termwpsFu9cKs1gYEK-vQ",
+        "source": "youtube",
+        "streamUrl": "/api/yt-stream?v=TkgID59s8cI",
+        "hasDirectAudio": false,
+        "matchConfidence": 0.9,
+        "matchMethod": "youtube_verified"
+      },
+      "selection_timestamp": "2026-11-22T04:34:34.159Z",
+      "updated_at": "2026-11-22T04:34:34.159Z",
+      "is_active": true
+    }
+  ]
+}

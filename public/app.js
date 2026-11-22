@@ -250,6 +250,9 @@
     // Home View
     greetingHeading: document.getElementById('greetingHeading'),
     quickPicksGrid: document.getElementById('quickPicksGrid'),
+    trendingHindiSection: document.getElementById('trendingHindiSection'),
+    trendingHindiCard: document.getElementById('trendingHindiCard'),
+    trendingDateTag: document.getElementById('trendingDateTag'),
     shelvesContainer: document.getElementById('shelvesContainer'),
 
     // Search View
@@ -6247,7 +6250,166 @@
     return unique;
   }
 
+  // ==========================================================================
+  // Daily Trending Hindi Song Homepage Feature Engine
+  // ==========================================================================
+  async function loadDailyTrendingHindiSong() {
+    if (!elements.trendingHindiCard) return;
+
+    try {
+      const res = await fetch('/api/trending/daily');
+      if (!res.ok) {
+        if (elements.trendingHindiSection) elements.trendingHindiSection.style.display = 'none';
+        return;
+      }
+      const json = await res.json();
+      if (!json.success || !json.data) {
+        if (elements.trendingHindiSection) elements.trendingHindiSection.style.display = 'none';
+        return;
+      }
+
+      const song = json.data;
+      state.dailyTrendingHindiSong = song;
+
+      // Format date in Asia/Kolkata
+      if (elements.trendingDateTag && song.date_ist) {
+        try {
+          const [y, m, d] = song.date_ist.split('-');
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const monthName = months[parseInt(m, 10) - 1] || m;
+          elements.trendingDateTag.textContent = `Today • ${parseInt(d, 10)} ${monthName} ${y}`;
+        } catch (e) {
+          elements.trendingDateTag.textContent = 'Today • India Trends';
+        }
+      }
+
+      renderDailyTrendingHindiCard(song);
+      if (elements.trendingHindiSection) elements.trendingHindiSection.style.display = '';
+    } catch (err) {
+      console.warn('Daily trending Hindi song load notice:', err.message);
+      if (elements.trendingHindiSection) elements.trendingHindiSection.style.display = 'none';
+    }
+  }
+
+  function renderDailyTrendingHindiCard(song) {
+    if (!elements.trendingHindiCard || !song) return;
+
+    const matched = song.matched_track || {};
+    const trackToPlay = {
+      id: matched.id || song.matched_track_id,
+      title: song.title || matched.title,
+      artist: song.artist || matched.artist,
+      album: song.album || matched.album || 'Single',
+      duration: matched.duration || 210,
+      image: song.thumbnail_url || matched.image,
+      thumbnailUrl: song.thumbnail_url || matched.image,
+      streamUrl: matched.streamUrl,
+      source: matched.source || song.platform_source,
+      hasDirectAudio: matched.hasDirectAudio !== false
+    };
+
+    // Build verified source badge icon & label
+    let sourceBadgeHtml = '';
+    if (song.platform_source === 'youtube_instagram') {
+      sourceBadgeHtml = `
+        <span class="trending-source-badge" title="Verified trend on YouTube & Instagram Reels">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+          <span>Trending on YouTube and Instagram</span>
+        </span>`;
+    } else if (song.platform_source === 'instagram') {
+      sourceBadgeHtml = `
+        <span class="trending-source-badge" title="Verified trending audio on Instagram Reels">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+          <span>Trending on Instagram</span>
+        </span>`;
+    } else {
+      sourceBadgeHtml = `
+        <span class="trending-source-badge" title="Verified trend on YouTube India">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+          <span>Trending on YouTube</span>
+        </span>`;
+    }
+
+    // Factual view metric
+    const viewCount = song.verified_metrics?.viewCount || 0;
+    let viewText = 'Viral in India • #1 Today';
+    if (viewCount > 1000000) {
+      viewText = `🔥 ${(viewCount / 1000000).toFixed(1)}M+ views • Top India Music Trend`;
+    } else if (viewCount > 100000) {
+      viewText = `🔥 ${Math.round(viewCount / 1000)}k+ views • Top India Music Trend`;
+    }
+
+    elements.trendingHindiCard.innerHTML = `
+      <div class="trending-card-artwork-box">
+        <img src="${trackToPlay.image}" alt="${escapeHtml(trackToPlay.title)}" class="trending-card-artwork" loading="lazy">
+      </div>
+      <div class="trending-card-content">
+        <div class="trending-card-badges-row">
+          ${sourceBadgeHtml}
+          <span class="trending-rank-tag">#1 Trending Hindi Song</span>
+        </div>
+        <h3 class="trending-song-title" title="${escapeHtml(trackToPlay.title)}">${escapeHtml(trackToPlay.title)}</h3>
+        <p class="trending-song-artists" title="${escapeHtml(trackToPlay.artist)}">${escapeHtml(trackToPlay.artist)}${trackToPlay.album && trackToPlay.album !== 'Single' ? ' • ' + escapeHtml(trackToPlay.album) : ''}</p>
+        <div class="trending-factual-metric">
+          <span>${viewText}</span>
+        </div>
+        <div class="trending-card-actions">
+          <button class="trending-play-btn" id="trendingPlayBtn">
+            <svg viewBox="0 0 24 24" class="trending-play-icon">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            <span class="trending-play-text">Play Now</span>
+          </button>
+          <button class="trending-action-icon-btn" id="trendingQueueBtn" title="Play Next">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 17px; height: 17px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <button class="trending-action-icon-btn" id="trendingLikeBtn" title="Save to Liked Songs">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 17px; height: 17px;"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          </button>
+        </div>
+      </div>
+    `;
+
+    // Wire Play Button to MusiSurf Authoritative Audio Engine
+    const playBtn = elements.trendingHindiCard.querySelector('#trendingPlayBtn');
+    if (playBtn) {
+      playBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (state.currentTrack && areTracksIdentical(state.currentTrack, trackToPlay)) {
+          togglePlayPause();
+        } else {
+          state.activePlaylistId = null;
+          playTrack(trackToPlay, [trackToPlay]);
+        }
+      });
+    }
+
+    // Wire Queue Button
+    const queueBtn = elements.trendingHindiCard.querySelector('#trendingQueueBtn');
+    if (queueBtn) {
+      queueBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!state.userQueue) state.userQueue = [];
+        state.userQueue.push(trackToPlay);
+        state.queue = [state.currentTrack, ...state.userQueue, ...state.contextQueue.slice(state.contextIndex + 1)];
+        updateQueueDrawerUI();
+        showToast(`Added to queue: "${trackToPlay.title}"`, '⏭');
+      });
+    }
+
+    // Wire Like Button
+    const likeBtn = elements.trendingHindiCard.querySelector('#trendingLikeBtn');
+    if (likeBtn) {
+      likeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleLikeSong(trackToPlay);
+      });
+    }
+  }
+
   async function loadTrendingShelves() {
+    loadDailyTrendingHindiSong();
     try {
       const res = await fetch(`/api/trending?t=${Date.now()}&refresh=1`);
       const data = await res.json();

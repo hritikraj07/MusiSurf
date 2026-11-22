@@ -1327,6 +1327,59 @@ app.get('/api/trending', async (req, res) => {
 });
 
 // ============================================================================
+// Daily Trending Hindi Song Feature Engine
+// ============================================================================
+const {
+  getDailyTrendingHindiSong,
+  executeDailyDiscoveryPipeline,
+  getDailyTrendingDebugInfo,
+  initDailyTrendingScheduler
+} = require('./services/dailyTrendingService');
+
+// Public endpoint for homepage: returns verified #1 trending Hindi song for Asia/Kolkata date
+app.get('/api/trending/daily', async (req, res) => {
+  try {
+    const forceRefresh = req.query.refresh === '1';
+    const song = await getDailyTrendingHindiSong(forceRefresh);
+    if (!song) {
+      return res.status(404).json({
+        success: false,
+        error: 'No verified trending Hindi song available for today'
+      });
+    }
+    res.json({
+      success: true,
+      data: song
+    });
+  } catch (err) {
+    console.error('Error fetching daily trending Hindi song:', err);
+    res.status(500).json({ success: false, error: 'Internal error loading daily trending feature' });
+  }
+});
+
+// Admin / internal inspection and debug endpoint
+app.get('/api/trending/daily/debug', (req, res) => {
+  res.json({
+    success: true,
+    debug: getDailyTrendingDebugInfo()
+  });
+});
+
+// Admin manual refresh trigger
+app.post('/api/trending/daily/refresh', async (req, res) => {
+  try {
+    const refreshed = await executeDailyDiscoveryPipeline(true);
+    res.json({
+      success: true,
+      message: 'Daily trending pipeline executed successfully',
+      data: refreshed
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================================================
 // Intelligent Recommendations & Vibe Matching Engine
 // ============================================================================
 const MOOD_KEYWORDS = {
@@ -2488,6 +2541,7 @@ app.use((err, req, res, next) => {
 
 // Start standalone server locally; never call app.listen() inside Vercel serverless functions
 if (!process.env.VERCEL && require.main === module) {
+  initDailyTrendingScheduler();
   app.listen(PORT, () => {
     console.log(`===============================================`);
     console.log(`🌊 MusiSurf Music Streaming Server Active!`);
