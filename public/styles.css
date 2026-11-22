@@ -11127,6 +11127,7 @@ body[data-active-view="lyrics"] .content-scroll {
   overflow-wrap: break-word !important;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
@@ -12676,6 +12677,7 @@ body[data-active-view="lyrics"] .content-scroll {
 
 .eq-vertical-slider {
   -webkit-appearance: slider-vertical;
+  appearance: slider-vertical;
   writing-mode: bt-lr;
   width: 8px;
   height: 110px;
