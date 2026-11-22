@@ -35,6 +35,17 @@
     playlistMode: localStorage.getItem('musisurf_playlist_playback_mode') || '1', // '1': In Order + Autoplay, '2': Shuffle Once + Autoplay, '3': Shuffle & Repeat Playlist
     recommendationQueue: [],
     rejectedRecommendationIds: new Set(),
+    recoSession: {
+      sessionId: 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      recommendedCanonicalIds: new Set(),
+      playedCanonicalIds: new Set(),
+      skippedCanonicalIds: new Map(), // canonicalId -> timestamp
+      removedCanonicalIds: new Set(),
+      recentArtists: [],
+      seedHistory: [],
+      pageOffsets: new Map(),
+      requestInProgress: false,
+    },
     playbackContext: { type: 'idle', playlistId: null, trackId: null },
     playlistProgressMap: {},
     sessionHistory: [],
@@ -877,6 +888,14 @@
     lastAdvanceCallTime = now;
     if (completedTrackId) lastAdvancedTrackId = completedTrackId;
 
+    if (state.currentTrack) {
+      if (reason === 'track_ended') {
+        recordTrackPlayed(state.currentTrack);
+      } else if (reason === 'playback_stream_error') {
+        recordTrackSkipped(state.currentTrack);
+      }
+    }
+
     transitionToNextSong();
   }
 
@@ -1543,26 +1562,324 @@
     elements.audioSecondary = getSecondaryDeck();
   }
 
-  // Stable Track Identity Comparison (handles IDs, ytIds, audio URLs, and normalized title+artist)
+  // ============================================================================
+  // Canonical Track Identity & Session Deduplication Engine
+  // ============================================================================
+  function normalizeString(str) {
+    if (!str || typeof str !== 'string') return '';
+    return str
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[\(\[\{].*?[\)\]\}]/g, '')
+      .replace(/[^\p{L}\p{N}\s]/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function extractPrimaryArtist(artistStr) {
+    if (!artistStr || typeof artistStr !== 'string') return '';
+    const first = artistStr.split(/[,&/|]|\bfeat\.?\b|\bft\.?\b/i)[0];
+    return normalizeString(first);
+  }
+
+  function extractVersionTag(titleStr) {
+    if (!titleStr || typeof titleStr !== 'string') return 'standard';
+    const lower = titleStr.toLowerCase();
+    if (lower.includes('acoustic')) return 'acoustic';
+    if (lower.includes('unplugged')) return 'unplugged';
+    if (lower.includes('live')) return 'live';
+    if (lower.includes('remix') || lower.includes('mix')) return 'remix';
+    if (lower.includes('reprise')) return 'reprise';
+    if (lower.includes('lofi') || lower.includes('lo-fi')) return 'lofi';
+    if (lower.includes('slowed') || lower.includes('reverb')) return 'slowed_reverb';
+    if (lower.includes('cover')) return 'cover';
+    if (lower.includes('instrumental')) return 'instrumental';
+    return 'standard';
+  }
+
+  function getCanonicalTrackId(track) {
+    if (!track || typeof track !== 'object') return '';
+
+    // Priority 1: ISRC
+    if (track.isrc && typeof track.isrc === 'string') {
+      const isrcClean = track.isrc.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (isrcClean.length >= 10 && isrcClean.length <= 15) {
+        return `isrc_${isrcClean}`;
+      }
+    }
+
+    // Priority 2: Canonical Provider Track ID
+    const rawId = String(track.id || track.trackId || track.originalId || track.ytId || '').trim();
+    if (rawId) {
+      if (rawId.startsWith('saavn_')) {
+        const core = rawId.replace(/^saavn_/, '');
+        if (core) return `saavn_${core}`;
+      }
+      if (rawId.startsWith('yt_')) {
+        const core = rawId.replace(/^yt_/, '');
+        if (core) return `yt_${core}`;
+      }
+      if (track.source === 'saavn' || track.hasDirectAudio) {
+        return `saavn_${rawId}`;
+      }
+      if (track.source === 'youtube' || track.ytId) {
+        return `yt_${rawId}`;
+      }
+      if (!rawId.startsWith('fp_') && !rawId.startsWith('id_') && rawId.length >= 4) {
+        return `id_${rawId}`;
+      }
+    }
+
+    // Priority 3: Normalized Fingerprint Fallback (Title + Primary Artist + Version)
+    const normTitle = normalizeString(track.title);
+    const primaryArtist = extractPrimaryArtist(track.artist);
+    const version = extractVersionTag(track.title);
+
+    if (normTitle && primaryArtist) {
+      return `fp_${normTitle}__${primaryArtist}__${version}`;
+    }
+    if (normTitle) {
+      return `fp_${normTitle}__unknown__${version}`;
+    }
+
+    return rawId ? `id_${rawId}` : '';
+  }
+
+  function getTrackFingerprint(track) {
+    if (!track || typeof track !== 'object') return '';
+    const normTitle = normalizeString(track.title);
+    const primaryArtist = extractPrimaryArtist(track.artist);
+    const version = extractVersionTag(track.title);
+    return `${normTitle}:::${primaryArtist}:::${version}`;
+  }
+
+  function areTracksIdentical(trackA, trackB) {
+    if (!trackA || !trackB) return false;
+    if (trackA === trackB) return true;
+
+    const idA = getCanonicalTrackId(trackA);
+    const idB = getCanonicalTrackId(trackB);
+
+    // Exact canonical ID match
+    if (idA && idB && idA === idB) return true;
+
+    // Cross-provider originalId match
+    const origA = String(trackA.originalId || trackA.id || '').replace(/^saavn_/, '');
+    const origB = String(trackB.originalId || trackB.id || '').replace(/^saavn_/, '');
+    if (origA && origB && origA === origB && origA.length >= 4) return true;
+
+    // Fingerprint match (Title + Primary Artist + Version)
+    const fpA = getTrackFingerprint(trackA);
+    const fpB = getTrackFingerprint(trackB);
+    if (fpA && fpB && fpA === fpB && !fpA.startsWith(':::')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // Stable Track Identity Comparison (delegates to areTracksIdentical)
   function isSameTrack(t1, t2) {
     if (!t1 || !t2) return false;
     if (t1 === t2) return true;
-    const id1 = t1.id ? String(t1.id) : '';
-    const id2 = t2.id ? String(t2.id) : '';
-    if (id1 && id2) {
-      if (id1 === id2) return true;
-      if (id1.replace(/^saavn_/, '') === id2.replace(/^saavn_/, '')) return true;
-    }
-    if (t1.ytId && t2.ytId && String(t1.ytId) === String(t2.ytId)) return true;
-    if (t1.audioUrl && t2.audioUrl && t1.audioUrl === t2.audioUrl) return true;
-    const cleanTitle = (s) => (s || '').trim().toLowerCase().replace(/\s*\(.*?\)/g, '').replace(/[^\w\s]/g, '').trim();
-    const title1 = cleanTitle(t1.title);
-    const title2 = cleanTitle(t2.title);
-    const artist1 = (t1.artist || '').trim().toLowerCase();
-    const artist2 = (t2.artist || '').trim().toLowerCase();
-    if (title1 && title1 === title2 && artist1 && (artist1 === artist2 || artist1.includes(artist2) || artist2.includes(artist1))) return true;
-    return false;
+    return areTracksIdentical(t1, t2);
   }
+
+  // Session Persistence & Tracking Helpers
+  function saveRecoSession() {
+    try {
+      if (!state.recoSession) return;
+      const data = {
+        sessionId: state.recoSession.sessionId,
+        recommendedCanonicalIds: Array.from(state.recoSession.recommendedCanonicalIds || []).slice(-300),
+        playedCanonicalIds: Array.from(state.recoSession.playedCanonicalIds || []).slice(-200),
+        skippedCanonicalIds: Array.from(state.recoSession.skippedCanonicalIds?.entries() || []).slice(-100),
+        removedCanonicalIds: Array.from(state.recoSession.removedCanonicalIds || []).slice(-100),
+        recentArtists: (state.recoSession.recentArtists || []).slice(-15),
+        seedHistory: (state.recoSession.seedHistory || []).slice(-15),
+        pageOffsets: Array.from(state.recoSession.pageOffsets?.entries() || []).slice(-50),
+        updatedAt: Date.now()
+      };
+      localStorage.setItem('musisurf_reco_session', JSON.stringify(data));
+    } catch (e) {}
+  }
+
+  function loadRecoSession() {
+    try {
+      if (!state.recoSession) return;
+      const raw = localStorage.getItem('musisurf_reco_session');
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (!data || typeof data !== 'object') return;
+      // Expire session if older than 24 hours
+      if (data.updatedAt && Date.now() - data.updatedAt > 24 * 60 * 60 * 1000) {
+        localStorage.removeItem('musisurf_reco_session');
+        return;
+      }
+      if (data.sessionId) state.recoSession.sessionId = data.sessionId;
+      if (Array.isArray(data.recommendedCanonicalIds)) {
+        state.recoSession.recommendedCanonicalIds = new Set(data.recommendedCanonicalIds);
+      }
+      if (Array.isArray(data.playedCanonicalIds)) {
+        state.recoSession.playedCanonicalIds = new Set(data.playedCanonicalIds);
+      }
+      if (Array.isArray(data.skippedCanonicalIds)) {
+        state.recoSession.skippedCanonicalIds = new Map(data.skippedCanonicalIds);
+      }
+      if (Array.isArray(data.removedCanonicalIds)) {
+        state.recoSession.removedCanonicalIds = new Set(data.removedCanonicalIds);
+      }
+      if (Array.isArray(data.recentArtists)) {
+        state.recoSession.recentArtists = data.recentArtists;
+      }
+      if (Array.isArray(data.seedHistory)) {
+        state.recoSession.seedHistory = data.seedHistory;
+      }
+      if (Array.isArray(data.pageOffsets)) {
+        state.recoSession.pageOffsets = new Map(data.pageOffsets);
+      }
+    } catch (e) {}
+  }
+
+  function recordTrackRecommended(track) {
+    if (!track || !state.recoSession) return;
+    const cid = getCanonicalTrackId(track);
+    if (cid) {
+      state.recoSession.recommendedCanonicalIds.add(cid);
+    }
+    const fp = getTrackFingerprint(track);
+    if (fp) {
+      state.recoSession.recommendedCanonicalIds.add(`fp_${fp}`);
+    }
+    const primaryArt = extractPrimaryArtist(track.artist);
+    if (primaryArt) {
+      state.recoSession.recentArtists = (state.recoSession.recentArtists || []).filter(a => a !== primaryArt);
+      state.recoSession.recentArtists.push(primaryArt);
+      if (state.recoSession.recentArtists.length > 15) {
+        state.recoSession.recentArtists.shift();
+      }
+    }
+    saveRecoSession();
+  }
+
+  function recordTrackPlayed(track) {
+    if (!track || !state.recoSession) return;
+    const cid = getCanonicalTrackId(track);
+    if (cid) {
+      state.recoSession.playedCanonicalIds.add(cid);
+    }
+    const fp = getTrackFingerprint(track);
+    if (fp) {
+      state.recoSession.playedCanonicalIds.add(`fp_${fp}`);
+    }
+    if (cid) {
+      state.recoSession.seedHistory = (state.recoSession.seedHistory || []).filter(id => id !== cid);
+      state.recoSession.seedHistory.push(cid);
+      if (state.recoSession.seedHistory.length > 15) {
+        state.recoSession.seedHistory.shift();
+      }
+    }
+    saveRecoSession();
+  }
+
+  function recordTrackSkipped(track) {
+    if (!track || !state.recoSession) return;
+    const cid = getCanonicalTrackId(track);
+    if (cid) {
+      state.recoSession.skippedCanonicalIds.set(cid, Date.now());
+    }
+    const fp = getTrackFingerprint(track);
+    if (fp) {
+      state.recoSession.skippedCanonicalIds.set(`fp_${fp}`, Date.now());
+    }
+    saveRecoSession();
+  }
+
+  function recordTrackRemoved(track) {
+    if (!track || !state.recoSession) return;
+    const cid = getCanonicalTrackId(track);
+    if (cid) {
+      state.recoSession.removedCanonicalIds.add(cid);
+    }
+    const fp = getTrackFingerprint(track);
+    if (fp) {
+      state.recoSession.removedCanonicalIds.add(`fp_${fp}`);
+    }
+    saveRecoSession();
+  }
+
+  function buildRecommendationExclusionList(seedTrack = null) {
+    const excludeSet = new Set();
+    if (!state.recoSession) return [];
+
+    // 1. Currently playing
+    if (state.currentTrack) {
+      const cid = getCanonicalTrackId(state.currentTrack);
+      if (cid) excludeSet.add(cid);
+      const fp = getTrackFingerprint(state.currentTrack);
+      if (fp) excludeSet.add(`fp_${fp}`);
+      if (state.currentTrack.id) excludeSet.add(state.currentTrack.id);
+    }
+
+    // 2. Queued tracks
+    (state.userQueue || []).forEach(t => {
+      const cid = getCanonicalTrackId(t);
+      if (cid) excludeSet.add(cid);
+      const fp = getTrackFingerprint(t);
+      if (fp) excludeSet.add(`fp_${fp}`);
+      if (t.id) excludeSet.add(t.id);
+    });
+
+    (state.recommendationQueue || []).forEach(t => {
+      const cid = getCanonicalTrackId(t);
+      if (cid) excludeSet.add(cid);
+      const fp = getTrackFingerprint(t);
+      if (fp) excludeSet.add(`fp_${fp}`);
+      if (t.id) excludeSet.add(t.id);
+    });
+
+    // 3. Recommended in active session
+    if (state.recoSession.recommendedCanonicalIds) {
+      state.recoSession.recommendedCanonicalIds.forEach(id => excludeSet.add(id));
+    }
+
+    // 4. Played in active session
+    if (state.recoSession.playedCanonicalIds) {
+      state.recoSession.playedCanonicalIds.forEach(id => excludeSet.add(id));
+    }
+
+    // 5. Manually removed from queue
+    if (state.recoSession.removedCanonicalIds) {
+      state.recoSession.removedCanonicalIds.forEach(id => excludeSet.add(id));
+    }
+
+    // 6. Recently skipped within 15-minute cooldown
+    const now = Date.now();
+    const SKIP_COOLDOWN_MS = 15 * 60 * 1000;
+    if (state.recoSession.skippedCanonicalIds) {
+      for (const [id, ts] of state.recoSession.skippedCanonicalIds.entries()) {
+        if (now - ts < SKIP_COOLDOWN_MS) {
+          excludeSet.add(id);
+        } else {
+          state.recoSession.skippedCanonicalIds.delete(id);
+        }
+      }
+    }
+
+    if (seedTrack) {
+      const cid = getCanonicalTrackId(seedTrack);
+      if (cid) excludeSet.add(cid);
+      const fp = getTrackFingerprint(seedTrack);
+      if (fp) excludeSet.add(`fp_${fp}`);
+      if (seedTrack.id) excludeSet.add(seedTrack.id);
+    }
+
+    return Array.from(excludeSet).filter(Boolean);
+  }
+
+  // Load existing session history on startup
+  loadRecoSession();
 
   // Sound Capsule & Listening Statistics Sync
   function saveListeningStats() {
@@ -2221,13 +2538,18 @@
     state._lastTrackedPlaybackTime = null;
     state.consecutivePlaybackErrors = 0;
 
-    if (state.userQueue && state.userQueue.length > 0 && isSameTrack(state.userQueue[0], nextTrackObj)) {
+    if (state.userQueue && state.userQueue.length > 0 && areTracksIdentical(state.userQueue[0], nextTrackObj)) {
       state.userQueue.shift();
-    } else if (state.contextQueue && state.contextQueue.length > state.contextIndex + 1 && isSameTrack(state.contextQueue[state.contextIndex + 1], nextTrackObj)) {
+    } else if (state.recommendationQueue && state.recommendationQueue.length > 0 && areTracksIdentical(state.recommendationQueue[0], nextTrackObj)) {
+      state.recommendationQueue.shift();
+      state.contextQueue = [nextTrackObj];
+      state.contextIndex = 0;
+    } else if (state.contextQueue && state.contextQueue.length > state.contextIndex + 1 && areTracksIdentical(state.contextQueue[state.contextIndex + 1], nextTrackObj)) {
       state.contextIndex++;
     }
 
     recordRecentlyPlayed(nextTrackObj);
+    recordTrackPlayed(nextTrackObj);
     applyAuthoritativeTrack(nextTrackObj, { source: 'automix_finalized' });
     updateQueueDrawerUI();
     schedulePreloadNextTrack(1500);
@@ -2598,13 +2920,27 @@
   }
 
   let recommendationFetchAbort = null;
-  async function fetchRecommendationBatch(seedTrack = null, force = false) {
+  async function replenishRecommendationQueue(seedTrack = null, force = false) {
     if (!state.autoplay && !force) return;
-    if (state.isFetchingRecommendations && !force) return;
+    if (state.recoSession?.requestInProgress && !force) return;
 
-    const seed = seedTrack || state.currentTrack || state.recommendationSeed;
+    // Maintain optimal queue depth (target 5-10 upcoming recommendation tracks)
+    if (!force && state.recommendationQueue && state.recommendationQueue.length > 4) {
+      return;
+    }
+
+    // Seed Selection Priority:
+    // 1. Current playing track
+    // 2. Last track in existing recommendation queue (for continuous vibe flow)
+    // 3. Stored recommendation seed
+    let seed = seedTrack || state.currentTrack;
+    if (!seed && state.recommendationQueue && state.recommendationQueue.length > 0) {
+      seed = state.recommendationQueue[state.recommendationQueue.length - 1];
+    }
+    if (!seed) seed = state.recommendationSeed;
     if (!seed || !seed.title) return;
 
+    if (state.recoSession) state.recoSession.requestInProgress = true;
     state.isFetchingRecommendations = true;
     if (elements.queueRecoVibePill) {
       elements.queueRecoVibePill.textContent = '✨ Finding vibe matches...';
@@ -2616,43 +2952,75 @@
       }
       recommendationFetchAbort = new AbortController();
 
-      const excludeIds = [
-        ...new Set([
-          ...(state.sessionHistory || []),
-          ...(state.userQueue || []).map(t => t.id),
-          ...(state.recommendationQueue || []).map(t => t.id),
-          seed.id
-        ])
-      ].filter(Boolean).slice(-40).join(',');
+      const seedCid = getCanonicalTrackId(seed);
+      const queryKey = seedCid || normalizeString(seed.title);
+      const page = (state.recoSession?.pageOffsets?.get(queryKey)) || 1;
+
+      const excludeIds = buildRecommendationExclusionList(seed);
+      const recentArtists = (state.recoSession?.recentArtists || []).slice(-10).join(',');
+      const seedHistory = (state.recoSession?.seedHistory || []).slice(-10).join(',');
 
       const lang = seed.language || (state.sessionProfile?.languages?.[0]) || detectClientLanguage(seed);
-      const url = `/api/recommendations?seedId=${encodeURIComponent(seed.id || '')}&title=${encodeURIComponent(seed.title || '')}&artist=${encodeURIComponent(seed.artist || '')}&language=${encodeURIComponent(lang || '')}&excludeIds=${encodeURIComponent(excludeIds)}&limit=12`;
+      const params = new URLSearchParams({
+        seedId: seed.id || '',
+        title: seed.title || '',
+        artist: seed.artist || '',
+        language: lang || '',
+        page: String(page),
+        recentArtists: recentArtists,
+        seedHistory: seedHistory,
+        excludeIds: excludeIds.join(','),
+        limit: '12'
+      });
 
-      const res = await fetch(url, { signal: recommendationFetchAbort.signal });
+      const res = await fetch(`/api/recommendations?${params.toString()}`, {
+        signal: recommendationFetchAbort.signal
+      });
+
       if (res.ok) {
         const data = await res.json();
-        if (data.success && Array.isArray(data.results) && data.results.length > 0) {
-          const existingIds = new Set([
-            ...(state.sessionHistory || []),
-            ...(state.userQueue || []).map(t => t.id),
-            ...(state.recommendationQueue || []).map(t => t.id),
-            state.currentTrack?.id
-          ].filter(Boolean));
+        if (data.success && Array.isArray(data.results)) {
+          // Advance pagination offset for next cycle
+          if (state.recoSession?.pageOffsets) {
+            state.recoSession.pageOffsets.set(queryKey, page + 1);
+          }
 
+          const latestExclude = new Set(buildRecommendationExclusionList(seed));
           const newTracks = [];
+
           for (const t of data.results) {
-            if (!t || !t.id || existingIds.has(t.id)) continue;
-            if (state.rejectedRecommendationIds && state.rejectedRecommendationIds.has(t.id)) continue;
+            if (!t) continue;
+            const cid = getCanonicalTrackId(t);
+            const fp = getTrackFingerprint(t);
+            const rawId = String(t.id || '');
+
+            // Strict exclusion against active session history and current queues
+            if (cid && latestExclude.has(cid)) continue;
+            if (fp && latestExclude.has(`fp_${fp}`)) continue;
+            if (rawId && latestExclude.has(rawId)) continue;
+
+            // Content & Mashup filter
             if (!isEligibleForRecommendation(t)) {
-              if (state.rejectedRecommendationIds) state.rejectedRecommendationIds.add(t.id);
+              if (cid) latestExclude.add(cid);
               continue;
             }
-            existingIds.add(t.id);
+
+            // Intra-batch duplicate prevention
+            if (newTracks.some(existing => areTracksIdentical(existing, t))) {
+              continue;
+            }
+
+            // Immediately mark recommended to prevent concurrent duplicate inserts
+            recordTrackRecommended(t);
+            if (cid) latestExclude.add(cid);
+            if (fp) latestExclude.add(`fp_${fp}`);
             newTracks.push(t);
           }
 
           if (!state.recommendationQueue) state.recommendationQueue = [];
           state.recommendationQueue.push(...newTracks);
+
+          saveRecoSession();
 
           if (elements.queueRecoVibePill) {
             const vibeText = data.vibe ? (data.vibe.charAt(0).toUpperCase() + data.vibe.slice(1)) : 'Autoplay';
@@ -2667,7 +3035,10 @@
             const nextReco = state.recommendationQueue.shift();
             logPlaybackDiag('AUTOPLAY_RESUME', `Resuming playback with newly arrived track: "${nextReco.title}"`);
             showToast(`Now playing recommendation: "${nextReco.title}"`, '✨');
-            playTrack(nextReco, null, true);
+            recordTrackPlayed(nextReco);
+            state.contextQueue = [nextReco];
+            state.contextIndex = 0;
+            playTrack(nextReco, [nextReco], true);
           } else {
             schedulePreloadNextTrack(1200);
           }
@@ -2678,23 +3049,24 @@
         console.warn('Recommendation fetch warning:', err.message);
         if (state.isAwaitingRecommendations) {
           state.isAwaitingRecommendations = false;
-          const pool = [...(state.sessionProfile?.recentTracks || []), ...(state.likedSongs || [])];
-          const fallbackTrack = pool.find(t => t.id && (!state.currentTrack || t.id !== state.currentTrack.id) && isEligibleForRecommendation(t)) || pool.find(t => isEligibleForRecommendation(t));
-          if (fallbackTrack) {
-            logPlaybackDiag('AUTOPLAY_FALLBACK', `Network unstable, using offline/cached fallback: "${fallbackTrack.title}"`);
-            playTrack(fallbackTrack, null, true);
-          } else {
-            state.isPlaying = false;
-            updatePlayPauseButton();
-          }
+          // Never loop back into played songs as fallback!
+          state.isPlaying = false;
+          updatePlayPauseButton();
+          showToast('End of automatic recommendations for this vibe', '🎵');
         }
       }
     } finally {
+      if (state.recoSession) state.recoSession.requestInProgress = false;
       state.isFetchingRecommendations = false;
       if (elements.queueRecoVibePill && elements.queueRecoVibePill.textContent.includes('Finding')) {
         elements.queueRecoVibePill.textContent = '✨ Smart Autoplay';
       }
     }
+  }
+
+  // Alias for backward compatibility across all existing caller sites
+  function fetchRecommendationBatch(seedTrack = null, force = false) {
+    return replenishRecommendationQueue(seedTrack, force);
   }
 
   // Fisher-Yates shuffle that ensures boundary separation
@@ -3030,12 +3402,15 @@
 
     let nextSong = targetTrack;
     let switchedToRecommendations = false;
+    let fromUserQueue = false;
+    let fromRecommendations = false;
     let loopedPlaylist = false;
 
     if (!nextSong) {
       // 1. Manual user queue (Priority 1)
       if (state.userQueue && state.userQueue.length > 0) {
         nextSong = state.userQueue.shift();
+        fromUserQueue = true;
       }
       // 2. Repeat One
       else if (state.repeatMode === 'one' && state.currentTrack) {
@@ -3063,6 +3438,7 @@
             if (state.recommendationQueue && state.recommendationQueue.length > 0) {
               nextSong = state.recommendationQueue.shift();
               switchedToRecommendations = true;
+              fromRecommendations = true;
             } else {
               fetchRecommendationBatch(state.currentTrack, true);
             }
@@ -3086,6 +3462,7 @@
             if (state.recommendationQueue && state.recommendationQueue.length > 0) {
               nextSong = state.recommendationQueue.shift();
               switchedToRecommendations = true;
+              fromRecommendations = true;
             } else {
               fetchRecommendationBatch(state.currentTrack, true);
             }
@@ -3122,6 +3499,7 @@
         if (state.recommendationQueue && state.recommendationQueue.length > 0) {
           nextSong = state.recommendationQueue.shift();
           switchedToRecommendations = true;
+          fromRecommendations = true;
         } else {
           // Fetch immediately if recommendations ran low
           fetchRecommendationBatch(state.currentTrack, true);
@@ -3204,14 +3582,27 @@
       state.consecutivePlaybackErrors = 0;
 
       updatePlayPauseButton();
+      if (fromRecommendations) {
+        state.contextQueue = [nextSong];
+        state.contextIndex = 0;
+      }
       applyAuthoritativeTrack(nextSong, { source: 'preloaded_deck_swap' });
       recordRecentlyPlayed(nextSong);
+      recordTrackPlayed(nextSong);
       updateSessionProfile(nextSong);
       schedulePreloadNextTrack(1500);
       state.isTransitioning = false;
     } else {
       state.isTransitioning = false;
-      playTrack(nextSong, queueContext || state.contextQueue, true);
+      if (fromRecommendations) {
+        state.contextQueue = [nextSong];
+        state.contextIndex = 0;
+        playTrack(nextSong, [nextSong], true);
+      } else if (fromUserQueue) {
+        playTrack(nextSong, 'PRESERVE_CONTEXT', true);
+      } else {
+        playTrack(nextSong, queueContext || state.contextQueue, true);
+      }
     }
   }
 
@@ -3435,9 +3826,9 @@
       logPlaybackDiagnostic('same-track-resume-guard', { trackId: track.id, hasValidDeckSource, readyState: actForGuard.readyState });
       if (queueList && Array.isArray(queueList)) {
         state.contextQueue = [...queueList];
-        state.contextIndex = state.contextQueue.findIndex(t => isSameTrack(t, track));
+        state.contextIndex = state.contextQueue.findIndex(t => areTracksIdentical(t, track));
         if (state.contextIndex === -1) {
-          state.contextQueue.unshift(previousTrack);
+          state.contextQueue = [track];
           state.contextIndex = 0;
         }
       }
@@ -3516,6 +3907,7 @@
     }
 
     recordRecentlyPlayed(track);
+    recordTrackPlayed(track);
 
     // Track playback history for previous song button navigation
     if (addToHistory && previousTrack && previousTrack.id !== track.id) {
@@ -3527,11 +3919,13 @@
     cancelActiveAutoMix(true);
 
     // Spotify-like Queue Management: Isolated search results vs context playlist
-    if (queueList && Array.isArray(queueList)) {
+    if (queueList === 'PRESERVE_CONTEXT') {
+      // Intentionally preserve state.contextQueue and state.contextIndex (e.g. playing user manual queue item)
+    } else if (queueList && Array.isArray(queueList)) {
       state.contextQueue = [...queueList];
-      state.contextIndex = state.contextQueue.findIndex(t => t.id === track.id);
+      state.contextIndex = state.contextQueue.findIndex(t => areTracksIdentical(t, track));
       if (state.contextIndex === -1) {
-        state.contextQueue.unshift(track);
+        state.contextQueue = [track];
         state.contextIndex = 0;
       }
       if (state.activePlaylistId || state.viewingPlaylistId) {
@@ -4337,6 +4731,9 @@
   }
 
   function nextTrack() {
+    if (state.currentTrack && state.isPlaying && (state._currentTrackListeningSeconds < 20 || getCurrentPlaybackTime() < 20)) {
+      recordTrackSkipped(state.currentTrack);
+    }
     transitionToNextSong();
   }
 
@@ -8111,6 +8508,7 @@
           // Play immediately
           card.querySelector('.reco-play-btn').addEventListener('click', (e) => {
             e.stopPropagation();
+            recordTrackPlayed(t);
             state.recommendationQueue.splice(i, 1);
             playTrack(t, null, true);
           });
@@ -8125,6 +8523,7 @@
           // Dismiss
           card.querySelector('.remove-queue-btn').addEventListener('click', (e) => {
             e.stopPropagation();
+            recordTrackRemoved(t);
             state.recommendationQueue.splice(i, 1);
             updateQueueDrawerUI();
             if (state.recommendationQueue.length <= 4) {
@@ -8134,6 +8533,7 @@
 
           card.addEventListener('click', (e) => {
             if (e.target.closest('button')) return;
+            recordTrackPlayed(t);
             state.recommendationQueue.splice(i, 1);
             playTrack(t, null, true);
           });

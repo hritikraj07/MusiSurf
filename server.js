@@ -10,6 +10,7 @@ const lyricsDiscoveryEngine = require('./scripts/lyrics_discovery_engine');
 const { cleanTrackTitle, extractArtists, extractSongVersion, computeLyricsMatchScore, validateLrcTimestamps } = require('./scripts/lyrics_matcher');
 const { analyzeTrackSilence } = require('./scripts/silence_detector');
 const { isMashupTrack, isEligibleForRecommendation } = require('./scripts/mashup_detector');
+const { getCanonicalTrackId, getTrackFingerprint, areTracksIdentical, extractPrimaryArtist, normalizeString } = require('./scripts/canonical_track');
 const searchEngine = require('./scripts/search_engine');
 const { requireAuth, optionalAuth, getAuthenticatedUser } = require('./services/auth');
 const libraryService = require('./services/library');
@@ -170,13 +171,14 @@ function transformSaavnSong(item) {
   };
 }
 
-// Search JioSaavn (Prioritizes dedicated song-search engine & general engine in parallel)
-async function searchSaavn(query, limit = 25) {
+// Search JioSaavn (Prioritizes dedicated song-search engine & general engine in parallel with pagination support)
+async function searchSaavn(query, limit = 25, page = 1) {
   if (!query) return [];
   try {
+    const pageNum = Math.max(1, parseInt(page || '1', 10));
     const urls = [
-      `https://www.jiosaavn.com/api.php?__call=search.getMoreResults&params=${encodeURIComponent(JSON.stringify({ type: 'songs' }))}&query=${encodeURIComponent(query)}&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=${limit}&p=1`,
-      `https://www.jiosaavn.com/api.php?__call=search.getResults&q=${encodeURIComponent(query)}&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=${limit}&p=1`
+      `https://www.jiosaavn.com/api.php?__call=search.getMoreResults&params=${encodeURIComponent(JSON.stringify({ type: 'songs' }))}&query=${encodeURIComponent(query)}&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=${limit}&p=${pageNum}`,
+      `https://www.jiosaavn.com/api.php?__call=search.getResults&q=${encodeURIComponent(query)}&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=${limit}&p=${pageNum}`
     ];
 
     const responses = await Promise.allSettled(urls.map(u => fetch(u, {
@@ -1393,10 +1395,43 @@ app.get('/api/recommendations', async (req, res) => {
   let artist = (req.query.artist || '').trim();
   let album = (req.query.album || '').trim();
   let language = (req.query.language || '').toLowerCase().trim();
-  const rawExclude = (req.query.excludeIds || '').trim();
-  const excludeSet = new Set(rawExclude ? rawExclude.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : []);
-  if (seedId) excludeSet.add(seedId.toLowerCase());
+  const page = Math.max(1, parseInt(req.query.page || '1', 10));
   const limit = Math.min(30, Math.max(1, parseInt(req.query.limit || '12', 10)));
+  const rawExclude = (req.query.excludeIds || '').trim();
+  const rawRecentArtists = (req.query.recentArtists || '').trim();
+  const rawSeedHistory = (req.query.seedHistory || '').trim();
+
+  const recentArtistsList = rawRecentArtists.split(',').map(s => extractPrimaryArtist(s)).filter(Boolean);
+  const recentArtistsSet = new Set(recentArtistsList);
+
+  const excludeIdSet = new Set();
+  const excludeFingerprintSet = new Set();
+
+  if (rawExclude) {
+    for (const raw of rawExclude.split(',')) {
+      const trimmed = raw.trim().toLowerCase();
+      if (!trimmed) continue;
+      excludeIdSet.add(trimmed);
+      excludeIdSet.add(trimmed.replace(/^saavn_/, ''));
+      excludeIdSet.add(`saavn_${trimmed.replace(/^saavn_/, '')}`);
+      excludeIdSet.add(trimmed.replace(/^yt_/, ''));
+      excludeIdSet.add(`yt_${trimmed.replace(/^yt_/, '')}`);
+      if (trimmed.startsWith('fp_')) {
+        excludeFingerprintSet.add(trimmed.replace(/^fp_/, ''));
+      }
+    }
+  }
+
+  if (seedId) {
+    const sLower = seedId.toLowerCase();
+    excludeIdSet.add(sLower);
+    excludeIdSet.add(sLower.replace(/^saavn_/, ''));
+    excludeIdSet.add(`saavn_${sLower.replace(/^saavn_/, '')}`);
+  }
+  if (title) {
+    const seedFp = getTrackFingerprint({ title, artist });
+    if (seedFp) excludeFingerprintSet.add(seedFp);
+  }
 
   try {
     let saavnArtistId = null;
@@ -1436,41 +1471,43 @@ app.get('/api/recommendations', async (req, res) => {
     const { mood, energy } = detectSongVibe(title, artist, album);
     const primaryArtistClean = (saavnPrimaryArtistName || artist.split(',')[0] || '').trim();
 
-    // 2. Fetch candidates from multiple relevant streams
+    // 2. Fetch candidates from multiple relevant streams with pagination
     const fetchPromises = [];
 
     // Stream A: Top songs from the primary artist (if Saavn artist ID available)
     if (saavnArtistId) {
       fetchPromises.push(
-        fetch(`https://www.jiosaavn.com/api.php?__call=artist.getArtistPageDetails&artistId=${saavnArtistId}&_format=json&_marker=0&api_version=4`, {
+        fetch(`https://www.jiosaavn.com/api.php?__call=artist.getArtistPageDetails&artistId=${saavnArtistId}&_format=json&_marker=0&api_version=4&n=20&p=${page}`, {
           signal: AbortSignal.timeout(4000)
         })
           .then(r => r.json())
-          .then(d => (d.topSongs?.songs || []).map(transformSaavnSong).filter(t => t && t.audioUrl))
+          .then(d => (d.topSongs?.songs || d.songs || []).map(transformSaavnSong).filter(t => t && t.audioUrl))
           .catch(() => [])
       );
     }
 
-    // Stream B: Vibe and genre specific search in this language
+    // Stream B: Vibe and genre specific search in this language (paginated)
     const vibeQuery = `${language} ${mood} hits`;
-    fetchPromises.push(searchSaavn(vibeQuery, 15));
+    fetchPromises.push(searchSaavn(vibeQuery, 20, page));
 
-    // Stream C: Primary artist in this language
+    // Stream C: Primary artist in this language (paginated)
     if (primaryArtistClean) {
       const artistQuery = `${primaryArtistClean} ${language} songs`;
-      fetchPromises.push(searchSaavn(artistQuery, 12));
+      fetchPromises.push(searchSaavn(artistQuery, 15, page));
     }
 
-    // Stream D: If album ID available, fetch album tracks
-    if (saavnAlbumId) {
-      fetchPromises.push(
-        fetch(`https://www.jiosaavn.com/api.php?__call=content.getAlbumDetails&albumid=${saavnAlbumId}&_format=json&_marker=0&api_version=4`, {
-          signal: AbortSignal.timeout(4000)
-        })
-          .then(r => r.json())
-          .then(d => (d.list || d.songs || []).map(transformSaavnSong).filter(t => t && t.audioUrl))
-          .catch(() => [])
-      );
+    // Stream D: Discovery / Trending in language (paginated)
+    const discoveryQuery = `${language} top songs`;
+    fetchPromises.push(searchSaavn(discoveryQuery, 15, page));
+
+    // Stream E: Secondary seeds from seedHistory (if available)
+    if (rawSeedHistory) {
+      const historySeeds = rawSeedHistory.split(',').map(s => s.trim()).filter(Boolean).slice(-3);
+      for (const hSeed of historySeeds) {
+        if (hSeed && hSeed !== seedId && !hSeed.startsWith('fp_')) {
+          fetchPromises.push(searchSaavn(`${hSeed} songs`, 10, page));
+        }
+      }
     }
 
     // Fallback: If YouTube seed or non-Saavn, also query YouTube for vibe
@@ -1478,52 +1515,71 @@ app.get('/api/recommendations', async (req, res) => {
       fetchPromises.push(searchYouTube(`${title} ${artist}`, 10));
     }
 
+    let totalCandidatesFetched = 0;
     const settled = await Promise.allSettled(fetchPromises);
     const candidatePool = [];
     for (const r of settled) {
       if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+        totalCandidatesFetched += r.value.length;
         candidatePool.push(...r.value);
       }
     }
 
-    // 3. Filter and score candidate songs
-    const seenKeys = new Set();
+    const seenCanonicalIds = new Set();
+    const seenFingerprints = new Set();
     const scoredCandidates = [];
-    const seedNormTitle = (title || '').toLowerCase().replace(/[\(\[\{].*?[\)\]\}]/g, '').trim();
+    let mashupFilteredCount = 0;
+    let excludedCount = 0;
 
     for (const track of candidatePool) {
       if (!track || !track.title) continue;
+
+      const canonicalId = getCanonicalTrackId(track).toLowerCase();
       const trackIdLower = (track.id || '').toLowerCase();
-      if (excludeSet.has(trackIdLower)) continue;
+      const rawIdLower = String(track.originalId || track.id || '').toLowerCase().replace(/^saavn_/, '');
+      const fingerprint = getTrackFingerprint(track);
 
-      const normTitle = (track.title || '').toLowerCase().replace(/[\(\[\{].*?[\)\]\}]/g, '').trim();
-      const normArtist = (track.artist || '').toLowerCase().trim();
-      const dedupeKey = `${normTitle}:::${normArtist.split(',')[0].trim()}`;
-      if (seenKeys.has(dedupeKey)) continue;
-      seenKeys.add(dedupeKey);
+      // Check ID exclusions
+      if (excludeIdSet.has(canonicalId) || excludeIdSet.has(trackIdLower) || excludeIdSet.has(rawIdLower)) {
+        excludedCount++;
+        continue;
+      }
+      // Check fingerprint exclusion
+      if (fingerprint && excludeFingerprintSet.has(fingerprint)) {
+        excludedCount++;
+        continue;
+      }
 
-      // Do not recommend the exact same song
-      if (normTitle === seedNormTitle && seedNormTitle.length > 2) continue;
+      // Check internal deduplication in this batch
+      if (seenCanonicalIds.has(canonicalId) || (fingerprint && seenFingerprints.has(fingerprint))) {
+        continue;
+      }
+      seenCanonicalIds.add(canonicalId);
+      if (fingerprint) seenFingerprints.add(fingerprint);
 
       // Strict Music & Mashup-Exclusion Eligibility Validation
       const eligibility = isEligibleForRecommendation(track, validateMusicContent);
-      if (!eligibility.eligible) continue;
+      if (!eligibility.eligible) {
+        mashupFilteredCount++;
+        continue;
+      }
 
       // Calculate Vibe Matching Score (out of 100)
       let score = 50;
 
-      // Language Compatibility (+40 exact, +15 compatible regional, -70 incompatible)
+      // Language Compatibility (+40 exact, +15 compatible regional, -80 incompatible)
       const candLang = (track.language || detectSongLanguage(track.title, track.artist, '')).toLowerCase();
       if (candLang === language) {
         score += 40;
       } else if (areLanguagesCompatible(language, candLang, mood)) {
         score += 15;
       } else {
-        score -= 70; // Strictly avoid jarring random language jumps!
+        score -= 80; // Strictly avoid random language jumps
       }
 
       // Artist Match (+30 primary, +15 collaborating)
-      if (primaryArtistClean && normArtist.includes(primaryArtistClean.toLowerCase())) {
+      const candPrimaryArtist = extractPrimaryArtist(track.artist);
+      if (primaryArtistClean && candPrimaryArtist && candPrimaryArtist === primaryArtistClean.toLowerCase()) {
         score += 30;
       }
 
@@ -1538,8 +1594,17 @@ app.get('/api/recommendations', async (req, res) => {
         score += 15;
       }
 
+      // DIVERSITY & REPETITION PENALTIES (Section 4)
+      // 1. Recent artist penalty: If artist was recently recommended, apply -35 penalty
+      if (candPrimaryArtist && recentArtistsSet.has(candPrimaryArtist)) {
+        score -= 35;
+      }
+
       scoredCandidates.push({
         track,
+        canonicalId,
+        fingerprint,
+        primaryArtist: candPrimaryArtist,
         score,
         candLang,
         candMood: candVibe.mood
@@ -1549,32 +1614,54 @@ app.get('/api/recommendations', async (req, res) => {
     // Sort by score descending
     scoredCandidates.sort((a, b) => b.score - a.score);
 
-    // Album variety filter: maximum 2 tracks per album
-    const albumCount = new Map();
+    // Apply batch diversity limits:
+    // 1. Maximum 2 tracks per artist in a single recommendation batch
+    // 2. Maximum 2 tracks per album in a single recommendation batch
+    const artistBatchCount = new Map();
+    const albumBatchCount = new Map();
     const finalResults = [];
 
     for (const item of scoredCandidates) {
+      if (item.score < 20) continue; // Drop low relevance tracks
+
+      const art = item.primaryArtist || 'unknown';
+      if (art !== 'unknown') {
+        const aCount = artistBatchCount.get(art) || 0;
+        if (aCount >= 2) continue;
+        artistBatchCount.set(art, aCount + 1);
+      }
+
       const alb = (item.track.album || 'single').toLowerCase().trim();
       if (alb && alb !== 'single') {
-        const count = albumCount.get(alb) || 0;
-        if (count >= 2) continue;
-        albumCount.set(alb, count + 1);
+        const alCount = albumBatchCount.get(alb) || 0;
+        if (alCount >= 2) continue;
+        albumBatchCount.set(alb, alCount + 1);
       }
+
       finalResults.push(item.track);
       if (finalResults.length >= limit) break;
     }
 
-    // Fallback: if fewer than 4 candidates, query broad trending in this language
-    if (finalResults.length < 4) {
+    // Fallback Pagination Discovery (Section 5 & 11):
+    // If fewer than limit candidates found, automatically discover next page!
+    if (finalResults.length < limit) {
       try {
-        const fallbackSongs = await searchSaavn(`${language} top hits`, limit);
-        for (const fb of fallbackSongs) {
-          if (!excludeSet.has((fb.id || '').toLowerCase()) && !finalResults.some(t => t.id === fb.id)) {
-            const fbEligible = isEligibleForRecommendation(fb, validateMusicContent);
-            if (!fbEligible.eligible) continue;
-            finalResults.push(fb);
-            if (finalResults.length >= limit) break;
-          }
+        const nextPage = page + 1;
+        const page2Songs = await searchSaavn(`${language} ${mood} hits`, limit, nextPage);
+        for (const fb of page2Songs) {
+          const fbCanonical = getCanonicalTrackId(fb).toLowerCase();
+          const fbFp = getTrackFingerprint(fb);
+          if (excludeIdSet.has(fbCanonical) || (fbFp && excludeFingerprintSet.has(fbFp))) continue;
+          if (seenCanonicalIds.has(fbCanonical) || (fbFp && seenFingerprints.has(fbFp))) continue;
+          const fbEligible = isEligibleForRecommendation(fb, validateMusicContent);
+          if (!fbEligible.eligible) continue;
+          const candLang = (fb.language || detectSongLanguage(fb.title, fb.artist, '')).toLowerCase();
+          if (candLang !== language && !areLanguagesCompatible(language, candLang, mood)) continue;
+
+          seenCanonicalIds.add(fbCanonical);
+          if (fbFp) seenFingerprints.add(fbFp);
+          finalResults.push(fb);
+          if (finalResults.length >= limit) break;
         }
       } catch (e) {}
     }
@@ -1584,6 +1671,8 @@ app.get('/api/recommendations', async (req, res) => {
       vibe: mood,
       energy: energy,
       language: language,
+      page: page,
+      nextPage: page + 1,
       seed: {
         id: seedId,
         title,
@@ -1591,7 +1680,14 @@ app.get('/api/recommendations', async (req, res) => {
         language
       },
       count: finalResults.length,
-      results: finalResults
+      results: finalResults,
+      diagnostics: {
+        totalCandidatesFetched,
+        uniqueCandidates: seenCanonicalIds.size,
+        excludedCount,
+        mashupFilteredCount,
+        returnedCount: finalResults.length
+      }
     });
   } catch (err) {
     console.error('Recommendations endpoint error:', err);
