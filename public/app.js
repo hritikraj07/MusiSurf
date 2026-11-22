@@ -501,6 +501,61 @@
     exportAsJsonBtn: document.getElementById('exportAsJsonBtn'),
     exportAsCsvBtn: document.getElementById('exportAsCsvBtn'),
 
+    // Playlist Import System Elements
+    settingsImportPlaylistBtn: document.getElementById('settingsImportPlaylistBtn'),
+    triggerImportModalBtn: document.getElementById('triggerImportModalBtn'),
+    drawerImportPlaylistBtn: document.getElementById('drawerImportPlaylistBtn'),
+    importPlaylistModal: document.getElementById('importPlaylistModal'),
+    closeImportPlaylistModalBtn: document.getElementById('closeImportPlaylistModalBtn'),
+    cancelImportModalBtn: document.getElementById('cancelImportModalBtn'),
+    importMethodLinkTab: document.getElementById('importMethodLinkTab'),
+    importMethodFileTab: document.getElementById('importMethodFileTab'),
+    importLinkBody: document.getElementById('importLinkBody'),
+    importFileBody: document.getElementById('importFileBody'),
+    importPlaylistUrlInput: document.getElementById('importPlaylistUrlInput'),
+    importPasteUrlBtn: document.getElementById('importPasteUrlBtn'),
+    importDropZone: document.getElementById('importDropZone'),
+    importPlaylistFileInput: document.getElementById('importPlaylistFileInput'),
+    importBrowseFileBtn: document.getElementById('importBrowseFileBtn'),
+    importSelectedFileInfo: document.getElementById('importSelectedFileInfo'),
+    importSelectedFileName: document.getElementById('importSelectedFileName'),
+    importClearSelectedFileBtn: document.getElementById('importClearSelectedFileBtn'),
+    importValidationError: document.getElementById('importValidationError'),
+    startImportFetchBtn: document.getElementById('startImportFetchBtn'),
+    importStepChoose: document.getElementById('importStepChoose'),
+    importStepProgress: document.getElementById('importStepProgress'),
+    importStepPreview: document.getElementById('importStepPreview'),
+    importStepSuccess: document.getElementById('importStepSuccess'),
+    importProgressStatusText: document.getElementById('importProgressStatusText'),
+    importProgressBarFill: document.getElementById('importProgressBarFill'),
+    importProgressCountText: document.getElementById('importProgressCountText'),
+    importProgressLiveStats: document.getElementById('importProgressLiveStats'),
+    importPreviewCover: document.getElementById('importPreviewCover'),
+    importPreviewName: document.getElementById('importPreviewName'),
+    importPreviewDesc: document.getElementById('importPreviewDesc'),
+    importPreviewProviderTag: document.getElementById('importPreviewProviderTag'),
+    importPreviewCountBadge: document.getElementById('importPreviewCountBadge'),
+    statSourceTotal: document.getElementById('statSourceTotal'),
+    statMatchedCount: document.getElementById('statMatchedCount'),
+    statReviewCount: document.getElementById('statReviewCount'),
+    statUnmatchedCount: document.getElementById('statUnmatchedCount'),
+    importDuplicateNotice: document.getElementById('importDuplicateNotice'),
+    importPreviewTracksBody: document.getElementById('importPreviewTracksBody'),
+    importPreviewSummaryText: document.getElementById('importPreviewSummaryText'),
+    backToChooseMethodBtn: document.getElementById('backToChooseMethodBtn'),
+    confirmCreatePlaylistBtn: document.getElementById('confirmCreatePlaylistBtn'),
+    importSuccessSub: document.getElementById('importSuccessSub'),
+    closeImportSuccessBtn: document.getElementById('closeImportSuccessBtn'),
+    openImportedPlaylistBtn: document.getElementById('openImportedPlaylistBtn'),
+    candidateReviewModal: document.getElementById('candidateReviewModal'),
+    closeCandidateReviewBtn: document.getElementById('closeCandidateReviewBtn'),
+    candReviewSourceTitle: document.getElementById('candReviewSourceTitle'),
+    candReviewSourceMeta: document.getElementById('candReviewSourceMeta'),
+    candReviewList: document.getElementById('candReviewList'),
+    candLeaveUnmatchedBtn: document.getElementById('candLeaveUnmatchedBtn'),
+    refreshImportHistoryBtn: document.getElementById('refreshImportHistoryBtn'),
+    settingsImportHistoryList: document.getElementById('settingsImportHistoryList'),
+
     // Local Music View
     localTrackCount: document.getElementById('localTrackCount'),
     localTotalTime: document.getElementById('localTotalTime'),
@@ -8996,6 +9051,452 @@
     }
   }
 
+  // ==========================================================================
+  // EXTERNAL PLAYLIST IMPORT & TRANSFER CONTROLLER
+  // ==========================================================================
+
+  const importWorkflowState = {
+    method: 'link', // 'link' or 'file'
+    selectedFile: null,
+    selectedFileContent: '',
+    parsedPlaylist: null,
+    matchResults: [],
+    matchedStats: null,
+    currentReviewIndex: -1,
+    duplicateExisting: null,
+    createdPlaylistId: null
+  };
+
+  function resetImportModalUI() {
+    importWorkflowState.method = 'link';
+    importWorkflowState.selectedFile = null;
+    importWorkflowState.selectedFileContent = '';
+    importWorkflowState.parsedPlaylist = null;
+    importWorkflowState.matchResults = [];
+    importWorkflowState.matchedStats = null;
+    importWorkflowState.currentReviewIndex = -1;
+    importWorkflowState.duplicateExisting = null;
+
+    if (elements.importStepChoose) elements.importStepChoose.style.display = 'block';
+    if (elements.importStepProgress) elements.importStepProgress.style.display = 'none';
+    if (elements.importStepPreview) elements.importStepPreview.style.display = 'none';
+    if (elements.importStepSuccess) elements.importStepSuccess.style.display = 'none';
+
+    if (elements.importPlaylistUrlInput) elements.importPlaylistUrlInput.value = '';
+    if (elements.importPlaylistFileInput) elements.importPlaylistFileInput.value = '';
+    if (elements.importSelectedFileInfo) elements.importSelectedFileInfo.style.display = 'none';
+    if (elements.importDropZone) elements.importDropZone.style.display = 'block';
+    if (elements.importValidationError) elements.importValidationError.style.display = 'none';
+    if (elements.importDuplicateNotice) elements.importDuplicateNotice.style.display = 'none';
+
+    // Reset tabs
+    switchImportTab('link');
+  }
+
+  function switchImportTab(method) {
+    importWorkflowState.method = method;
+    if (elements.importMethodLinkTab) elements.importMethodLinkTab.classList.toggle('active', method === 'link');
+    if (elements.importMethodFileTab) elements.importMethodFileTab.classList.toggle('active', method === 'file');
+    if (elements.importLinkBody) elements.importLinkBody.style.display = method === 'link' ? 'block' : 'none';
+    if (elements.importFileBody) elements.importFileBody.style.display = method === 'file' ? 'block' : 'none';
+    if (elements.importValidationError) elements.importValidationError.style.display = 'none';
+  }
+
+  function showImportError(msg) {
+    if (elements.importValidationError) {
+      elements.importValidationError.textContent = msg;
+      elements.importValidationError.style.display = 'block';
+    } else {
+      showToast(msg, '⚠️');
+    }
+  }
+
+  function openImportPlaylistModal() {
+    resetImportModalUI();
+    if (elements.importPlaylistModal) {
+      elements.importPlaylistModal.style.display = 'flex';
+    }
+  }
+
+  function closeImportPlaylistModal() {
+    if (elements.importPlaylistModal) {
+      elements.importPlaylistModal.style.display = 'none';
+    }
+  }
+
+  async function loadImportHistoryUI() {
+    if (!elements.settingsImportHistoryList) return;
+    try {
+      const res = await fetch('/api/import/history', { credentials: 'include' });
+      const data = await res.json();
+      const list = data && Array.isArray(data.history) ? data.history : [];
+      if (list.length === 0) {
+        elements.settingsImportHistoryList.innerHTML = '<div class="import-history-empty">No playlists imported yet. Paste a link or upload a file above to transfer your playlists!</div>';
+        return;
+      }
+      elements.settingsImportHistoryList.innerHTML = '';
+      list.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'import-history-item';
+        const dateStr = item.importedAt ? new Date(item.importedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently';
+        div.innerHTML = `
+          <div class="import-history-left">
+            <span class="import-history-badge">${escapeHtml(item.provider || 'SPOTIFY')}</span>
+            <div>
+              <h4 class="import-history-name">${escapeHtml(item.playlistName || 'Imported Playlist')}</h4>
+              <p class="import-history-meta">${item.trackCount || 0} songs • ${dateStr}</p>
+            </div>
+          </div>
+          <button type="button" class="sound-pill-btn" style="padding: 4px 10px; font-size: 0.78rem;">Open</button>
+        `;
+        const openBtn = div.querySelector('button');
+        openBtn.onclick = () => {
+          if (elements.settingsModal) elements.settingsModal.style.display = 'none';
+          if (item.playlistId) renderPlaylistView(item.playlistId);
+        };
+        elements.settingsImportHistoryList.appendChild(div);
+      });
+    } catch (err) {
+      console.warn('[ImportHistory] Load note:', err.message);
+    }
+  }
+
+  async function startImportWorkflow() {
+    if (elements.importValidationError) elements.importValidationError.style.display = 'none';
+
+    let payload = {};
+    if (importWorkflowState.method === 'link') {
+      const url = (elements.importPlaylistUrlInput?.value || '').trim();
+      if (!url) {
+        showImportError('Please enter a Spotify playlist URL or URI.');
+        return;
+      }
+      payload.url = url;
+    } else {
+      if (!importWorkflowState.selectedFileContent) {
+        showImportError('Please select or drop a playlist file to upload.');
+        return;
+      }
+      payload.fileContent = importWorkflowState.selectedFileContent;
+      payload.filename = importWorkflowState.selectedFile?.name || 'playlist.m3u';
+    }
+
+    // Step 2: Show progress screen
+    if (elements.importStepChoose) elements.importStepChoose.style.display = 'none';
+    if (elements.importStepProgress) elements.importStepProgress.style.display = 'block';
+    if (elements.importProgressStatusText) elements.importProgressStatusText.textContent = 'Connecting to provider & reading tracks...';
+    if (elements.importProgressBarFill) elements.importProgressBarFill.style.width = '25%';
+
+    try {
+      // 1. Parse playlist
+      const parseRes = await fetch('/api/import/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      });
+      const parseData = await parseRes.json();
+      if (!parseRes.ok || !parseData.success || !parseData.playlist) {
+        throw new Error(parseData.error || 'Failed to parse playlist');
+      }
+
+      const externalPlaylist = parseData.playlist;
+      importWorkflowState.parsedPlaylist = externalPlaylist;
+
+      if (!externalPlaylist.tracks || externalPlaylist.tracks.length === 0) {
+        throw new Error('This playlist contains 0 tracks or is empty.');
+      }
+
+      // Update progress
+      if (elements.importProgressStatusText) {
+        elements.importProgressStatusText.textContent = `Matching ${externalPlaylist.tracks.length} songs against MusiSurf catalogue...`;
+      }
+      if (elements.importProgressBarFill) elements.importProgressBarFill.style.width = '60%';
+      if (elements.importProgressCountText) {
+        elements.importProgressCountText.textContent = `Processing ${externalPlaylist.tracks.length} tracks`;
+      }
+
+      // 2. Match tracks
+      const matchRes = await fetch('/api/import/match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ playlist: externalPlaylist })
+      });
+      const matchData = await matchRes.json();
+      if (!matchRes.ok || !matchData.success) {
+        throw new Error(matchData.error || 'Failed to match tracks');
+      }
+
+      importWorkflowState.matchResults = matchData.results || [];
+      importWorkflowState.matchedStats = matchData.stats || {};
+
+      // 3. Check for potential duplicate imports
+      try {
+        const dupRes = await fetch('/api/import/check-duplicate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            name: externalPlaylist.name,
+            externalId: externalPlaylist.externalPlaylistId || ''
+          })
+        });
+        const dupData = await dupRes.json();
+        if (dupData && dupData.exists) {
+          importWorkflowState.duplicateExisting = dupData.existing;
+        }
+      } catch (dupErr) {
+        console.warn('[Import] Duplicate check note:', dupErr.message);
+      }
+
+      if (elements.importProgressBarFill) elements.importProgressBarFill.style.width = '100%';
+
+      // Move to Step 3: Preview Screen
+      renderImportPreviewUI();
+
+    } catch (err) {
+      console.error('[Import] Workflow error:', err);
+      if (elements.importStepProgress) elements.importStepProgress.style.display = 'none';
+      if (elements.importStepChoose) elements.importStepChoose.style.display = 'block';
+      showImportError(err.message || 'Import failed. Check the URL/file and try again.');
+    }
+  }
+
+  function renderImportPreviewUI() {
+    if (elements.importStepProgress) elements.importStepProgress.style.display = 'none';
+    if (elements.importStepChoose) elements.importStepChoose.style.display = 'none';
+    if (elements.importStepPreview) elements.importStepPreview.style.display = 'block';
+
+    const pl = importWorkflowState.parsedPlaylist || {};
+    const results = importWorkflowState.matchResults || [];
+
+    // Header info
+    if (elements.importPreviewName) elements.importPreviewName.textContent = pl.name || 'Imported Playlist';
+    if (elements.importPreviewDesc) elements.importPreviewDesc.textContent = pl.description || `Transfer from ${pl.provider || 'external'}`;
+    if (elements.importPreviewProviderTag) elements.importPreviewProviderTag.textContent = (pl.provider || 'SPOTIFY').toUpperCase();
+    if (elements.importPreviewCountBadge) elements.importPreviewCountBadge.textContent = `${results.length} tracks`;
+
+    if (elements.importPreviewCover) {
+      if (pl.artwork) {
+        elements.importPreviewCover.src = pl.artwork;
+        elements.importPreviewCover.style.display = 'block';
+      } else {
+        elements.importPreviewCover.src = '/icons/icon-192.png';
+      }
+    }
+
+    // Stats calculations
+    let matched = 0;
+    let review = 0;
+    let unmatched = 0;
+
+    results.forEach(r => {
+      if (r.excluded) return;
+      if (r.status === 'matched') matched++;
+      else if (r.status === 'review') review++;
+      else unmatched++;
+    });
+
+    if (elements.statSourceTotal) elements.statSourceTotal.textContent = results.length;
+    if (elements.statMatchedCount) elements.statMatchedCount.textContent = matched;
+    if (elements.statReviewCount) elements.statReviewCount.textContent = review;
+    if (elements.statUnmatchedCount) elements.statUnmatchedCount.textContent = unmatched;
+
+    // Duplicate Banner
+    if (elements.importDuplicateNotice) {
+      elements.importDuplicateNotice.style.display = importWorkflowState.duplicateExisting ? 'flex' : 'none';
+    }
+
+    // Render Track Rows
+    if (elements.importPreviewTracksBody) {
+      elements.importPreviewTracksBody.innerHTML = '';
+      results.forEach((r, idx) => {
+        const row = document.createElement('div');
+        row.className = `import-track-row ${r.excluded ? 'is-excluded' : ''}`;
+        row.dataset.resultIndex = idx;
+
+        const thumbUrl = r.matchedTrack?.image || r.source?.artwork || '/icons/icon.svg';
+        const displayTitle = r.matchedTrack?.title || r.source?.title || 'Unknown Title';
+        const displayArtist = r.matchedTrack?.artist || r.source?.artist || 'Various Artists';
+
+        let badgeHtml = '';
+        if (r.status === 'matched') {
+          badgeHtml = `<span class="match-status-badge badge-matched" title="${r.confidence}% Match">✓ Matched</span>`;
+        } else if (r.status === 'review') {
+          badgeHtml = `<span class="match-status-badge badge-review" role="button" title="Click to review candidates">⚠️ Review</span>`;
+        } else {
+          badgeHtml = `<span class="match-status-badge badge-unmatched" title="Song not found in MusiSurf catalogue">✕ Not Found</span>`;
+        }
+
+        row.innerHTML = `
+          <span style="color: var(--text-subdued);">${idx + 1}</span>
+          <div class="import-track-title-cell">
+            <img src="${thumbUrl}" class="import-track-thumb" alt="Track Art" onerror="this.src='/icons/icon.svg'" />
+            <span class="import-track-title-text" title="${escapeHtml(displayTitle)}">${escapeHtml(displayTitle)}</span>
+          </div>
+          <span class="import-track-artist-text" title="${escapeHtml(displayArtist)}">${escapeHtml(displayArtist)}</span>
+          <div>${badgeHtml}</div>
+          <div>
+            <button type="button" class="exclude-track-btn" title="${r.excluded ? 'Include track' : 'Exclude track'}">${r.excluded ? '↩' : '&times;'}</button>
+          </div>
+        `;
+
+        // Review click
+        const reviewBadge = row.querySelector('.badge-review');
+        if (reviewBadge) {
+          reviewBadge.addEventListener('click', () => openCandidateReview(idx));
+        }
+
+        // Exclude / Include button
+        const excludeBtn = row.querySelector('.exclude-track-btn');
+        if (excludeBtn) {
+          excludeBtn.addEventListener('click', () => {
+            r.excluded = !r.excluded;
+            renderImportPreviewUI();
+          });
+        }
+
+        elements.importPreviewTracksBody.appendChild(row);
+      });
+    }
+
+    // Summary footer text
+    if (elements.importPreviewSummaryText) {
+      elements.importPreviewSummaryText.textContent = `Ready to import ${matched} playable songs out of ${results.length} source songs. Unmatched entries will be excluded from playback.`;
+    }
+  }
+
+  function openCandidateReview(resultIndex) {
+    importWorkflowState.currentReviewIndex = resultIndex;
+    const r = importWorkflowState.matchResults[resultIndex];
+    if (!r) return;
+
+    if (elements.candReviewSourceTitle) elements.candReviewSourceTitle.textContent = r.source.title || '';
+    if (elements.candReviewSourceMeta) {
+      elements.candReviewSourceMeta.textContent = `${r.source.artist || ''} • ${formatDuration(r.source.duration || 0)}`;
+    }
+
+    if (elements.candReviewList) {
+      elements.candReviewList.innerHTML = '';
+      const candidates = r.candidates || [];
+      if (candidates.length === 0) {
+        elements.candReviewList.innerHTML = '<div style="color: var(--text-subdued); padding: 12px; text-align: center;">No alternative candidates found</div>';
+      } else {
+        candidates.forEach(cand => {
+          const card = document.createElement('div');
+          card.className = 'candidate-card-item';
+          const score = Math.round(cand.score ? cand.score * 100 : r.confidence);
+          card.innerHTML = `
+            <div class="candidate-card-left">
+              <img src="${cand.image || '/icons/icon.svg'}" class="candidate-thumb" alt="Thumb" onerror="this.src='/icons/icon.svg'" />
+              <div>
+                <h4 class="candidate-title">${escapeHtml(cand.title)}</h4>
+                <p class="candidate-sub">${escapeHtml(cand.artist)} • ${formatDuration(cand.duration || 0)}</p>
+              </div>
+            </div>
+            <span class="candidate-score-badge">${score}% Match</span>
+          `;
+          card.onclick = () => {
+            r.matchedTrack = cand;
+            r.status = 'matched';
+            r.confidence = score;
+            if (elements.candidateReviewModal) elements.candidateReviewModal.style.display = 'none';
+            renderImportPreviewUI();
+          };
+          elements.candReviewList.appendChild(card);
+        });
+      }
+    }
+
+    if (elements.candidateReviewModal) elements.candidateReviewModal.style.display = 'flex';
+  }
+
+  async function executeConfirmImport() {
+    const pl = importWorkflowState.parsedPlaylist;
+    const results = importWorkflowState.matchResults || [];
+    if (!pl) return;
+
+    // Collect confirmed playable tracks in source order (preserving intentional duplicates!)
+    const confirmedPlayableTracks = [];
+    results.forEach(r => {
+      if (!r.excluded && r.status === 'matched' && r.matchedTrack && r.matchedTrack.id) {
+        confirmedPlayableTracks.push(r.matchedTrack);
+      }
+    });
+
+    if (confirmedPlayableTracks.length === 0) {
+      showToast('No playable songs matched to import.', '⚠️');
+      return;
+    }
+
+    const dupRadio = document.querySelector('input[name="duplicateAction"]:checked');
+    const duplicateAction = dupRadio ? dupRadio.value : 'create_new';
+
+    try {
+      if (elements.confirmCreatePlaylistBtn) {
+        elements.confirmCreatePlaylistBtn.disabled = true;
+        elements.confirmCreatePlaylistBtn.innerHTML = '<span>Creating Playlist...</span>';
+      }
+
+      const res = await fetch('/api/import/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          playlistName: pl.name,
+          description: pl.description,
+          coverUrl: pl.artwork,
+          confirmedTracks: confirmedPlayableTracks,
+          provider: pl.provider || 'spotify',
+          externalPlaylistId: pl.externalPlaylistId || '',
+          duplicateAction: duplicateAction,
+          targetPlaylistId: importWorkflowState.duplicateExisting?.id || null
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to create playlist');
+      }
+
+      const created = data.playlist;
+      importWorkflowState.createdPlaylistId = created.id;
+
+      // Ensure client local state is synchronized
+      const existingIdx = state.customPlaylists.findIndex(p => p.id === created.id);
+      if (existingIdx !== -1) {
+        state.customPlaylists[existingIdx] = created;
+      } else {
+        state.customPlaylists.push(created);
+      }
+      saveStoredPlaylists();
+      renderSidebarPlaylists();
+      updateLibraryUI();
+
+      // Show Step 4: Success View
+      if (elements.importStepPreview) elements.importStepPreview.style.display = 'none';
+      if (elements.importStepSuccess) elements.importStepSuccess.style.display = 'block';
+      if (elements.importSuccessSub) {
+        elements.importSuccessSub.textContent = `Created playlist "${created.name}" with ${confirmedPlayableTracks.length} playable songs.`;
+      }
+
+      showToast(`✓ Imported playlist "${created.name}"!`, '🎉');
+
+      // Refresh settings import history
+      loadImportHistoryUI();
+
+    } catch (err) {
+      console.error('[Import] Creation error:', err);
+      showToast(err.message || 'Failed to create playlist', '❌');
+    } finally {
+      if (elements.confirmCreatePlaylistBtn) {
+        elements.confirmCreatePlaylistBtn.disabled = false;
+        elements.confirmCreatePlaylistBtn.innerHTML = '<span>Confirm & Create Playlist</span>';
+      }
+    }
+  }
+
   function renderSidebarPlaylists() {
     if (!elements.customPlaylistsList) return;
     elements.customPlaylistsList.innerHTML = '';
@@ -11853,6 +12354,9 @@
         document.querySelectorAll('.settings-tab-view').forEach(view => {
           view.classList.toggle('active', view.id === targetId);
         });
+        if (targetId === 'settingsLibrarySection') {
+          loadImportHistoryUI();
+        }
       });
     });
 
@@ -12085,6 +12589,215 @@
       elements.exportAsCsvBtn.addEventListener('click', () => {
         exportCurrentPlaylist('csv');
       });
+    }
+
+    // ------------------------------------------------------------------------
+    // Playlist Import & Transfer Event Listeners
+    // ------------------------------------------------------------------------
+
+    // Open from Settings card or button
+    if (elements.settingsImportPlaylistBtn) {
+      elements.settingsImportPlaylistBtn.addEventListener('click', openImportPlaylistModal);
+    }
+    if (elements.triggerImportModalBtn) {
+      elements.triggerImportModalBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openImportPlaylistModal();
+      });
+    }
+
+    // Open from Mobile Navigation Drawer
+    if (elements.drawerImportPlaylistBtn) {
+      elements.drawerImportPlaylistBtn.addEventListener('click', () => {
+        if (elements.mobileNavDrawer) elements.mobileNavDrawer.classList.remove('open');
+        if (elements.mobileDrawerBackdrop) elements.mobileDrawerBackdrop.style.display = 'none';
+        openImportPlaylistModal();
+      });
+    }
+
+    // Close & Cancel buttons
+    if (elements.closeImportPlaylistModalBtn) {
+      elements.closeImportPlaylistModalBtn.addEventListener('click', closeImportPlaylistModal);
+    }
+    if (elements.cancelImportModalBtn) {
+      elements.cancelImportModalBtn.addEventListener('click', closeImportPlaylistModal);
+    }
+    if (elements.importPlaylistModal) {
+      elements.importPlaylistModal.addEventListener('click', (e) => {
+        if (e.target === elements.importPlaylistModal) {
+          closeImportPlaylistModal();
+        }
+      });
+    }
+
+    // Import Method Tabs
+    if (elements.importMethodLinkTab) {
+      elements.importMethodLinkTab.addEventListener('click', () => switchImportTab('link'));
+    }
+    if (elements.importMethodFileTab) {
+      elements.importMethodFileTab.addEventListener('click', () => switchImportTab('file'));
+    }
+
+    // Clipboard Paste Button
+    if (elements.importPasteUrlBtn) {
+      elements.importPasteUrlBtn.addEventListener('click', async () => {
+        try {
+          if (navigator.clipboard && navigator.clipboard.readText) {
+            const clipText = await navigator.clipboard.readText();
+            if (clipText && elements.importPlaylistUrlInput) {
+              elements.importPlaylistUrlInput.value = clipText.trim();
+              if (elements.importValidationError) elements.importValidationError.style.display = 'none';
+              showToast('Pasted playlist link from clipboard', '📋');
+            }
+          } else {
+            showToast('Clipboard access not available, paste manually', 'ℹ️');
+          }
+        } catch (err) {
+          showToast('Please paste the URL manually (Ctrl+V / Cmd+V)', 'ℹ️');
+        }
+      });
+    }
+
+    // File Input & Drag-and-Drop Handling
+    function handleImportFile(file) {
+      if (!file) return;
+      const validExtensions = ['.m3u', '.m3u8', '.pls', '.xspf', '.csv', '.json', '.txt'];
+      const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+      if (!validExtensions.includes(ext)) {
+        showImportError(`Unsupported file format "${ext}". Supported: M3U, M3U8, PLS, XSPF, CSV, JSON, TXT.`);
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        showImportError('File exceeds maximum size of 5 MB.');
+        return;
+      }
+
+      importWorkflowState.selectedFile = file;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        importWorkflowState.selectedFileContent = e.target.result;
+        if (elements.importSelectedFileName) elements.importSelectedFileName.textContent = file.name;
+        if (elements.importSelectedFileInfo) elements.importSelectedFileInfo.style.display = 'flex';
+        if (elements.importDropZone) elements.importDropZone.style.display = 'none';
+        if (elements.importValidationError) elements.importValidationError.style.display = 'none';
+      };
+      reader.onerror = () => {
+        showImportError('Failed to read file from your device.');
+      };
+      reader.readAsText(file);
+    }
+
+    if (elements.importPlaylistFileInput) {
+      elements.importPlaylistFileInput.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (file) handleImportFile(file);
+      });
+    }
+
+    if (elements.importBrowseFileBtn) {
+      elements.importBrowseFileBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        elements.importPlaylistFileInput?.click();
+      });
+    }
+
+    if (elements.importDropZone) {
+      elements.importDropZone.addEventListener('click', () => {
+        elements.importPlaylistFileInput?.click();
+      });
+      ['dragenter', 'dragover'].forEach(name => {
+        elements.importDropZone.addEventListener(name, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          elements.importDropZone.classList.add('drag-active');
+        });
+      });
+      ['dragleave', 'drop'].forEach(name => {
+        elements.importDropZone.addEventListener(name, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          elements.importDropZone.classList.remove('drag-active');
+        });
+      });
+      elements.importDropZone.addEventListener('drop', (e) => {
+        const file = e.dataTransfer?.files?.[0];
+        if (file) handleImportFile(file);
+      });
+    }
+
+    if (elements.importClearSelectedFileBtn) {
+      elements.importClearSelectedFileBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        importWorkflowState.selectedFile = null;
+        importWorkflowState.selectedFileContent = '';
+        if (elements.importPlaylistFileInput) elements.importPlaylistFileInput.value = '';
+        if (elements.importSelectedFileInfo) elements.importSelectedFileInfo.style.display = 'none';
+        if (elements.importDropZone) elements.importDropZone.style.display = 'block';
+      });
+    }
+
+    // Start Import / Continue Button
+    if (elements.startImportFetchBtn) {
+      elements.startImportFetchBtn.addEventListener('click', startImportWorkflow);
+    }
+
+    // Step 3: Back & Confirm Buttons
+    if (elements.backToChooseMethodBtn) {
+      elements.backToChooseMethodBtn.addEventListener('click', () => {
+        if (elements.importStepPreview) elements.importStepPreview.style.display = 'none';
+        if (elements.importStepChoose) elements.importStepChoose.style.display = 'block';
+      });
+    }
+
+    if (elements.confirmCreatePlaylistBtn) {
+      elements.confirmCreatePlaylistBtn.addEventListener('click', executeConfirmImport);
+    }
+
+    // Step 4: Success View Buttons
+    if (elements.closeImportSuccessBtn) {
+      elements.closeImportSuccessBtn.addEventListener('click', closeImportPlaylistModal);
+    }
+
+    if (elements.openImportedPlaylistBtn) {
+      elements.openImportedPlaylistBtn.addEventListener('click', () => {
+        closeImportPlaylistModal();
+        if (elements.settingsModal) elements.settingsModal.style.display = 'none';
+        if (importWorkflowState.createdPlaylistId) {
+          renderPlaylistView(importWorkflowState.createdPlaylistId);
+        }
+      });
+    }
+
+    // Candidate Review Modal Listeners
+    if (elements.closeCandidateReviewBtn) {
+      elements.closeCandidateReviewBtn.addEventListener('click', () => {
+        if (elements.candidateReviewModal) elements.candidateReviewModal.style.display = 'none';
+      });
+    }
+
+    if (elements.candLeaveUnmatchedBtn) {
+      elements.candLeaveUnmatchedBtn.addEventListener('click', () => {
+        const r = importWorkflowState.matchResults[importWorkflowState.currentReviewIndex];
+        if (r) {
+          r.status = 'unmatched';
+          r.matchedTrack = null;
+        }
+        if (elements.candidateReviewModal) elements.candidateReviewModal.style.display = 'none';
+        renderImportPreviewUI();
+      });
+    }
+
+    if (elements.candidateReviewModal) {
+      elements.candidateReviewModal.addEventListener('click', (e) => {
+        if (e.target === elements.candidateReviewModal) {
+          elements.candidateReviewModal.style.display = 'none';
+        }
+      });
+    }
+
+    // Import History Refresh Button
+    if (elements.refreshImportHistoryBtn) {
+      elements.refreshImportHistoryBtn.addEventListener('click', loadImportHistoryUI);
     }
 
     // Local Files Event Listeners

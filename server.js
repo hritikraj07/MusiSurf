@@ -14,6 +14,7 @@ const { getCanonicalTrackId, getTrackFingerprint, areTracksIdentical, extractPri
 const searchEngine = require('./scripts/search_engine');
 const { requireAuth, optionalAuth, getAuthenticatedUser } = require('./services/auth');
 const libraryService = require('./services/library');
+const importService = require('./services/import/importService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -37,7 +38,8 @@ app.use(cors({
   credentials: true
 }));
 app.use(cookieParser());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.text({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Google Search Console Site Ownership Verification File
@@ -2557,6 +2559,123 @@ const handleSaveProgress = async (req, res) => {
 
 app.post('/api/library/playlists/:id/progress', requireAuth, handleSaveProgress);
 app.put('/api/library/playlists/:id/progress', requireAuth, handleSaveProgress);
+
+// --------------------------------------------------------------------------
+// EXTERNAL PLAYLIST IMPORT & TRANSFER ENGINE
+// --------------------------------------------------------------------------
+
+// 1. Parse playlist from link or uploaded file
+app.post('/api/import/parse', async (req, res) => {
+  try {
+    const { url, fileContent, filename, fileName, format } = req.body || {};
+    const playlist = await importService.parseExternalPlaylist({
+      url,
+      fileContent,
+      filename: filename || fileName,
+      format
+    });
+    res.json({ success: true, playlist });
+  } catch (err) {
+    console.warn('[Import API] Parse error:', err.message);
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// 2. Match external playlist tracks against MusiSurf catalogue
+app.post('/api/import/match', async (req, res) => {
+  try {
+    const { playlist } = req.body || {};
+    if (!playlist || !Array.isArray(playlist.tracks)) {
+      return res.status(400).json({ success: false, error: 'Playlist with tracks array required' });
+    }
+
+    const matchedData = await importService.matchExternalPlaylist(
+      playlist,
+      searchSaavn,
+      searchYouTube
+    );
+
+    res.json({
+      success: true,
+      playlist: matchedData.playlist,
+      stats: matchedData.stats,
+      results: matchedData.results
+    });
+  } catch (err) {
+    console.error('[Import API] Matching error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 3. Check for potential duplicate imports
+app.post('/api/import/check-duplicate', optionalAuth, async (req, res) => {
+  try {
+    const { name, externalId } = req.body || {};
+    const userId = req.user ? req.user.id : null;
+    const existing = await importService.checkDuplicateImport(userId, name || '', externalId || '');
+    res.json({ success: true, exists: Boolean(existing), existing });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4. Confirm and persist imported playlist into MusiSurf library
+app.post('/api/import/confirm', optionalAuth, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const playlistName = body.playlistName || body.name || body.playlist?.playlistName || body.playlist?.name;
+    const description = body.description || body.playlist?.description || '';
+    const coverUrl = body.coverUrl || body.artwork || body.playlist?.artwork || body.playlist?.coverUrl || null;
+    const confirmedTracks = body.confirmedTracks || body.tracks || body.playlist?.tracks || [];
+    const provider = body.provider || body.playlist?.provider || body.playlist?.platform || 'spotify';
+    const externalPlaylistId = body.externalPlaylistId || body.playlist?.externalPlaylistId || '';
+    const duplicateAction = body.duplicateAction || body.mergeStrategy || 'create_new';
+    const targetPlaylistId = body.targetPlaylistId || null;
+
+    if (!playlistName || !playlistName.trim()) {
+      return res.status(400).json({ success: false, error: 'Playlist name is required' });
+    }
+
+    const userId = req.user ? req.user.id : null;
+
+    const result = await importService.confirmAndCreatePlaylist({
+      userId,
+      playlistName,
+      description,
+      coverUrl,
+      confirmedTracks,
+      provider,
+      externalPlaylistId,
+      duplicateAction,
+      targetPlaylistId
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error('[Import API] Confirm creation error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5. Get import history
+app.get('/api/import/history', optionalAuth, (req, res) => {
+  try {
+    const history = importService.getImportHistory();
+    res.json({ success: true, history });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 6. Delete import history item
+app.delete('/api/import/history/:id', optionalAuth, (req, res) => {
+  try {
+    const removed = importService.deleteImportHistoryItem(req.params.id);
+    res.json({ success: true, removed });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // Status and Info
 app.get('/api/status', (req, res) => {
