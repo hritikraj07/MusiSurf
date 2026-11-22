@@ -4078,19 +4078,21 @@
         }
       }
       if (!state.isPlaying || actForGuard.paused) {
-        state.isTrackLoading = true;
+        state.isPlaying = true;
+        state.isTrackLoading = false;
+        actForGuard.volume = state.isMuted ? 0 : (state.volume || 0.8);
         updatePlayPauseButton();
 
         let sameTrackHandled = false;
         let sameTrackWatchdog = setTimeout(() => {
           if (!sameTrackHandled && (!state.isPlaying || actForGuard.paused)) {
-            console.warn('Same-track resume play stalled (connection severed during pause), executing seamless recovery reload');
+            console.warn('Same-track resume play stalled, executing recovery reload');
             logPlaybackDiagnostic('same-track-resume-watchdog-triggered', { trackId: track.id });
             sameTrackHandled = true;
             cleanupSameTrackListeners();
             playTrack(track, queueList, false, (actForGuard && actForGuard.currentTime > 0) ? actForGuard.currentTime : 0, true);
           }
-        }, 1200);
+        }, 1500);
 
         function cleanupSameTrackListeners() {
           if (sameTrackWatchdog) {
@@ -4098,7 +4100,6 @@
             sameTrackWatchdog = null;
           }
           actForGuard.removeEventListener('playing', onSameTrackSuccess);
-          actForGuard.removeEventListener('canplay', onSameTrackSuccess);
           actForGuard.removeEventListener('timeupdate', onSameTrackSuccess);
         }
 
@@ -4114,7 +4115,6 @@
         }
 
         actForGuard.addEventListener('playing', onSameTrackSuccess, { once: true });
-        actForGuard.addEventListener('canplay', onSameTrackSuccess, { once: true });
         actForGuard.addEventListener('timeupdate', onSameTrackSuccess, { once: true });
 
         const playPromise = actForGuard.play();
@@ -4122,6 +4122,7 @@
           playPromise.then(() => {
             onSameTrackSuccess();
           }).catch(err => {
+            if (err.name === 'AbortError') return;
             if (sameTrackHandled) return;
             sameTrackHandled = true;
             cleanupSameTrackListeners();
@@ -4438,14 +4439,31 @@
             try { act.load(); } catch (e) {}
           }
           if (customStartTime > 0) {
-            const seekStartTime = () => {
+            let startSeeked = false;
+            const applyInitialSeekAndPlay = () => {
+              if (startSeeked || currentToken !== activePlayToken) return;
+              startSeeked = true;
               try { act.currentTime = customStartTime; } catch (e) {}
+              if (currentToken === activePlayToken && (state.isPlaying || state.isTrackLoading)) {
+                act.play().then(() => {
+                  if (currentToken === activePlayToken) {
+                    state.isPlaying = true;
+                    state.isTrackLoading = false;
+                    updatePlayPauseButton();
+                    logPlaybackDiagnostic('initial-seek-play-resolved', { trackId: track.id });
+                  }
+                }).catch(err => {
+                  if (currentToken === activePlayToken && err.name !== 'AbortError') {
+                    console.warn('Initial seek play error:', err);
+                  }
+                });
+              }
             };
             if (act.readyState >= 1) {
-              seekStartTime();
+              applyInitialSeekAndPlay();
             } else {
-              act.addEventListener('loadedmetadata', seekStartTime, { once: true });
-              act.addEventListener('canplay', seekStartTime, { once: true });
+              act.addEventListener('loadedmetadata', applyInitialSeekAndPlay, { once: true });
+              act.addEventListener('canplay', applyInitialSeekAndPlay, { once: true });
             }
           } else {
             if (act.readyState >= 1) {
@@ -4486,42 +4504,44 @@
           } else {
             act.volume = state.isMuted ? 0 : state.volume;
           }
-          logPlaybackDiagnostic('play-invoked', { trackId: track.id });
-          const playPromise = act.play();
-          if (playPromise !== undefined) {
-            playPromise.then(() => {
-              if (currentToken === activePlayToken) {
-                state.isPlaying = true;
-                state.isTrackLoading = false;
-                updatePlayPauseButton();
-                logPlaybackDiagnostic('play-resolved', { trackId: track.id });
-              }
-            }).catch(err => {
-              if (currentToken !== activePlayToken) return;
-              logPlaybackDiagnostic('play-rejected', { trackId: track.id, errorName: err.name, errorMessage: err.message });
-              if (err.name === 'AbortError') {
-                const retryPlay = () => {
-                  if (currentToken === activePlayToken && act.paused) {
-                    act.play().then(() => {
-                      if (currentToken === activePlayToken) {
-                        state.isPlaying = true;
-                        state.isTrackLoading = false;
-                        updatePlayPauseButton();
-                        logPlaybackDiagnostic('abort-retry-play-resolved', { trackId: track.id });
-                      }
-                    }).catch(retryErr => {
-                      logPlaybackDiagnostic('abort-retry-play-failed', { trackId: track.id, error: retryErr.message });
-                    });
-                  }
-                };
-                if (act.readyState >= 2) {
-                  retryPlay();
-                } else {
-                  act.addEventListener('canplay', retryPlay, { once: true });
-                  act.addEventListener('loadeddata', retryPlay, { once: true });
+
+          if (customStartTime <= 0) {
+            logPlaybackDiagnostic('play-invoked', { trackId: track.id });
+            const playPromise = act.play();
+            if (playPromise !== undefined) {
+              playPromise.then(() => {
+                if (currentToken === activePlayToken) {
+                  state.isPlaying = true;
+                  state.isTrackLoading = false;
+                  updatePlayPauseButton();
+                  logPlaybackDiagnostic('play-resolved', { trackId: track.id });
                 }
-                return;
-              }
+              }).catch(err => {
+                if (currentToken !== activePlayToken) return;
+                logPlaybackDiagnostic('play-rejected', { trackId: track.id, errorName: err.name, errorMessage: err.message });
+                if (err.name === 'AbortError') {
+                  const retryPlay = () => {
+                    if (currentToken === activePlayToken && act.paused) {
+                      act.play().then(() => {
+                        if (currentToken === activePlayToken) {
+                          state.isPlaying = true;
+                          state.isTrackLoading = false;
+                          updatePlayPauseButton();
+                          logPlaybackDiagnostic('abort-retry-play-resolved', { trackId: track.id });
+                        }
+                      }).catch(retryErr => {
+                        logPlaybackDiagnostic('abort-retry-play-failed', { trackId: track.id, error: retryErr.message });
+                      });
+                    }
+                  };
+                  if (act.readyState >= 2) {
+                    retryPlay();
+                  } else {
+                    act.addEventListener('canplay', retryPlay, { once: true });
+                    act.addEventListener('loadeddata', retryPlay, { once: true });
+                  }
+                  return;
+                }
               if (err.name === 'NotAllowedError') {
                 console.warn('Autoplay prevented by browser:', err);
                 state.isPlaying = false;
@@ -4729,29 +4749,23 @@
         const masterVol = state.isMuted ? 0 : (state.volume || 0.8);
         act.volume = masterVol;
 
-        if (resumeTime > 0 && act.readyState >= 1) {
-          try {
-            if (Math.abs(act.currentTime - resumeTime) > 0.5) {
-              act.currentTime = resumeTime;
-            }
-          } catch (e) {}
-        }
-
-        state.isTrackLoading = true;
+        // Immediately reflect playing state so controls show Pause button without freezing
+        state.isPlaying = true;
+        state.isTrackLoading = false;
         updatePlayPauseButton();
 
-        logPlaybackDiagnostic('togglePlayPause-resume-play', { resumeTime });
+        logPlaybackDiagnostic('togglePlayPause-resume-play', { resumeTime, currentDeckTime });
 
         let resumeHandled = false;
         let resumeWatchdog = setTimeout(() => {
           if (!resumeHandled && (!state.isPlaying || act.paused)) {
-            console.warn('Audio resume stalled after pause (connection severed), executing seamless recovery reload');
+            console.warn('Audio resume stalled after pause, executing seamless recovery reload');
             logPlaybackDiagnostic('togglePlayPause-resume-watchdog-triggered', { resumeTime });
             resumeHandled = true;
             cleanupResumeListeners();
-            playTrack(state.currentTrack, state.queue, false, resumeTime, true);
+            playTrack(state.currentTrack, state.queue, false, (act && act.currentTime > 0) ? act.currentTime : resumeTime, true);
           }
-        }, 1200);
+        }, 1500);
 
         function cleanupResumeListeners() {
           if (resumeWatchdog) {
@@ -4759,7 +4773,6 @@
             resumeWatchdog = null;
           }
           act.removeEventListener('playing', onResumeSuccess);
-          act.removeEventListener('canplay', onResumeSuccess);
           act.removeEventListener('timeupdate', onResumeSuccess);
         }
 
@@ -4775,7 +4788,6 @@
         }
 
         act.addEventListener('playing', onResumeSuccess, { once: true });
-        act.addEventListener('canplay', onResumeSuccess, { once: true });
         act.addEventListener('timeupdate', onResumeSuccess, { once: true });
 
         const resumePromise = act.play();
@@ -4783,15 +4795,13 @@
           resumePromise.then(() => {
             onResumeSuccess();
           }).catch(err => {
+            if (err.name === 'AbortError') return;
             if (resumeHandled) return;
             resumeHandled = true;
             cleanupResumeListeners();
             console.warn('Audio resume error, attempting full recovery playTrack:', err);
             logPlaybackDiagnostic('togglePlayPause-resume-failed', { error: err.message });
-            state.isPlaying = false;
-            state.isTrackLoading = false;
-            updatePlayPauseButton();
-            playTrack(state.currentTrack, state.queue, false, resumeTime, true);
+            playTrack(state.currentTrack, state.queue, false, (act && act.currentTime > 0) ? act.currentTime : resumeTime, true);
           });
         }
       }
@@ -5143,6 +5153,10 @@
   let lastKnownPlaybackTime = 0;
 
   function getCurrentPlaybackTime() {
+    const act = (typeof getActiveDeck === 'function') ? getActiveDeck() : elements.audio;
+    if (act && Number.isFinite(act.currentTime) && act.currentTime > 0) {
+      return act.currentTime;
+    }
     if (state.isTrackLoading) {
       return state.restoredResumeTime || 0;
     }
@@ -11072,6 +11086,19 @@
 
     // Lyrics Fullscreen Mode Controller (Web Fullscreen Mode)
     function enterLyricsFullscreen() {
+      try {
+        const root = document.documentElement;
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+          if (root.requestFullscreen) {
+            root.requestFullscreen().catch(() => {});
+          } else if (root.webkitRequestFullscreen) {
+            root.webkitRequestFullscreen();
+          } else if (root.msRequestFullscreen) {
+            root.msRequestFullscreen();
+          }
+        }
+      } catch (e) {}
+
       document.body.classList.add('lyrics-fullscreen-active');
       if (elements.lyricsFullscreenBtn) {
         elements.lyricsFullscreenBtn.title = 'Exit full screen';
@@ -11090,6 +11117,18 @@
     }
 
     function exitLyricsFullscreen() {
+      try {
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
+          if (document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+          } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+          }
+        }
+      } catch (e) {}
+
       document.body.classList.remove('lyrics-fullscreen-active');
       if (elements.lyricsFullscreenBtn) {
         elements.lyricsFullscreenBtn.title = 'Full screen';
@@ -11158,11 +11197,14 @@
       }
     });
 
-    document.addEventListener('fullscreenchange', () => {
-      if (!document.fullscreenElement && document.body.classList.contains('lyrics-fullscreen-active')) {
+    const onFsChange = () => {
+      const isFs = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+      if (!isFs && document.body.classList.contains('lyrics-fullscreen-active')) {
         exitLyricsFullscreen();
       }
-    });
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange);
 
     window.addEventListener('resize', () => {
       if (state.currentView === 'lyrics') {
@@ -11887,7 +11929,9 @@
       });
       deck.addEventListener('waiting', () => {
         if (deck === getActiveDeck()) {
-          state.isTrackLoading = true;
+          if (!state.isPlaying || deck.currentTime <= 0.05) {
+            state.isTrackLoading = true;
+          }
           logPlaybackDiagnostic('native-deck-waiting');
         }
       });
@@ -11898,6 +11942,7 @@
       });
       deck.addEventListener('canplay', () => {
         if (deck === getActiveDeck()) {
+          if (state.isPlaying) state.isTrackLoading = false;
           logPlaybackDiagnostic('native-deck-canplay');
         }
       });
@@ -11906,7 +11951,13 @@
           deck._fadeHandler();
         }
 
-        if (deck !== getActiveDeck() || isYouTubeActive() || state.isTrackLoading) return;
+        if (deck !== getActiveDeck() || isYouTubeActive()) return;
+        if (state.isTrackLoading && !deck.paused && deck.currentTime > 0) {
+          state.isTrackLoading = false;
+          state.isPlaying = true;
+          updatePlayPauseButton();
+        }
+        if (state.isTrackLoading) return;
         accumulatePlaybackTime(deck);
         if (state.playbackContext && state.playbackContext.type === 'playlist') {
           saveCurrentPlaylistProgress({ immediate: false });
