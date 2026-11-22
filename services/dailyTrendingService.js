@@ -1069,5 +1069,6 @@ module.exports = {
   isDevotionalOrBhajan,
   calculateTrendScore,
   matchPlayableMusiSurfTrack,
-  getTodayISTString
+  getTodayISTString,
+  getYesterdayISTString
 };

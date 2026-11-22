@@ -24,7 +24,8 @@ const {
   isVerifiedHindiSong,
   calculateTrendScore,
   matchPlayableMusiSurfTrack,
-  getTodayISTString
+  getTodayISTString,
+  getYesterdayISTString
 } = require('../services/dailyTrendingService');
 
 console.log('🧪 Starting MUSISURF Daily Trending Hindi Song Verification Suite...\n');
@@ -244,7 +245,7 @@ async function runAllTests() {
   // Test 9: Same song was featured yesterday (Repetition penalty applied)
   // --------------------------------------------------------------------------
   runTest('Test 9 — Repetition penalty applied to yesterday featured song, allowing rising trend to win', () => {
-    const yesterdayDate = '2026-11-21';
+    const yesterdayDate = getYesterdayISTString();
     const mockHistory = [
       { date_ist: yesterdayDate, canonical_id: 'track_A', matched_track_id: 'track_A' }
     ];
