@@ -4080,15 +4080,51 @@
       if (!state.isPlaying || actForGuard.paused) {
         state.isTrackLoading = true;
         updatePlayPauseButton();
+
+        let sameTrackHandled = false;
+        let sameTrackWatchdog = setTimeout(() => {
+          if (!sameTrackHandled && (!state.isPlaying || actForGuard.paused)) {
+            console.warn('Same-track resume play stalled (connection severed during pause), executing seamless recovery reload');
+            logPlaybackDiagnostic('same-track-resume-watchdog-triggered', { trackId: track.id });
+            sameTrackHandled = true;
+            cleanupSameTrackListeners();
+            playTrack(track, queueList, false, (actForGuard && actForGuard.currentTime > 0) ? actForGuard.currentTime : 0, true);
+          }
+        }, 1200);
+
+        function cleanupSameTrackListeners() {
+          if (sameTrackWatchdog) {
+            clearTimeout(sameTrackWatchdog);
+            sameTrackWatchdog = null;
+          }
+          actForGuard.removeEventListener('playing', onSameTrackSuccess);
+          actForGuard.removeEventListener('canplay', onSameTrackSuccess);
+          actForGuard.removeEventListener('timeupdate', onSameTrackSuccess);
+        }
+
+        function onSameTrackSuccess() {
+          if (sameTrackHandled) return;
+          sameTrackHandled = true;
+          cleanupSameTrackListeners();
+          state.isPlaying = true;
+          state.isTrackLoading = false;
+          actForGuard.volume = state.isMuted ? 0 : (state.volume || 0.8);
+          updatePlayPauseButton();
+          logPlaybackDiagnostic('same-track-resume-success', { trackId: track.id });
+        }
+
+        actForGuard.addEventListener('playing', onSameTrackSuccess, { once: true });
+        actForGuard.addEventListener('canplay', onSameTrackSuccess, { once: true });
+        actForGuard.addEventListener('timeupdate', onSameTrackSuccess, { once: true });
+
         const playPromise = actForGuard.play();
         if (playPromise !== undefined) {
           playPromise.then(() => {
-            state.isPlaying = true;
-            state.isTrackLoading = false;
-            actForGuard.volume = state.isMuted ? 0 : (state.volume || 0.8);
-            updatePlayPauseButton();
-            logPlaybackDiagnostic('same-track-resume-success', { trackId: track.id });
+            onSameTrackSuccess();
           }).catch(err => {
+            if (sameTrackHandled) return;
+            sameTrackHandled = true;
+            cleanupSameTrackListeners();
             console.warn('Same-track resume play error, recovering with full playTrack:', err);
             logPlaybackDiagnostic('same-track-resume-failed', { trackId: track.id, error: err.message });
             state.isPlaying = false;
@@ -4705,15 +4741,51 @@
         updatePlayPauseButton();
 
         logPlaybackDiagnostic('togglePlayPause-resume-play', { resumeTime });
+
+        let resumeHandled = false;
+        let resumeWatchdog = setTimeout(() => {
+          if (!resumeHandled && (!state.isPlaying || act.paused)) {
+            console.warn('Audio resume stalled after pause (connection severed), executing seamless recovery reload');
+            logPlaybackDiagnostic('togglePlayPause-resume-watchdog-triggered', { resumeTime });
+            resumeHandled = true;
+            cleanupResumeListeners();
+            playTrack(state.currentTrack, state.queue, false, resumeTime, true);
+          }
+        }, 1200);
+
+        function cleanupResumeListeners() {
+          if (resumeWatchdog) {
+            clearTimeout(resumeWatchdog);
+            resumeWatchdog = null;
+          }
+          act.removeEventListener('playing', onResumeSuccess);
+          act.removeEventListener('canplay', onResumeSuccess);
+          act.removeEventListener('timeupdate', onResumeSuccess);
+        }
+
+        function onResumeSuccess() {
+          if (resumeHandled) return;
+          resumeHandled = true;
+          cleanupResumeListeners();
+          state.isPlaying = true;
+          state.isTrackLoading = false;
+          act.volume = masterVol;
+          updatePlayPauseButton();
+          logPlaybackDiagnostic('togglePlayPause-resume-success');
+        }
+
+        act.addEventListener('playing', onResumeSuccess, { once: true });
+        act.addEventListener('canplay', onResumeSuccess, { once: true });
+        act.addEventListener('timeupdate', onResumeSuccess, { once: true });
+
         const resumePromise = act.play();
         if (resumePromise !== undefined) {
           resumePromise.then(() => {
-            state.isPlaying = true;
-            state.isTrackLoading = false;
-            act.volume = masterVol;
-            updatePlayPauseButton();
-            logPlaybackDiagnostic('togglePlayPause-resume-success');
+            onResumeSuccess();
           }).catch(err => {
+            if (resumeHandled) return;
+            resumeHandled = true;
+            cleanupResumeListeners();
             console.warn('Audio resume error, attempting full recovery playTrack:', err);
             logPlaybackDiagnostic('togglePlayPause-resume-failed', { error: err.message });
             state.isPlaying = false;
@@ -7206,7 +7278,7 @@
     elements.topResultCard.className = `top-result-card ${isPlayingThisTop ? 'playing' : ''}`;
     elements.topResultCard.innerHTML = `
       <div class="top-result-header-row">
-        <img src="${top.image}" alt="${escapeHtml(top.title)}" class="top-result-img">
+        <img src="${top.image}" alt="${escapeHtml(top.title)}" class="top-result-img" loading="lazy" decoding="async">
         <div class="top-result-info">
           <h4 class="top-result-title">${escapeHtml(top.title)}${getPlaylistTickBadgeHtml(top.id)}${getDownloadedBadgeHtml(top.id)}</h4>
           <div class="top-result-meta">
@@ -7419,7 +7491,7 @@
     const formattedArtist = escapeHtml(track.artist);
 
     row.innerHTML = `
-      <img src="${track.image}" alt="${escapeHtml(track.title)}" class="song-thumb">
+      <img src="${track.image}" alt="${escapeHtml(track.title)}" class="song-thumb" loading="lazy" decoding="async">
       <div class="song-info-col">
         <div class="song-title-text"><span class="title-text-main" title="${escapeHtml(track.title)}">${formattedTitle}</span>${tickHtml}${badgeHtml}</div>
         <div class="song-artist-text" title="${escapeHtml(track.artist)}">${formattedArtist}</div>
@@ -7535,7 +7607,7 @@
       </td>
       <td class="col-title">
         <div class="table-title-cell">
-          <img src="${track.image}" alt="${escapeHtml(track.title)}" class="table-cover" loading="lazy">
+          <img src="${track.image}" alt="${escapeHtml(track.title)}" class="table-cover" loading="lazy" decoding="async">
           <div>
             <div class="table-title-main"><span class="title-text-main" title="${escapeHtml(track.title)}">${formattedTitle}</span>${tickHtml}${badgeHtml}</div>
             <div class="table-artist-sub" title="${escapeHtml(track.artist)}">${formattedArtist}</div>

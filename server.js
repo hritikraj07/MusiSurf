@@ -1932,8 +1932,27 @@ app.get('/api/yt-stream', async (req, res) => {
     if (!ytdl) return res.status(500).send('Audio extractor unavailable');
 
     // Fetch video info to select native AAC / MP4 format (vital for iOS/Android background tab playback)
+    // Parse HTTP Range header for seamless HTML5 Audio seek, pause & resume
+    const rangeHeader = req.headers.range;
+    let rangeOptions = undefined;
+    let startByte = 0;
+    let endByte = undefined;
+
+    if (rangeHeader && rangeHeader.startsWith('bytes=')) {
+      const parts = rangeHeader.replace('bytes=', '').split('-');
+      startByte = parseInt(parts[0], 10) || 0;
+      if (parts[1]) {
+        endByte = parseInt(parts[1], 10);
+      }
+      rangeOptions = { start: startByte };
+      if (endByte !== undefined && !isNaN(endByte)) {
+        rangeOptions.end = endByte;
+      }
+    }
+
     let stream;
     let contentType = 'audio/mp4';
+    let contentLength = undefined;
 
     try {
       const info = await ytdl.getInfo(ytId);
@@ -1946,8 +1965,12 @@ app.get('/api/yt-stream', async (req, res) => {
 
       if (chosenFormat) {
         contentType = chosenFormat.mimeType ? chosenFormat.mimeType.split(';')[0] : (chosenFormat.container === 'mp4' ? 'audio/mp4' : 'audio/webm');
+        if (chosenFormat.contentLength) {
+          contentLength = parseInt(chosenFormat.contentLength, 10);
+        }
         stream = await ytdl.download(info, {
           format: chosenFormat,
+          range: rangeOptions,
           highWaterMark: 1 << 22
         });
       }
@@ -1958,6 +1981,7 @@ app.get('/api/yt-stream', async (req, res) => {
     if (!stream) {
       stream = await ytdl.download(ytId, {
         filter: { hasAudio: true, hasVideo: false },
+        range: rangeOptions,
         highWaterMark: 1 << 22
       });
       contentType = 'audio/mp4';
@@ -1967,6 +1991,22 @@ app.get('/api/yt-stream', async (req, res) => {
     res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=3600');
+
+    if (rangeOptions) {
+      const finalEnd = endByte !== undefined ? endByte : (contentLength ? contentLength - 1 : undefined);
+      if (finalEnd !== undefined) {
+        res.setHeader('Content-Range', `bytes ${startByte}-${finalEnd}/${contentLength || '*'}`);
+        res.setHeader('Content-Length', finalEnd - startByte + 1);
+      } else {
+        res.setHeader('Content-Range', `bytes ${startByte}-*/*`);
+      }
+      res.status(206);
+    } else if (contentLength) {
+      res.setHeader('Content-Length', contentLength);
+      res.status(200);
+    } else {
+      res.status(200);
+    }
 
     req.on('close', () => {
       try { if (stream && typeof stream.destroy === 'function') stream.destroy(); } catch (e) {}
