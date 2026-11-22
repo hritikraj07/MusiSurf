@@ -1832,30 +1832,60 @@
       </div>
     </div>
 
-    <!-- Delete Playlist Confirmation Modal (MusiSurf Dark Theme) -->
-    <div class="modal-backdrop" id="deletePlaylistConfirmModal" style="display: none;">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3 style="color: #ef4444; display: flex; align-items: center; gap: 8px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+    <!-- Delete Playlist Confirmation Modal (MusiSurf Premium Dark Theme) -->
+    <div class="modal-backdrop delete-modal-backdrop" id="deletePlaylistConfirmModal" style="display: none;">
+      <div class="delete-confirm-card">
+        <!-- Close button in top-right -->
+        <button class="delete-modal-close-btn" id="closeDeletePlaylistModalBtn" title="Close" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+
+        <!-- Top Red Warning Icon Badge -->
+        <div class="delete-icon-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            <line x1="10" y1="11" x2="10" y2="17" />
+            <line x1="14" y1="11" x2="14" y2="17" />
+          </svg>
+        </div>
+
+        <!-- Title -->
+        <h3 class="delete-confirm-title">Delete Playlist</h3>
+
+        <!-- Target Playlist Preview Card -->
+        <div class="delete-playlist-target-badge">
+          <div class="delete-playlist-target-art">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 18V5l12-2v13" />
+              <circle cx="6" cy="18" r="3" />
+              <circle cx="18" cy="16" r="3" />
+            </svg>
+          </div>
+          <div class="delete-playlist-target-info">
+            <span class="delete-playlist-target-name" id="deletePlaylistModalTargetName">Playlist</span>
+            <span class="delete-playlist-target-sub" id="deletePlaylistModalTargetSub">Custom Playlist</span>
+          </div>
+        </div>
+
+        <!-- Description Note -->
+        <p class="delete-confirm-desc">
+          Are you sure? This action cannot be undone and will permanently remove this playlist from your library.
+        </p>
+
+        <!-- Action Buttons -->
+        <div class="delete-confirm-actions">
+          <button type="button" class="delete-btn-cancel" id="cancelDeletePlaylistBtn">Cancel</button>
+          <button type="button" class="delete-btn-confirm" id="confirmDeletePlaylistModalBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="3 6 5 6 21 6" />
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
             </svg>
-            Delete Playlist
-          </h3>
-          <button class="modal-close-btn" id="closeDeletePlaylistModalBtn" title="Close">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+            Delete
           </button>
-        </div>
-        <div style="padding: 16px 0 22px; color: var(--text-secondary); font-size: 14.5px; line-height: 1.55;">
-          Are you sure you want to delete playlist <strong id="deletePlaylistModalTargetName" style="color: #fff;"></strong>? This action cannot be undone and will permanently remove it from your library.
-        </div>
-        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px;">
-          <button type="button" class="btn-secondary" id="cancelDeletePlaylistBtn">Cancel</button>
-          <button type="button" class="btn-danger" id="confirmDeletePlaylistModalBtn">Delete</button>
         </div>
       </div>
     </div>

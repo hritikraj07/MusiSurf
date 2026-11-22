@@ -8616,7 +8616,12 @@
     state._deletingPlaylistTitle = safeTitle;
     if (elements.deletePlaylistConfirmModal) {
       if (elements.deletePlaylistModalTargetName) {
-        elements.deletePlaylistModalTargetName.textContent = `"${safeTitle}"`;
+        elements.deletePlaylistModalTargetName.textContent = (safeTitle || 'Playlist').trim();
+      }
+      const subEl = document.getElementById('deletePlaylistModalTargetSub');
+      if (subEl) {
+        const trackCount = pl && Array.isArray(pl.tracks) ? pl.tracks.length : 0;
+        subEl.textContent = `${trackCount} ${trackCount === 1 ? 'song' : 'songs'} • Custom Playlist`;
       }
       elements.deletePlaylistConfirmModal.style.display = 'flex';
     } else {
