@@ -3269,18 +3269,17 @@
     let modeTitle = '';
 
     if (mode === '1') {
-      // Mode 1: Plays playlist in order (Shuffle: Off)
+      // Mode 1: Plays playlist in order (Default Shuffle / Shuffle: Off)
       iconSvg = `
-        <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M16 3h5v5"/>
-          <path d="M4 20L21 3"/>
-          <path d="M21 16v5h-5"/>
-          <path d="M15 15l6 6"/>
-          <path d="M4 4l5 5"/>
+        <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 4l3 3l-3 3"/>
+          <path d="M18 20l3 -3l-3 -3"/>
+          <path d="M3 7h3a5 5 0 0 1 5 5a5 5 0 0 0 5 5h5"/>
+          <path d="M21 7h-5a4.978 4.978 0 0 0 -3 1m-4 8a4.984 4.984 0 0 1 -3 1h-3"/>
         </svg>`;
       modeTitle = 'Shuffle: Off (Plays in order) • Click to Shuffle';
     } else if (mode === '2') {
-      // Mode 2: Plays in random order (Shuffle Once)
+      // Mode 2: Random play from playlist
       iconSvg = `
         <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
           <path d="M16 3h5v5"/>
@@ -3288,20 +3287,16 @@
           <path d="M21 16v5h-5"/>
           <path d="M15 15l6 6"/>
           <path d="M4 4l5 5"/>
-          <circle cx="12" cy="21" r="1.8" fill="currentColor" stroke="none"/>
         </svg>`;
       modeTitle = 'Shuffle: On (Random order) • Click for Shuffle & Loop';
     } else if (mode === '3') {
-      // Mode 3: Plays in random order with loop (Shuffle & Loop)
+      // Mode 3: Random and loop of playlist
       iconSvg = `
         <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M16 3h5v5"/>
-          <path d="M4 20L21 3"/>
-          <path d="M21 16v5h-5"/>
-          <path d="M15 15l6 6"/>
-          <path d="M4 4l5 5"/>
-          <path d="M19 11a4 4 0 0 0-3.5-3.8" stroke-width="1.8" stroke-dasharray="1.5 1.5"/>
-          <circle cx="12" cy="21" r="1.8" fill="currentColor" stroke="none"/>
+          <path d="m18 4 3 3-3 3"/>
+          <path d="m18 20 3-3-3-3"/>
+          <path d="M3 7h3a5 5 0 0 1 5 5a5 5 0 0 0 5 5h5"/>
+          <path d="M3 17h3a5 5 0 0 0 5-5a5 5 0 0 1 5-5h5"/>
         </svg>`;
       modeTitle = 'Shuffle: Loop & Repeat • Click for In Order';
     }
@@ -6858,6 +6853,20 @@
 
     let html = '';
 
+    // Merge any distinct lyric matches into songs so they appear cleanly under Songs (no lyrics-match badge or quote snippets)
+    if (lyricsMatches.length > 0) {
+      lyricsMatches.forEach(lyr => {
+        if (!songs.some(s => (s.id && s.id === lyr.id) || (s.title && s.title.toLowerCase() === (lyr.title || '').toLowerCase()))) {
+          songs.push({
+            id: lyr.id || `yt_${lyr.title}`,
+            title: lyr.title,
+            artist: lyr.artist || 'Artist',
+            image: lyr.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=80&auto=format&fit=crop&q=80'
+          });
+        }
+      });
+    }
+
     // 1. Song Suggestions
     if (songs.length > 0) {
       html += `
@@ -6866,7 +6875,7 @@
         </div>
         <div class="dropdown-section-group">
       `;
-      songs.slice(0, 4).forEach(song => {
+      songs.slice(0, 5).forEach(song => {
         html += `
           <div class="search-suggestion-item track-item" data-action="play-song" data-song='${escapeHtml(JSON.stringify(song))}'>
             <img src="${song.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=80&auto=format&fit=crop&q=80'}" alt="${escapeHtml(song.title)}" class="sugg-thumb" loading="lazy">
@@ -6875,33 +6884,6 @@
               <span class="sugg-subtitle">${escapeHtml(song.artist || 'Artist')}</span>
             </div>
             <span class="sugg-badge">Song</span>
-          </div>
-        `;
-      });
-      html += `</div>`;
-    }
-
-    // 2. Lyrics Match Suggestions (Styled with website monochrome theme)
-    if (lyricsMatches.length > 0) {
-      html += `
-        <div class="dropdown-section-title">
-          <span>Lyrics Match</span>
-        </div>
-        <div class="dropdown-section-group">
-      `;
-      lyricsMatches.slice(0, 3).forEach(lyr => {
-        html += `
-          <div class="search-suggestion-item lyric-item" data-action="search" data-query="${escapeHtml(lyr.title)}">
-            <svg class="suggestion-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #ffffff !important;">
-              <path d="M9 18V5l12-2v13"/>
-              <circle cx="6" cy="18" r="3"/>
-              <circle cx="18" cy="16" r="3"/>
-            </svg>
-            <div class="sugg-info">
-              <span class="sugg-title">${escapeHtml(lyr.title)} <span style="font-weight: 400; color: #a7a7a7;">• ${escapeHtml(lyr.artist)}</span></span>
-              <span class="sugg-lyric-snippet">“${escapeHtml(lyr.snippet || lyr.matchedLine)}”</span>
-            </div>
-            <span class="sugg-badge lyric-badge">Lyrics match</span>
           </div>
         `;
       });
@@ -7201,9 +7183,8 @@
           <h4 class="top-result-title">${escapeHtml(top.title)}${getPlaylistTickBadgeHtml(top.id)}${getDownloadedBadgeHtml(top.id)}</h4>
           <div class="top-result-meta">
             <span class="top-result-artist">${escapeHtml(top.artist)}</span>
-            <span class="top-result-pill ${isLyricsMatch ? 'lyric-pill' : ''}" style="${isLyricsMatch ? 'background: rgba(255, 255, 255, 0.15); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.25); font-weight: 700;' : ''}">${isLyricsMatch ? 'Lyrics Match' : 'Song'}</span>
+            <span class="top-result-pill">Song</span>
           </div>
-          ${isLyricsMatch && lyricSnippet ? `<div class="top-result-lyric-match" style="margin-top: 6px; font-size: 13px; color: rgba(255, 255, 255, 0.85); font-style: italic;">“${escapeHtml(lyricSnippet)}”</div>` : ''}
         </div>
       </div>
       <div class="top-result-actions">

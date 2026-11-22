@@ -703,28 +703,32 @@
               </button>
               <button class="playlist-shuffle-btn" id="shufflePlaylistBtn" title="Mode 1: In Order + Autoplay • Click to cycle modes" aria-label="Playback order mode">
                 <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="3" y1="6" x2="14" y2="6"/>
-                  <line x1="3" y1="12" x2="14" y2="12"/>
-                  <line x1="3" y1="18" x2="11" y2="18"/>
-                  <polygon points="16 13 21 16 16 19 16 13" fill="currentColor"/>
+                  <path d="M18 4l3 3l-3 3"/>
+                  <path d="M18 20l3 -3l-3 -3"/>
+                  <path d="M3 7h3a5 5 0 0 1 5 5a5 5 0 0 0 5 5h5"/>
+                  <path d="M21 7h-5a4.978 4.978 0 0 0 -3 1m-4 8a4.984 4.984 0 0 1 -3 1h-3"/>
                 </svg>
               </button>
               <button class="playlist-action-icon-btn pin-playlist-btn" id="pinPlaylistBtn" title="Pin Playlist" style="display: none;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="12" y1="17" x2="12" y2="22"/>
-                  <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.89A2 2 0 0 1 15 10.77V6a3 3 0 0 0-6 0v4.77a2 2 0 0 1-1.11 1.79l-1.78.89A2 2 0 0 0 5 15.24Z"/>
+                  <path d="M15 4.5l-4 4l-4 1.5l-1.5 1.5l7 7l1.5 -1.5l1.5 -4l4 -4"/>
+                  <path d="M9 15l-4.5 4.5"/>
+                  <path d="M14.5 4l5.5 5.5"/>
                 </svg>
               </button>
               <button class="playlist-action-icon-btn rename-playlist-btn" id="renamePlaylistBtn" title="Rename Playlist" style="display: none;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                  <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>
+                  <path d="m15 5 4 4"/>
                 </svg>
               </button>
-              <button class="playlist-action-icon-btn export-playlist-btn" id="exportPlaylistBtn" title="Export Playlist">
+              <button class="playlist-action-icon-btn export-playlist-btn" id="exportPlaylistBtn" title="Share Playlist">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
+                  <circle cx="18" cy="5" r="3"/>
+                  <circle cx="6" cy="12" r="3"/>
+                  <circle cx="18" cy="19" r="3"/>
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
                 </svg>
               </button>
               <button class="playlist-action-sub-btn delete-playlist-btn" id="deletePlaylistBtn" title="Delete Playlist" style="display: none;">
@@ -874,16 +878,16 @@
           <!-- Web-Only Lyrics Fullscreen Option (Bottom Right Corner) -->
           <button class="lyrics-fullscreen-btn" id="lyricsFullscreenBtn" title="Full screen (F)" aria-label="Full screen" type="button">
             <svg class="icon-enter-fullscreen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="15 3 21 3 21 9"/>
-              <polyline points="9 21 3 21 3 15"/>
-              <line x1="21" y1="3" x2="14" y2="10"/>
-              <line x1="3" y1="21" x2="10" y2="14"/>
+              <path d="M3 7V5a2 2 0 0 1 2-2h2"/>
+              <path d="M17 3h2a2 2 0 0 1 2 2v2"/>
+              <path d="M21 17v2a2 2 0 0 1-2 2h-2"/>
+              <path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
             </svg>
             <svg class="icon-exit-fullscreen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-              <polyline points="4 14 10 14 10 20"/>
-              <polyline points="20 10 14 10 14 4"/>
-              <line x1="14" y1="10" x2="21" y2="3"/>
-              <line x1="10" y1="14" x2="3" y2="21"/>
+              <path d="M4 10h6V4"/>
+              <path d="M20 10h-6V4"/>
+              <path d="M4 14h6v6"/>
+              <path d="M20 14h-6v6"/>
             </svg>
           </button>
         </section>
@@ -1290,12 +1294,11 @@
       <div class="player-center">
         <div class="player-controls">
           <button class="control-btn" id="shuffleBtn" title="Enable Shuffle (S)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/>
-              <path d="m18 2 4 4-4 4"/>
-              <path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/>
-              <path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/>
-              <path d="m18 14 4 4-4 4"/>
+            <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 4l3 3l-3 3"/>
+              <path d="M18 20l3 -3l-3 -3"/>
+              <path d="M3 7h3a5 5 0 0 1 5 5a5 5 0 0 0 5 5h5"/>
+              <path d="M21 7h-5a4.978 4.978 0 0 0 -3 1m-4 8a4.984 4.984 0 0 1 -3 1h-3"/>
             </svg>
           </button>
 
@@ -1324,11 +1327,11 @@
           </button>
 
           <button class="control-btn" id="repeatBtn" title="Enable Repeat (R)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="17 1 21 5 17 9" />
-              <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-              <polyline points="7 23 3 19 7 15" />
-              <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m2 9 3-3 3 3"/>
+              <path d="M13 18H7a2 2 0 0 1-2-2V6"/>
+              <path d="m22 15-3 3-3-3"/>
+              <path d="M11 6h6a2 2 0 0 1 2 2v10"/>
             </svg>
             <span class="repeat-one-badge" aria-hidden="true">1</span>
           </button>
@@ -1355,22 +1358,14 @@
         <!-- Live Lyrics Trigger -->
         <button class="player-icon-btn" id="lyricsBtn" title="Synchronized Lyrics (L)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="2" width="6" height="11" rx="3"/>
-            <path d="M5 10a7 7 0 0 0 14 0"/>
-            <line x1="8" y1="21" x2="16" y2="21"/>
-            <line x1="12" y1="17" x2="12" y2="21"/>
+            <path d="M15 12.9A5 5 0 1 0 11.098 9M15 12.9l-3.902-3.899l-7.513 8.584a2 2 0 1 0 2.827 2.83z"/>
           </svg>
         </button>
 
         <!-- Queue Drawer Trigger -->
         <button class="player-icon-btn" id="queueBtn" title="Play Queue (Q)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="8" y1="6" x2="21" y2="6" />
-            <line x1="8" y1="12" x2="21" y2="12" />
-            <line x1="8" y1="18" x2="21" y2="18" />
-            <line x1="3" y1="6" x2="3.01" y2="6" />
-            <line x1="3" y1="12" x2="3.01" y2="12" />
-            <line x1="3" y1="18" x2="3.01" y2="18" />
+          <svg viewBox="0 0 256 256" fill="currentColor">
+            <path d="M32 64a8 8 0 0 1 8-8h176a8 8 0 0 1 0 16H40a8 8 0 0 1-8-8m104 56H40a8 8 0 0 0 0 16h96a8 8 0 0 0 0-16m0 64H40a8 8 0 0 0 0 16h96a8 8 0 0 0 0-16m112-24a8 8 0 0 1-3.76 6.78l-64 40A8 8 0 0 1 168 200v-80a8 8 0 0 1 12.24-6.78l64 40A8 8 0 0 1 248 160m-23.09 0L184 134.43v51.14Z"/>
           </svg>
         </button>
 
@@ -1506,12 +1501,11 @@
       <!-- Controls -->
       <div class="mobile-player-controls-row">
         <button class="control-btn" id="mobShuffleBtn" title="Toggle Shuffle">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/>
-            <path d="m18 2 4 4-4 4"/>
-            <path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/>
-            <path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/>
-            <path d="m18 14 4 4-4 4"/>
+          <svg class="mode-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 4l3 3l-3 3"/>
+            <path d="M18 20l3 -3l-3 -3"/>
+            <path d="M3 7h3a5 5 0 0 1 5 5a5 5 0 0 0 5 5h5"/>
+            <path d="M21 7h-5a4.978 4.978 0 0 0 -3 1m-4 8a4.984 4.984 0 0 1 -3 1h-3"/>
           </svg>
         </button>
         <button class="control-btn" id="mobPrevBtn" title="Previous Track">
@@ -1536,11 +1530,11 @@
           </svg>
         </button>
         <button class="control-btn" id="mobRepeatBtn" title="Toggle Repeat">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="17 1 21 5 17 9" />
-            <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-            <polyline points="7 23 3 19 7 15" />
-            <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m2 9 3-3 3 3"/>
+            <path d="M13 18H7a2 2 0 0 1-2-2V6"/>
+            <path d="m22 15-3 3-3-3"/>
+            <path d="M11 6h6a2 2 0 0 1 2 2v10"/>
           </svg>
           <span class="repeat-one-badge" aria-hidden="true">1</span>
         </button>
@@ -1550,9 +1544,11 @@
       <div class="mobile-player-bottom-bar">
         <button class="mob-bottom-icon-btn" id="mobPlayerShareBtn" title="Share Song" aria-label="Share Song">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
-            <polyline points="16 6 12 2 8 6"/>
-            <line x1="12" y1="2" x2="12" y2="15"/>
+            <circle cx="18" cy="5" r="3"/>
+            <circle cx="6" cy="12" r="3"/>
+            <circle cx="18" cy="19" r="3"/>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
           </svg>
         </button>
         <button class="mob-bottom-icon-btn timer-icon-btn" id="mobPlayerTimerBtn" title="Sleep Timer" aria-label="Sleep Timer">
@@ -1564,20 +1560,12 @@
         </button>
         <button class="mob-bottom-icon-btn" id="mobPlayerLyricsBtn" title="Lyrics" aria-label="Open Lyrics">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="2" width="6" height="11" rx="3"/>
-            <path d="M5 10a7 7 0 0 0 14 0"/>
-            <line x1="8" y1="21" x2="16" y2="21"/>
-            <line x1="12" y1="17" x2="12" y2="21"/>
+            <path d="M15 12.9A5 5 0 1 0 11.098 9M15 12.9l-3.902-3.899l-7.513 8.584a2 2 0 1 0 2.827 2.83z"/>
           </svg>
         </button>
         <button class="mob-bottom-icon-btn" id="mobPlayerQueueBtn" title="Queue" aria-label="Open Queue">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="8" y1="6" x2="21" y2="6"/>
-            <line x1="8" y1="12" x2="21" y2="12"/>
-            <line x1="8" y1="18" x2="21" y2="18"/>
-            <line x1="3" y1="6" x2="3.01" y2="6"/>
-            <line x1="3" y1="12" x2="3.01" y2="12"/>
-            <line x1="3" y1="18" x2="3.01" y2="18"/>
+          <svg viewBox="0 0 256 256" fill="currentColor">
+            <path d="M32 64a8 8 0 0 1 8-8h176a8 8 0 0 1 0 16H40a8 8 0 0 1-8-8m104 56H40a8 8 0 0 0 0 16h96a8 8 0 0 0 0-16m0 64H40a8 8 0 0 0 0 16h96a8 8 0 0 0 0-16m112-24a8 8 0 0 1-3.76 6.78l-64 40A8 8 0 0 1 168 200v-80a8 8 0 0 1 12.24-6.78l64 40A8 8 0 0 1 248 160m-23.09 0L184 134.43v51.14Z"/>
           </svg>
         </button>
       </div>

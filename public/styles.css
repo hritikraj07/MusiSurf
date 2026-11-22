@@ -14908,4 +14908,26 @@ body.lyrics-fullscreen-active .lyrics-edge-glow {
   }
 }
 
+/* Static clean styling for lyrics & queue buttons - no animations */
+#lyricsBtn,
+#queueBtn,
+#mobPlayerLyricsBtn,
+#mobPlayerQueueBtn,
+#lyricsBtn svg,
+#queueBtn svg,
+#mobPlayerLyricsBtn svg,
+#mobPlayerQueueBtn svg {
+  animation: none !important;
+}
+
+/* Suppress lyrics match badges and lyric snippet quotes across all songs */
+.top-result-lyric-match,
+.sugg-lyric-snippet,
+.sugg-badge.lyric-badge,
+.top-result-pill.lyric-pill,
+.dropdown-section-title:has(+ .dropdown-section-group .lyric-item) {
+  display: none !important;
+}
+
+
 
