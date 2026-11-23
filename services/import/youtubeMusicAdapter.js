@@ -277,7 +277,161 @@ async function fetchViaInnerTube(playlistId) {
   });
 
   if (tracks.length === 0) {
-    throw new Error('This YouTube Music playlist contains no accessible songs or is set to private');
+    const err = new Error('This YouTube Music playlist contains no accessible songs or is set to private. Connect your Google account to import private playlists.');
+    err.code = 'ERR_YTMUSIC_AUTH_REQUIRED';
+    err.requiresAuth = true;
+    err.playlistId = playlistId;
+    throw err;
+  }
+
+  return {
+    provider: 'youtube_music',
+    externalPlaylistId: playlistId,
+    name: playlistName,
+    playlistName: playlistName,
+    description: playlistDesc,
+    creator,
+    artwork,
+    totalTracks: tracks.length,
+    tracks
+  };
+}
+
+/**
+ * Fetches playlist metadata and items via official YouTube Data API v3 using user OAuth token.
+ */
+async function fetchViaYouTubeDataApi(playlistId, token) {
+  // 1. Fetch Playlist Metadata
+  let metaRes;
+  try {
+    metaRes = await fetch(`https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&id=${encodeURIComponent(playlistId)}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+      signal: AbortSignal.timeout(8000)
+    });
+  } catch (netErr) {
+    const err = new Error("We couldn't connect to Google / YouTube API. Check your connection and retry.");
+    err.code = 'ERR_YTMUSIC_NETWORK';
+    throw err;
+  }
+
+  if (metaRes.status === 401) {
+    const err = new Error('Your Google connection has expired. Reconnect your account to continue.');
+    err.code = 'ERR_GOOGLE_AUTH_EXPIRED';
+    err.requiresAuth = true;
+    throw err;
+  }
+  if (metaRes.status === 404) {
+    const err = new Error("We couldn't find this YouTube Music playlist. Check the link and try again.");
+    err.code = 'ERR_YTMUSIC_NOT_FOUND';
+    throw err;
+  }
+  if (metaRes.status === 403) {
+    const err = new Error('Google / YouTube API permission restriction or quota reached.');
+    err.code = 'ERR_YTMUSIC_FORBIDDEN';
+    err.requiresAuth = true;
+    throw err;
+  }
+  if (!metaRes.ok) {
+    const err = new Error(`YouTube API request failed (HTTP ${metaRes.status})`);
+    err.code = 'ERR_YTMUSIC_API_ERROR';
+    throw err;
+  }
+
+  const metaData = await metaRes.json();
+  const plItem = metaData.items?.[0];
+  if (!plItem) {
+    const err = new Error("We couldn't find this YouTube playlist. Check the link and try again.");
+    err.code = 'ERR_YTMUSIC_NOT_FOUND';
+    throw err;
+  }
+
+  const snippet = plItem.snippet || {};
+  const playlistName = sanitizeString(snippet.title || 'YouTube Music Playlist');
+  const playlistDesc = sanitizeString(snippet.description || '');
+  const creator = sanitizeString(snippet.channelTitle || 'YouTube Music');
+  const thumbs = snippet.thumbnails;
+  const artwork = thumbs?.maxres?.url || thumbs?.high?.url || thumbs?.medium?.url || thumbs?.default?.url || '';
+
+  // 2. Fetch Playlist Items via playlistItems endpoint
+  let pageToken = '';
+  const rawItems = [];
+
+  while (rawItems.length < 1000) {
+    const url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&maxResults=50&playlistId=${encodeURIComponent(playlistId)}${pageToken ? `&pageToken=${pageToken}` : ''}`;
+    let itemsRes;
+    try {
+      itemsRes = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        signal: AbortSignal.timeout(8000)
+      });
+    } catch (e) {
+      if (rawItems.length > 0) break;
+      throw e;
+    }
+
+    if (!itemsRes.ok) {
+      if (rawItems.length > 0) break;
+      if (itemsRes.status === 401) {
+        const err = new Error('Your Google connection has expired. Reconnect your account to continue.');
+        err.code = 'ERR_GOOGLE_AUTH_EXPIRED';
+        err.requiresAuth = true;
+        throw err;
+      }
+      break;
+    }
+
+    const itemsData = await itemsRes.json();
+    if (Array.isArray(itemsData.items)) {
+      rawItems.push(...itemsData.items);
+    }
+    pageToken = itemsData.nextPageToken || '';
+    if (!pageToken) break;
+  }
+
+  const tracks = [];
+  rawItems.forEach((it, idx) => {
+    const snip = it.snippet;
+    if (!snip) return;
+
+    const rawTitle = snip.title || '';
+    if (!rawTitle || rawTitle === 'Private video' || rawTitle === 'Deleted video') return;
+
+    const videoId = snip.resourceId?.videoId || it.contentDetails?.videoId || '';
+    const channelName = snip.videoOwnerChannelTitle || snip.channelTitle || 'Various Artists';
+
+    // Parse artist and title from YouTube video title
+    let trackTitle = cleanSongTitle(rawTitle);
+    let trackArtist = cleanArtist(channelName);
+
+    if (rawTitle.includes(' - ')) {
+      const parts = rawTitle.split(' - ').map(s => s.trim());
+      if (parts.length >= 2 && parts[0].length < 50) {
+        trackArtist = cleanArtist(parts[0]);
+        trackTitle = cleanSongTitle(parts.slice(1).join(' - '));
+      }
+    }
+
+    const itemThumbs = snip.thumbnails;
+    const trackArt = itemThumbs?.high?.url || itemThumbs?.medium?.url || itemThumbs?.default?.url || '';
+
+    tracks.push({
+      position: idx + 1,
+      title: trackTitle,
+      artist: trackArtist || 'Various Artists',
+      album: '',
+      duration: 210, // Default duration estimate
+      isrc: '',
+      externalId: videoId,
+      externalUrl: videoId ? `https://music.youtube.com/watch?v=${videoId}` : '',
+      artwork: trackArt,
+      videoId
+    });
+  });
+
+  if (tracks.length === 0) {
+    const err = new Error('This YouTube playlist contains no accessible videos or tracks.');
+    err.code = 'ERR_YTMUSIC_EMPTY';
+    throw err;
   }
 
   return {
@@ -295,18 +449,46 @@ async function fetchViaInnerTube(playlistId) {
 
 /**
  * Universal YouTube Music Playlist Fetcher.
+ * Tries official Google OAuth token first if provided, then falls back to zero-config public InnerTube.
  */
-async function fetchYouTubeMusicPlaylist(input) {
+async function fetchYouTubeMusicPlaylist(input, googleToken = null) {
   const playlistId = extractYouTubePlaylistId(input);
   if (!playlistId) {
     throw new Error("This doesn't look like a supported YouTube Music playlist link. Check the URL and try again.");
   }
 
-  return await fetchViaInnerTube(playlistId);
+  // 1. If user provided Google OAuth token, try official YouTube Data API v3
+  if (googleToken && typeof googleToken === 'string') {
+    try {
+      return await fetchViaYouTubeDataApi(playlistId, googleToken);
+    } catch (apiErr) {
+      console.warn('[YouTubeMusicAdapter] YouTube Data API error, falling back to public InnerTube:', apiErr.message);
+      if (apiErr.code === 'ERR_GOOGLE_AUTH_EXPIRED') {
+        throw apiErr;
+      }
+    }
+  }
+
+  // 2. Zero-config public InnerTube fallback
+  try {
+    return await fetchViaInnerTube(playlistId);
+  } catch (innerErr) {
+    // If public access fails and no Google token was provided, offer Google authorization
+    if (!googleToken) {
+      const err = new Error('Connect your Google account to import this YouTube Music playlist.');
+      err.code = 'ERR_YTMUSIC_AUTH_REQUIRED';
+      err.requiresAuth = true;
+      err.playlistId = playlistId;
+      throw err;
+    }
+    throw innerErr;
+  }
 }
 
 module.exports = {
   extractYouTubePlaylistId,
   fetchYouTubeMusicPlaylist,
+  fetchViaInnerTube,
+  fetchViaYouTubeDataApi,
   parseDurationToSeconds
 };

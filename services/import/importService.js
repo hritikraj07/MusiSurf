@@ -16,7 +16,7 @@ const inMemoryImportHistory = [];
 /**
  * Parses an external playlist from link URL/URI or uploaded file.
  */
-async function parseExternalPlaylist({ url, fileContent, filename, format, spotifyToken = null }) {
+async function parseExternalPlaylist({ url, fileContent, filename, format, spotifyToken = null, googleToken = null }) {
   if (url && typeof url === 'string' && url.trim()) {
     const trimmedUrl = url.trim();
 
@@ -32,7 +32,7 @@ async function parseExternalPlaylist({ url, fileContent, filename, format, spoti
       trimmedUrl.includes('youtu.be') ||
       extractYouTubePlaylistId(trimmedUrl)
     ) {
-      return await fetchYouTubeMusicPlaylist(trimmedUrl);
+      return await fetchYouTubeMusicPlaylist(trimmedUrl, googleToken);
     }
 
     throw new Error('Unsupported playlist provider URL. Currently Spotify, YouTube Music, and playlist export files are supported.');

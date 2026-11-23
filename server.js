@@ -15,6 +15,7 @@ const searchEngine = require('./scripts/search_engine');
 const { requireAuth, optionalAuth, getAuthenticatedUser } = require('./services/auth');
 const libraryService = require('./services/library');
 const importService = require('./services/import/importService');
+const authManager = require('./services/import/authManager');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -2564,85 +2565,155 @@ app.put('/api/library/playlists/:id/progress', requireAuth, handleSaveProgress);
 // EXTERNAL PLAYLIST IMPORT & TRANSFER ENGINE
 // --------------------------------------------------------------------------
 
+// ==========================================================================
+// SPOTIFY AUTOMATIC OAUTH & CONNECTION MANAGEMENT
+// ==========================================================================
+
 // Spotify OAuth & Account Connection Status
 app.get('/api/auth/spotify/status', (req, res) => {
   const hasToken = Boolean(req.cookies?.spotify_access_token);
-  const hasAppCredentials = Boolean(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET);
+  const hasRefreshToken = Boolean(req.cookies?.spotify_refresh_token);
+  const isConfigured = authManager.isSpotifyConfigured();
   res.json({
     success: true,
-    connected: hasToken,
-    configured: hasAppCredentials
+    connected: hasToken || hasRefreshToken,
+    configured: isConfigured
   });
 });
 
-// Spotify OAuth Login Initiation
+// Spotify OAuth Login Initiation (with automatic pending import capture & PKCE)
 app.get('/api/auth/spotify/login', (req, res) => {
-  const clientId = process.env.SPOTIFY_CLIENT_ID;
-  if (!clientId) {
+  if (!authManager.isSpotifyConfigured()) {
     return res.status(400).json({
       success: false,
       configured: false,
-      message: 'Spotify Client ID is not configured in environment variables. Add SPOTIFY_CLIENT_ID to .env to enable 1-click Spotify login.'
+      error: 'Spotify OAuth is not configured on the server. Please add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to .env to enable automatic playlist importing.'
     });
   }
 
   const redirectUri = process.env.SPOTIFY_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/spotify/callback`;
-  const scope = encodeURIComponent('playlist-read-private playlist-read-collaborative user-read-private');
-  const authUrl = `https://accounts.spotify.com/authorize?response_type=code&client_id=${encodeURIComponent(clientId)}&scope=${scope}&redirect_uri=${encodeURIComponent(redirectUri)}&show_dialog=true`;
+  const state = authManager.generateRandomString(24);
+  const codeVerifier = authManager.generateRandomString(32);
+  const codeChallenge = authManager.generateCodeChallenge(codeVerifier);
+
+  const pendingUrl = req.query.pending_url || req.query.url || null;
+  const pendingId = req.query.pending_id || null;
+
+  let pendingImportId = null;
+  if (pendingUrl) {
+    const pendingRecord = authManager.createPendingImport({
+      provider: 'spotify',
+      url: pendingUrl,
+      playlistId: pendingId,
+      userId: req.user ? req.user.id : null
+    });
+    pendingImportId = pendingRecord.id;
+  }
+
+  // Save state, PKCE verifier, and pending import link in secure cookie
+  res.cookie('spotify_oauth_state', JSON.stringify({ state, codeVerifier, pendingImportId }), {
+    maxAge: 15 * 60 * 1000,
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/'
+  });
+
+  const authUrl = authManager.getSpotifyAuthUrl({ state, codeChallenge, redirectUri });
   res.redirect(authUrl);
 });
 
 // Spotify OAuth Callback
 app.get('/api/auth/spotify/callback', async (req, res) => {
-  const { code, error } = req.query;
+  const { code, state, error } = req.query;
+  let savedStateObj = null;
+  try {
+    if (req.cookies?.spotify_oauth_state) {
+      savedStateObj = JSON.parse(req.cookies.spotify_oauth_state);
+    }
+  } catch (e) {}
+
+  res.clearCookie('spotify_oauth_state', { path: '/' });
+
   if (error || !code) {
-    return res.redirect('/?spotify_error=' + encodeURIComponent(error || 'Authorization denied'));
+    if (savedStateObj?.pendingImportId) {
+      authManager.consumePendingImport(savedStateObj.pendingImportId);
+    }
+    return res.redirect('/?oauth_cancelled=1&provider=spotify');
   }
 
-  const clientId = process.env.SPOTIFY_CLIENT_ID;
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+  if (!savedStateObj || savedStateObj.state !== state) {
+    return res.redirect('/?oauth_error=' + encodeURIComponent('Invalid or expired OAuth state'));
+  }
+
   const redirectUri = process.env.SPOTIFY_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/spotify/callback`;
 
   try {
-    const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
-      },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code: String(code),
-        redirect_uri: redirectUri
-      }).toString()
+    const tokens = await authManager.exchangeSpotifyCode({
+      code,
+      codeVerifier: savedStateObj.codeVerifier,
+      redirectUri
     });
 
-    if (!tokenRes.ok) {
-      const errBody = await tokenRes.text();
-      return res.redirect('/?spotify_error=' + encodeURIComponent('Token exchange failed: ' + errBody));
+    res.cookie('spotify_access_token', tokens.accessToken, {
+      maxAge: tokens.expiresIn * 1000,
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/'
+    });
+
+    if (tokens.refreshToken) {
+      res.cookie('spotify_refresh_token', tokens.refreshToken, {
+        maxAge: 30 * 24 * 3600 * 1000,
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/'
+      });
     }
 
-    const tokenData = await tokenRes.json();
-    if (tokenData.access_token) {
-      res.cookie('spotify_access_token', tokenData.access_token, {
-        maxAge: (tokenData.expires_in || 3600) * 1000,
+    if (savedStateObj.pendingImportId) {
+      res.cookie('musisurf_pending_import_id', savedStateObj.pendingImportId, {
+        maxAge: 15 * 60 * 1000,
         httpOnly: false,
         sameSite: 'lax',
         path: '/'
       });
-      if (tokenData.refresh_token) {
-        res.cookie('spotify_refresh_token', tokenData.refresh_token, {
-          maxAge: 30 * 24 * 3600 * 1000,
-          httpOnly: true,
-          sameSite: 'lax',
-          path: '/'
-        });
-      }
-      return res.redirect('/?spotify_connected=1');
+      return res.redirect('/?import_resume=1&provider=spotify');
     }
-    res.redirect('/?spotify_error=no_token');
+
+    return res.redirect('/?spotify_connected=1');
   } catch (err) {
-    res.redirect('/?spotify_error=' + encodeURIComponent(err.message));
+    console.warn('[Spotify OAuth] Callback exchange error:', err.message);
+    res.redirect('/?oauth_error=' + encodeURIComponent(err.message));
+  }
+});
+
+// Spotify Automatic Token Refresh
+app.post('/api/auth/spotify/refresh', async (req, res) => {
+  const refreshToken = req.cookies?.spotify_refresh_token;
+  if (!refreshToken || !authManager.isSpotifyConfigured()) {
+    return res.status(401).json({ success: false, error: 'No refresh token or Spotify not configured' });
+  }
+
+  try {
+    const tokens = await authManager.refreshSpotifyAccessToken(refreshToken);
+    res.cookie('spotify_access_token', tokens.accessToken, {
+      maxAge: tokens.expiresIn * 1000,
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/'
+    });
+    if (tokens.refreshToken) {
+      res.cookie('spotify_refresh_token', tokens.refreshToken, {
+        maxAge: 30 * 24 * 3600 * 1000,
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/'
+      });
+    }
+    res.json({ success: true, connected: true });
+  } catch (err) {
+    res.clearCookie('spotify_access_token', { path: '/' });
+    res.status(401).json({ success: false, error: err.message });
   }
 });
 
@@ -2650,36 +2721,329 @@ app.get('/api/auth/spotify/callback', async (req, res) => {
 app.post('/api/auth/spotify/disconnect', (req, res) => {
   res.clearCookie('spotify_access_token', { path: '/' });
   res.clearCookie('spotify_refresh_token', { path: '/' });
+  res.clearCookie('spotify_oauth_state', { path: '/' });
   res.json({ success: true, message: 'Spotify disconnected' });
 });
 
-// Direct Spotify Access Token submission (convenience fallback)
-app.post('/api/auth/spotify/token', (req, res) => {
-  const { token } = req.body || {};
-  if (token && typeof token === 'string' && token.trim()) {
-    res.cookie('spotify_access_token', token.trim(), {
-      maxAge: 3600 * 1000,
-      httpOnly: false,
+// ==========================================================================
+// GOOGLE / YOUTUBE AUTOMATIC OAUTH & CONNECTION MANAGEMENT
+// ==========================================================================
+
+// Google OAuth & Account Connection Status
+app.get('/api/auth/google/status', (req, res) => {
+  const hasToken = Boolean(req.cookies?.google_access_token);
+  const hasRefreshToken = Boolean(req.cookies?.google_refresh_token);
+  const isConfigured = authManager.isGoogleConfigured();
+  res.json({
+    success: true,
+    connected: hasToken || hasRefreshToken,
+    configured: isConfigured
+  });
+});
+
+// Google OAuth Login Initiation (with automatic pending import capture)
+app.get('/api/auth/google/login', (req, res) => {
+  if (!authManager.isGoogleConfigured()) {
+    return res.status(400).json({
+      success: false,
+      configured: false,
+      error: 'Google OAuth is not configured on the server. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env to enable automatic YouTube Music playlist importing.'
+    });
+  }
+
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+  const state = authManager.generateRandomString(24);
+
+  const pendingUrl = req.query.pending_url || req.query.url || null;
+  const pendingId = req.query.pending_id || null;
+
+  let pendingImportId = null;
+  if (pendingUrl) {
+    const pendingRecord = authManager.createPendingImport({
+      provider: 'youtube_music',
+      url: pendingUrl,
+      playlistId: pendingId,
+      userId: req.user ? req.user.id : null
+    });
+    pendingImportId = pendingRecord.id;
+  }
+
+  res.cookie('google_oauth_state', JSON.stringify({ state, pendingImportId }), {
+    maxAge: 15 * 60 * 1000,
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/'
+  });
+
+  const authUrl = authManager.getGoogleAuthUrl({ state, redirectUri });
+  res.redirect(authUrl);
+});
+
+// Google OAuth Callback
+app.get('/api/auth/google/callback', async (req, res) => {
+  const { code, state, error } = req.query;
+  let savedStateObj = null;
+  try {
+    if (req.cookies?.google_oauth_state) {
+      savedStateObj = JSON.parse(req.cookies.google_oauth_state);
+    }
+  } catch (e) {}
+
+  res.clearCookie('google_oauth_state', { path: '/' });
+
+  if (error || !code) {
+    if (savedStateObj?.pendingImportId) {
+      authManager.consumePendingImport(savedStateObj.pendingImportId);
+    }
+    return res.redirect('/?oauth_cancelled=1&provider=google');
+  }
+
+  if (!savedStateObj || savedStateObj.state !== state) {
+    return res.redirect('/?oauth_error=' + encodeURIComponent('Invalid or expired OAuth state'));
+  }
+
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+
+  try {
+    const tokens = await authManager.exchangeGoogleCode({
+      code,
+      redirectUri
+    });
+
+    res.cookie('google_access_token', tokens.accessToken, {
+      maxAge: tokens.expiresIn * 1000,
+      httpOnly: true,
       sameSite: 'lax',
       path: '/'
     });
-    return res.json({ success: true, connected: true });
+
+    if (tokens.refreshToken) {
+      res.cookie('google_refresh_token', tokens.refreshToken, {
+        maxAge: 60 * 24 * 3600 * 1000,
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/'
+      });
+    }
+
+    if (savedStateObj.pendingImportId) {
+      res.cookie('musisurf_pending_import_id', savedStateObj.pendingImportId, {
+        maxAge: 15 * 60 * 1000,
+        httpOnly: false,
+        sameSite: 'lax',
+        path: '/'
+      });
+      return res.redirect('/?import_resume=1&provider=ytmusic');
+    }
+
+    return res.redirect('/?google_connected=1');
+  } catch (err) {
+    console.warn('[Google OAuth] Callback exchange error:', err.message);
+    res.redirect('/?oauth_error=' + encodeURIComponent(err.message));
   }
-  res.status(400).json({ success: false, error: 'Token is required' });
 });
+
+// Google Automatic Token Refresh
+app.post('/api/auth/google/refresh', async (req, res) => {
+  const refreshToken = req.cookies?.google_refresh_token;
+  if (!refreshToken || !authManager.isGoogleConfigured()) {
+    return res.status(401).json({ success: false, error: 'No refresh token or Google not configured' });
+  }
+
+  try {
+    const tokens = await authManager.refreshGoogleAccessToken(refreshToken);
+    res.cookie('google_access_token', tokens.accessToken, {
+      maxAge: tokens.expiresIn * 1000,
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/'
+    });
+    if (tokens.refreshToken) {
+      res.cookie('google_refresh_token', tokens.refreshToken, {
+        maxAge: 60 * 24 * 3600 * 1000,
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/'
+      });
+    }
+    res.json({ success: true, connected: true });
+  } catch (err) {
+    res.clearCookie('google_access_token', { path: '/' });
+    res.status(401).json({ success: false, error: err.message });
+  }
+});
+
+// Google Disconnect
+app.post('/api/auth/google/disconnect', (req, res) => {
+  res.clearCookie('google_access_token', { path: '/' });
+  res.clearCookie('google_refresh_token', { path: '/' });
+  res.clearCookie('google_oauth_state', { path: '/' });
+  res.json({ success: true, message: 'Google account disconnected' });
+});
+
+// ==========================================================================
+// PENDING IMPORT LIFECYCLE API
+// ==========================================================================
+
+// Retrieve & consume pending import (for automatic resume after OAuth redirect)
+app.get('/api/import/pending', (req, res) => {
+  const importId = req.query.id || req.cookies?.musisurf_pending_import_id;
+  if (!importId) {
+    return res.json({ hasPending: false, pending: null });
+  }
+
+  const pending = authManager.consumePendingImport(importId);
+  res.clearCookie('musisurf_pending_import_id', { path: '/' });
+
+  if (!pending) {
+    return res.json({ hasPending: false, pending: null });
+  }
+
+  res.json({ hasPending: true, pending });
+});
+
+// Register a pending import before manual or auto OAuth redirect
+app.post('/api/import/pending', optionalAuth, (req, res) => {
+  const { provider, url, playlistId } = req.body || {};
+  if (!url || !provider) {
+    return res.status(400).json({ success: false, error: 'url and provider are required' });
+  }
+
+  const record = authManager.createPendingImport({
+    provider,
+    url,
+    playlistId,
+    userId: req.user ? req.user.id : null
+  });
+
+  res.cookie('musisurf_pending_import_id', record.id, {
+    maxAge: 15 * 60 * 1000,
+    httpOnly: false,
+    sameSite: 'lax',
+    path: '/'
+  });
+
+  res.json({ success: true, pendingId: record.id, record });
+});
+
+// ==========================================================================
+// CENTRALIZED PLAYLIST PARSER WITH AUTO TOKEN REFRESH
+// ==========================================================================
 
 // 1. Parse playlist from link or uploaded file
 app.post('/api/import/parse', async (req, res) => {
   try {
-    const { url, fileContent, filename, fileName, format, spotifyToken } = req.body || {};
-    const token = spotifyToken || req.cookies?.spotify_access_token || req.headers['x-spotify-token'] || null;
-    const playlist = await importService.parseExternalPlaylist({
-      url,
-      fileContent,
-      filename: filename || fileName,
-      format,
-      spotifyToken: token
-    });
+    const { url, fileContent, filename, fileName, format } = req.body || {};
+    let sToken = req.cookies?.spotify_access_token || null;
+    let gToken = req.cookies?.google_access_token || null;
+
+    // Automatic Spotify Token Refresh if access token expired but refresh token exists
+    if (!sToken && req.cookies?.spotify_refresh_token && authManager.isSpotifyConfigured()) {
+      try {
+        const refreshed = await authManager.refreshSpotifyAccessToken(req.cookies.spotify_refresh_token);
+        sToken = refreshed.accessToken;
+        res.cookie('spotify_access_token', refreshed.accessToken, {
+          maxAge: refreshed.expiresIn * 1000,
+          httpOnly: true,
+          sameSite: 'lax',
+          path: '/'
+        });
+        if (refreshed.refreshToken) {
+          res.cookie('spotify_refresh_token', refreshed.refreshToken, {
+            maxAge: 30 * 24 * 3600 * 1000,
+            httpOnly: true,
+            sameSite: 'lax',
+            path: '/'
+          });
+        }
+      } catch (refErr) {
+        console.warn('[Import API] Auto Spotify token refresh failed:', refErr.message);
+      }
+    }
+
+    // Automatic Google Token Refresh if access token expired but refresh token exists
+    if (!gToken && req.cookies?.google_refresh_token && authManager.isGoogleConfigured()) {
+      try {
+        const refreshed = await authManager.refreshGoogleAccessToken(req.cookies.google_refresh_token);
+        gToken = refreshed.accessToken;
+        res.cookie('google_access_token', refreshed.accessToken, {
+          maxAge: refreshed.expiresIn * 1000,
+          httpOnly: true,
+          sameSite: 'lax',
+          path: '/'
+        });
+        if (refreshed.refreshToken) {
+          res.cookie('google_refresh_token', refreshed.refreshToken, {
+            maxAge: 60 * 24 * 3600 * 1000,
+            httpOnly: true,
+            sameSite: 'lax',
+            path: '/'
+          });
+        }
+      } catch (refErr) {
+        console.warn('[Import API] Auto Google token refresh failed:', refErr.message);
+      }
+    }
+
+    let playlist;
+    try {
+      playlist = await importService.parseExternalPlaylist({
+        url,
+        fileContent,
+        filename: filename || fileName,
+        format,
+        spotifyToken: sToken,
+        googleToken: gToken
+      });
+    } catch (parseErr) {
+      // If token expired during request, attempt one auto-refresh and retry seamlessly
+      if ((parseErr.code === 'ERR_SPOTIFY_AUTH_EXPIRED') && req.cookies?.spotify_refresh_token && authManager.isSpotifyConfigured()) {
+        try {
+          const refreshed = await authManager.refreshSpotifyAccessToken(req.cookies.spotify_refresh_token);
+          sToken = refreshed.accessToken;
+          res.cookie('spotify_access_token', refreshed.accessToken, {
+            maxAge: refreshed.expiresIn * 1000,
+            httpOnly: true,
+            sameSite: 'lax',
+            path: '/'
+          });
+          playlist = await importService.parseExternalPlaylist({
+            url,
+            fileContent,
+            filename: filename || fileName,
+            format,
+            spotifyToken: sToken,
+            googleToken: gToken
+          });
+        } catch (retryErr) {
+          throw parseErr;
+        }
+      } else if ((parseErr.code === 'ERR_GOOGLE_AUTH_EXPIRED') && req.cookies?.google_refresh_token && authManager.isGoogleConfigured()) {
+        try {
+          const refreshed = await authManager.refreshGoogleAccessToken(req.cookies.google_refresh_token);
+          gToken = refreshed.accessToken;
+          res.cookie('google_access_token', refreshed.accessToken, {
+            maxAge: refreshed.expiresIn * 1000,
+            httpOnly: true,
+            sameSite: 'lax',
+            path: '/'
+          });
+          playlist = await importService.parseExternalPlaylist({
+            url,
+            fileContent,
+            filename: filename || fileName,
+            format,
+            spotifyToken: sToken,
+            googleToken: gToken
+          });
+        } catch (retryErr) {
+          throw parseErr;
+        }
+      } else {
+        throw parseErr;
+      }
+    }
+
     res.json({ success: true, playlist });
   } catch (err) {
     console.warn('[Import API] Parse error:', err.message);

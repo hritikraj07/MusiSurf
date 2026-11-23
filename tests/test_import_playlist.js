@@ -397,6 +397,85 @@ Mohit Chauhan - Kun Faya Kun`;
   console.log('  ✓ Dedicated multi-step modal with mandatory Preview screen verified');
   console.log('  ✓ 3 import tabs (Spotify, YouTube Music, File) and live ID detection badges verified');
 
+  // --------------------------------------------------------------------------
+  // SUITE G: AUTOMATIC OAUTH, PENDING IMPORT & TOKEN HYGIENE
+  // --------------------------------------------------------------------------
+  console.log('\n--- SUITE G: AUTOMATIC OAUTH, PENDING IMPORT & TOKEN HYGIENE ---');
+
+  const authManager = require('../services/import/authManager');
+
+  // 1. PKCE and State Helpers
+  const testState = authManager.generateRandomString(24);
+  assert(testState && testState.length >= 24, 'OAuth state must be generated cryptographically');
+  const verifier = authManager.generateRandomString(32);
+  const challenge = authManager.generateCodeChallenge(verifier);
+  assert(challenge && challenge.length > 20, 'PKCE code challenge must be generated via SHA-256');
+
+  // 2. Pending Import Lifecycle
+  const pending = authManager.createPendingImport({
+    provider: 'spotify',
+    url: 'https://open.spotify.com/playlist/1XBjvHvMsZlZaFoNtRKpTl',
+    playlistId: '1XBjvHvMsZlZaFoNtRKpTl',
+    userId: 'user_123'
+  });
+  assert(pending && pending.id.startsWith('imp_'), 'Pending import must have an operation ID');
+  assert.strictEqual(pending.provider, 'spotify');
+  assert.strictEqual(pending.playlistId, '1XBjvHvMsZlZaFoNtRKpTl');
+
+  const retrieved = authManager.getPendingImport(pending.id);
+  assert.strictEqual(retrieved.id, pending.id, 'Pending import must be retrievable before consumption');
+
+  const consumed = authManager.consumePendingImport(pending.id);
+  assert.strictEqual(consumed.id, pending.id, 'Must consume pending import');
+  assert.strictEqual(authManager.getPendingImport(pending.id), null, 'Pending import must be single-use only');
+
+  console.log('  ✓ Pending import lifecycle verified: creation, lookup, and single-use consumption');
+
+  // 3. Spotify & Google Auth URLs
+  process.env.SPOTIFY_CLIENT_ID = 'test_spotify_client_id';
+  const spotifyUrl = authManager.getSpotifyAuthUrl({
+    state: testState,
+    codeChallenge: challenge,
+    redirectUri: 'http://localhost:3000/api/auth/spotify/callback'
+  });
+  assert(spotifyUrl.includes('client_id=test_spotify_client_id'), 'Spotify auth URL must include client_id');
+  assert(spotifyUrl.includes('code_challenge='), 'Spotify auth URL must include PKCE code_challenge');
+  assert(spotifyUrl.includes('playlist-read-private'), 'Spotify auth URL must include required scopes');
+
+  process.env.GOOGLE_CLIENT_ID = 'test_google_client_id';
+  const googleUrl = authManager.getGoogleAuthUrl({
+    state: testState,
+    redirectUri: 'http://localhost:3000/api/auth/google/callback'
+  });
+  assert(googleUrl.includes('client_id=test_google_client_id'), 'Google auth URL must include client_id');
+  assert(googleUrl.includes('youtube.readonly'), 'Google auth URL must include youtube.readonly scope');
+  assert(googleUrl.includes('access_type=offline'), 'Google auth URL must request offline access for refresh token');
+
+  console.log('  ✓ Spotify and Google official OAuth URLs formatted with required scopes & parameters');
+
+  // 4. Token Hygiene Verification (Zero manual token inputs in UI)
+  const appJsContent = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
+  assert(!appJsContent.includes('promptSpotifyTokenInput'), 'app.js must NOT contain manual token input prompt');
+  assert(!appJsContent.includes('Paste Access Token'), 'app.js must NOT contain Paste Access Token button');
+  assert(!htmlContent.includes('Paste Access Token'), 'index.html must NOT contain Paste Access Token button');
+
+  // 5. Connect & Disconnect Controls
+  assert(htmlContent.includes('id="spotifyConnectHeaderBtn"'), 'index.html must have Spotify Connect button');
+  assert(htmlContent.includes('id="spotifyDisconnectHeaderBtn"'), 'index.html must have Spotify Disconnect button');
+  assert(htmlContent.includes('id="ytConnectHeaderBtn"'), 'index.html must have Google/YouTube Connect button');
+  assert(htmlContent.includes('id="ytDisconnectHeaderBtn"'), 'index.html must have Google/YouTube Disconnect button');
+
+  // 6. Environment Example Verification
+  const envExample = fs.readFileSync(path.join(__dirname, '..', '.env.example'), 'utf8');
+  assert(envExample.includes('SPOTIFY_CLIENT_ID'), '.env.example must document SPOTIFY_CLIENT_ID');
+  assert(envExample.includes('SPOTIFY_CLIENT_SECRET'), '.env.example must document SPOTIFY_CLIENT_SECRET');
+  assert(envExample.includes('GOOGLE_CLIENT_ID'), '.env.example must document GOOGLE_CLIENT_ID');
+  assert(envExample.includes('GOOGLE_CLIENT_SECRET'), '.env.example must document GOOGLE_CLIENT_SECRET');
+
+  console.log('  ✓ UI token hygiene verified: 0 manual token prompts or paste buttons');
+  console.log('  ✓ Dedicated Spotify and Google Connect/Disconnect controls verified');
+  console.log('  ✓ .env.example contains complete application-level credentials documentation');
+
   console.log('\n====================================================');
   console.log('🏁 ALL PLAYLIST IMPORT & TRANSFER TESTS PASSED (100%)');
   console.log('====================================================');

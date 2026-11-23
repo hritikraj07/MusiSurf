@@ -2812,15 +2812,15 @@
             <div class="import-provider-pill-badge" style="justify-content: space-between;">
               <div style="display: flex; align-items: center; gap: 6px;">
                 <span class="provider-dot spotify-dot"></span>
-                <span>Spotify Playlist Import</span>
+                <span id="spotifyConnectionTitle">Spotify — Not Connected</span>
               </div>
               <div id="spotifyAuthStatusBadge" class="spotify-auth-status-badge">
                 <span id="spotifyAuthStatusDot" class="status-indicator-dot dot-gray"></span>
-                <span id="spotifyAuthStatusText">Not connected</span>
-                <button type="button" id="spotifyConnectHeaderBtn" class="spotify-header-auth-btn">Connect</button>
+                <button type="button" id="spotifyConnectHeaderBtn" class="spotify-header-auth-btn">Connect Spotify</button>
                 <button type="button" id="spotifyDisconnectHeaderBtn" class="spotify-header-auth-btn disconnect-btn" style="display: none;">Disconnect</button>
               </div>
             </div>
+            <p id="spotifyConnectionDesc" class="import-connection-desc" style="font-size: 0.78rem; color: var(--text-muted); margin: -4px 0 12px 0;">Connect your Spotify account to import playlists.</p>
             <label class="import-field-label" for="importPlaylistUrlInput">Spotify Playlist Link or URI</label>
             <div class="import-input-wrap">
               <input type="text" id="importPlaylistUrlInput" class="import-text-input" placeholder="https://open.spotify.com/playlist/... or spotify:playlist:..." />
@@ -2835,18 +2835,22 @@
             <!-- Live Structured ID Detection Feedback Card -->
             <div id="spotifyDetectedIdPill" class="detected-playlist-card" style="display: none;"></div>
             <p class="import-hint-text">Supported: <code>https://open.spotify.com/playlist/{id}</code> and <code>spotify:playlist:{id}</code></p>
-            <div class="spotify-auth-action-row" id="spotifyAuthActionRow" style="margin-top: 10px; display: none;">
-              <span class="spotify-auth-hint" style="font-size: 0.78rem; color: var(--text-muted);">Spotify Account:</span>
-              <button type="button" id="spotifyConnectBtn" class="sound-pill-btn" style="padding: 4px 10px; font-size: 0.76rem; background: rgba(29, 185, 84, 0.15); color: #1ed760; border: 1px solid rgba(29, 185, 84, 0.3);">Connect Spotify Account</button>
-            </div>
           </div>
 
           <!-- Tab Content B: YouTube Music URL Link Input -->
           <div class="import-tab-body" id="importYtMusicBody" style="display: none;">
-            <div class="import-provider-pill-badge">
-              <span class="provider-dot ytmusic-dot" style="background: #ff0000; box-shadow: 0 0 6px rgba(255, 0, 0, 0.6);"></span>
-              <span>YouTube Music Priority Integration</span>
+            <div class="import-provider-pill-badge" style="justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="provider-dot ytmusic-dot" style="background: #ff0000; box-shadow: 0 0 6px rgba(255, 0, 0, 0.6);"></span>
+                <span id="ytConnectionTitle">YouTube Music — Not Connected</span>
+              </div>
+              <div id="ytAuthStatusBadge" class="spotify-auth-status-badge">
+                <span id="ytAuthStatusDot" class="status-indicator-dot dot-gray"></span>
+                <button type="button" id="ytConnectHeaderBtn" class="spotify-header-auth-btn" style="background: rgba(255, 0, 0, 0.15); color: #ff5252; border-color: rgba(255, 0, 0, 0.35);">Connect Google Account</button>
+                <button type="button" id="ytDisconnectHeaderBtn" class="spotify-header-auth-btn disconnect-btn" style="display: none;">Disconnect</button>
+              </div>
             </div>
+            <p id="ytConnectionDesc" class="import-connection-desc" style="font-size: 0.78rem; color: var(--text-muted); margin: -4px 0 12px 0;">Connect your Google account to import supported YouTube Music playlists.</p>
             <label class="import-field-label" for="importYtMusicUrlInput">YouTube Music or YouTube Playlist Link</label>
             <div class="import-input-wrap">
               <input type="text" id="importYtMusicUrlInput" class="import-text-input" placeholder="https://music.youtube.com/playlist?list=... or youtube.com/playlist?list=..." />
@@ -2858,8 +2862,8 @@
                 <span>Paste</span>
               </button>
             </div>
-            <!-- Live ID Detection Feedback Pill (Shows full ID so user is confident no truncation occurred) -->
-            <div id="ytDetectedIdPill" class="import-detected-id-pill" style="display: none;"></div>
+            <!-- Live ID Detection Feedback Card -->
+            <div id="ytDetectedIdPill" class="detected-playlist-card ytmusic-card" style="display: none;"></div>
             <p class="import-hint-text">Supported: <code>https://music.youtube.com/playlist?list={id}</code> and <code>https://www.youtube.com/playlist?list={id}</code></p>
           </div>
 

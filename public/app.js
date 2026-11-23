@@ -521,11 +521,16 @@
     importPasteYtMusicUrlBtn: document.getElementById('importPasteYtMusicUrlBtn'),
     spotifyDetectedIdPill: document.getElementById('spotifyDetectedIdPill'),
     ytDetectedIdPill: document.getElementById('ytDetectedIdPill'),
-    spotifyAuthActionRow: document.getElementById('spotifyAuthActionRow'),
-    spotifyConnectBtn: document.getElementById('spotifyConnectBtn'),
+    spotifyConnectionTitle: document.getElementById('spotifyConnectionTitle'),
+    spotifyConnectionDesc: document.getElementById('spotifyConnectionDesc'),
     spotifyConnectHeaderBtn: document.getElementById('spotifyConnectHeaderBtn'),
     spotifyDisconnectHeaderBtn: document.getElementById('spotifyDisconnectHeaderBtn'),
     spotifyAuthStatusDot: document.getElementById('spotifyAuthStatusDot'),
+    ytConnectionTitle: document.getElementById('ytConnectionTitle'),
+    ytConnectionDesc: document.getElementById('ytConnectionDesc'),
+    ytConnectHeaderBtn: document.getElementById('ytConnectHeaderBtn'),
+    ytDisconnectHeaderBtn: document.getElementById('ytDisconnectHeaderBtn'),
+    ytAuthStatusDot: document.getElementById('ytAuthStatusDot'),
     spotifyAuthStatusText: document.getElementById('spotifyAuthStatusText'),
     importDropZone: document.getElementById('importDropZone'),
     importPlaylistFileInput: document.getElementById('importPlaylistFileInput'),
@@ -9147,24 +9152,49 @@
     // Reset tabs
     switchImportTab('spotify');
     checkSpotifyAuthStatus();
+    checkGoogleAuthStatus();
   }
 
   function checkSpotifyAuthStatus() {
     fetch('/api/auth/spotify/status')
       .then(res => res.json())
       .then(data => {
-        if (elements.spotifyAuthStatusDot && elements.spotifyAuthStatusText) {
+        if (elements.spotifyAuthStatusDot) {
           if (data && data.connected) {
             elements.spotifyAuthStatusDot.className = 'status-indicator-dot dot-green';
-            elements.spotifyAuthStatusText.textContent = 'Spotify Connected';
+            if (elements.spotifyConnectionTitle) elements.spotifyConnectionTitle.textContent = 'Spotify — Connected';
+            if (elements.spotifyConnectionDesc) elements.spotifyConnectionDesc.textContent = 'Your Spotify account is connected for automatic importing.';
             if (elements.spotifyConnectHeaderBtn) elements.spotifyConnectHeaderBtn.style.display = 'none';
             if (elements.spotifyDisconnectHeaderBtn) elements.spotifyDisconnectHeaderBtn.style.display = 'inline-block';
-            if (elements.spotifyAuthActionRow) elements.spotifyAuthActionRow.style.display = 'none';
           } else {
             elements.spotifyAuthStatusDot.className = 'status-indicator-dot dot-gray';
-            elements.spotifyAuthStatusText.textContent = 'Not connected';
+            if (elements.spotifyConnectionTitle) elements.spotifyConnectionTitle.textContent = 'Spotify — Not Connected';
+            if (elements.spotifyConnectionDesc) elements.spotifyConnectionDesc.textContent = 'Connect your Spotify account to import playlists.';
             if (elements.spotifyConnectHeaderBtn) elements.spotifyConnectHeaderBtn.style.display = 'inline-block';
             if (elements.spotifyDisconnectHeaderBtn) elements.spotifyDisconnectHeaderBtn.style.display = 'none';
+          }
+        }
+      })
+      .catch(() => {});
+  }
+
+  function checkGoogleAuthStatus() {
+    fetch('/api/auth/google/status')
+      .then(res => res.json())
+      .then(data => {
+        if (elements.ytAuthStatusDot) {
+          if (data && data.connected) {
+            elements.ytAuthStatusDot.className = 'status-indicator-dot dot-green';
+            if (elements.ytConnectionTitle) elements.ytConnectionTitle.textContent = 'YouTube Music — Connected';
+            if (elements.ytConnectionDesc) elements.ytConnectionDesc.textContent = 'Your Google account is connected for automatic importing.';
+            if (elements.ytConnectHeaderBtn) elements.ytConnectHeaderBtn.style.display = 'none';
+            if (elements.ytDisconnectHeaderBtn) elements.ytDisconnectHeaderBtn.style.display = 'inline-block';
+          } else {
+            elements.ytAuthStatusDot.className = 'status-indicator-dot dot-gray';
+            if (elements.ytConnectionTitle) elements.ytConnectionTitle.textContent = 'YouTube Music — Not Connected';
+            if (elements.ytConnectionDesc) elements.ytConnectionDesc.textContent = 'Connect your Google account to import supported YouTube Music playlists.';
+            if (elements.ytConnectHeaderBtn) elements.ytConnectHeaderBtn.style.display = 'inline-block';
+            if (elements.ytDisconnectHeaderBtn) elements.ytDisconnectHeaderBtn.style.display = 'none';
           }
         }
       })
@@ -9248,42 +9278,41 @@
   }
 
   function promptSpotifyConnect() {
+    const url = (elements.importPlaylistUrlInput?.value || '').trim();
+    const info = clientExtractSpotifyPlaylistInfo(url);
+    const pendingQuery = url ? `?pending_url=${encodeURIComponent(url)}&pending_id=${encodeURIComponent(info?.id || '')}` : '';
+
     fetch('/api/auth/spotify/status')
       .then(res => res.json())
-      .then(statusData => {
-        if (statusData && statusData.configured) {
-          window.location.href = '/api/auth/spotify/login';
+      .then(data => {
+        if (data && data.configured) {
+          window.location.href = `/api/auth/spotify/login${pendingQuery}`;
         } else {
-          promptSpotifyTokenInput();
+          showImportError('Spotify integration is not configured on the server. Please add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to the server environment.');
         }
       })
       .catch(() => {
-        promptSpotifyTokenInput();
+        window.location.href = `/api/auth/spotify/login${pendingQuery}`;
       });
   }
 
-  function promptSpotifyTokenInput() {
-    const token = prompt('Paste your Spotify Access Token to connect your Spotify account:');
-    if (token && token.trim()) {
-      fetch('/api/auth/spotify/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: token.trim() })
+  function promptGoogleConnect() {
+    const url = (elements.importYtMusicUrlInput?.value || '').trim();
+    const ytId = clientExtractYouTubePlaylistId(url);
+    const pendingQuery = url ? `?pending_url=${encodeURIComponent(url)}&pending_id=${encodeURIComponent(ytId || '')}` : '';
+
+    fetch('/api/auth/google/status')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.configured) {
+          window.location.href = `/api/auth/google/login${pendingQuery}`;
+        } else {
+          showImportError('Google integration is not configured on the server. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the server environment.');
+        }
       })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            showToast('Spotify account connected successfully!', '🟢');
-            checkSpotifyAuthStatus();
-            if (elements.importValidationError) elements.importValidationError.style.display = 'none';
-          } else {
-            showToast('Failed to save Spotify token: ' + (data.error || 'Invalid token'), '⚠️');
-          }
-        })
-        .catch(err => {
-          showToast('Error connecting token: ' + err.message, '⚠️');
-        });
-    }
+      .catch(() => {
+        window.location.href = `/api/auth/google/login${pendingQuery}`;
+      });
   }
 
   function showImportError(msg, requiresAuth = false, code = null) {
@@ -9314,16 +9343,13 @@
       return;
     }
 
-    if (code === 'ERR_SPOTIFY_AUTH_REQUIRED' || requiresAuth) {
+    if (code === 'ERR_SPOTIFY_AUTH_REQUIRED' || (requiresAuth && importWorkflowState.method === 'spotify')) {
       elements.importValidationError.innerHTML = `
-        <div style="font-weight: 600; margin-bottom: 5px;">Spotify Authentication Required</div>
+        <div style="font-weight: 600; margin-bottom: 5px;">Spotify Authorization Required</div>
         <p style="margin: 0 0 10px 0; font-size: 0.83rem; line-height: 1.45; opacity: 0.95;">${escapeHtml(msg)}</p>
         <div class="import-error-actions">
           <button type="button" class="import-error-action-btn primary-action" id="errorBtnConnectSpotify">
-            Connect Spotify Account
-          </button>
-          <button type="button" class="import-error-action-btn" id="errorBtnPasteToken">
-            Paste Access Token
+            Connect Spotify
           </button>
           <button type="button" class="import-error-action-btn" id="errorBtnSwitchFile">
             Import via Playlist File
@@ -9332,9 +9358,27 @@
       `;
       const btnConn = elements.importValidationError.querySelector('#errorBtnConnectSpotify');
       if (btnConn) btnConn.onclick = () => promptSpotifyConnect();
-      const btnTok = elements.importValidationError.querySelector('#errorBtnPasteToken');
-      if (btnTok) btnTok.onclick = () => promptSpotifyTokenInput();
       const btnFile = elements.importValidationError.querySelector('#errorBtnSwitchFile');
+      if (btnFile) btnFile.onclick = () => switchImportTab('file');
+      return;
+    }
+
+    if (code === 'ERR_YTMUSIC_AUTH_REQUIRED' || code === 'ERR_GOOGLE_AUTH_EXPIRED' || (requiresAuth && importWorkflowState.method === 'ytmusic')) {
+      elements.importValidationError.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 5px;">Google Authorization Required</div>
+        <p style="margin: 0 0 10px 0; font-size: 0.83rem; line-height: 1.45; opacity: 0.95;">${escapeHtml(msg)}</p>
+        <div class="import-error-actions">
+          <button type="button" class="import-error-action-btn primary-action" id="errorBtnConnectGoogle" style="background: rgba(255, 0, 0, 0.25); border-color: rgba(255, 0, 0, 0.5); color: #ff5252;">
+            Connect Google Account
+          </button>
+          <button type="button" class="import-error-action-btn" id="errorBtnSwitchFileYt">
+            Import via Playlist File
+          </button>
+        </div>
+      `;
+      const btnGoogle = elements.importValidationError.querySelector('#errorBtnConnectGoogle');
+      if (btnGoogle) btnGoogle.onclick = () => promptGoogleConnect();
+      const btnFile = elements.importValidationError.querySelector('#errorBtnSwitchFileYt');
       if (btnFile) btnFile.onclick = () => switchImportTab('file');
       return;
     }
@@ -12933,18 +12977,94 @@
       });
     }
 
-    // Check query params for Spotify OAuth return notification
-    try {
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('spotify_connected') === '1') {
-        showToast('Spotify account connected successfully! You can now import private playlists.', '🟢');
-        checkSpotifyAuthStatus();
-        window.history.replaceState({}, document.title, window.location.pathname);
-      } else if (urlParams.get('spotify_error')) {
-        showToast('Spotify connection note: ' + urlParams.get('spotify_error'), '⚠️');
-        window.history.replaceState({}, document.title, window.location.pathname);
+    // Google / YouTube Music Connect & Disconnect Buttons
+    if (elements.ytConnectHeaderBtn) {
+      elements.ytConnectHeaderBtn.addEventListener('click', promptGoogleConnect);
+    }
+    if (elements.ytDisconnectHeaderBtn) {
+      elements.ytDisconnectHeaderBtn.addEventListener('click', async () => {
+        try {
+          const res = await fetch('/api/auth/google/disconnect', { method: 'POST' });
+          const d = await res.json();
+          if (d.success) {
+            showToast('Google account disconnected', '🔌');
+            checkGoogleAuthStatus();
+          }
+        } catch (e) {
+          showToast('Failed to disconnect Google account', '⚠️');
+        }
+      });
+    }
+
+    // Check query params for OAuth return and automatic pending import resumption
+    async function checkPendingImportResume() {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+
+        if (urlParams.get('oauth_cancelled') === '1') {
+          showToast("Authorization was cancelled. You can connect your account whenever you're ready.", 'ℹ️');
+          window.history.replaceState({}, document.title, window.location.pathname);
+          return;
+        }
+
+        if (urlParams.get('oauth_error')) {
+          showToast('Connection error: ' + urlParams.get('oauth_error'), '⚠️');
+          window.history.replaceState({}, document.title, window.location.pathname);
+          return;
+        }
+
+        if (urlParams.get('spotify_connected') === '1') {
+          showToast('Spotify account connected successfully!', '🟢');
+          checkSpotifyAuthStatus();
+          window.history.replaceState({}, document.title, window.location.pathname);
+          return;
+        }
+
+        if (urlParams.get('google_connected') === '1') {
+          showToast('Google account connected successfully!', '🟢');
+          checkGoogleAuthStatus();
+          window.history.replaceState({}, document.title, window.location.pathname);
+          return;
+        }
+
+        if (urlParams.get('import_resume') === '1') {
+          window.history.replaceState({}, document.title, window.location.pathname);
+          checkSpotifyAuthStatus();
+          checkGoogleAuthStatus();
+
+          // Retrieve pending import operation
+          const res = await fetch('/api/import/pending');
+          const data = await res.json();
+          if (data && data.hasPending && data.pending) {
+            const pending = data.pending;
+            openImportPlaylistModal();
+
+            if (pending.provider === 'youtube_music') {
+              switchImportTab('ytmusic');
+              if (elements.importYtMusicUrlInput) {
+                elements.importYtMusicUrlInput.value = pending.url;
+                updateYtMusicLiveDetection();
+              }
+            } else {
+              switchImportTab('spotify');
+              if (elements.importPlaylistUrlInput) {
+                elements.importPlaylistUrlInput.value = pending.url;
+                updateSpotifyLiveDetection();
+              }
+            }
+
+            showToast('Account authorized! Automatically continuing playlist import...', '🚀');
+            setTimeout(() => {
+              startImportWorkflow();
+            }, 300);
+          }
+        }
+      } catch (e) {
+        console.warn('[Import] Pending import resume check note:', e);
       }
-    } catch (e) {}
+    }
+
+    checkPendingImportResume();
 
     // File Input & Drag-and-Drop Handling
     function handleImportFile(file) {
