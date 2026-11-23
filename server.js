@@ -1786,6 +1786,47 @@ app.get('/api/recommendations', async (req, res) => {
 // Resilient Stream Proxy with HTTP Range Support & Full Length Audio
 app.get('/api/stream', async (req, res) => {
   let audioUrl = req.query.url;
+
+  // Auto-resolve missing audioUrl by trackId or title & artist
+  if (!audioUrl || !audioUrl.startsWith('http')) {
+    const trackId = String(req.query.id || req.query.trackId || '');
+    const title = String(req.query.title || req.query.q || '').trim();
+    const artist = String(req.query.artist || '').trim();
+
+    if (trackId && (trackId.startsWith('saavn_') || /^\d+$/.test(trackId))) {
+      const rawPid = trackId.replace(/^saavn_/, '');
+      try {
+        const detailsRes = await fetch(`https://www.jiosaavn.com/api.php?__call=song.getDetails&pids=${rawPid}&_format=json&_marker=0&api_version=4`, {
+          signal: AbortSignal.timeout(4500)
+        });
+        if (detailsRes.ok) {
+          const detailsData = await detailsRes.json();
+          const detail = detailsData[rawPid];
+          if (detail && detail.more_info && detail.more_info.encrypted_media_url) {
+            audioUrl = decryptSaavnMediaUrl(detail.more_info.encrypted_media_url);
+          }
+        }
+      } catch (err) {
+        console.warn('[Stream API] Failed resolving Saavn PID:', rawPid, err.message);
+      }
+    } else if (trackId && (trackId.startsWith('yt_') || req.query.source === 'youtube')) {
+      const ytId = trackId.replace(/^yt_/, '');
+      return res.redirect(`/api/yt-stream?id=${encodeURIComponent(ytId)}`);
+    }
+
+    if ((!audioUrl || !audioUrl.startsWith('http')) && title) {
+      try {
+        const query = `${title} ${artist}`.trim();
+        const matches = await searchSaavn(query, 3);
+        if (matches && matches.length > 0 && matches[0].audioUrl) {
+          audioUrl = matches[0].audioUrl;
+        }
+      } catch (err) {
+        console.warn('[Stream API] Search fallback failed for:', title, err.message);
+      }
+    }
+  }
+
   if (!audioUrl || !audioUrl.startsWith('http')) {
     return res.status(400).send('Invalid audio URL');
   }

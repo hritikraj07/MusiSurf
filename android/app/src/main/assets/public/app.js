@@ -4664,6 +4664,14 @@
           elements.audio.volume = state.volume;
         }
 
+        // Auto-resolve streamUrl if missing (e.g. liked songs or playlist songs synced from database)
+        if (!track.streamUrl && !track.audioUrl) {
+          const tid = track.id || '';
+          const tTitle = track.title || '';
+          const tArtist = track.artist || '';
+          track.streamUrl = `/api/stream?id=${encodeURIComponent(tid)}&title=${encodeURIComponent(tTitle)}&artist=${encodeURIComponent(tArtist)}`;
+        }
+
         const streamUrl = track.streamUrl || (track.audioUrl ? `/api/stream?url=${encodeURIComponent(track.audioUrl)}` : null);
         const audioSrc = track.audioUrl || streamUrl;
 
@@ -11627,21 +11635,6 @@
     // Strict Sign-In Gate: unauthenticated guest users see clean locked prompt
     if (!isAuthenticated()) {
       if (replayAuthGate) replayAuthGate.style.display = 'flex';
-      if (replayDashboard) replayDashboard.style.display = 'none';
-      return;
-    }
-
-    if (replayAuthGate) replayAuthGate.style.display = 'none';
-    if (replayDashboard) replayDashboard.style.display = 'grid';
-
-    document.querySelectorAll('.replay-pill').forEach(pill => {
-      pill.classList.toggle('active', pill.dataset.period === period);
-    });
-
-    // Real dynamic Sound Capsule statistics from Neon Postgres
-    fetchAndRenderSoundtrackStats();
-  }
-
   async function fetchAndRenderSoundtrackStats() {
     try {
       const res = await fetch('/api/soundtrack/stats', { credentials: 'include' });
@@ -14165,11 +14158,25 @@
         showToast('Connect to internet to view lyrics', '⚡');
       }
       state.openedLyricsFromMobilePlayer = true;
+      if (typeof closeMobilePlayerModal === 'function') {
+        closeMobilePlayerModal();
+      } else if (elements.mobilePlayerModal) {
+        elements.mobilePlayerModal.style.display = 'none';
+        document.body.style.overflow = '';
+      }
       switchView('lyrics');
     }
 
     if (elements.mobPlayerLyricsBtn) {
       elements.mobPlayerLyricsBtn.addEventListener('click', openFullLyricsFromMobile);
+    }
+
+    const mobLyricsPreviewExpandBtn = document.getElementById('mobLyricsPreviewExpandBtn');
+    if (mobLyricsPreviewExpandBtn) {
+      mobLyricsPreviewExpandBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openFullLyricsFromMobile();
+      });
     }
 
     const mobLyricsShowBtn = document.getElementById('mobLyricsShowBtn');
@@ -14925,15 +14932,23 @@
       if (likesRes.ok) {
         const data = await likesRes.json();
         if (data.success && Array.isArray(data.tracks)) {
-          state.likedSongs = data.tracks.map(t => ({
-            id: t.track_id || t.id,
-            title: t.title,
-            artist: t.artist,
-            album: t.album || '',
-            image: t.thumbnail_url || '/icons/icon.svg',
-            duration: t.duration_seconds || 0,
-            addedAt: new Date(t.liked_at).getTime()
-          }));
+          state.likedSongs = data.tracks.map(t => {
+            const tid = t.track_id || t.id;
+            const tTitle = t.title || '';
+            const tArtist = t.artist || '';
+            const existing = (state.likedSongs || []).find(x => x.id === tid);
+            return {
+              id: tid,
+              title: tTitle,
+              artist: tArtist,
+              album: t.album || '',
+              image: t.thumbnail_url || existing?.image || '/icons/icon.svg',
+              duration: t.duration_seconds || existing?.duration || 0,
+              audioUrl: existing?.audioUrl || null,
+              streamUrl: existing?.streamUrl || `/api/stream?id=${encodeURIComponent(tid)}&title=${encodeURIComponent(tTitle)}&artist=${encodeURIComponent(tArtist)}`,
+              addedAt: new Date(t.liked_at).getTime()
+            };
+          });
           saveStoredLikes();
           updateHeartIcon(state.currentTrack?.id);
           if (state.currentView === 'liked') {
@@ -14961,15 +14976,21 @@
                     name: sData.playlist.name,
                     description: sData.playlist.description || '',
                     cover_url: sData.playlist.cover_url,
-                    tracks: (sData.playlist.tracks || []).map(t => ({
-                      id: t.track_id || t.id,
-                      title: t.title,
-                      artist: t.artist,
-                      album: t.album || '',
-                      image: t.thumbnail_url || '/icons/icon.svg',
-                      duration: t.duration_seconds || 0,
-                      addedAt: new Date(t.added_at).getTime()
-                    }))
+                    tracks: (sData.playlist.tracks || []).map(t => {
+                      const tid = t.track_id || t.id;
+                      const tTitle = t.title || '';
+                      const tArtist = t.artist || '';
+                      return {
+                        id: tid,
+                        title: tTitle,
+                        artist: tArtist,
+                        album: t.album || '',
+                        image: t.thumbnail_url || '/icons/icon.svg',
+                        duration: t.duration_seconds || 0,
+                        streamUrl: `/api/stream?id=${encodeURIComponent(tid)}&title=${encodeURIComponent(tTitle)}&artist=${encodeURIComponent(tArtist)}`,
+                        addedAt: new Date(t.added_at).getTime()
+                      };
+                    })
                   };
                 }
               }

@@ -98,9 +98,12 @@
         return `${base}/api/stream?url=${encodeURIComponent(this.audioUrl)}`;
       }
       if (this.ytId) {
-        return `${base}/api/yt-stream?v=${encodeURIComponent(this.ytId)}`;
+        return `${base}/api/yt-stream?id=${encodeURIComponent(this.ytId)}`;
       }
-      return `${base}/api/download?title=${encodeURIComponent(this.title)}&artist=${encodeURIComponent(this.artist)}`;
+      const tid = this.id || '';
+      const title = this.title || '';
+      const artist = this.artist || '';
+      return `${base}/api/stream?id=${encodeURIComponent(tid)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`;
     }
 
     toDict() {

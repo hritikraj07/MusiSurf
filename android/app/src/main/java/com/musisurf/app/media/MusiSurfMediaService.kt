@@ -252,7 +252,21 @@ class MusiSurfMediaService : MediaSessionService(), Player.Listener, AudioManage
     private fun buildMediaItem(track: JSObject): MediaItem? {
         val localUri = track.getString("localFileUri")
         val remoteStream = track.getString("remoteStreamUrl") ?: track.getString("streamUrl") ?: track.getString("audioUrl")
-        val resolvedRemote = ensureAbsoluteUrl(remoteStream)
+        val resolvedRemote = if (!remoteStream.isNullOrEmpty()) {
+            ensureAbsoluteUrl(remoteStream)
+        } else {
+            val tid = track.getString("id") ?: ""
+            val title = track.getString("title") ?: ""
+            val artist = track.getString("artist") ?: ""
+            try {
+                val encodedTitle = java.net.URLEncoder.encode(title, "UTF-8")
+                val encodedArtist = java.net.URLEncoder.encode(artist, "UTF-8")
+                val encodedId = java.net.URLEncoder.encode(tid, "UTF-8")
+                ensureAbsoluteUrl("/api/stream?id=$encodedId&title=$encodedTitle&artist=$encodedArtist")
+            } catch (e: Exception) {
+                ensureAbsoluteUrl("/api/stream?id=$tid")
+            }
+        }
 
         val targetUri = if (!localUri.isNullOrEmpty() && File(Uri.parse(localUri).path ?: "").exists()) {
             Uri.parse(localUri)
@@ -329,6 +343,9 @@ class MusiSurfMediaService : MediaSessionService(), Player.Listener, AudioManage
 
     fun resume() {
         if (requestAudioFocus()) {
+            if (player?.playbackState == Player.STATE_IDLE) {
+                player?.prepare()
+            }
             player?.play()
             startForegroundNotification()
         }
@@ -373,6 +390,7 @@ class MusiSurfMediaService : MediaSessionService(), Player.Listener, AudioManage
     }
 
     fun setQueue(queue: JSArray, startIndex: Int = 0) {
+        val wasPlaying = player?.playWhenReady == true || player?.isPlaying == true
         queueList.clear()
         val mediaItems = mutableListOf<MediaItem>()
 
@@ -399,6 +417,9 @@ class MusiSurfMediaService : MediaSessionService(), Player.Listener, AudioManage
 
         player?.setMediaItems(mediaItems, currentIndex, 0L)
         player?.prepare()
+        if (wasPlaying && requestAudioFocus()) {
+            player?.play()
+        }
         listener?.onQueueUpdated(queue, currentIndex)
     }
 

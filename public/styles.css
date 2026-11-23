@@ -6908,6 +6908,31 @@ div[data-track-id].playing:hover .song-more-trigger {
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.75);
 }
 
+.mob-lyrics-preview-expand-btn {
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.mob-lyrics-preview-expand-btn:active {
+  transform: scale(0.92);
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.mob-lyrics-preview-expand-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
 .mob-lyrics-preview-lines {
   display: flex;
   flex-direction: column;
@@ -10405,12 +10430,12 @@ body[data-active-view="lyrics"] .content-scroll {
     pointer-events: none;
     border-radius: 0 !important;
     box-shadow: none !important;
-    background: radial-gradient(circle at 50% 30%, 
-      rgba(var(--lyrics-card-rgb, var(--lyrics-theme-rgb, 45, 55, 72)), 0.62) 0%, 
-      rgba(var(--lyrics-card-rgb, var(--lyrics-theme-rgb, 45, 55, 72)), 0.3) 45%, 
-      rgba(10, 12, 16, 0.88) 75%, 
-      #08090c 100%
-    ), #0c0e14 !important;
+    background: radial-gradient(ellipse at 50% 30%, 
+      rgba(var(--lyrics-card-rgb, var(--lyrics-theme-rgb, 65, 45, 60)), 0.85) 0%, 
+      rgba(var(--lyrics-card-rgb, var(--lyrics-theme-rgb, 65, 45, 60)), 0.52) 42%, 
+      rgba(18, 20, 26, 0.92) 80%, 
+      #0c0e14 100%
+    ), #101218 !important;
   }
 
   body[data-active-view="lyrics"] #lyricsView {
@@ -11006,19 +11031,19 @@ body[data-active-view="lyrics"] .content-scroll {
    SYNCHRONIZED LYRICS VIEW (Image 2 & 9 - Dynamic Atmospheric Blur Backdrop)
    ========================================================================== */
 #lyricsView {
-  background-color: #0c0e14 !important;
-  background: radial-gradient(circle at 50% 35%, 
-    rgba(var(--lyrics-card-rgb, var(--lyrics-theme-rgb, 45, 55, 72)), 0.6) 0%, 
-    rgba(var(--lyrics-card-rgb, var(--lyrics-theme-rgb, 45, 55, 72)), 0.28) 48%, 
-    rgba(10, 12, 16, 0.88) 78%, 
-    #08090c 100%
-  ), #0c0e14 !important;
+  background-color: #101218 !important;
+  background: radial-gradient(ellipse at 50% 35%, 
+    rgba(var(--lyrics-card-rgb, var(--lyrics-theme-rgb, 65, 45, 60)), 0.85) 0%, 
+    rgba(var(--lyrics-card-rgb, var(--lyrics-theme-rgb, 65, 45, 60)), 0.52) 42%, 
+    rgba(18, 20, 26, 0.92) 80%, 
+    #0c0e14 100%
+  ), #101218 !important;
   width: 100%;
   height: 100%;
   position: relative;
   overflow: hidden;
   border-radius: 0 !important;
-  box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.45) !important;
+  box-shadow: none !important;
   transition: background 0.4s ease, background-color 0.4s ease;
 }
 
@@ -11240,7 +11265,7 @@ body[data-active-view="lyrics"] .content-scroll {
   font-size: 1.65rem;
   font-weight: 600;
   line-height: 1.45;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
   margin-bottom: 20px;
@@ -11253,16 +11278,17 @@ body[data-active-view="lyrics"] .content-scroll {
 }
 
 #lyricsView .lyric-line:hover {
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.92);
 }
 
 #lyricsView .lyric-line.active {
   font-size: 2.15rem !important;
-  font-weight: 700 !important;
-  color: rgba(255, 255, 255, 0.45) !important;
+  font-weight: 800 !important;
+  color: #ffffff !important;
   opacity: 1 !important;
   transform: scale(1.02);
   transform-origin: left center;
+  text-shadow: 0 0 16px rgba(255, 255, 255, 0.7), 0 0 32px rgba(var(--lyrics-theme-rgb, 255, 255, 255), 0.35);
 }
 
 #lyricsView .lyric-line.active .lyric-word.glowing,
@@ -16507,9 +16533,19 @@ body[data-playlist-id="downloaded"] #mobileTopActions {
   display: none !important;
 }
 
-body.in-downloaded-playlist .app-layout,
-body[data-playlist-id="downloaded"] .app-layout {
-  grid-template-rows: 0px 1fr var(--player-height) !important;
+@media (min-width: 769px) {
+  body.in-downloaded-playlist .app-layout,
+  body[data-playlist-id="downloaded"] .app-layout {
+    grid-template-rows: 0px 1fr var(--player-height) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  body.in-downloaded-playlist .app-layout,
+  body[data-playlist-id="downloaded"] .app-layout {
+    grid-template-rows: 1fr var(--player-height, 80px) !important;
+    grid-template-areas: "main" "player" !important;
+  }
 }
 
 body.in-downloaded-playlist .main-content {
