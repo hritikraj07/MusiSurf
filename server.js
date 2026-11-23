@@ -2217,6 +2217,24 @@ app.get('/api/auth/me', async (req, res) => {
   }
 });
 
+function getAuthOrigin(req) {
+  let origin = req.headers.origin;
+  if (!origin) {
+    const host = req.get('host');
+    if (host) {
+      const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+      origin = `${proto}://${host}`;
+    }
+  }
+  if (origin) {
+    origin = origin.replace(/\/$/, '');
+  }
+  if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+    return origin;
+  }
+  return origin || (process.env.APP_URL ? process.env.APP_URL.replace(/\/$/, '') : 'https://musi-surf.vercel.app');
+}
+
 // Proxy Sign-Up to Neon Auth
 app.post('/api/auth/sign-up', async (req, res) => {
   try {
@@ -2225,7 +2243,18 @@ app.post('/api/auth/sign-up', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
+    const cleanEmail = String(email).trim().toLowerCase();
+    if (!cleanEmail.includes('@')) {
+      return res.status(400).json({ error: 'Please enter a valid email address' });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    const cleanName = (name && String(name).trim()) ? String(name).trim() : (cleanEmail.split('@')[0] || 'User');
+    const origin = getAuthOrigin(req);
+
     const remoteRes = await fetch(`${process.env.NEON_AUTH_BASE_URL}/sign-up/email`, {
       method: 'POST',
       headers: {
@@ -2234,9 +2263,9 @@ app.post('/api/auth/sign-up', async (req, res) => {
         'User-Agent': req.headers['user-agent'] || 'MusiSurf'
       },
       body: JSON.stringify({
-        email,
+        email: cleanEmail,
         password,
-        name: name || (email ? email.split('@')[0] : 'User'),
+        name: cleanName,
         callbackURL: `${origin}/`
       })
     });
@@ -2248,7 +2277,13 @@ app.post('/api/auth/sign-up', async (req, res) => {
 
     const data = await remoteRes.json().catch(() => ({}));
     if (!remoteRes.ok) {
-      return res.status(remoteRes.status).json(data);
+      console.error('[Auth API] Sign-up failed on Neon Auth:', remoteRes.status, data);
+      const errorMessage = data.message || data.error?.message || (typeof data.error === 'string' ? data.error : null) || 'Failed to create account';
+      return res.status(remoteRes.status).json({
+        ...data,
+        error: errorMessage,
+        message: errorMessage
+      });
     }
 
     // Automatically trigger verification OTP email
@@ -2259,19 +2294,22 @@ app.post('/api/auth/sign-up', async (req, res) => {
           'Content-Type': 'application/json',
           'Origin': origin
         },
-        body: JSON.stringify({ email, type: 'email-verification' })
+        body: JSON.stringify({ email: cleanEmail, type: 'email-verification' })
       });
     } catch (e) {}
 
     res.json({
       success: true,
-      requiresVerification: true,
+      requiresVerification: !data.token,
       user: data.user || null,
-      message: 'Account created. Please enter the 6-digit verification code sent to your email.'
+      token: data.token || null,
+      message: data.token
+        ? 'Account created successfully!'
+        : 'Account created! Check your email to verify your account, then sign in.'
     });
   } catch (err) {
     console.error('[Auth API] Sign-up error:', err.message);
-    res.status(500).json({ error: 'Sign-up failed. Please try again.' });
+    res.status(500).json({ error: err.message || 'Sign-up failed. Please try again.' });
   }
 });
 
@@ -2283,7 +2321,8 @@ app.post('/api/auth/sign-in', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
+    const cleanEmail = String(email).trim().toLowerCase();
+    const origin = getAuthOrigin(req);
     const remoteRes = await fetch(`${process.env.NEON_AUTH_BASE_URL}/sign-in/email`, {
       method: 'POST',
       headers: {
@@ -2291,7 +2330,7 @@ app.post('/api/auth/sign-in', async (req, res) => {
         'Origin': origin,
         'User-Agent': req.headers['user-agent'] || 'MusiSurf'
       },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email: cleanEmail, password })
     });
 
     const setCookies = remoteRes.headers.getSetCookie ? remoteRes.headers.getSetCookie() : [remoteRes.headers.get('set-cookie')].filter(Boolean);
@@ -2301,7 +2340,13 @@ app.post('/api/auth/sign-in', async (req, res) => {
 
     const data = await remoteRes.json().catch(() => ({}));
     if (!remoteRes.ok) {
-      return res.status(remoteRes.status).json(data);
+      console.error('[Auth API] Sign-in failed on Neon Auth:', remoteRes.status, data);
+      const errorMessage = data.message || data.error?.message || (typeof data.error === 'string' ? data.error : null) || 'Invalid email or password';
+      return res.status(remoteRes.status).json({
+        ...data,
+        error: errorMessage,
+        message: errorMessage
+      });
     }
 
     res.json({
@@ -2311,7 +2356,7 @@ app.post('/api/auth/sign-in', async (req, res) => {
     });
   } catch (err) {
     console.error('[Auth API] Sign-in error:', err.message);
-    res.status(500).json({ error: 'Sign-in failed. Please try again.' });
+    res.status(500).json({ error: err.message || 'Sign-in failed. Please try again.' });
   }
 });
 
@@ -2323,7 +2368,8 @@ app.post('/api/auth/verify-otp', async (req, res) => {
       return res.status(400).json({ error: 'Email and 6-digit OTP code are required' });
     }
 
-    const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
+    const cleanEmail = String(email).trim().toLowerCase();
+    const origin = getAuthOrigin(req);
     const remoteRes = await fetch(`${process.env.NEON_AUTH_BASE_URL}/email-otp/verify-email`, {
       method: 'POST',
       headers: {
@@ -2331,7 +2377,7 @@ app.post('/api/auth/verify-otp', async (req, res) => {
         'Origin': origin,
         'User-Agent': req.headers['user-agent'] || 'MusiSurf'
       },
-      body: JSON.stringify({ email, otp: String(otp).trim() })
+      body: JSON.stringify({ email: cleanEmail, otp: String(otp).trim() })
     });
 
     const setCookies = remoteRes.headers.getSetCookie ? remoteRes.headers.getSetCookie() : [remoteRes.headers.get('set-cookie')].filter(Boolean);
@@ -2341,7 +2387,13 @@ app.post('/api/auth/verify-otp', async (req, res) => {
 
     const data = await remoteRes.json().catch(() => ({}));
     if (!remoteRes.ok) {
-      return res.status(remoteRes.status).json(data);
+      console.error('[Auth API] Verify OTP failed on Neon Auth:', remoteRes.status, data);
+      const errorMessage = data.message || data.error?.message || (typeof data.error === 'string' ? data.error : null) || 'Invalid or expired verification code';
+      return res.status(remoteRes.status).json({
+        ...data,
+        error: errorMessage,
+        message: errorMessage
+      });
     }
 
     res.json({
@@ -2352,7 +2404,7 @@ app.post('/api/auth/verify-otp', async (req, res) => {
     });
   } catch (err) {
     console.error('[Auth API] Verify OTP error:', err.message);
-    res.status(500).json({ error: 'Verification failed. Please check the code and try again.' });
+    res.status(500).json({ error: err.message || 'Verification failed. Please check the code and try again.' });
   }
 });
 
@@ -2362,20 +2414,29 @@ app.post('/api/auth/resend-otp', async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email is required' });
 
-    const origin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
+    const cleanEmail = String(email).trim().toLowerCase();
+    const origin = getAuthOrigin(req);
     const remoteRes = await fetch(`${process.env.NEON_AUTH_BASE_URL}/email-otp/send-verification-otp`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Origin': origin
       },
-      body: JSON.stringify({ email, type: 'email-verification' })
+      body: JSON.stringify({ email: cleanEmail, type: 'email-verification' })
     });
 
     const data = await remoteRes.json().catch(() => ({}));
-    res.status(remoteRes.status).json(data);
+    if (!remoteRes.ok) {
+      const errorMessage = data.message || data.error?.message || (typeof data.error === 'string' ? data.error : null) || 'Failed to resend code';
+      return res.status(remoteRes.status).json({
+        ...data,
+        error: errorMessage,
+        message: errorMessage
+      });
+    }
+    res.json({ success: true, message: 'Verification code resent successfully' });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to resend code.' });
+    res.status(500).json({ error: err.message || 'Failed to resend code.' });
   }
 });
 
@@ -2397,11 +2458,44 @@ app.post('/api/auth/sign-out', async (req, res) => {
 });
 
 // Social Login URL (Google)
-app.get('/api/auth/social-url', (req, res) => {
-  const provider = req.query.provider || 'google';
-  const callbackUrl = req.query.callbackURL || `${req.protocol}://${req.get('host')}/`;
-  const url = `${process.env.NEON_AUTH_BASE_URL}/sign-in/social?provider=${encodeURIComponent(provider)}&callbackURL=${encodeURIComponent(callbackUrl)}`;
-  res.json({ url });
+app.all('/api/auth/social-url', async (req, res) => {
+  try {
+    const provider = req.query.provider || req.body?.provider || 'google';
+    const origin = getAuthOrigin(req);
+    const callbackUrl = req.query.callbackURL || req.body?.callbackURL || `${origin}/`;
+    const resolvedCallback = callbackUrl.startsWith('http') ? callbackUrl : `${origin}${callbackUrl.startsWith('/') ? '' : '/'}${callbackUrl}`;
+
+    const remoteRes = await fetch(`${process.env.NEON_AUTH_BASE_URL}/sign-in/social`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Origin': origin,
+        'User-Agent': req.headers['user-agent'] || 'MusiSurf'
+      },
+      body: JSON.stringify({
+        provider,
+        callbackURL: resolvedCallback
+      })
+    });
+
+    const setCookies = remoteRes.headers.getSetCookie ? remoteRes.headers.getSetCookie() : [remoteRes.headers.get('set-cookie')].filter(Boolean);
+    for (const sc of setCookies) {
+      res.append('Set-Cookie', sc);
+    }
+
+    const data = await remoteRes.json().catch(() => ({}));
+    if (!remoteRes.ok || !data.url) {
+      console.error('[Auth API] Social login initiation failed:', remoteRes.status, data);
+      return res.status(remoteRes.status || 500).json({
+        error: data.message || 'Could not initiate Google Sign-in. Please try again.'
+      });
+    }
+
+    res.json({ url: data.url });
+  } catch (err) {
+    console.error('[Auth API] Social url error:', err.message);
+    res.status(500).json({ error: 'Failed to initiate social login' });
+  }
 });
 
 // --------------------------------------------------------------------------

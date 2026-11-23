@@ -58,6 +58,25 @@ async function migrate() {
   `;
   console.log('[Migration] Verified indexes:', indexes.map(i => i.indexname));
 
+  // Ensure trusted origins in neon_auth.project_config (without trailing slashes)
+  try {
+    const trustedOrigins = [
+      { domain: "https://musi-surf.vercel.app" },
+      { domain: "https://musi-surf.vercel.app/" },
+      { domain: "http://localhost:3000" },
+      { domain: "http://127.0.0.1:3000" },
+      { domain: "https://musisurf.vercel.app" }
+    ];
+    await sql`
+      UPDATE neon_auth.project_config
+      SET trusted_origins = ${JSON.stringify(trustedOrigins)}::jsonb,
+          updated_at = NOW()
+    `;
+    console.log('[Migration] Verified & synced neon_auth.project_config trusted_origins');
+  } catch (authConfigErr) {
+    console.warn('[Migration] Note: project_config trusted_origins sync note:', authConfigErr.message);
+  }
+
   console.log('[Migration] Migration completed successfully!');
 }
 

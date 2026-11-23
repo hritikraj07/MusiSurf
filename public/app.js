@@ -14835,7 +14835,7 @@
           if (data && data.url) {
             window.location.href = data.url;
           } else {
-            showAlert('Could not initiate Google Sign-in. Please try again.');
+            showAlert(data.error || 'Could not initiate Google Sign-in. Please try again.');
           }
         } catch (err) {
           showAlert('Failed to connect to Google Auth: ' + err.message);
@@ -15006,17 +15006,26 @@
       authForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         clearAlert();
-        const email = authEmailInput ? authEmailInput.value.trim() : '';
+        const cleanEmail = (authEmailInput ? authEmailInput.value : '').trim().toLowerCase();
         const password = authPasswordInput ? authPasswordInput.value.trim() : '';
-        const name = (authNameInput && authNameInput.value.trim()) || email.split('@')[0] || 'User';
+        const rawName = authNameInput ? authNameInput.value.trim() : '';
+        const cleanName = (rawName && rawName.length > 0) ? rawName : (cleanEmail.split('@')[0] || 'User');
 
-        if (!email) {
+        if (!cleanEmail) {
           showAlert('Please enter your email address');
           return;
         }
-        if (!password || password.length < 6) {
-          showAlert('Password must be at least 6 characters long');
-          return;
+
+        if (authMode === 'signup') {
+          if (!password || password.length < 8) {
+            showAlert('Password must be at least 8 characters');
+            return;
+          }
+        } else {
+          if (!password) {
+            showAlert('Please enter your password');
+            return;
+          }
         }
 
         const submitBtnText = authSubmitBtn?.querySelector('span');
@@ -15030,33 +15039,66 @@
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include',
-              body: JSON.stringify({ email, password, name })
+              body: JSON.stringify({ email: cleanEmail, password, name: cleanName })
             });
-            const data = await res.json();
-            if (!res.ok || data.error) {
-              showAlert(data.error || 'Failed to create account');
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok || data.error || !data.success) {
+              console.error('[AuthSignUp] Status:', res.status, 'Response:', data);
+              const errMsg = data.error?.message || data.message || (typeof data.error === 'string' ? data.error : null) || res.statusText || 'Failed to create account';
+              showAlert(errMsg);
               return;
             }
 
-            pendingVerificationEmail = email;
-            if (authMainContainer) authMainContainer.style.display = 'none';
-            if (authOtpContainer) authOtpContainer.style.display = 'flex';
-            if (authOtpSubTitle) authOtpSubTitle.textContent = `Enter the 6-digit code sent to ${email}`;
-            if (authOtpInput) {
-              authOtpInput.value = '';
-              setTimeout(() => authOtpInput.focus(), 100);
+            if (data.requiresVerification || !data.token) {
+              pendingVerificationEmail = cleanEmail;
+              if (authMainContainer) authMainContainer.style.display = 'none';
+              if (authOtpContainer) authOtpContainer.style.display = 'flex';
+              if (authOtpSubTitle) authOtpSubTitle.textContent = `Enter the 6-digit code sent to ${cleanEmail}`;
+              if (authOtpInput) {
+                authOtpInput.value = '';
+                setTimeout(() => authOtpInput.focus(), 100);
+              }
+              showAlert(data.message || 'Account created! Check your email to verify your account, then sign in.', 'success');
+            } else {
+              state.currentUser = data.user;
+              localStorage.setItem('musisurf_user', JSON.stringify(data.user));
+              updateAuthUI();
+              closeAuthModal();
+              showToast(`Welcome to MusiSurf, ${data.user.name || cleanEmail}!`, '✓');
+              syncLibraryFromServer();
+              loadAccountPlaylistProgress();
+              syncUserSearchHistory();
             }
-            showAlert('Verification code sent! Please check your email.', 'success');
           } else {
             const res = await fetch('/api/auth/sign-in', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include',
-              body: JSON.stringify({ email, password })
+              body: JSON.stringify({ email: cleanEmail, password })
             });
-            const data = await res.json();
-            if (!res.ok || data.error) {
-              showAlert(data.error || 'Invalid email or password');
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.error || !data.user) {
+              console.error('[AuthSignIn] Status:', res.status, 'Response:', data);
+              if (data.code === 'EMAIL_NOT_VERIFIED' || data.message?.toLowerCase().includes('email not verified')) {
+                pendingVerificationEmail = cleanEmail;
+                if (authMainContainer) authMainContainer.style.display = 'none';
+                if (authOtpContainer) authOtpContainer.style.display = 'flex';
+                if (authOtpSubTitle) authOtpSubTitle.textContent = `Please verify your email. Enter the 6-digit code sent to ${cleanEmail}`;
+                if (authOtpInput) {
+                  authOtpInput.value = '';
+                  setTimeout(() => authOtpInput.focus(), 100);
+                }
+                showAlert('Your email is not verified yet. Enter your code or click Resend Code.', 'warning');
+                fetch('/api/auth/resend-otp', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email: cleanEmail })
+                }).catch(() => {});
+                return;
+              }
+              const errMsg = data.error?.message || data.message || (typeof data.error === 'string' ? data.error : null) || 'Invalid email or password';
+              showAlert(errMsg);
               return;
             }
 
@@ -15064,12 +15106,13 @@
             localStorage.setItem('musisurf_user', JSON.stringify(data.user));
             updateAuthUI();
             closeAuthModal();
-            showToast(`Welcome back, ${data.user.name || email}!`, '✓');
+            showToast(`Welcome back, ${data.user.name || cleanEmail}!`, '✓');
             syncLibraryFromServer();
             loadAccountPlaylistProgress();
             syncUserSearchHistory();
           }
         } catch (err) {
+          console.error('[Auth] Error:', err);
           showAlert('Network error: ' + err.message);
         } finally {
           if (submitBtnText) submitBtnText.textContent = origText;
