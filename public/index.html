@@ -159,6 +159,18 @@
             <span>Settings</span>
           </button>
 
+          <!-- Change Profile Picture from Gallery (Only shown after signing in) -->
+          <button type="button" class="user-dropdown-item user-dropdown-avatar-upload" id="userDropdownChangeAvatarBtn" style="display: none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+            <span>Change Profile Picture</span>
+          </button>
+
+          <!-- Hidden Gallery Image File Picker -->
+          <input type="file" id="userAvatarFileInput" accept="image/*" style="display: none;" aria-hidden="true" />
+
           <!-- Sign Out Option (Shown when user is signed in) -->
           <button type="button" class="user-dropdown-item user-dropdown-signout" id="userDropdownSignOutBtn" style="display: none;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -2179,9 +2191,9 @@
           </button>
           <div class="drawer-accordion-content">
             <div class="drawer-card-box">
-              <span class="drawer-prop-label">Import Playlist</span>
-              <p class="drawer-prop-sub">Transfer playlists from Spotify and other music platforms to MusiSurf.</p>
-              <button class="drawer-action-btn" id="drawerImportPlaylistBtn" type="button" style="background: var(--accent-primary); color: #000; font-weight: 600; margin-bottom: 12px;">Import Playlist</button>
+              <span class="drawer-prop-label" style="display: none !important;">Import Playlist</span>
+              <p class="drawer-prop-sub" style="display: none !important;">Transfer playlists from Spotify and other music platforms to MusiSurf.</p>
+              <button class="drawer-action-btn" id="drawerImportPlaylistBtn" type="button" style="display: none !important; background: var(--accent-primary); color: #000; font-weight: 600; margin-bottom: 12px;">Import Playlist</button>
 
               <div class="drawer-divider"></div>
 
@@ -2386,7 +2398,7 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="22"/><line x1="6" y1="6" x2="6" y2="18"/><line x1="18" y1="8" x2="18" y2="16"/><line x1="2" y1="10" x2="2" y2="14"/><line x1="22" y1="10" x2="22" y2="14"/></svg>
               <span>Sound</span>
             </button>
-            <button class="settings-cat-btn" data-target="settingsLibrarySection">
+            <button class="settings-cat-btn" data-target="settingsLibrarySection" style="display: none !important;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M5 10l7 7 7-7M4 19h16"/></svg>
               <span>Library & Playlists</span>
             </button>
@@ -2613,12 +2625,15 @@
                     <p class="sound-desc" id="settingsAccountEmail">user@example.com</p>
                   </div>
                 </div>
-                <button type="button" class="btn-secondary" id="settingsAccountSignOutBtn" style="padding: 6px 14px; font-size: 0.85rem; border-radius: 8px;">Sign Out</button>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <button type="button" class="btn-secondary" id="settingsChangeAvatarBtn" style="padding: 6px 14px; font-size: 0.85rem; border-radius: 8px;">Upload Photo</button>
+                  <button type="button" class="btn-secondary" id="settingsAccountSignOutBtn" style="padding: 6px 14px; font-size: 0.85rem; border-radius: 8px;">Sign Out</button>
+                </div>
               </div>
             </div>
 
-            <!-- Subscription Plan (Shown strictly after sign in) -->
-            <div class="settings-section-block" id="settingsAccountSubscriptionBlock" style="display: none;">
+            <!-- Subscription Plan (Hidden per user request) -->
+            <div class="settings-section-block" id="settingsAccountSubscriptionBlock" style="display: none !important;">
               <span class="settings-section-label">Subscription</span>
               <div class="sound-card-item">
                 <div class="sound-card-left">
@@ -2632,8 +2647,8 @@
             </div>
           </section>
 
-          <!-- LIBRARY & PLAYLISTS TAB CONTENT -->
-          <section class="settings-tab-view" id="settingsLibrarySection">
+          <!-- LIBRARY & PLAYLISTS TAB CONTENT (Hidden per user request) -->
+          <section class="settings-tab-view" id="settingsLibrarySection" style="display: none !important;">
             <div class="settings-tab-header">
               <h1 class="settings-tab-title">Library & Playlists</h1>
               <p class="settings-tab-desc">Transfer playlists, backup libraries and cloud sync</p>
@@ -2757,7 +2772,7 @@
     </div>
 
     <!-- Dedicated Import Playlist Modal (Spotify Link & File Transfer System) -->
-    <div class="modal-backdrop" id="importPlaylistModal" style="display: none; z-index: 3000;">
+    <div class="modal-backdrop" id="importPlaylistModal" style="display: none !important; z-index: 3000;">
       <div class="modal-card import-playlist-modal-card">
         <!-- Modal Top Bar -->
         <div class="modal-header import-modal-header">

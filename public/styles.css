@@ -1348,6 +1348,8 @@ html, body {
   align-items: center !important;
   justify-content: center !important;
   border-radius: 50% !important;
+  background-color: #282828 !important;
+  overflow: hidden !important;
 }
 
 .top-user-icon-svg {
@@ -1359,8 +1361,23 @@ html, body {
   flex-shrink: 0 !important;
 }
 
-.top-user-initial {
-  display: none !important;
+.top-user-initial,
+.user-initial-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  user-select: none !important;
+  font-family: inherit !important;
+}
+
+.user-custom-avatar-img {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  display: block !important;
 }
 
 /* Remove Sign In text buttons globally from everywhere */
@@ -2024,67 +2041,65 @@ html, body {
   transform: scale(0.8);
 }
 
-/* In expanded sidebar: "Your Library" starts at far left. On hover over header/left, slide in the collapse button */
+/* In expanded sidebar: "Your Library" with fixed, smooth zero-lag collapse morph */
 .sidebar:not(.collapsed) .library-header-left {
   display: flex !important;
   align-items: center !important;
-  gap: 0 !important;
+  gap: 4px !important;
 }
 
 .sidebar:not(.collapsed) .library-collapse-icon-btn,
 .sidebar:not(.collapsed) #collapseSidebarBtn {
-  width: 0 !important;
-  min-width: 0 !important;
-  max-width: 0 !important;
-  height: 36px !important;
-  opacity: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  pointer-events: none !important;
-  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease, margin-right 0.22s cubic-bezier(0.4, 0, 0.2, 1), padding 0.22s ease !important;
-}
-
-/* Collapse icon reveals ONLY when hovering on "Your Library" (.library-header-left), NEVER on the + icon */
-.sidebar:not(.collapsed) .library-header-left:hover .library-collapse-icon-btn,
-.sidebar:not(.collapsed) .library-header-left:hover #collapseSidebarBtn {
-  width: 36px !important;
-  min-width: 36px !important;
-  max-width: 36px !important;
-  opacity: 1 !important;
-  margin-right: 6px !important;
-  padding: 6px !important;
+  width: 32px !important;
+  min-width: 32px !important;
+  max-width: 32px !important;
+  height: 32px !important;
+  opacity: 0.85 !important;
+  margin: 0 4px 0 0 !important;
+  padding: 4px !important;
+  border-radius: 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   pointer-events: auto !important;
+  color: #b3b3b3 !important;
+  transition: color 0.15s ease, background-color 0.15s ease, transform 0.15s ease, opacity 0.15s ease !important;
 }
 
-/* Guard: when hovering on + button (.library-header-right), strictly do NOT show collapse button */
-.sidebar:not(.collapsed) .library-header:has(.library-header-right:hover) .library-collapse-icon-btn,
-.sidebar:not(.collapsed) .library-header:has(#createPlaylistBtn:hover) .library-collapse-icon-btn,
-.sidebar:not(.collapsed) .library-header:has(.sidebar-action-btn:hover) .library-collapse-icon-btn {
-  width: 0 !important;
-  min-width: 0 !important;
-  max-width: 0 !important;
-  opacity: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  pointer-events: none !important;
+.sidebar:not(.collapsed) .library-collapse-icon-btn:hover,
+.sidebar:not(.collapsed) #collapseSidebarBtn:hover,
+.sidebar:not(.collapsed) .library-header-left:hover .library-collapse-icon-btn {
+  opacity: 1 !important;
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 .sidebar:not(.collapsed) .library-nav-btn,
 .sidebar:not(.collapsed) #navLibraryBtn {
-  padding-left: 0 !important;
-  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  padding-left: 2px !important;
+  transition: color 0.15s ease !important;
 }
 
-/* Hover over library icon / header: morph books into collapse arrow */
-/* In expanded sidebar: reveal collapse icon on header hover */
+/* Hover over library icon / header: GPU-accelerated smooth icon morph without layout shift */
 .sidebar:not(.collapsed) .library-collapse-icon-btn .library-icon-morph .icon-books {
+  opacity: 0.9 !important;
+  transform: scale(1) !important;
+  transition: opacity 0.15s ease, transform 0.15s ease !important;
+}
+
+.sidebar:not(.collapsed) .library-collapse-icon-btn .library-icon-morph .icon-collapse {
+  opacity: 0 !important;
+  transform: scale(0.8) !important;
+  pointer-events: none !important;
+  transition: opacity 0.15s ease, transform 0.15s ease !important;
+}
+
+.sidebar:not(.collapsed) .library-header-left:hover .library-collapse-icon-btn .library-icon-morph .icon-books,
+.sidebar:not(.collapsed) .library-collapse-icon-btn:hover .library-icon-morph .icon-books {
   opacity: 0 !important;
   transform: scale(0.8) !important;
 }
 
-.sidebar:not(.collapsed) .library-collapse-icon-btn .library-icon-morph .icon-collapse,
-.sidebar:not(.collapsed) .library-header:hover .library-collapse-icon-btn .library-icon-morph .icon-collapse,
 .sidebar:not(.collapsed) .library-header-left:hover .library-collapse-icon-btn .library-icon-morph .icon-collapse,
 .sidebar:not(.collapsed) .library-collapse-icon-btn:hover .library-icon-morph .icon-collapse {
   opacity: 1 !important;
@@ -2937,7 +2952,7 @@ body[data-active-view="lyrics"] .content-scroll::-webkit-scrollbar,
 /* 6 Quick Play Tiles (3-Column Desktop Layout & Longer/Taller Cards) */
 .quick-picks-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr) !important;
+  grid-template-columns: repeat(3, 1fr);
   gap: 14px;
   margin-bottom: 24px;
 }
@@ -7897,8 +7912,14 @@ div[data-track-id].playing:hover .song-more-trigger {
   }
 
   .quick-picks-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, 1fr) !important;
     gap: 8px;
+  }
+
+  /* Remove 1 row and 1 column on mobile only: show 2x2 (4 tiles), hide cards 5 and 6 */
+  .quick-picks-grid .quick-pick-tile:nth-child(n+5),
+  .quick-picks-grid .quick-pick-skeleton:nth-child(n+5) {
+    display: none !important;
   }
 
   .quick-pick-tile {
@@ -16387,6 +16408,107 @@ body.lyrics-fullscreen-active .lyrics-edge-glow {
     justify-content: space-between;
   }
 }
+
+/* ==========================================================================
+   USER CUSTOMIZATIONS & POLISH
+   ========================================================================== */
+
+/* 1. Hide Subscription Plan (Free Streaming Tier) Globally */
+#settingsAccountSubscriptionBlock,
+.settings-subscription-block {
+  display: none !important;
+}
+
+/* 2. Hide Import Playlist feature and tabs completely */
+#settingsLibrarySection,
+[data-target="settingsLibrarySection"],
+#drawerImportPlaylistBtn,
+#importPlaylistModal,
+.settings-import-section,
+.import-history-section {
+  display: none !important;
+}
+
+/* 3. Sliding Animation on First Liked Song added */
+@keyframes slideInLikedPlaylist {
+  0% {
+    opacity: 0;
+    transform: translateX(-24px);
+    max-height: 0;
+    margin-bottom: 0;
+  }
+  60% {
+    opacity: 0.9;
+    transform: translateX(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+    max-height: 72px;
+  }
+}
+
+.library-item.liked-songs-item.slide-in-liked {
+  animation: slideInLikedPlaylist 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+/* 4. Hide Top Nav in Downloaded Playlist section */
+body.in-downloaded-playlist .top-header,
+body.in-downloaded-playlist .mobile-top-bar,
+body.in-downloaded-playlist .mobile-top-actions,
+body.in-downloaded-playlist #mobileTopActions {
+  display: none !important;
+}
+
+body.in-downloaded-playlist .app-layout {
+  grid-template-rows: 0px 1fr var(--player-height) !important;
+}
+
+body.in-downloaded-playlist .main-content {
+  padding-top: 12px !important;
+}
+
+/* 5. Mobile Player Artwork Touch Handling & Smooth Swiping */
+.mobile-player-art-wrap {
+  touch-action: pan-y pinch-zoom;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+}
+
+.mobile-player-art-wrap.swiping-left {
+  transform: translateX(-40px);
+  opacity: 0.7;
+}
+
+.mobile-player-art-wrap.swiping-right {
+  transform: translateX(40px);
+  opacity: 0.7;
+}
+
+/* 6. Mobile Compatibility for Sleep Timer and Dialogs */
+@media (max-width: 480px) {
+  .sleep-timer-card {
+    width: 92% !important;
+    max-width: 360px !important;
+    padding: 16px 14px !important;
+    max-height: 86vh !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .sleep-timer-grid {
+    gap: 8px !important;
+  }
+  .timer-option-btn {
+    padding: 10px 8px !important;
+    font-size: 0.88rem !important;
+  }
+  .sleep-timer-desc {
+    font-size: 0.82rem !important;
+    margin-bottom: 14px !important;
+  }
+}
+
 
 
 

@@ -1353,7 +1353,18 @@
     }
     const navLiked = document.getElementById('navLikedBtn') || elements.navLiked;
     if (navLiked) {
-      navLiked.style.display = count > 0 ? 'flex' : 'none';
+      const wasHidden = navLiked.style.display === 'none' || (window.getComputedStyle && window.getComputedStyle(navLiked).display === 'none');
+      if (count > 0) {
+        navLiked.style.display = 'flex';
+        if (wasHidden) {
+          navLiked.classList.remove('slide-in-liked');
+          void navLiked.offsetWidth; // Force CSS reflow to replay sliding animation
+          navLiked.classList.add('slide-in-liked');
+        }
+      } else {
+        navLiked.style.display = 'none';
+        navLiked.classList.remove('slide-in-liked');
+      }
     }
     const libHubLikedBtn = document.getElementById('libHubLikedBtn') || elements.libHubLikedBtn;
     if (libHubLikedBtn) {
@@ -8555,6 +8566,11 @@
   function renderPlaylistView(playlistId, options = {}) {
     state.viewingPlaylistId = playlistId;
     document.body.dataset.playlistId = playlistId;
+    if (playlistId === 'downloaded') {
+      document.body.classList.add('in-downloaded-playlist');
+    } else {
+      document.body.classList.remove('in-downloaded-playlist');
+    }
     switchView('playlist', { force: true, pushHistory: options.pushHistory !== false });
     if (playlistId === 'downloaded' && typeof updateMobNav === 'function') {
       updateMobNav('mobNavDownloads');
@@ -10301,6 +10317,9 @@
       state.viewingPlaylistId = null;
       state.viewingPlaylistTracks = null;
       delete document.body.dataset.playlistId;
+      document.body.classList.remove('in-downloaded-playlist');
+    } else if (state.viewingPlaylistId !== 'downloaded') {
+      document.body.classList.remove('in-downloaded-playlist');
     }
 
     // Persist active view so refreshing page returns to current location
@@ -14226,6 +14245,47 @@
       if (state.currentTrack) toggleLikeSong(state.currentTrack);
     });
 
+    // Mobile Fullscreen Player: Touch Swipe Left (Next Song) & Swipe Right (Previous Song) on Album Artwork
+    const mobArtWrap = document.querySelector('.mobile-player-art-wrap') || document.getElementById('mobPlayerCover');
+    if (mobArtWrap) {
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let touchStartTime = 0;
+
+      mobArtWrap.addEventListener('touchstart', (e) => {
+        if (e.touches && e.touches.length === 1) {
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+          touchStartTime = Date.now();
+        }
+      }, { passive: true });
+
+      mobArtWrap.addEventListener('touchend', (e) => {
+        if (e.changedTouches && e.changedTouches.length === 1) {
+          const touchEndX = e.changedTouches[0].clientX;
+          const touchEndY = e.changedTouches[0].clientY;
+          const deltaX = touchEndX - touchStartX;
+          const deltaY = touchEndY - touchStartY;
+          const deltaTime = Date.now() - touchStartTime;
+
+          // Significant horizontal swipe (>45px, more horizontal than vertical, within 700ms)
+          if (Math.abs(deltaX) >= 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3 && deltaTime < 700) {
+            if (deltaX < 0) {
+              // Swiped left -> next song
+              mobArtWrap.classList.add('swiping-left');
+              setTimeout(() => mobArtWrap.classList.remove('swiping-left'), 250);
+              nextTrack();
+            } else {
+              // Swiped right -> previous song
+              mobArtWrap.classList.add('swiping-right');
+              setTimeout(() => mobArtWrap.classList.remove('swiping-right'), 250);
+              prevTrack();
+            }
+          }
+        }
+      }, { passive: true });
+    }
+
     // Mobile System Back & Popstate History Navigation (Prevents app from closing on single back)
     window.addEventListener('popstate', (e) => {
       // 1. If any modal or drawer is open, close it first
@@ -14831,33 +14891,54 @@
       authAlert.style.display = 'none';
     }
 
+    function renderAvatarElement(el, initial, customPhoto, size = 32) {
+      if (!el) return;
+      if (customPhoto) {
+        el.innerHTML = `<img src="${customPhoto}" class="user-custom-avatar-img" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
+      } else if (initial) {
+        el.innerHTML = `<span class="user-initial-badge" style="font-weight:700;font-size:${Math.round(size * 0.44)}px;color:#fff;line-height:1;text-transform:uppercase;">${initial}</span>`;
+      } else {
+        el.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:60%;height:60%;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+      }
+    }
+
     function updateAuthUI() {
       const user = state.currentUser;
       const userDropdownHeader = document.getElementById('userDropdownHeader');
       const userDropdownSignInBtn = document.getElementById('userDropdownSignInBtn');
       const userDropdownDivider = document.getElementById('userDropdownDivider');
+      const userDropdownChangeAvatarBtn = document.getElementById('userDropdownChangeAvatarBtn');
+      const settingsChangeAvatarBtn = document.getElementById('settingsChangeAvatarBtn');
+      const headerUserAvatarCircle = document.getElementById('headerUserAvatarCircle');
 
       if (user && user.email) {
+        const initial = ((user.name || user.email || 'U')[0]).toUpperCase();
+        const userKey = (user.id || user.email || 'current_user');
+        let customPhoto = null;
+        try {
+          customPhoto = localStorage.getItem('musisurf_avatar_' + userKey);
+        } catch (e) {}
+
         if (headerUserAvatarBtn) {
           headerUserAvatarBtn.title = `${user.name || user.email} (Signed In)`;
-          if (headerUserIconSvg) headerUserIconSvg.style.display = 'block';
         }
+        renderAvatarElement(headerUserAvatarCircle, initial, customPhoto, 34);
 
-        const initial = ((user.name || user.email || 'U')[0]).toUpperCase();
-        if (userDropdownAvatar) userDropdownAvatar.textContent = initial;
+        if (userDropdownAvatar) renderAvatarElement(userDropdownAvatar, initial, customPhoto, 44);
         if (userDropdownName) userDropdownName.textContent = user.name || user.email.split('@')[0];
         if (userDropdownEmail) userDropdownEmail.textContent = user.email;
 
         if (userDropdownHeader) userDropdownHeader.style.setProperty('display', 'flex', 'important');
         if (userDropdownSignInBtn) userDropdownSignInBtn.style.setProperty('display', 'none', 'important');
         if (userDropdownSignOutBtn) userDropdownSignOutBtn.style.setProperty('display', 'flex', 'important');
+        if (userDropdownChangeAvatarBtn) userDropdownChangeAvatarBtn.style.setProperty('display', 'flex', 'important');
         if (userDropdownDivider) userDropdownDivider.style.setProperty('display', 'block', 'important');
 
         if (mobTopAvatar) {
-          mobTopAvatar.innerHTML = `<span style="font-weight:700;font-size:14px;color:#fff;">${initial}</span>`;
+          renderAvatarElement(mobTopAvatar, initial, customPhoto, 34);
         }
 
-        if (drawerUserAvatar) drawerUserAvatar.innerHTML = `<span style="font-weight:700;font-size:16px;color:#fff;">${initial}</span>`;
+        if (drawerUserAvatar) renderAvatarElement(drawerUserAvatar, initial, customPhoto, 48);
         if (drawerUserName) drawerUserName.textContent = user.name || user.email.split('@')[0];
         if (drawerUserStatus) drawerUserStatus.textContent = 'Signed in with Neon';
         if (drawerUserEmail) drawerUserEmail.textContent = user.email;
@@ -14877,26 +14958,28 @@
         const settingsEmail = document.getElementById('settingsAccountEmail');
         if (settingsGuestBlock) settingsGuestBlock.style.setProperty('display', 'none', 'important');
         if (settingsUserBlock) settingsUserBlock.style.setProperty('display', 'block', 'important');
-        if (settingsSubBlock) settingsSubBlock.style.setProperty('display', 'block', 'important');
-        if (settingsAvatar) settingsAvatar.textContent = initial;
+        if (settingsSubBlock) settingsSubBlock.style.setProperty('display', 'none', 'important');
+        if (settingsChangeAvatarBtn) settingsChangeAvatarBtn.style.setProperty('display', 'inline-flex', 'important');
+        if (settingsAvatar) renderAvatarElement(settingsAvatar, initial, customPhoto, 48);
         if (settingsName) settingsName.textContent = user.name || user.email.split('@')[0];
         if (settingsEmail) settingsEmail.textContent = user.email;
       } else {
         if (headerUserAvatarBtn) {
           headerUserAvatarBtn.title = 'Account & Sign In';
-          if (headerUserIconSvg) headerUserIconSvg.style.display = 'block';
         }
+        renderAvatarElement(headerUserAvatarCircle, null, null, 34);
 
         if (userDropdownHeader) userDropdownHeader.style.setProperty('display', 'none', 'important');
         if (userDropdownSignInBtn) userDropdownSignInBtn.style.setProperty('display', 'flex', 'important');
         if (userDropdownSignOutBtn) userDropdownSignOutBtn.style.setProperty('display', 'none', 'important');
+        if (userDropdownChangeAvatarBtn) userDropdownChangeAvatarBtn.style.setProperty('display', 'none', 'important');
         if (userDropdownDivider) userDropdownDivider.style.setProperty('display', 'block', 'important');
 
         if (mobTopAvatar) {
-          mobTopAvatar.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+          renderAvatarElement(mobTopAvatar, null, null, 34);
         }
 
-        if (drawerUserAvatar) drawerUserAvatar.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+        if (drawerUserAvatar) renderAvatarElement(drawerUserAvatar, null, null, 48);
         if (drawerUserName) drawerUserName.textContent = 'Guest Listener';
         if (drawerUserStatus) drawerUserStatus.textContent = 'Tap to sign in / sign up';
         if (drawerUserEmail) drawerUserEmail.textContent = 'Sign in to sync your library';
@@ -14914,6 +14997,7 @@
         if (settingsGuestBlock) settingsGuestBlock.style.setProperty('display', 'block', 'important');
         if (settingsUserBlock) settingsUserBlock.style.setProperty('display', 'none', 'important');
         if (settingsSubBlock) settingsSubBlock.style.setProperty('display', 'none', 'important');
+        if (settingsChangeAvatarBtn) settingsChangeAvatarBtn.style.setProperty('display', 'none', 'important');
       }
     }
 
@@ -15066,6 +15150,80 @@
         } else if (typeof openSettingsModal === 'function') {
           openSettingsModal();
         }
+      });
+    }
+
+    const userDropdownChangeAvatarBtn = document.getElementById('userDropdownChangeAvatarBtn');
+    const settingsChangeAvatarBtn = document.getElementById('settingsChangeAvatarBtn');
+    const userAvatarFileInput = document.getElementById('userAvatarFileInput');
+
+    if (userDropdownChangeAvatarBtn && userAvatarFileInput) {
+      userDropdownChangeAvatarBtn.addEventListener('click', (e) => {
+        if (e) e.stopPropagation();
+        if (userProfileDropdown) userProfileDropdown.classList.remove('is-open');
+        if (!state.currentUser) {
+          showToast('Please sign in first to change your profile picture', '🔒');
+          return;
+        }
+        userAvatarFileInput.click();
+      });
+    }
+
+    if (settingsChangeAvatarBtn && userAvatarFileInput) {
+      settingsChangeAvatarBtn.addEventListener('click', (e) => {
+        if (e) e.stopPropagation();
+        if (!state.currentUser) {
+          showToast('Please sign in first to upload photo', '🔒');
+          return;
+        }
+        userAvatarFileInput.click();
+      });
+    }
+
+    if (userAvatarFileInput) {
+      userAvatarFileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        if (!state.currentUser) {
+          showToast('Please sign in first to customize your profile picture.', '🔒');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          const img = new Image();
+          img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const MAX_DIM = 256;
+            let w = img.width;
+            let h = img.height;
+            if (w > h) {
+              if (w > MAX_DIM) {
+                h = Math.round((h * MAX_DIM) / w);
+                w = MAX_DIM;
+              }
+            } else {
+              if (h > MAX_DIM) {
+                w = Math.round((w * MAX_DIM) / h);
+                h = MAX_DIM;
+              }
+            }
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            const userKey = (state.currentUser.id || state.currentUser.email || 'current_user');
+            try {
+              localStorage.setItem('musisurf_avatar_' + userKey, dataUrl);
+            } catch (err) {
+              console.warn('Failed to store avatar in localStorage', err);
+            }
+            updateAuthUI();
+            showToast('✓ Profile picture updated!', '✓');
+          };
+          img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
       });
     }
 
