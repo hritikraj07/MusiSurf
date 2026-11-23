@@ -11698,40 +11698,32 @@
         }
         if (elements.currentTimeLabel) elements.currentTimeLabel.textContent = displayTime;
         if (elements.mobCurrentTime) elements.mobCurrentTime.textContent = displayTime;
-
-        if (elements.progressHoverTime && !isMobileScrubber) {
-          const rect = barEl.getBoundingClientRect();
-          elements.progressHoverTime.style.left = `${dragPct * rect.width}px`;
-          elements.progressHoverTime.textContent = displayTime;
-        }
       }
 
       function getClientX(e) {
         if (e.touches && e.touches.length > 0) return e.touches[0].clientX;
         if (e.changedTouches && e.changedTouches.length > 0) return e.changedTouches[0].clientX;
-        return e.clientX;
+        return e.clientX || 0;
       }
 
       function handleStart(e) {
-        const rect = barEl.getBoundingClientRect();
-        if (!rect || rect.width <= 0) return;
         isDragging = true;
         state.isDraggingProgress = true;
         barEl.classList.add('scrubbing');
+        const rect = barEl.getBoundingClientRect();
         const clientX = getClientX(e);
-        const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+        const pct = (clientX - rect.left) / rect.width;
         updateScrubUI(pct);
-        if (e.cancelable) e.preventDefault();
+        e.preventDefault();
       }
 
       function handleMove(e) {
         if (!isDragging) return;
         const rect = barEl.getBoundingClientRect();
-        if (!rect || rect.width <= 0) return;
         const clientX = getClientX(e);
-        const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+        const pct = (clientX - rect.left) / rect.width;
         updateScrubUI(pct);
-        if (e.cancelable) e.preventDefault();
+        e.preventDefault();
       }
 
       function handleEnd(e) {
@@ -11739,10 +11731,12 @@
         isDragging = false;
         barEl.classList.remove('scrubbing');
         const dur = getTotalDuration();
-        if (dur > 0 && Number.isFinite(dur)) {
+        if (dur > 0) {
           seekTo(dragPct * dur);
         }
-        state.isDraggingProgress = false;
+        setTimeout(() => {
+          state.isDraggingProgress = false;
+        }, 80);
       }
 
       // Mouse drag events
@@ -11781,7 +11775,7 @@
           const rect = barEl.getBoundingClientRect();
           const hoverX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
           const pct = hoverX / rect.width;
-          const dur = getTotalDuration() || parseDurationToSeconds(elements.totalDurationLabel?.textContent) || 0;
+          const dur = getTotalDuration();
           elements.progressHoverTime.style.left = `${hoverX}px`;
           elements.progressHoverTime.textContent = formatTime(pct * dur);
         });
@@ -11799,51 +11793,54 @@
     let isDraggingVolume = false;
 
     function handleVolumeChange(e) {
+      if (!elements.volumeBar) return;
       const rect = elements.volumeBar.getBoundingClientRect();
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       setVolume(pct);
     }
 
-    elements.volumeBtn.addEventListener('click', toggleMute);
+    if (elements.volumeBtn) elements.volumeBtn.addEventListener('click', toggleMute);
 
-    elements.volumeBar.addEventListener('mousedown', (e) => {
-      isDraggingVolume = true;
-      elements.volumeBar.classList.add('dragging');
-      handleVolumeChange(e);
-      e.preventDefault();
-    });
+    if (elements.volumeBar) {
+      elements.volumeBar.addEventListener('mousedown', (e) => {
+        isDraggingVolume = true;
+        elements.volumeBar.classList.add('dragging');
+        handleVolumeChange(e);
+        e.preventDefault();
+      });
 
-    window.addEventListener('mousemove', (e) => {
-      if (!isDraggingVolume) return;
-      handleVolumeChange(e);
-    });
+      window.addEventListener('mousemove', (e) => {
+        if (!isDraggingVolume) return;
+        handleVolumeChange(e);
+      });
 
-    window.addEventListener('mouseup', () => {
-      if (isDraggingVolume) {
-        isDraggingVolume = false;
-        elements.volumeBar.classList.remove('dragging');
-      }
-    });
+      window.addEventListener('mouseup', () => {
+        if (isDraggingVolume) {
+          isDraggingVolume = false;
+          elements.volumeBar.classList.remove('dragging');
+        }
+      });
 
-    // Touch support for mobile devices
-    elements.volumeBar.addEventListener('touchstart', (e) => {
-      isDraggingVolume = true;
-      elements.volumeBar.classList.add('dragging');
-      handleVolumeChange(e);
-    }, { passive: false });
+      // Touch support for mobile devices
+      elements.volumeBar.addEventListener('touchstart', (e) => {
+        isDraggingVolume = true;
+        elements.volumeBar.classList.add('dragging');
+        handleVolumeChange(e);
+      }, { passive: false });
 
-    window.addEventListener('touchmove', (e) => {
-      if (!isDraggingVolume) return;
-      handleVolumeChange(e);
-    }, { passive: false });
+      window.addEventListener('touchmove', (e) => {
+        if (!isDraggingVolume) return;
+        handleVolumeChange(e);
+      }, { passive: false });
 
-    window.addEventListener('touchend', () => {
-      if (isDraggingVolume) {
-        isDraggingVolume = false;
-        elements.volumeBar.classList.remove('dragging');
-      }
-    });
+      window.addEventListener('touchend', () => {
+        if (isDraggingVolume) {
+          isDraggingVolume = false;
+          elements.volumeBar.classList.remove('dragging');
+        }
+      });
+    }
 
     if (elements.queueBtn) {
       elements.queueBtn.addEventListener('click', (e) => {
@@ -11884,7 +11881,6 @@
       });
     }
 
-    // Dismiss queue drawer when clicking or tapping anywhere outside (capture phase so no stopPropagation blocks it)
     document.addEventListener('click', (e) => {
       if (elements.queueDrawer && elements.queueDrawer.classList.contains('open')) {
         const isClickInside = elements.queueDrawer.contains(e.target);
