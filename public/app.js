@@ -11635,6 +11635,20 @@
     // Strict Sign-In Gate: unauthenticated guest users see clean locked prompt
     if (!isAuthenticated()) {
       if (replayAuthGate) replayAuthGate.style.display = 'flex';
+      if (replayDashboard) replayDashboard.style.display = 'none';
+      return;
+    }
+
+    if (replayAuthGate) replayAuthGate.style.display = 'none';
+    if (replayDashboard) replayDashboard.style.display = 'grid';
+
+    document.querySelectorAll('.replay-pill').forEach(pill => {
+      pill.classList.toggle('active', pill.dataset.period === period);
+    });
+
+    // Real dynamic Sound Capsule statistics from Neon Postgres
+    fetchAndRenderSoundtrackStats();
+  }
   async function fetchAndRenderSoundtrackStats() {
     try {
       const res = await fetch('/api/soundtrack/stats', { credentials: 'include' });
