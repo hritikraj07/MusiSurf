@@ -119,6 +119,11 @@ function parseSilenceDetectStderr(stderr, rawDuration) {
 
 /**
  * Analyzes audio for leading and trailing silence using system ffmpeg.
+ * @param {Object} options
+ * @param {string} [options.trackId]
+ * @param {string} [options.url]
+ * @param {number} [options.duration]
+ * @param {(() => Promise<any>) | null} [options.ytdlGetter]
  */
 async function analyzeTrackSilence({ trackId, url, duration = 0, ytdlGetter = null }) {
   if (!trackId && !url) {

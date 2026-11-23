@@ -4,6 +4,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
+const { Readable } = require('stream');
 const CryptoJS = require('crypto-js');
 const { transliterateTextToDevanagari, detectLyricsLanguage } = require('./scripts/lyrics_transliteration');
 const lyricsDiscoveryEngine = require('./scripts/lyrics_discovery_engine');
@@ -185,7 +186,9 @@ function transformSaavnSong(item) {
     isVerified: isVerified,
     label: label,
     source: 'saavn',
-    hasDirectAudio: true
+    hasDirectAudio: true,
+    isLyricsMatch: false,
+    matchedLine: null
   };
 }
 
@@ -193,7 +196,7 @@ function transformSaavnSong(item) {
 async function searchSaavn(query, limit = 25, page = 1) {
   if (!query) return [];
   try {
-    const pageNum = Math.max(1, parseInt(page || '1', 10));
+    const pageNum = Math.max(1, parseInt(String(page || 1), 10));
     const urls = [
       `https://www.jiosaavn.com/api.php?__call=search.getMoreResults&params=${encodeURIComponent(JSON.stringify({ type: 'songs' }))}&query=${encodeURIComponent(query)}&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=${limit}&p=${pageNum}`,
       `https://www.jiosaavn.com/api.php?__call=search.getResults&q=${encodeURIComponent(query)}&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=${limit}&p=${pageNum}`
@@ -1962,10 +1965,9 @@ app.get('/api/yt-stream', async (req, res) => {
       if (parts[1]) {
         endByte = parseInt(parts[1], 10);
       }
-      rangeOptions = { start: startByte };
-      if (endByte !== undefined && !isNaN(endByte)) {
-        rangeOptions.end = endByte;
-      }
+      rangeOptions = (endByte !== undefined && !isNaN(endByte))
+        ? { start: startByte, end: endByte }
+        : { start: startByte };
     }
 
     let stream;
@@ -2157,7 +2159,6 @@ app.get('/api/download', async (req, res) => {
           res.setHeader('Content-Length', audioRes.headers.get('content-length'));
         }
 
-        const { Readable } = require('stream');
         const stream = Readable.fromWeb(audioRes.body);
         return stream.pipe(res);
       }
@@ -2175,7 +2176,6 @@ app.get('/api/download', async (req, res) => {
         if (audioRes.ok) {
           res.setHeader('Content-Disposition', `attachment; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`);
           res.setHeader('Content-Type', 'audio/mpeg');
-          const { Readable } = require('stream');
           const stream = Readable.fromWeb(audioRes.body);
           return stream.pipe(res);
         }
@@ -3434,9 +3434,5 @@ app.validateMusicContent = validateMusicContent;
 app.validateYouTubeVideoMetadata = validateYouTubeVideoMetadata;
 
 module.exports = app;
-module.exports.searchSaavn = searchSaavn;
-module.exports.searchYouTube = searchYouTube;
-module.exports.validateMusicContent = validateMusicContent;
-module.exports.validateYouTubeVideoMetadata = validateYouTubeVideoMetadata;
 
 
