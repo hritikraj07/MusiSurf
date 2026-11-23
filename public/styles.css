@@ -14218,6 +14218,18 @@ body[data-active-view="lyrics"] .content-scroll {
   color: #86efac;
 }
 
+.auth-alert.info {
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #93c5fd;
+}
+
+.auth-alert.warning {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fcd34d;
+}
+
 /* 6-Digit Email Verification Code Input (Verify at Sign-up) */
 .auth-otp-container {
   display: flex;

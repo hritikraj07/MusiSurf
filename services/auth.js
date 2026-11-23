@@ -138,11 +138,11 @@ async function getAuthenticatedUser(req) {
  */
 async function requireAuth(req, res, next) {
   const user = await getAuthenticatedUser(req);
-  if (!user) {
+  if (!user || !user.id) {
     return res.status(401).json({
       success: false,
-      error: 'Unauthorized',
-      message: 'Please sign in to access your library.'
+      error: 'AUTH_REQUIRED',
+      message: 'Please sign in or create an account to perform this action.'
     });
   }
   req.user = user;

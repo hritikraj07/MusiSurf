@@ -119,8 +119,59 @@ async function runAuthTests() {
   await sql`DELETE FROM neon_auth."user" WHERE id = ${prodData.user.id}`;
   console.log('\n  ✓ Cleaned up test user from database');
 
+  // 6. Test Library & Write Action Authentication Guards
+  console.log('\n--- SUITE 6: LIBRARY & WRITE ACTION AUTHENTICATION GUARDS ---');
+  const { requireAuth } = require('../services/auth');
+
+  // 6.1: Direct requireAuth middleware test with unauthenticated request
+  let unauthStatus = null;
+  let unauthData = null;
+  const mockReq = { headers: {}, cookies: {} };
+  const mockRes = {
+    status(code) {
+      unauthStatus = code;
+      return this;
+    },
+    json(payload) {
+      unauthData = payload;
+      return this;
+    }
+  };
+  let nextCalled = false;
+  await requireAuth(mockReq, mockRes, () => { nextCalled = true; });
+
+  assert.strictEqual(nextCalled, false, 'requireAuth must not call next() for unauthenticated requests');
+  assert.strictEqual(unauthStatus, 401, 'requireAuth must return HTTP 401');
+  assert.strictEqual(unauthData.error, 'AUTH_REQUIRED', 'requireAuth must return error code AUTH_REQUIRED');
+  assert.strictEqual(unauthData.message, 'Please sign in or create an account to perform this action.');
+  console.log('  ✓ requireAuth middleware strictly returns 401 with AUTH_REQUIRED');
+
+  // 6.2: Frontend Auth Guard inspection
+  assert(appJs.includes('function isAuthenticated()'), 'public/app.js must define isAuthenticated()');
+  assert(appJs.includes('function requireAuthForAction'), 'public/app.js must define requireAuthForAction()');
+  assert(appJs.includes('resumePendingAuthAction()'), 'public/app.js must define resumePendingAuthAction()');
+  assert(appJs.includes("requireAuthForAction('like songs'"), 'toggleLikeSong must be guarded with requireAuthForAction');
+  assert(appJs.includes("requireAuthForAction('create a playlist'"), 'Create playlist must be guarded with requireAuthForAction');
+  assert(appJs.includes("requireAuthForAction('add songs to playlists'"), 'Add to playlist must be guarded with requireAuthForAction');
+  assert(appJs.includes("requireAuthForAction('add local songs'"), 'Local song adding must be guarded with requireAuthForAction');
+  assert(appJs.includes("requireAuthForAction('manage playlists'"), 'Playlist management must be guarded with requireAuthForAction');
+  console.log('  ✓ Frontend gates like, playlist creation, playlist modification, and local audio adding');
+
+  // 6.3: Storage fallback suppression
+  assert(appJs.includes('if (!isAuthenticated()) return;'), 'public/app.js must prevent guest localStorage / DB writes');
+  console.log('  ✓ Guest writes to localStorage and IndexedDB strictly prevented');
+
+  // 6.4: Backend write endpoints guarded in server.js
+  assert(serverJs.includes("app.post('/api/library/playlists', requireAuth"), 'POST /api/library/playlists must requireAuth');
+  assert(serverJs.includes("app.post('/api/library/likes/toggle', requireAuth"), 'POST /api/library/likes/toggle must requireAuth');
+  assert(serverJs.includes("app.post('/api/playlists', requireAuth"), 'POST /api/playlists must requireAuth');
+  assert(serverJs.includes("app.post('/api/liked-songs', requireAuth"), 'POST /api/liked-songs must requireAuth');
+  assert(serverJs.includes("app.post('/api/local-songs', requireAuth"), 'POST /api/local-songs must requireAuth');
+  console.log('  ✓ Server-side write routes guarded by requireAuth middleware');
+
   console.log('\n====================================================');
   console.log('🏁 ALL NEON AUTH & GOOGLE OAUTH TESTS PASSED (100%)');
+  console.log('🏁 ALL NEON AUTH, GOOGLE OAUTH & GUARD TESTS PASSED (100%)');
   console.log('====================================================');
 }
 

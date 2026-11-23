@@ -144,6 +144,58 @@
     })()
   };
 
+  // --------------------------------------------------------------------------
+  // USER AUTHENTICATION & PROTECTED ACTION GUARDS
+  // --------------------------------------------------------------------------
+  let pendingAuthAction = null;
+
+  function isAuthenticated() {
+    return Boolean(state.currentUser && (state.currentUser.id || state.currentUser.email));
+  }
+
+  function requireAuthForAction(actionLabel = 'perform this action', onAuthenticated = null) {
+    if (isAuthenticated()) {
+      if (typeof onAuthenticated === 'function') {
+        try { onAuthenticated(); } catch (e) { console.error(e); }
+      }
+      return true;
+    }
+
+    const cleanLabel = (actionLabel || '').trim().toLowerCase();
+    const promptText = cleanLabel.startsWith('sign in')
+      ? actionLabel
+      : `Sign in or create an account to ${cleanLabel}.`;
+
+    pendingAuthAction = typeof onAuthenticated === 'function' ? onAuthenticated : null;
+
+    if (typeof window.openAuthModal === 'function') {
+      window.openAuthModal('signin', promptText);
+    } else {
+      const authM = document.getElementById('authModal');
+      if (authM) authM.style.display = 'flex';
+      const alertEl = document.getElementById('authAlert');
+      if (alertEl) {
+        alertEl.className = 'auth-alert info';
+        alertEl.textContent = promptText;
+        alertEl.style.display = 'flex';
+      }
+    }
+
+    return false;
+  }
+
+  function resumePendingAuthAction() {
+    if (typeof pendingAuthAction === 'function') {
+      const fn = pendingAuthAction;
+      pendingAuthAction = null;
+      try {
+        fn();
+      } catch (err) {
+        console.warn('[Auth] Resume pending action error:', err);
+      }
+    }
+  }
+
   // DOM Elements
   const elements = {
     // Audio elements (Dual-Deck for Equal-Power Crossfading)
@@ -1087,36 +1139,45 @@
       }
     } catch (e) {}
 
-    try {
-      const storedLikes = localStorage.getItem('musisurf_liked');
-      if (storedLikes) {
-        state.likedSongs = JSON.parse(storedLikes);
-        if (Array.isArray(state.likedSongs)) {
-          const nowBase = Date.now();
-          state.likedSongs.forEach((t, i) => {
-            if (!t.addedAt) {
-              t.addedAt = nowBase - ((state.likedSongs.length - i) * 86400000);
-            }
-          });
+    // Only load user-created custom playlists and liked songs if signed in
+    if (state.currentUser && (state.currentUser.id || state.currentUser.email)) {
+      try {
+        const storedLikes = localStorage.getItem('musisurf_liked');
+        if (storedLikes) {
+          state.likedSongs = JSON.parse(storedLikes);
+          if (Array.isArray(state.likedSongs)) {
+            const nowBase = Date.now();
+            state.likedSongs.forEach((t, i) => {
+              if (!t.addedAt) {
+                t.addedAt = nowBase - ((state.likedSongs.length - i) * 86400000);
+              }
+            });
+          }
         }
-      }
 
-      const storedPlaylists = localStorage.getItem('musisurf_playlists');
-      if (storedPlaylists) {
-        state.customPlaylists = JSON.parse(storedPlaylists);
-        if (Array.isArray(state.customPlaylists)) {
-          const nowBase = Date.now();
-          state.customPlaylists.forEach(pl => {
-            if (Array.isArray(pl.tracks)) {
-              pl.tracks.forEach((t, i) => {
-                if (!t.addedAt) {
-                  t.addedAt = nowBase - ((pl.tracks.length - i) * 86400000);
-                }
-              });
-            }
-          });
+        const storedPlaylists = localStorage.getItem('musisurf_playlists');
+        if (storedPlaylists) {
+          state.customPlaylists = JSON.parse(storedPlaylists);
+          if (Array.isArray(state.customPlaylists)) {
+            const nowBase = Date.now();
+            state.customPlaylists.forEach(pl => {
+              if (Array.isArray(pl.tracks)) {
+                pl.tracks.forEach((t, i) => {
+                  if (!t.addedAt) {
+                    t.addedAt = nowBase - ((pl.tracks.length - i) * 86400000);
+                  }
+                });
+              }
+            });
+          }
         }
+      } catch (e) {
+        console.warn('Error loading user library data:', e);
       }
+    } else {
+      state.likedSongs = [];
+      state.customPlaylists = [];
+    }
 
       const storedOffline = localStorage.getItem('musisurf_offline_tracks');
       if (storedOffline) {
@@ -1170,6 +1231,7 @@
   }
 
   function saveStoredLikes() {
+    if (!isAuthenticated()) return;
     try {
       localStorage.setItem('musisurf_liked', JSON.stringify(state.likedSongs));
       updateLikedCountUI();
@@ -1179,6 +1241,7 @@
   }
 
   function saveStoredPlaylists() {
+    if (!isAuthenticated()) return;
     try {
       localStorage.setItem('musisurf_playlists', JSON.stringify(state.customPlaylists));
       renderSidebarPlaylists();
@@ -7977,6 +8040,11 @@
   }
 
   function toggleLikeSong(track) {
+    if (!isAuthenticated()) {
+      requireAuthForAction('like songs', () => toggleLikeSong(track));
+      return;
+    }
+    if (!track) return;
     const idx = state.likedSongs.findIndex(s => s.id === track.id);
     if (idx >= 0) {
       state.likedSongs.splice(idx, 1);
@@ -8920,6 +8988,10 @@
 
   // Delete Custom Playlist Confirmation (MusiSurf Dark Themed Modal)
   function promptDeleteCurrentPlaylist(playlistId, title) {
+    if (!isAuthenticated()) {
+      requireAuthForAction('manage playlists');
+      return;
+    }
     if (!playlistId || playlistId === 'liked' || playlistId === 'downloaded' || playlistId === 'local') return;
     const pl = state.customPlaylists.find(p => p.id === playlistId);
     const safeTitle = (pl && pl.name) ? pl.name : (title && title !== 'NONE' && title !== 'undefined' ? title : (elements.playlistTitle?.textContent || 'Playlist'));
@@ -8972,6 +9044,10 @@
 
   // Rename Custom Playlist Action (MusiSurf Dark Themed Modal)
   function promptRenameCurrentPlaylist() {
+    if (!isAuthenticated()) {
+      requireAuthForAction('manage playlists');
+      return;
+    }
     const playlistId = state.viewingPlaylistId || state.activePlaylistId;
     if (!playlistId || playlistId === 'liked' || playlistId === 'downloaded' || playlistId === 'local') return;
     const pl = state.customPlaylists.find(p => p.id === playlistId);
@@ -10618,6 +10694,10 @@
 
   // Modal Helpers
   function openAddToPlaylistModal(track) {
+    if (!isAuthenticated()) {
+      requireAuthForAction('add songs to playlists', () => openAddToPlaylistModal(track));
+      return;
+    }
     if (!track) return;
     pendingTrackForPlaylist = track;
     elements.modalPlaylistPickerList.innerHTML = '';
@@ -10641,6 +10721,10 @@
       </div>
     `;
     newPlItem.addEventListener('click', () => {
+      if (!isAuthenticated()) {
+        requireAuthForAction('create a playlist');
+        return;
+      }
       elements.addToPlaylistModal.style.display = 'none';
       elements.createPlaylistModal.style.display = 'flex';
       try { window.history.pushState({ modal: 'createPlaylist' }, '', window.location.pathname); } catch (e) {}
@@ -10671,6 +10755,10 @@
       </div>
     `;
     likedItem.addEventListener('click', () => {
+      if (!isAuthenticated()) {
+        requireAuthForAction('like songs');
+        return;
+      }
       isAlreadyLiked = state.likedSongs.some(t => t.id === track.id);
       const chk = likedItem.querySelector('.modal-playlist-checkbox');
       if (isAlreadyLiked) {
@@ -10723,6 +10811,10 @@
           </div>
         `;
         item.addEventListener('click', () => {
+          if (!isAuthenticated()) {
+            requireAuthForAction('add songs to playlists');
+            return;
+          }
           inThisPl = pl.tracks.some(t => t.id === track.id);
           const chk = item.querySelector('.modal-playlist-checkbox');
           if (inThisPl) {
@@ -10900,6 +10992,7 @@
   }
 
   async function saveLocalTrackToDB(track) {
+    if (!isAuthenticated()) return;
     try {
       const db = await getLocalDB();
       const tx = db.transaction(LOCAL_STORE_NAME, 'readwrite');
@@ -11051,6 +11144,10 @@
   }
 
   async function handleLocalAudioFiles(fileList) {
+    if (!isAuthenticated()) {
+      requireAuthForAction('add local songs', () => handleLocalAudioFiles(fileList));
+      return;
+    }
     if (!fileList || fileList.length === 0) return;
     for (const file of Array.from(fileList)) {
       const isAudio = file.type.startsWith('audio/') || /\.(mp3|m4a|wav|flac|ogg|aac)$/i.test(file.name);
@@ -12153,6 +12250,13 @@
 
     // Create Playlist Modal
     elements.createPlaylistBtn.addEventListener('click', () => {
+      if (!isAuthenticated()) {
+        requireAuthForAction('create a playlist', () => {
+          elements.createPlaylistModal.style.display = 'flex';
+          elements.playlistNameInput.focus();
+        });
+        return;
+      }
       elements.createPlaylistModal.style.display = 'flex';
       elements.playlistNameInput.focus();
     });
@@ -12165,6 +12269,10 @@
 
     elements.createPlaylistForm.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (!isAuthenticated()) {
+        requireAuthForAction('create a playlist');
+        return;
+      }
       const name = elements.playlistNameInput.value.trim();
       const desc = elements.playlistDescInput.value.trim();
       if (!name) return;
@@ -12455,6 +12563,11 @@
     if (elements.closeNowPlayingPanelBtn) elements.closeNowPlayingPanelBtn.addEventListener('click', toggleNowPlayingPanel);
     if (elements.nowPlayingHeartBtn) {
       elements.nowPlayingHeartBtn.addEventListener('click', () => {
+        if (state.currentTrack) toggleLikeSong(state.currentTrack);
+      });
+    }
+    if (elements.playerHeartBtn) {
+      elements.playerHeartBtn.addEventListener('click', () => {
         if (state.currentTrack) toggleLikeSong(state.currentTrack);
       });
     }
@@ -13231,22 +13344,63 @@
       elements.localDropZone.addEventListener('drop', (e) => {
         const dt = e.dataTransfer;
         if (dt && dt.files && dt.files.length > 0) {
+          if (!isAuthenticated()) {
+            requireAuthForAction('add local songs', () => {
+              handleLocalAudioFiles(dt.files);
+            });
+            return;
+          }
           handleLocalAudioFiles(dt.files);
         }
       });
       elements.localDropZone.addEventListener('click', () => {
+        if (!isAuthenticated()) {
+          requireAuthForAction('add local songs', () => {
+            elements.localAudioFileInput?.click();
+          });
+          return;
+        }
         elements.localAudioFileInput?.click();
       });
     }
 
     if (elements.localAudioFileInput) {
+      elements.localAudioFileInput.addEventListener('click', (e) => {
+        if (!isAuthenticated()) {
+          e.preventDefault();
+          e.stopPropagation();
+          requireAuthForAction('add local songs', () => {
+            elements.localAudioFileInput?.click();
+          });
+        }
+      });
       elements.localAudioFileInput.addEventListener('change', (e) => {
+        if (!isAuthenticated()) {
+          e.preventDefault();
+          e.stopPropagation();
+          elements.localAudioFileInput.value = '';
+          requireAuthForAction('add local songs');
+          return;
+        }
         if (e.target.files && e.target.files.length > 0) {
           handleLocalAudioFiles(e.target.files);
           e.target.value = '';
         }
       });
     }
+
+    // Intercept .add-local-files-btn triggers before OS file picker opens
+    document.querySelectorAll('.add-local-files-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        if (!isAuthenticated()) {
+          e.preventDefault();
+          e.stopPropagation();
+          requireAuthForAction('add local songs', () => {
+            elements.localAudioFileInput?.click();
+          });
+        }
+      });
+    });
 
     if (elements.playAllLocalBtn) {
       elements.playAllLocalBtn.addEventListener('click', () => {
@@ -13635,6 +13789,10 @@
       elements.libHubLocalBtn.addEventListener('click', () => renderPlaylistView('local'));
     }
     const openCreatePlaylistModal = () => {
+      if (!isAuthenticated()) {
+        requireAuthForAction('create a playlist', () => openCreatePlaylistModal());
+        return;
+      }
       elements.createPlaylistModal.style.display = 'flex';
       try { window.history.pushState({ modal: 'createPlaylist' }, '', window.location.pathname); } catch (e) {}
       elements.playlistNameInput.focus();
@@ -13952,6 +14110,12 @@
           pl.tracks = (pl.tracks || []).filter(t => String(t.id) !== String(target.id));
           saveStoredPlaylists();
           updateAllPlaylistTickBadges(target.id);
+          if (state.currentUser && state.currentUser.id && !pl.id.startsWith('pl_')) {
+            fetch(`/api/library/playlists/${pl.id}/tracks/${encodeURIComponent(target.id)}`, {
+              method: 'DELETE',
+              credentials: 'include'
+            }).catch(err => console.warn('[Neon Playlists] Remove track error:', err.message));
+          }
           if (state.currentView === 'playlist' && state.viewingPlaylistId === pl.id) {
             renderPlaylistView(pl.id);
           }
@@ -14754,7 +14918,7 @@
       }
     }
 
-    function openAuthModal(mode = 'signin') {
+    function openAuthModal(mode = 'signin', promptMessage = null) {
       authMode = mode;
       clearAlert();
       if (authOtpContainer) authOtpContainer.style.display = 'none';
@@ -14786,14 +14950,21 @@
         if (authSwitchPrompt) authSwitchPrompt.textContent = "Don't have an account?";
         if (authSwitchBtn) authSwitchBtn.textContent = 'Create one';
       }
+
+      if (promptMessage) {
+        showAlert(promptMessage, 'info');
+      }
+
       if (authModal) authModal.style.display = 'flex';
       try {
         window.history.pushState({ modal: 'auth' }, '', window.location.pathname);
       } catch (e) {}
     }
+    window.openAuthModal = openAuthModal;
 
     function closeAuthModal() {
       if (authModal) authModal.style.display = 'none';
+      pendingAuthAction = null;
       clearAlert();
     }
 
@@ -15069,6 +15240,7 @@
               syncLibraryFromServer();
               loadAccountPlaylistProgress();
               syncUserSearchHistory();
+              resumePendingAuthAction();
             }
           } else {
             const res = await fetch('/api/auth/sign-in', {
@@ -15110,6 +15282,7 @@
             syncLibraryFromServer();
             loadAccountPlaylistProgress();
             syncUserSearchHistory();
+            resumePendingAuthAction();
           }
         } catch (err) {
           console.error('[Auth] Error:', err);
@@ -15161,6 +15334,7 @@
         syncLibraryFromServer();
         loadAccountPlaylistProgress();
         syncUserSearchHistory();
+        resumePendingAuthAction();
       } catch (err) {
         showAlert('Network error: ' + err.message);
       } finally {
