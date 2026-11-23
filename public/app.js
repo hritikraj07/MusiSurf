@@ -11687,11 +11687,36 @@
       elements.globalSearchInput.focus();
     });
 
-    // Close autocomplete on click outside
-    document.addEventListener('click', (e) => {
-      if (elements.searchAutocompleteDropdown &&
-          elements.globalSearchInput &&
-          !elements.globalSearchInput.contains(e.target) &&
+    // Interactive Draggable Scrubber Engine (Desktop & Mobile, Mouse & Touch)
+    function setupDraggableScrubber(barEl, fillEl, timeLabelEl, isMobileScrubber = false) {
+      if (!barEl) return;
+
+      let isDragging = false;
+      let dragPct = 0;
+
+      function updateScrubUI(pct) {
+        dragPct = Math.max(0, Math.min(1, pct));
+        const dur = getTotalDuration();
+        const displayTime = formatTime(dragPct * dur);
+
+        if (fillEl) fillEl.style.width = `${dragPct * 100}%`;
+        if (timeLabelEl) timeLabelEl.textContent = displayTime;
+
+        // Keep desktop and mobile scrubber bars in sync during drag
+        if (elements.progressFill && fillEl !== elements.progressFill) {
+          elements.progressFill.style.width = `${dragPct * 100}%`;
+        }
+        if (elements.mobProgressFill && fillEl !== elements.mobProgressFill) {
+          elements.mobProgressFill.style.width = `${dragPct * 100}%`;
+        }
+        if (elements.miniPlayerFill) {
+          elements.miniPlayerFill.style.width = `${dragPct * 100}%`;
+        }
+        if (elements.currentTimeLabel) elements.currentTimeLabel.textContent = displayTime;
+        if (elements.mobCurrentTime) elements.mobCurrentTime.textContent = displayTime;
+      }
+
+      function getClientX(e) {
         if (e.touches && e.touches.length > 0) return e.touches[0].clientX;
         if (e.changedTouches && e.changedTouches.length > 0) return e.changedTouches[0].clientX;
         return e.clientX || 0;
