@@ -298,14 +298,23 @@ async function fetchViaInnerTube(playlistId) {
 }
 
 /**
- * Fetches playlist metadata and items via official YouTube Data API v3 using user OAuth token.
+ * Fetches playlist metadata and items via official YouTube Data API v3 using OAuth token or API key.
  */
-async function fetchViaYouTubeDataApi(playlistId, token) {
+async function fetchViaYouTubeDataApi(playlistId, auth = null) {
+  const token = typeof auth === 'string' ? auth : auth?.token;
+  const apiKey = (auth && typeof auth === 'object' && auth.apiKey) ? auth.apiKey : (!token ? process.env.YOUTUBE_API_KEY : null);
+
+  const headers = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const keyParam = (!token && apiKey) ? `&key=${encodeURIComponent(apiKey)}` : '';
+
   // 1. Fetch Playlist Metadata
   let metaRes;
   try {
-    metaRes = await fetch(`https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&id=${encodeURIComponent(playlistId)}`, {
-      headers: { 'Authorization': `Bearer ${token}` },
+    metaRes = await fetch(`https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&id=${encodeURIComponent(playlistId)}${keyParam}`, {
+      headers,
       signal: AbortSignal.timeout(8000)
     });
   } catch (netErr) {
@@ -357,11 +366,11 @@ async function fetchViaYouTubeDataApi(playlistId, token) {
   const rawItems = [];
 
   while (rawItems.length < 1000) {
-    const url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&maxResults=50&playlistId=${encodeURIComponent(playlistId)}${pageToken ? `&pageToken=${pageToken}` : ''}`;
+    const url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&maxResults=50&playlistId=${encodeURIComponent(playlistId)}${keyParam}${pageToken ? `&pageToken=${pageToken}` : ''}`;
     let itemsRes;
     try {
       itemsRes = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers,
         signal: AbortSignal.timeout(8000)
       });
     } catch (e) {
@@ -462,14 +471,23 @@ async function fetchYouTubeMusicPlaylist(input, googleToken = null) {
     try {
       return await fetchViaYouTubeDataApi(playlistId, googleToken);
     } catch (apiErr) {
-      console.warn('[YouTubeMusicAdapter] YouTube Data API error, falling back to public InnerTube:', apiErr.message);
+      console.warn('[YouTubeMusicAdapter] YouTube Data API token error, falling back:', apiErr.message);
       if (apiErr.code === 'ERR_GOOGLE_AUTH_EXPIRED') {
         throw apiErr;
       }
     }
   }
 
-  // 2. Zero-config public InnerTube fallback
+  // 2. If server has YOUTUBE_API_KEY configured, try official YouTube Data API v3 with API Key
+  if (process.env.YOUTUBE_API_KEY) {
+    try {
+      return await fetchViaYouTubeDataApi(playlistId, { apiKey: process.env.YOUTUBE_API_KEY });
+    } catch (apiErr) {
+      console.warn('[YouTubeMusicAdapter] YouTube Data API Key error, falling back to public InnerTube:', apiErr.message);
+    }
+  }
+
+  // 3. Zero-config public InnerTube fallback
   try {
     return await fetchViaInnerTube(playlistId);
   } catch (innerErr) {

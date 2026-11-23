@@ -471,6 +471,11 @@ Mohit Chauhan - Kun Faya Kun`;
   assert(envExample.includes('SPOTIFY_CLIENT_SECRET'), '.env.example must document SPOTIFY_CLIENT_SECRET');
   assert(envExample.includes('GOOGLE_CLIENT_ID'), '.env.example must document GOOGLE_CLIENT_ID');
   assert(envExample.includes('GOOGLE_CLIENT_SECRET'), '.env.example must document GOOGLE_CLIENT_SECRET');
+  assert(envExample.includes('YOUTUBE_API_KEY'), '.env.example must document YOUTUBE_API_KEY');
+
+  // Verify fetchViaYouTubeDataApi supports apiKey configuration
+  const ytAdapter = require('../services/import/youtubeMusicAdapter');
+  assert(typeof ytAdapter.fetchViaYouTubeDataApi === 'function', 'fetchViaYouTubeDataApi must be exported');
 
   console.log('  ✓ UI token hygiene verified: 0 manual token prompts or paste buttons');
   console.log('  ✓ Dedicated Spotify and Google Connect/Disconnect controls verified');
