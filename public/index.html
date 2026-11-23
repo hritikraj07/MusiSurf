@@ -159,15 +159,6 @@
             <span>Settings</span>
           </button>
 
-          <!-- Change Profile Picture from Gallery (Only shown after signing in) -->
-          <button type="button" class="user-dropdown-item user-dropdown-avatar-upload" id="userDropdownChangeAvatarBtn" style="display: none;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
-            <span>Change Profile Picture</span>
-          </button>
-
           <!-- Hidden Gallery Image File Picker -->
           <input type="file" id="userAvatarFileInput" accept="image/*" style="display: none;" aria-hidden="true" />
 
@@ -2619,14 +2610,14 @@
               <span class="settings-section-label">Profile</span>
               <div class="sound-card-item">
                 <div class="sound-card-left">
-                  <div class="user-dropdown-avatar" id="settingsAccountAvatar">U</div>
+                  <div class="user-dropdown-avatar settings-avatar-clickable" id="settingsAccountAvatar" title="Click to change profile photo" style="cursor: pointer;">U</div>
                   <div class="sound-meta">
                     <h3 class="sound-title" id="settingsAccountName">User</h3>
                     <p class="sound-desc" id="settingsAccountEmail">user@example.com</p>
                   </div>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center;">
-                  <button type="button" class="btn-secondary" id="settingsChangeAvatarBtn" style="padding: 6px 14px; font-size: 0.85rem; border-radius: 8px;">Upload Photo</button>
+                  <button type="button" class="btn-secondary" id="settingsChangeAvatarBtn" style="padding: 6px 14px; font-size: 0.85rem; border-radius: 8px;">Change Profile Photo</button>
                   <button type="button" class="btn-secondary" id="settingsAccountSignOutBtn" style="padding: 6px 14px; font-size: 0.85rem; border-radius: 8px;">Sign Out</button>
                 </div>
               </div>

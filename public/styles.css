@@ -1380,6 +1380,16 @@ html, body {
   display: block !important;
 }
 
+.settings-avatar-clickable {
+  cursor: pointer !important;
+  transition: transform 0.18s ease, filter 0.18s ease !important;
+}
+
+.settings-avatar-clickable:hover {
+  transform: scale(1.06) !important;
+  filter: brightness(1.15) !important;
+}
+
 /* Remove Sign In text buttons globally from everywhere */
 .top-login-btn,
 .mobile-sign-in-btn,
@@ -6853,23 +6863,27 @@ div[data-track-id].playing:hover .song-more-trigger {
   background: rgba(255, 255, 255, 0.16);
 }
 
-/* Mobile Lyrics Preview Section (Spotify Style - Matching Image 2) */
+/* Mobile Lyrics Preview Section (Spotify Style - Cinematic Dark Card with Vibrant Artwork Glow) */
 .mob-lyrics-preview-card {
   width: 100%;
   border-radius: 22px;
-  background: var(--lyrics-theme-color, #751e18);
-  background: linear-gradient(170deg, rgba(var(--lyrics-theme-rgb, 120, 32, 24), 0.96) 0%, rgba(var(--lyrics-theme-rgb, 75, 18, 14), 0.98) 100%);
+  background: linear-gradient(175deg, 
+    rgba(var(--lyrics-card-rgb, var(--lyrics-theme-rgb, 120, 32, 24)), 0.58) 0%, 
+    rgba(var(--lyrics-card-rgb, var(--lyrics-theme-rgb, 75, 18, 14)), 0.28) 42%, 
+    rgba(14, 16, 22, 0.95) 85%, 
+    #0c0e14 100%
+  ), #101218 !important;
   padding: 24px 20px 24px 20px;
   margin-top: 48px;
   margin-bottom: 56px;
   flex-shrink: 0;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7), 0 0 32px rgba(var(--lyrics-theme-rgb, 120, 32, 24), 0.28) !important;
+  border: 1px solid rgba(var(--lyrics-theme-rgb, 120, 32, 24), 0.4) !important;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   cursor: pointer;
-  transition: transform 0.15s ease, background 0.4s ease;
+  transition: transform 0.15s ease, background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
 .mob-lyrics-preview-card:active {
@@ -6886,8 +6900,9 @@ div[data-track-id].playing:hover .song-more-trigger {
 .mob-lyrics-preview-title {
   font-size: 1.18rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #ffffff !important;
   letter-spacing: -0.01em;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.75);
 }
 
 .mob-lyrics-preview-lines {
@@ -6902,7 +6917,8 @@ div[data-track-id].playing:hover .song-more-trigger {
   font-size: 1.25rem;
   font-weight: 700;
   line-height: 1.38;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.85) !important;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.65);
   transition: color 0.2s ease, font-size 0.2s ease;
   word-break: break-word;
 }
@@ -6910,14 +6926,15 @@ div[data-track-id].playing:hover .song-more-trigger {
 .mob-lyrics-preview-line.active {
   font-size: 1.45rem;
   font-weight: 800;
-  color: #ffffff;
-  text-shadow: 0 0 16px rgba(255, 255, 255, 0.65);
+  color: #ffffff !important;
+  text-shadow: 0 0 16px rgba(255, 255, 255, 0.75), 0 2px 10px rgba(0, 0, 0, 0.85);
 }
 
 .mob-lyrics-preview-placeholder {
   font-size: 1.05rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.65);
+  color: rgba(255, 255, 255, 0.75) !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
   padding: 18px 0;
 }
 
@@ -10385,7 +10402,12 @@ body[data-active-view="lyrics"] .content-scroll {
     pointer-events: none;
     border-radius: 0 !important;
     box-shadow: none !important;
-    background: var(--lyrics-theme-color, #121212) !important;
+    background: radial-gradient(circle at 50% 30%, 
+      rgba(var(--lyrics-card-rgb, var(--lyrics-theme-rgb, 45, 55, 72)), 0.62) 0%, 
+      rgba(var(--lyrics-card-rgb, var(--lyrics-theme-rgb, 45, 55, 72)), 0.3) 45%, 
+      rgba(10, 12, 16, 0.88) 75%, 
+      #08090c 100%
+    ), #0c0e14 !important;
   }
 
   body[data-active-view="lyrics"] #lyricsView {
@@ -10981,19 +11003,19 @@ body[data-active-view="lyrics"] .content-scroll {
    SYNCHRONIZED LYRICS VIEW (Image 2 & 9 - Dynamic Atmospheric Blur Backdrop)
    ========================================================================== */
 #lyricsView {
-  background-color: rgb(var(--lyrics-theme-rgb, 45, 55, 72)) !important;
-  background: radial-gradient(circle at 50% 50%, 
-    rgba(var(--lyrics-theme-rgb, 45, 55, 72), 0.98) 0%, 
-    rgba(var(--lyrics-theme-rgb, 45, 55, 72), 0.88) 50%, 
-    rgba(10, 12, 16, 0.42) 82%, 
-    rgba(0, 0, 0, 0.68) 100%
-  ), rgb(var(--lyrics-theme-rgb, 45, 55, 72)) !important;
+  background-color: #0c0e14 !important;
+  background: radial-gradient(circle at 50% 35%, 
+    rgba(var(--lyrics-card-rgb, var(--lyrics-theme-rgb, 45, 55, 72)), 0.6) 0%, 
+    rgba(var(--lyrics-card-rgb, var(--lyrics-theme-rgb, 45, 55, 72)), 0.28) 48%, 
+    rgba(10, 12, 16, 0.88) 78%, 
+    #08090c 100%
+  ), #0c0e14 !important;
   width: 100%;
   height: 100%;
   position: relative;
   overflow: hidden;
   border-radius: 0 !important;
-  box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.38) !important;
+  box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.45) !important;
   transition: background 0.4s ease, background-color 0.4s ease;
 }
 

@@ -8417,11 +8417,31 @@
       const topB = Math.min(255, Math.max(35, Math.floor(b * 0.95)));
       const rgbStr = `${topR}, ${topG}, ${topB}`;
 
+      // Perceived luminance calculation: L = 0.299R + 0.587G + 0.114B
+      const lum = 0.299 * topR + 0.587 * topG + 0.114 * topB;
+      // When artwork colors are overly bright (e.g. bright yellow, light cyan, pale orange),
+      // scale down the luminance for the background card so it provides deep comfortable darkness
+      // while retaining the rich saturated hue, glow, and borders without blinding glare.
+      let cardR = topR;
+      let cardG = topG;
+      let cardB = topB;
+      if (lum > 115) {
+        const factor = 95 / lum;
+        cardR = Math.min(255, Math.max(25, Math.round(topR * factor)));
+        cardG = Math.min(255, Math.max(25, Math.round(topG * factor)));
+        cardB = Math.min(255, Math.max(25, Math.round(topB * factor)));
+      }
+      const cardRgbStr = `${cardR}, ${cardG}, ${cardB}`;
+
       document.documentElement.style.setProperty('--lyrics-theme-rgb', rgbStr);
       document.documentElement.style.setProperty('--lyrics-theme-color', `rgb(${rgbStr})`);
+      document.documentElement.style.setProperty('--lyrics-card-rgb', cardRgbStr);
+      document.documentElement.style.setProperty('--lyrics-card-color', `rgb(${cardRgbStr})`);
       if (lyricsViewEl) {
         lyricsViewEl.style.setProperty('--lyrics-theme-rgb', rgbStr);
         lyricsViewEl.style.setProperty('--lyrics-theme-color', `rgb(${rgbStr})`);
+        lyricsViewEl.style.setProperty('--lyrics-card-rgb', cardRgbStr);
+        lyricsViewEl.style.setProperty('--lyrics-card-color', `rgb(${cardRgbStr})`);
         lyricsViewEl.style.setProperty('--glow-primary', `rgb(${rgbStr})`);
         lyricsViewEl.style.setProperty('--glow-secondary', `rgb(${rgbStr})`);
         lyricsViewEl.style.setProperty('--glow-tertiary', `rgb(${rgbStr})`);
@@ -8439,6 +8459,8 @@
       if (mobLyricsCard) {
         mobLyricsCard.style.setProperty('--lyrics-theme-rgb', rgbStr);
         mobLyricsCard.style.setProperty('--lyrics-theme-color', `rgb(${rgbStr})`);
+        mobLyricsCard.style.setProperty('--lyrics-card-rgb', cardRgbStr);
+        mobLyricsCard.style.setProperty('--lyrics-card-color', `rgb(${cardRgbStr})`);
       }
       if (elements.lyricsFullscreenBtn) {
         elements.lyricsFullscreenBtn.style.setProperty('--lyrics-theme-rgb', rgbStr);
@@ -8450,9 +8472,13 @@
     } catch (e) {
       document.documentElement.style.setProperty('--lyrics-theme-color', '#2d3748');
       document.documentElement.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
+      document.documentElement.style.setProperty('--lyrics-card-rgb', '30, 36, 48');
+      document.documentElement.style.setProperty('--lyrics-card-color', '#1e2430');
       if (lyricsViewEl) {
         lyricsViewEl.style.setProperty('--lyrics-theme-color', '#2d3748');
         lyricsViewEl.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
+        lyricsViewEl.style.setProperty('--lyrics-card-rgb', '30, 36, 48');
+        lyricsViewEl.style.setProperty('--lyrics-card-color', '#1e2430');
         lyricsViewEl.style.setProperty('--glow-primary', '#2d3748');
         lyricsViewEl.style.setProperty('--glow-secondary', '#2d3748');
         lyricsViewEl.style.setProperty('--glow-tertiary', '#2d3748');
@@ -8470,6 +8496,8 @@
       if (mobLyricsCard) {
         mobLyricsCard.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
         mobLyricsCard.style.setProperty('--lyrics-theme-color', '#2d3748');
+        mobLyricsCard.style.setProperty('--lyrics-card-rgb', '30, 36, 48');
+        mobLyricsCard.style.setProperty('--lyrics-card-color', '#1e2430');
       }
       if (elements.lyricsFullscreenBtn) {
         elements.lyricsFullscreenBtn.style.setProperty('--lyrics-theme-rgb', '45, 55, 72');
@@ -11628,52 +11656,6 @@
     if (uniqueTracks.length > 0) {
       playTrack(uniqueTracks[0], uniqueTracks);
     } else {
-      showToast('No listening history yet, play some songs first!', 'ℹ️');
-    }
-  }
-
-  function shareReplay() {
-    const minutes = Math.floor((state.totalListenedSeconds || 0) / 60);
-    const songs = state.totalSongsPlayed || 0;
-    const topSong = elements.replayTopSongTitle?.textContent || 'Top Track';
-    const artist = elements.replayTopSongArtist?.textContent || 'Artist';
-    const text = `🔥 My MusiSurf Sound Capsule: ${minutes.toLocaleString()} mins listened across ${songs.toLocaleString()} songs played! Top Song: ${topSong} by ${artist}! Ride the wave of pure music at ${window.location.origin}`;
-    if (navigator.share) {
-      navigator.share({ title: 'MusiSurf Sound Capsule', text: text, url: window.location.href }).catch(() => {});
-    } else {
-      try {
-        navigator.clipboard.writeText(text);
-        showToast('Sound Capsule stats copied to clipboard! 📋', '✨');
-      } catch (e) {
-        showToast(text, '🔥');
-      }
-    }
-  }
-
-  // ==========================================================================
-  // EVENT LISTENERS & SETUP
-  // ==========================================================================
-  function setupEventListeners() {
-    // Top Bar Home Button
-    if (elements.topHomeBtn) {
-      elements.topHomeBtn.addEventListener('click', navigateToHomeTop);
-    }
-
-    // Top Bar History Back & Forward (Previous & Ahead)
-    if (elements.historyBackBtn) {
-      elements.historyBackBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        appHistory.back();
-      });
-    }
-    if (elements.historyForwardBtn) {
-      elements.historyForwardBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        appHistory.forward();
-      });
-    }
-    appHistory.updateButtons();
-
     // Top Bar Compass / Explore Categories (Shows browse categories, no recents)
     if (elements.topCompassBtn) {
       elements.topCompassBtn.addEventListener('click', (e) => {
@@ -14907,7 +14889,6 @@
       const userDropdownHeader = document.getElementById('userDropdownHeader');
       const userDropdownSignInBtn = document.getElementById('userDropdownSignInBtn');
       const userDropdownDivider = document.getElementById('userDropdownDivider');
-      const userDropdownChangeAvatarBtn = document.getElementById('userDropdownChangeAvatarBtn');
       const settingsChangeAvatarBtn = document.getElementById('settingsChangeAvatarBtn');
       const headerUserAvatarCircle = document.getElementById('headerUserAvatarCircle');
 
@@ -14931,7 +14912,6 @@
         if (userDropdownHeader) userDropdownHeader.style.setProperty('display', 'flex', 'important');
         if (userDropdownSignInBtn) userDropdownSignInBtn.style.setProperty('display', 'none', 'important');
         if (userDropdownSignOutBtn) userDropdownSignOutBtn.style.setProperty('display', 'flex', 'important');
-        if (userDropdownChangeAvatarBtn) userDropdownChangeAvatarBtn.style.setProperty('display', 'flex', 'important');
         if (userDropdownDivider) userDropdownDivider.style.setProperty('display', 'block', 'important');
 
         if (mobTopAvatar) {
@@ -14972,7 +14952,6 @@
         if (userDropdownHeader) userDropdownHeader.style.setProperty('display', 'none', 'important');
         if (userDropdownSignInBtn) userDropdownSignInBtn.style.setProperty('display', 'flex', 'important');
         if (userDropdownSignOutBtn) userDropdownSignOutBtn.style.setProperty('display', 'none', 'important');
-        if (userDropdownChangeAvatarBtn) userDropdownChangeAvatarBtn.style.setProperty('display', 'none', 'important');
         if (userDropdownDivider) userDropdownDivider.style.setProperty('display', 'block', 'important');
 
         if (mobTopAvatar) {
@@ -15153,31 +15132,24 @@
       });
     }
 
-    const userDropdownChangeAvatarBtn = document.getElementById('userDropdownChangeAvatarBtn');
     const settingsChangeAvatarBtn = document.getElementById('settingsChangeAvatarBtn');
+    const settingsAccountAvatar = document.getElementById('settingsAccountAvatar');
     const userAvatarFileInput = document.getElementById('userAvatarFileInput');
 
-    if (userDropdownChangeAvatarBtn && userAvatarFileInput) {
-      userDropdownChangeAvatarBtn.addEventListener('click', (e) => {
-        if (e) e.stopPropagation();
-        if (userProfileDropdown) userProfileDropdown.classList.remove('is-open');
-        if (!state.currentUser) {
-          showToast('Please sign in first to change your profile picture', '🔒');
-          return;
-        }
-        userAvatarFileInput.click();
-      });
-    }
+    const triggerSettingsAvatarUpload = (e) => {
+      if (e) e.stopPropagation();
+      if (!state.currentUser) {
+        showToast('Please sign in first to change your profile photo', '🔒');
+        return;
+      }
+      if (userAvatarFileInput) userAvatarFileInput.click();
+    };
 
-    if (settingsChangeAvatarBtn && userAvatarFileInput) {
-      settingsChangeAvatarBtn.addEventListener('click', (e) => {
-        if (e) e.stopPropagation();
-        if (!state.currentUser) {
-          showToast('Please sign in first to upload photo', '🔒');
-          return;
-        }
-        userAvatarFileInput.click();
-      });
+    if (settingsChangeAvatarBtn) {
+      settingsChangeAvatarBtn.addEventListener('click', triggerSettingsAvatarUpload);
+    }
+    if (settingsAccountAvatar) {
+      settingsAccountAvatar.addEventListener('click', triggerSettingsAvatarUpload);
     }
 
     if (userAvatarFileInput) {
