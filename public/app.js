@@ -508,12 +508,23 @@
     importPlaylistModal: document.getElementById('importPlaylistModal'),
     closeImportPlaylistModalBtn: document.getElementById('closeImportPlaylistModalBtn'),
     cancelImportModalBtn: document.getElementById('cancelImportModalBtn'),
-    importMethodLinkTab: document.getElementById('importMethodLinkTab'),
+    importMethodLinkTab: document.getElementById('importMethodLinkTab') || document.getElementById('importMethodSpotifyTab'),
+    importMethodSpotifyTab: document.getElementById('importMethodSpotifyTab'),
+    importMethodYtMusicTab: document.getElementById('importMethodYtMusicTab'),
     importMethodFileTab: document.getElementById('importMethodFileTab'),
     importLinkBody: document.getElementById('importLinkBody'),
+    importYtMusicBody: document.getElementById('importYtMusicBody'),
     importFileBody: document.getElementById('importFileBody'),
     importPlaylistUrlInput: document.getElementById('importPlaylistUrlInput'),
+    importYtMusicUrlInput: document.getElementById('importYtMusicUrlInput'),
     importPasteUrlBtn: document.getElementById('importPasteUrlBtn'),
+    importPasteYtMusicUrlBtn: document.getElementById('importPasteYtMusicUrlBtn'),
+    spotifyDetectedIdPill: document.getElementById('spotifyDetectedIdPill'),
+    ytDetectedIdPill: document.getElementById('ytDetectedIdPill'),
+    spotifyAuthActionRow: document.getElementById('spotifyAuthActionRow'),
+    spotifyConnectBtn: document.getElementById('spotifyConnectBtn'),
+    spotifyAuthStatusDot: document.getElementById('spotifyAuthStatusDot'),
+    spotifyAuthStatusText: document.getElementById('spotifyAuthStatusText'),
     importDropZone: document.getElementById('importDropZone'),
     importPlaylistFileInput: document.getElementById('importPlaylistFileInput'),
     importBrowseFileBtn: document.getElementById('importBrowseFileBtn'),
@@ -935,6 +946,10 @@
   // Guarantees monotonic progression, prevents rapid double-advance race conditions,
   // and eliminates duplicate track replay bugs.
   function advanceToNextTrack(reason = 'unknown', completedTrackId = null) {
+    if (state.isTrackLoading || state.isTransitioning) {
+      logPlaybackDiag('ADVANCE_IGNORED', 'Ignored advance request while track is loading or transitioning');
+      return;
+    }
     const now = Date.now();
     logPlaybackDiag('ADVANCE_TRIGGER', `Advance requested [Reason: ${reason}]`, {
       completedTrackId,
@@ -1751,6 +1766,11 @@
     const origA = String(trackA.originalId || trackA.id || '').replace(/^saavn_/, '');
     const origB = String(trackB.originalId || trackB.id || '').replace(/^saavn_/, '');
     if (origA && origB && origA === origB && origA.length >= 4) return true;
+
+    // Guard: If both have explicit distinct IDs and distinct original IDs, they are different tracks!
+    if (trackA.id && trackB.id && String(trackA.id) !== String(trackB.id) && origA !== origB) {
+      return false;
+    }
 
     // Fingerprint match (Title + Primary Artist + Version)
     const fpA = getTrackFingerprint(trackA);
@@ -3989,7 +4009,7 @@
 
   // Background-safe interval backup for high-precision end cut and AutoMix
   setInterval(() => {
-    if (state.isPlaying && state.currentTrack && !isYouTubeActive()) {
+    if (state.isPlaying && !state.isTrackLoading && !state.isTransitioning && state.currentTrack && !isYouTubeActive()) {
       const cur = getCurrentPlaybackTime();
       const dur = getTotalDuration();
       if (dur > 0 && Number.isFinite(dur) && Number.isFinite(cur)) {
@@ -4250,6 +4270,10 @@
     state._lastTrackedPlaybackTime = null;
     state._tailSilenceStartTime = null;
 
+    cancelActiveAutoMix(true);
+    state.isTransitioning = true;
+    setTimeout(() => { state.isTransitioning = false; }, 350);
+
     const currentToken = ++activePlayToken;
     state.isTrackLoading = true;
     updatePlayPauseButton();
@@ -4260,13 +4284,20 @@
     elements.audio = getActiveDeck();
     elements.audioSecondary = getSecondaryDeck();
 
-    // Pause active deck smoothly if it is currently playing
+    // Immediately stop and silence both audio decks to prevent stale playback or overlap
     try {
-      const curDeck = getActiveDeck();
-      if (curDeck && !curDeck.paused) {
-        curDeck.pause();
+      if (elements.audio) {
+        elements.audio._playToken = currentToken;
+        if (!elements.audio.paused) elements.audio.pause();
+      }
+      if (elements.audioSecondary) {
+        elements.audioSecondary._playToken = 0;
+        if (!elements.audioSecondary.paused) elements.audioSecondary.pause();
+        elements.audioSecondary.removeAttribute('src');
+        elements.audioSecondary.load();
       }
     } catch (e) {}
+
     if (state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
       try {
         state.ytPlayer.pauseVideo();
@@ -4303,18 +4334,21 @@
       recordPlaybackHistoryEntry(track, options);
     }
 
-    cancelActiveAutoMix(true);
-
     // Spotify-like Queue Management: Isolated search results vs context playlist
     if (queueList === 'PRESERVE_CONTEXT') {
       // Intentionally preserve state.contextQueue and state.contextIndex (e.g. playing user manual queue item)
     } else if (queueList && Array.isArray(queueList)) {
       state.contextQueue = [...queueList];
-      state.contextIndex = state.contextQueue.findIndex(t => areTracksIdentical(t, track));
-      if (state.contextIndex === -1) {
-        state.contextQueue = [track];
-        state.contextIndex = 0;
+      let matchIdx = -1;
+      if (typeof options?.explicitIndex === 'number' && options.explicitIndex >= 0 && options.explicitIndex < state.contextQueue.length) {
+        matchIdx = options.explicitIndex;
+      } else {
+        matchIdx = state.contextQueue.findIndex(t => areTracksIdentical(t, track));
+        if (matchIdx === -1) {
+          matchIdx = state.contextQueue.findIndex(t => t && String(t.id) === String(track.id));
+        }
       }
+      state.contextIndex = matchIdx !== -1 ? matchIdx : 0;
       if (state.activePlaylistId || state.viewingPlaylistId) {
         state.playbackContext = {
           type: 'playlist',
@@ -5265,7 +5299,7 @@
   }
 
   function onTrackEnded() {
-    if (state.isCrossfading) return;
+    if (state.isCrossfading || state.isTrackLoading || state.isTransitioning) return;
     const completedTrack = state.currentTrack;
     logPlaybackDiag('TRACK_ENDED', `onTrackEnded fired for "${completedTrack?.title}"`, {
       id: completedTrack?.id,
@@ -7648,7 +7682,7 @@
     }
   }
 
-  function createSongRow(track, queueList) {
+  function createSongRow(track, queueList, rowIndex = -1) {
     const row = document.createElement('div');
     const isDownloaded = isTrackDownloaded(track.id);
     const isPlaying = Boolean(state.currentTrack && isSameTrack(state.currentTrack, track));
@@ -7693,6 +7727,14 @@
         showToast("You're offline! Listen to your downloaded songs.", '⚡');
         return;
       }
+      let startIdx = (typeof rowIndex === 'number' && rowIndex >= 0)
+        ? rowIndex
+        : (Array.isArray(queueList) ? queueList.findIndex(t => areTracksIdentical(t, track)) : 0);
+      if (startIdx < 0 && Array.isArray(queueList)) {
+        startIdx = queueList.findIndex(t => t && String(t.id) === String(track.id));
+      }
+      if (startIdx < 0) startIdx = 0;
+
       if (state.currentView === 'search' || state.currentView === 'home') {
         state.activePlaylistId = null;
         state.activePlaylistTracks = null;
@@ -7714,10 +7756,10 @@
           plObj.lastPlayedAt = Date.now();
           saveStoredPlaylists();
         }
-        initPlaylistCycle(queueList, queueList.findIndex(t => String(t.id) === String(track.id)));
+        initPlaylistCycle(queueList, startIdx);
         saveCurrentPlaylistProgress({ immediate: true });
       }
-      playTrack(track, queueList);
+      playTrack(track, queueList, true, 0, false, { explicitIndex: startIdx });
     });
 
     return row;
@@ -7820,6 +7862,14 @@
         showToast("You're offline! Listen to your downloaded songs.", '⚡');
         return;
       }
+      let startIdx = (typeof rowIndex === 'number' && rowIndex >= 0)
+        ? rowIndex
+        : (Array.isArray(queueList) ? queueList.findIndex(t => areTracksIdentical(t, track)) : 0);
+      if (startIdx < 0 && Array.isArray(queueList)) {
+        startIdx = queueList.findIndex(t => t && String(t.id) === String(track.id));
+      }
+      if (startIdx < 0) startIdx = 0;
+
       if (state.currentView === 'search' || state.currentView === 'home') {
         state.activePlaylistId = null;
         state.activePlaylistTracks = null;
@@ -7841,10 +7891,10 @@
           plObj.lastPlayedAt = Date.now();
           saveStoredPlaylists();
         }
-        initPlaylistCycle(queueList, queueList.findIndex(t => String(t.id) === String(track.id)));
+        initPlaylistCycle(queueList, startIdx);
         saveCurrentPlaylistProgress({ immediate: true });
       }
-      playTrack(track, queueList);
+      playTrack(track, queueList, true, 0, false, { explicitIndex: startIdx });
     });
 
     return tr;
@@ -9083,31 +9133,104 @@
     if (elements.importStepSuccess) elements.importStepSuccess.style.display = 'none';
 
     if (elements.importPlaylistUrlInput) elements.importPlaylistUrlInput.value = '';
+    if (elements.importYtMusicUrlInput) elements.importYtMusicUrlInput.value = '';
     if (elements.importPlaylistFileInput) elements.importPlaylistFileInput.value = '';
     if (elements.importSelectedFileInfo) elements.importSelectedFileInfo.style.display = 'none';
     if (elements.importDropZone) elements.importDropZone.style.display = 'block';
     if (elements.importValidationError) elements.importValidationError.style.display = 'none';
     if (elements.importDuplicateNotice) elements.importDuplicateNotice.style.display = 'none';
+    if (elements.spotifyDetectedIdPill) elements.spotifyDetectedIdPill.style.display = 'none';
+    if (elements.ytDetectedIdPill) elements.ytDetectedIdPill.style.display = 'none';
 
     // Reset tabs
-    switchImportTab('link');
+    switchImportTab('spotify');
+    checkSpotifyAuthStatus();
+  }
+
+  function checkSpotifyAuthStatus() {
+    fetch('/api/auth/spotify/status')
+      .then(res => res.json())
+      .then(data => {
+        if (elements.spotifyAuthStatusDot && elements.spotifyAuthStatusText) {
+          if (data && data.connected) {
+            elements.spotifyAuthStatusDot.className = 'status-indicator-dot dot-green';
+            elements.spotifyAuthStatusText.textContent = 'Account connected';
+            if (elements.spotifyAuthActionRow) elements.spotifyAuthActionRow.style.display = 'none';
+          } else {
+            elements.spotifyAuthStatusDot.className = 'status-indicator-dot dot-gray';
+            elements.spotifyAuthStatusText.textContent = 'Not connected';
+          }
+        }
+      })
+      .catch(() => {});
+  }
+
+  function clientExtractSpotifyPlaylistInfo(input) {
+    if (!input || typeof input !== 'string') return null;
+    const trimmed = input.trim();
+    if (trimmed.startsWith('spotify:playlist:')) {
+      const parts = trimmed.replace('spotify:playlist:', '').split('?');
+      const id = parts[0].trim();
+      const params = new URLSearchParams(parts[1] || '');
+      return /^[a-zA-Z0-9]{15,35}$/.test(id) ? { id, hasPtToken: Boolean(params.get('pt')) } : null;
+    }
+    try {
+      const parsed = new URL(trimmed);
+      const segments = parsed.pathname.split('/').filter(Boolean);
+      const idx = segments.indexOf('playlist');
+      if (idx !== -1 && segments[idx + 1]) {
+        const id = segments[idx + 1].trim();
+        const hasPt = Boolean(parsed.searchParams.get('pt'));
+        return /^[a-zA-Z0-9]{15,35}$/.test(id) ? { id, hasPtToken: hasPt } : null;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function clientExtractYouTubePlaylistId(input) {
+    if (!input || typeof input !== 'string') return null;
+    const trimmed = input.trim();
+    const ytRegex = /^(PL|OLAK5uy_|RDCLAK5uy_|RD|UU|FL|LL|TL|VL)[a-zA-Z0-9_\-]{8,120}$/i;
+    if (ytRegex.test(trimmed)) return trimmed.replace(/^VL/i, '');
+    try {
+      const parsed = new URL(trimmed);
+      const list = parsed.searchParams.get('list');
+      if (list && list.length >= 8) return list.replace(/^VL/i, '');
+      const segments = parsed.pathname.split('/').filter(Boolean);
+      const bIdx = segments.indexOf('browse');
+      if (bIdx !== -1 && segments[bIdx + 1]) {
+        return segments[bIdx + 1].replace(/^VL/i, '');
+      }
+    } catch (e) {}
+    return null;
   }
 
   function switchImportTab(method) {
+    if (method === 'link') method = 'spotify';
     importWorkflowState.method = method;
-    if (elements.importMethodLinkTab) elements.importMethodLinkTab.classList.toggle('active', method === 'link');
+
+    if (elements.importMethodSpotifyTab) elements.importMethodSpotifyTab.classList.toggle('active', method === 'spotify');
+    if (elements.importMethodLinkTab && elements.importMethodLinkTab !== elements.importMethodSpotifyTab) {
+      elements.importMethodLinkTab.classList.toggle('active', method === 'spotify');
+    }
+    if (elements.importMethodYtMusicTab) elements.importMethodYtMusicTab.classList.toggle('active', method === 'ytmusic');
     if (elements.importMethodFileTab) elements.importMethodFileTab.classList.toggle('active', method === 'file');
-    if (elements.importLinkBody) elements.importLinkBody.style.display = method === 'link' ? 'block' : 'none';
+
+    if (elements.importLinkBody) elements.importLinkBody.style.display = method === 'spotify' ? 'block' : 'none';
+    if (elements.importYtMusicBody) elements.importYtMusicBody.style.display = method === 'ytmusic' ? 'block' : 'none';
     if (elements.importFileBody) elements.importFileBody.style.display = method === 'file' ? 'block' : 'none';
     if (elements.importValidationError) elements.importValidationError.style.display = 'none';
   }
 
-  function showImportError(msg) {
+  function showImportError(msg, requiresAuth = false) {
     if (elements.importValidationError) {
       elements.importValidationError.textContent = msg;
       elements.importValidationError.style.display = 'block';
     } else {
       showToast(msg, '⚠️');
+    }
+    if (requiresAuth && elements.spotifyAuthActionRow) {
+      elements.spotifyAuthActionRow.style.display = 'flex';
     }
   }
 
@@ -9165,10 +9288,17 @@
     if (elements.importValidationError) elements.importValidationError.style.display = 'none';
 
     let payload = {};
-    if (importWorkflowState.method === 'link') {
+    if (importWorkflowState.method === 'spotify' || importWorkflowState.method === 'link') {
       const url = (elements.importPlaylistUrlInput?.value || '').trim();
       if (!url) {
         showImportError('Please enter a Spotify playlist URL or URI.');
+        return;
+      }
+      payload.url = url;
+    } else if (importWorkflowState.method === 'ytmusic') {
+      const url = (elements.importYtMusicUrlInput?.value || '').trim();
+      if (!url) {
+        showImportError('Please enter a YouTube Music or YouTube playlist link.');
         return;
       }
       payload.url = url;
@@ -9197,7 +9327,11 @@
       });
       const parseData = await parseRes.json();
       if (!parseRes.ok || !parseData.success || !parseData.playlist) {
-        throw new Error(parseData.error || 'Failed to parse playlist');
+        const errorMsg = parseData.error || 'Failed to parse playlist';
+        const errObj = new Error(errorMsg);
+        errObj.requiresAuth = Boolean(parseData.requiresAuth);
+        errObj.code = parseData.code;
+        throw errObj;
       }
 
       const externalPlaylist = parseData.playlist;
@@ -9259,7 +9393,7 @@
       console.error('[Import] Workflow error:', err);
       if (elements.importStepProgress) elements.importStepProgress.style.display = 'none';
       if (elements.importStepChoose) elements.importStepChoose.style.display = 'block';
-      showImportError(err.message || 'Import failed. Check the URL/file and try again.');
+      showImportError(err.message || 'Import failed. Check the URL/file and try again.', err.requiresAuth);
     }
   }
 
@@ -12630,15 +12764,43 @@
       });
     }
 
-    // Import Method Tabs
-    if (elements.importMethodLinkTab) {
-      elements.importMethodLinkTab.addEventListener('click', () => switchImportTab('link'));
+    // Import Method Tabs (Spotify, YouTube Music, Playlist File)
+    if (elements.importMethodSpotifyTab) {
+      elements.importMethodSpotifyTab.addEventListener('click', () => switchImportTab('spotify'));
+    }
+    if (elements.importMethodLinkTab && elements.importMethodLinkTab !== elements.importMethodSpotifyTab) {
+      elements.importMethodLinkTab.addEventListener('click', () => switchImportTab('spotify'));
+    }
+    if (elements.importMethodYtMusicTab) {
+      elements.importMethodYtMusicTab.addEventListener('click', () => switchImportTab('ytmusic'));
     }
     if (elements.importMethodFileTab) {
       elements.importMethodFileTab.addEventListener('click', () => switchImportTab('file'));
     }
 
-    // Clipboard Paste Button
+    // Spotify Live ID Detection Pill & Paste Button
+    function updateSpotifyLiveDetection() {
+      const val = (elements.importPlaylistUrlInput?.value || '').trim();
+      const info = clientExtractSpotifyPlaylistInfo(val);
+      if (elements.spotifyDetectedIdPill) {
+        if (info && info.id) {
+          elements.spotifyDetectedIdPill.style.display = 'inline-flex';
+          elements.spotifyDetectedIdPill.innerHTML = `✓ Detected Spotify Playlist ID: <strong>${escapeHtml(info.id)}</strong> (${info.id.length} chars)${info.hasPtToken ? ' <span style="opacity:0.85;font-size:0.7rem;margin-left:4px;">(Sharing Token Present)</span>' : ''}`;
+          if (info.hasPtToken && elements.spotifyAuthActionRow) {
+            elements.spotifyAuthActionRow.style.display = 'flex';
+          }
+        } else {
+          elements.spotifyDetectedIdPill.style.display = 'none';
+        }
+      }
+      if (elements.importValidationError) elements.importValidationError.style.display = 'none';
+    }
+
+    if (elements.importPlaylistUrlInput) {
+      elements.importPlaylistUrlInput.addEventListener('input', updateSpotifyLiveDetection);
+      elements.importPlaylistUrlInput.addEventListener('change', updateSpotifyLiveDetection);
+    }
+
     if (elements.importPasteUrlBtn) {
       elements.importPasteUrlBtn.addEventListener('click', async () => {
         try {
@@ -12646,8 +12808,8 @@
             const clipText = await navigator.clipboard.readText();
             if (clipText && elements.importPlaylistUrlInput) {
               elements.importPlaylistUrlInput.value = clipText.trim();
-              if (elements.importValidationError) elements.importValidationError.style.display = 'none';
-              showToast('Pasted playlist link from clipboard', '📋');
+              updateSpotifyLiveDetection();
+              showToast('Pasted Spotify playlist link from clipboard', '📋');
             }
           } else {
             showToast('Clipboard access not available, paste manually', 'ℹ️');
@@ -12657,6 +12819,66 @@
         }
       });
     }
+
+    // YouTube Music Live ID Detection Pill & Paste Button
+    function updateYtMusicLiveDetection() {
+      const val = (elements.importYtMusicUrlInput?.value || '').trim();
+      const ytId = clientExtractYouTubePlaylistId(val);
+      if (elements.ytDetectedIdPill) {
+        if (ytId) {
+          elements.ytDetectedIdPill.style.display = 'inline-flex';
+          elements.ytDetectedIdPill.className = 'import-detected-id-pill ytmusic-pill';
+          elements.ytDetectedIdPill.innerHTML = `✓ Detected YouTube Playlist ID: <strong>${escapeHtml(ytId)}</strong> (${ytId.length} chars)`;
+        } else {
+          elements.ytDetectedIdPill.style.display = 'none';
+        }
+      }
+      if (elements.importValidationError) elements.importValidationError.style.display = 'none';
+    }
+
+    if (elements.importYtMusicUrlInput) {
+      elements.importYtMusicUrlInput.addEventListener('input', updateYtMusicLiveDetection);
+      elements.importYtMusicUrlInput.addEventListener('change', updateYtMusicLiveDetection);
+    }
+
+    if (elements.importPasteYtMusicUrlBtn) {
+      elements.importPasteYtMusicUrlBtn.addEventListener('click', async () => {
+        try {
+          if (navigator.clipboard && navigator.clipboard.readText) {
+            const clipText = await navigator.clipboard.readText();
+            if (clipText && elements.importYtMusicUrlInput) {
+              elements.importYtMusicUrlInput.value = clipText.trim();
+              updateYtMusicLiveDetection();
+              showToast('Pasted YouTube Music playlist link from clipboard', '📋');
+            }
+          } else {
+            showToast('Clipboard access not available, paste manually', 'ℹ️');
+          }
+        } catch (err) {
+          showToast('Please paste the URL manually (Ctrl+V / Cmd+V)', 'ℹ️');
+        }
+      });
+    }
+
+    // Spotify Connect Button
+    if (elements.spotifyConnectBtn) {
+      elements.spotifyConnectBtn.addEventListener('click', () => {
+        window.location.href = '/api/auth/spotify/login';
+      });
+    }
+
+    // Check query params for Spotify OAuth return notification
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('spotify_connected') === '1') {
+        showToast('Spotify account connected successfully! You can now import private playlists.', '🟢');
+        checkSpotifyAuthStatus();
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else if (urlParams.get('spotify_error')) {
+        showToast('Spotify connection note: ' + urlParams.get('spotify_error'), '⚠️');
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    } catch (e) {}
 
     // File Input & Drag-and-Drop Handling
     function handleImportFile(file) {
@@ -12955,6 +13177,8 @@
         }
       });
       deck.addEventListener('ended', () => {
+        if (deck._playToken && deck._playToken !== activePlayToken) return;
+        if (state.isTrackLoading || state.isTransitioning) return;
         if (deck === getActiveDeck()) {
           if (state.isCrossfading && state.preloadedNextTrack) {
             finalizeCrossfade(state.preloadedNextTrack, state.isMuted ? 0 : (state.volume || 0.8));

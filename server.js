@@ -2564,20 +2564,132 @@ app.put('/api/library/playlists/:id/progress', requireAuth, handleSaveProgress);
 // EXTERNAL PLAYLIST IMPORT & TRANSFER ENGINE
 // --------------------------------------------------------------------------
 
+// Spotify OAuth & Account Connection Status
+app.get('/api/auth/spotify/status', (req, res) => {
+  const hasToken = Boolean(req.cookies?.spotify_access_token);
+  const hasAppCredentials = Boolean(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET);
+  res.json({
+    success: true,
+    connected: hasToken,
+    configured: hasAppCredentials
+  });
+});
+
+// Spotify OAuth Login Initiation
+app.get('/api/auth/spotify/login', (req, res) => {
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
+  if (!clientId) {
+    return res.status(400).json({
+      success: false,
+      configured: false,
+      message: 'Spotify Client ID is not configured in environment variables. Add SPOTIFY_CLIENT_ID to .env to enable 1-click Spotify login.'
+    });
+  }
+
+  const redirectUri = process.env.SPOTIFY_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/spotify/callback`;
+  const scope = encodeURIComponent('playlist-read-private playlist-read-collaborative user-read-private');
+  const authUrl = `https://accounts.spotify.com/authorize?response_type=code&client_id=${encodeURIComponent(clientId)}&scope=${scope}&redirect_uri=${encodeURIComponent(redirectUri)}&show_dialog=true`;
+  res.redirect(authUrl);
+});
+
+// Spotify OAuth Callback
+app.get('/api/auth/spotify/callback', async (req, res) => {
+  const { code, error } = req.query;
+  if (error || !code) {
+    return res.redirect('/?spotify_error=' + encodeURIComponent(error || 'Authorization denied'));
+  }
+
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+  const redirectUri = process.env.SPOTIFY_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/spotify/callback`;
+
+  try {
+    const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: String(code),
+        redirect_uri: redirectUri
+      }).toString()
+    });
+
+    if (!tokenRes.ok) {
+      const errBody = await tokenRes.text();
+      return res.redirect('/?spotify_error=' + encodeURIComponent('Token exchange failed: ' + errBody));
+    }
+
+    const tokenData = await tokenRes.json();
+    if (tokenData.access_token) {
+      res.cookie('spotify_access_token', tokenData.access_token, {
+        maxAge: (tokenData.expires_in || 3600) * 1000,
+        httpOnly: false,
+        sameSite: 'lax',
+        path: '/'
+      });
+      if (tokenData.refresh_token) {
+        res.cookie('spotify_refresh_token', tokenData.refresh_token, {
+          maxAge: 30 * 24 * 3600 * 1000,
+          httpOnly: true,
+          sameSite: 'lax',
+          path: '/'
+        });
+      }
+      return res.redirect('/?spotify_connected=1');
+    }
+    res.redirect('/?spotify_error=no_token');
+  } catch (err) {
+    res.redirect('/?spotify_error=' + encodeURIComponent(err.message));
+  }
+});
+
+// Spotify Disconnect
+app.post('/api/auth/spotify/disconnect', (req, res) => {
+  res.clearCookie('spotify_access_token', { path: '/' });
+  res.clearCookie('spotify_refresh_token', { path: '/' });
+  res.json({ success: true, message: 'Spotify disconnected' });
+});
+
+// Direct Spotify Access Token submission (convenience fallback)
+app.post('/api/auth/spotify/token', (req, res) => {
+  const { token } = req.body || {};
+  if (token && typeof token === 'string' && token.trim()) {
+    res.cookie('spotify_access_token', token.trim(), {
+      maxAge: 3600 * 1000,
+      httpOnly: false,
+      sameSite: 'lax',
+      path: '/'
+    });
+    return res.json({ success: true, connected: true });
+  }
+  res.status(400).json({ success: false, error: 'Token is required' });
+});
+
 // 1. Parse playlist from link or uploaded file
 app.post('/api/import/parse', async (req, res) => {
   try {
-    const { url, fileContent, filename, fileName, format } = req.body || {};
+    const { url, fileContent, filename, fileName, format, spotifyToken } = req.body || {};
+    const token = spotifyToken || req.cookies?.spotify_access_token || req.headers['x-spotify-token'] || null;
     const playlist = await importService.parseExternalPlaylist({
       url,
       fileContent,
       filename: filename || fileName,
-      format
+      format,
+      spotifyToken: token
     });
     res.json({ success: true, playlist });
   } catch (err) {
     console.warn('[Import API] Parse error:', err.message);
-    res.status(400).json({ success: false, error: err.message });
+    res.status(400).json({
+      success: false,
+      error: err.message,
+      code: err.code || 'ERR_IMPORT_PARSE_FAILED',
+      requiresAuth: Boolean(err.requiresAuth),
+      playlistId: err.playlistId || null
+    });
   }
 });
 

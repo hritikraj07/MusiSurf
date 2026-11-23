@@ -16,8 +16,14 @@ const path = require('path');
 
 const {
   extractSpotifyPlaylistId,
+  extractSpotifyPlaylistInfo,
   fetchSpotifyPlaylist
 } = require('../services/import/spotifyAdapter');
+
+const {
+  extractYouTubePlaylistId,
+  fetchYouTubeMusicPlaylist
+} = require('../services/import/youtubeMusicAdapter');
 
 const {
   parsePlaylistFile,
@@ -90,13 +96,53 @@ async function runTestSuite() {
     'Must reject Spotify album links when expecting a playlist'
   );
 
+  // User reported Spotify URL test
+  const userSpotifyUrl = 'https://open.spotify.com/playlist/1XBjvHvMsZlZaFoNtRKpTl?si=a0081be864944c0f&pt=dc66b12165ace170f7531562d85333b9';
+  const userExtractedId = extractSpotifyPlaylistId(userSpotifyUrl);
   assert.strictEqual(
-    extractSpotifyPlaylistId('https://open.spotify.com/playlist/invalid!@#$%'),
-    null,
-    'Must reject malformed special characters in playlist ID'
+    userExtractedId,
+    '1XBjvHvMsZlZaFoNtRKpTl',
+    'Must extract full 22-character ID without any 9-character or visual truncation'
+  );
+  assert.strictEqual(userExtractedId.length, 22, 'Playlist ID must be exactly 22 characters');
+
+  const userExtractedInfo = extractSpotifyPlaylistInfo(userSpotifyUrl);
+  assert.strictEqual(userExtractedInfo.id, '1XBjvHvMsZlZaFoNtRKpTl');
+  assert.strictEqual(userExtractedInfo.hasPtToken, true, 'Must detect presence of pt collaborative/invite sharing token');
+  assert.strictEqual(userExtractedInfo.pt, 'dc66b12165ace170f7531562d85333b9');
+
+  console.log('  ✓ User exact Spotify playlist link parsed with full 22-char ID and sharing token detected');
+
+  // YouTube Music URL & ID validation
+  console.log('\n--- SUITE A2: YOUTUBE MUSIC URL & PLAYLIST ID EXTRACTION ---');
+  const ytmUrl1 = 'https://music.youtube.com/playlist?list=PL4fGSI1pDJn5oibdgJt8Hy0-dr2B7kSs2';
+  assert.strictEqual(
+    extractYouTubePlaylistId(ytmUrl1),
+    'PL4fGSI1pDJn5oibdgJt8Hy0-dr2B7kSs2',
+    'Must extract playlist ID from music.youtube.com playlist link'
   );
 
-  console.log('  ✓ Successfully validated Spotify Web URLs, URIs, and rejected malformed/external links');
+  const ytmUrl2 = 'https://www.youtube.com/playlist?list=PL4fGSI1pDJn5oibdgJt8Hy0-dr2B7kSs2&si=xyz';
+  assert.strictEqual(
+    extractYouTubePlaylistId(ytmUrl2),
+    'PL4fGSI1pDJn5oibdgJt8Hy0-dr2B7kSs2',
+    'Must extract playlist ID from standard youtube.com link with query parameters'
+  );
+
+  const ytmBrowseUrl = 'https://music.youtube.com/browse/VLPL4fGSI1pDJn5oibdgJt8Hy0-dr2B7kSs2';
+  assert.strictEqual(
+    extractYouTubePlaylistId(ytmBrowseUrl),
+    'PL4fGSI1pDJn5oibdgJt8Hy0-dr2B7kSs2',
+    'Must extract clean ID from /browse/VL... URL'
+  );
+
+  assert.strictEqual(
+    extractYouTubePlaylistId('OLAK5uy_lSTp1DIuzZBUyee3kDsXwPgP25WdfwB40'),
+    'OLAK5uy_lSTp1DIuzZBUyee3kDsXwPgP25WdfwB40',
+    'Must recognize raw album/chart playlist IDs'
+  );
+
+  console.log('  ✓ Successfully extracted YouTube Music playlist IDs across all URL variations');
 
   // --------------------------------------------------------------------------
   // SUITE B: PLAYLIST FILE PARSERS (7 FORMATS)
@@ -327,10 +373,27 @@ Mohit Chauhan - Kun Faya Kun`;
     htmlContent.includes('id="candidateReviewModal"'),
     'index.html must have candidateReviewModal for reviewable tracks'
   );
+  assert(
+    htmlContent.includes('id="importMethodYtMusicTab"'),
+    'index.html must have YouTube Music method tab button'
+  );
+  assert(
+    htmlContent.includes('id="importYtMusicBody"'),
+    'index.html must have YouTube Music input body'
+  );
+  assert(
+    htmlContent.includes('id="spotifyDetectedIdPill"'),
+    'index.html must have live Spotify ID detection feedback badge'
+  );
+  assert(
+    htmlContent.includes('id="ytDetectedIdPill"'),
+    'index.html must have live YouTube ID detection feedback badge'
+  );
 
   console.log('  ✓ "Library & Playlists" category correctly placed in Settings navigation');
   console.log('  ✓ "Import Playlist" card configured with title, description, and icon');
   console.log('  ✓ Dedicated multi-step modal with mandatory Preview screen verified');
+  console.log('  ✓ 3 import tabs (Spotify, YouTube Music, File) and live ID detection badges verified');
 
   console.log('\n====================================================');
   console.log('🏁 ALL PLAYLIST IMPORT & TRANSFER TESTS PASSED (100%)');

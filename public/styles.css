@@ -15538,6 +15538,52 @@ body.lyrics-fullscreen-active .lyrics-edge-glow {
   box-shadow: 0 0 8px #1ed760;
 }
 
+.import-detected-id-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(30, 215, 96, 0.1);
+  border: 1px solid rgba(30, 215, 96, 0.28);
+  color: #1ed760;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-family: var(--font-mono, monospace);
+  margin-top: 8px;
+  animation: fadeIn 0.2s ease;
+  word-break: break-all;
+}
+
+.import-detected-id-pill.ytmusic-pill {
+  background: rgba(255, 0, 0, 0.1);
+  border-color: rgba(255, 0, 0, 0.35);
+  color: #ff5252;
+}
+
+.spotify-auth-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.spotify-auth-status-badge .status-indicator-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.spotify-auth-status-badge .dot-green {
+  background: #1ed760;
+  box-shadow: 0 0 6px #1ed760;
+}
+
+.spotify-auth-status-badge .dot-gray {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 .import-field-label {
   display: block;
   font-size: 0.82rem;

@@ -2782,14 +2782,19 @@
 
         <!-- STEP 1: METHOD CHOOSER & INPUT -->
         <div class="import-modal-step" id="importStepChoose">
-          <!-- Method Selection Tabs -->
+          <!-- Method Selection Tabs (3 Supported Sources) -->
           <div class="import-methods-tabs">
-            <button type="button" class="import-method-tab active" data-method="link" id="importMethodLinkTab">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            <button type="button" class="import-method-tab active" data-method="spotify" id="importMethodSpotifyTab">
+              <svg viewBox="0 0 24 24" fill="currentColor" style="width: 17px; height: 17px;">
+                <path d="M12 2C6.477 2 2 6.477 2 12c0 5.524 4.477 10 10 10 5.524 0 10-4.476 10-10 0-5.523-4.476-10-10-10zm4.587 14.428a.747.747 0 0 1-1.03.248c-2.822-1.724-6.375-2.114-10.56-1.158a.751.751 0 0 1-.337-1.464c4.584-1.047 8.52-.601 11.68 1.344.349.213.46.669.247 1.03zm1.226-2.727a.936.936 0 0 1-1.288.309c-3.23-1.986-8.156-2.56-11.977-1.4a.937.937 0 1 1-.547-1.791c4.372-1.328 9.799-.687 13.503 1.593.415.257.548.803.309 1.289zm.106-2.842c-3.874-2.3-10.26-2.512-13.966-1.388a1.124 1.124 0 1 1-.652-2.152c4.258-1.293 11.31-1.048 15.77 1.597a1.124 1.124 0 0 1-1.152 1.943z"/>
               </svg>
-              <span>Playlist Link (Spotify)</span>
+              <span>Spotify</span>
+            </button>
+            <button type="button" class="import-method-tab" data-method="ytmusic" id="importMethodYtMusicTab">
+              <svg viewBox="0 0 24 24" fill="currentColor" style="width: 17px; height: 17px; color: #ff0000;">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1zm-2-2.8l5 2.8-5 2.8V8.2z"/>
+              </svg>
+              <span>YouTube Music</span>
             </button>
             <button type="button" class="import-method-tab" data-method="file" id="importMethodFileTab">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2802,11 +2807,17 @@
             </button>
           </div>
 
-          <!-- Tab Content A: URL Link Input -->
+          <!-- Tab Content A: Spotify URL Link Input -->
           <div class="import-tab-body" id="importLinkBody">
-            <div class="import-provider-pill-badge">
-              <span class="provider-dot spotify-dot"></span>
-              <span>Spotify Priority Integration Active</span>
+            <div class="import-provider-pill-badge" style="justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="provider-dot spotify-dot"></span>
+                <span>Spotify Playlist Import</span>
+              </div>
+              <div id="spotifyAuthStatusBadge" class="spotify-auth-status-badge">
+                <span id="spotifyAuthStatusDot" class="status-indicator-dot dot-gray"></span>
+                <span id="spotifyAuthStatusText">Not connected</span>
+              </div>
             </div>
             <label class="import-field-label" for="importPlaylistUrlInput">Spotify Playlist Link or URI</label>
             <div class="import-input-wrap">
@@ -2819,10 +2830,38 @@
                 <span>Paste</span>
               </button>
             </div>
+            <!-- Live ID Detection Feedback Pill (Shows full 22-char ID so user is confident no truncation occurred) -->
+            <div id="spotifyDetectedIdPill" class="import-detected-id-pill" style="display: none;"></div>
             <p class="import-hint-text">Supported: <code>https://open.spotify.com/playlist/{id}</code> and <code>spotify:playlist:{id}</code></p>
+            <div class="spotify-auth-action-row" id="spotifyAuthActionRow" style="margin-top: 10px; display: none;">
+              <span class="spotify-auth-hint" style="font-size: 0.78rem; color: var(--text-muted);">Private or invite playlist?</span>
+              <button type="button" id="spotifyConnectBtn" class="sound-pill-btn" style="padding: 4px 10px; font-size: 0.76rem; background: rgba(29, 185, 84, 0.15); color: #1ed760; border: 1px solid rgba(29, 185, 84, 0.3);">Connect Spotify Account</button>
+            </div>
           </div>
 
-          <!-- Tab Content B: File Upload -->
+          <!-- Tab Content B: YouTube Music URL Link Input -->
+          <div class="import-tab-body" id="importYtMusicBody" style="display: none;">
+            <div class="import-provider-pill-badge">
+              <span class="provider-dot ytmusic-dot" style="background: #ff0000; box-shadow: 0 0 6px rgba(255, 0, 0, 0.6);"></span>
+              <span>YouTube Music Priority Integration</span>
+            </div>
+            <label class="import-field-label" for="importYtMusicUrlInput">YouTube Music or YouTube Playlist Link</label>
+            <div class="import-input-wrap">
+              <input type="text" id="importYtMusicUrlInput" class="import-text-input" placeholder="https://music.youtube.com/playlist?list=... or youtube.com/playlist?list=..." />
+              <button type="button" class="import-paste-btn" id="importPasteYtMusicUrlBtn" title="Paste from clipboard">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+                </svg>
+                <span>Paste</span>
+              </button>
+            </div>
+            <!-- Live ID Detection Feedback Pill (Shows full ID so user is confident no truncation occurred) -->
+            <div id="ytDetectedIdPill" class="import-detected-id-pill" style="display: none;"></div>
+            <p class="import-hint-text">Supported: <code>https://music.youtube.com/playlist?list={id}</code> and <code>https://www.youtube.com/playlist?list={id}</code></p>
+          </div>
+
+          <!-- Tab Content C: File Upload -->
           <div class="import-tab-body" id="importFileBody" style="display: none;">
             <div class="import-dropzone" id="importDropZone">
               <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">

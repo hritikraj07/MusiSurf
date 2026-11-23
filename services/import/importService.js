@@ -4,7 +4,8 @@
  */
 
 const { parsePlaylistFile } = require('./playlistParser');
-const { fetchSpotifyPlaylist, extractSpotifyPlaylistId } = require('./spotifyAdapter');
+const { fetchSpotifyPlaylist, extractSpotifyPlaylistId, extractSpotifyPlaylistInfo } = require('./spotifyAdapter');
+const { fetchYouTubeMusicPlaylist, extractYouTubePlaylistId } = require('./youtubeMusicAdapter');
 const { matchTrackList } = require('./matchingEngine');
 const libraryService = require('../library');
 const { sql } = require('../db');
@@ -15,21 +16,33 @@ const inMemoryImportHistory = [];
 /**
  * Parses an external playlist from link URL/URI or uploaded file.
  */
-async function parseExternalPlaylist({ url, fileContent, filename, format }) {
+async function parseExternalPlaylist({ url, fileContent, filename, format, spotifyToken = null }) {
   if (url && typeof url === 'string' && url.trim()) {
     const trimmedUrl = url.trim();
-    // Spotify playlist link or URI
-    if (trimmedUrl.includes('spotify.com') || trimmedUrl.startsWith('spotify:playlist:')) {
-      return await fetchSpotifyPlaylist(trimmedUrl);
+
+    // 1. Spotify playlist link or URI
+    if (trimmedUrl.includes('spotify.com') || trimmedUrl.startsWith('spotify:playlist:') || extractSpotifyPlaylistId(trimmedUrl)) {
+      return await fetchSpotifyPlaylist(trimmedUrl, spotifyToken);
     }
-    throw new Error('Unsupported playlist provider URL. Currently, Spotify links and playlist export files are supported.');
+
+    // 2. YouTube Music / YouTube playlist link
+    if (
+      trimmedUrl.includes('music.youtube.com') ||
+      trimmedUrl.includes('youtube.com/playlist') ||
+      trimmedUrl.includes('youtu.be') ||
+      extractYouTubePlaylistId(trimmedUrl)
+    ) {
+      return await fetchYouTubeMusicPlaylist(trimmedUrl);
+    }
+
+    throw new Error('Unsupported playlist provider URL. Currently Spotify, YouTube Music, and playlist export files are supported.');
   }
 
   if (fileContent && typeof fileContent === 'string' && fileContent.trim()) {
     return parsePlaylistFile(fileContent, filename || 'playlist.m3u', format || '');
   }
 
-  throw new Error('Please provide a valid Spotify playlist link or upload a playlist file.');
+  throw new Error('Please provide a valid Spotify or YouTube Music playlist link or upload a playlist file.');
 }
 
 /**
