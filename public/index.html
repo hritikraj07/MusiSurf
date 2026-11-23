@@ -2817,6 +2817,8 @@
               <div id="spotifyAuthStatusBadge" class="spotify-auth-status-badge">
                 <span id="spotifyAuthStatusDot" class="status-indicator-dot dot-gray"></span>
                 <span id="spotifyAuthStatusText">Not connected</span>
+                <button type="button" id="spotifyConnectHeaderBtn" class="spotify-header-auth-btn">Connect</button>
+                <button type="button" id="spotifyDisconnectHeaderBtn" class="spotify-header-auth-btn disconnect-btn" style="display: none;">Disconnect</button>
               </div>
             </div>
             <label class="import-field-label" for="importPlaylistUrlInput">Spotify Playlist Link or URI</label>
@@ -2830,11 +2832,11 @@
                 <span>Paste</span>
               </button>
             </div>
-            <!-- Live ID Detection Feedback Pill (Shows full 22-char ID so user is confident no truncation occurred) -->
-            <div id="spotifyDetectedIdPill" class="import-detected-id-pill" style="display: none;"></div>
+            <!-- Live Structured ID Detection Feedback Card -->
+            <div id="spotifyDetectedIdPill" class="detected-playlist-card" style="display: none;"></div>
             <p class="import-hint-text">Supported: <code>https://open.spotify.com/playlist/{id}</code> and <code>spotify:playlist:{id}</code></p>
             <div class="spotify-auth-action-row" id="spotifyAuthActionRow" style="margin-top: 10px; display: none;">
-              <span class="spotify-auth-hint" style="font-size: 0.78rem; color: var(--text-muted);">Private or invite playlist?</span>
+              <span class="spotify-auth-hint" style="font-size: 0.78rem; color: var(--text-muted);">Spotify Account:</span>
               <button type="button" id="spotifyConnectBtn" class="sound-pill-btn" style="padding: 4px 10px; font-size: 0.76rem; background: rgba(29, 185, 84, 0.15); color: #1ed760; border: 1px solid rgba(29, 185, 84, 0.3);">Connect Spotify Account</button>
             </div>
           </div>

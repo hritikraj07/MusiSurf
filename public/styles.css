@@ -15538,33 +15538,80 @@ body.lyrics-fullscreen-active .lyrics-edge-glow {
   box-shadow: 0 0 8px #1ed760;
 }
 
+.detected-playlist-card,
 .import-detected-id-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(30, 215, 96, 0.1);
+  display: block;
+  background: rgba(30, 215, 96, 0.08);
   border: 1px solid rgba(30, 215, 96, 0.28);
-  color: #1ed760;
-  padding: 5px 12px;
-  border-radius: 6px;
-  font-size: 0.76rem;
-  font-family: var(--font-mono, monospace);
-  margin-top: 8px;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-top: 10px;
   animation: fadeIn 0.2s ease;
+  font-size: 0.82rem;
+  color: #e0e0e0;
+}
+
+.detected-playlist-card.ytmusic-card,
+.import-detected-id-pill.ytmusic-pill {
+  background: rgba(255, 0, 0, 0.08);
+  border-color: rgba(255, 0, 0, 0.3);
+}
+
+.detected-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #1ed760;
+  margin-bottom: 8px;
+}
+
+.detected-playlist-card.ytmusic-card .detected-card-header,
+.import-detected-id-pill.ytmusic-pill .detected-card-header {
+  color: #ff5252;
+}
+
+.detected-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.detected-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+
+.detected-row .row-label {
+  color: var(--text-muted, #a0a0a0);
+  min-width: 140px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.detected-row .row-value {
+  color: #ffffff;
+  font-weight: 500;
   word-break: break-all;
 }
 
-.import-detected-id-pill.ytmusic-pill {
-  background: rgba(255, 0, 0, 0.1);
-  border-color: rgba(255, 0, 0, 0.35);
+.detected-row .row-value.mono {
+  font-family: var(--font-mono, monospace);
+  color: #1ed760;
+  letter-spacing: 0.5px;
+}
+
+.detected-playlist-card.ytmusic-card .detected-row .row-value.mono {
   color: #ff5252;
 }
 
 .spotify-auth-status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.72rem;
+  gap: 8px;
+  font-size: 0.76rem;
   color: var(--text-muted);
 }
 
@@ -15584,6 +15631,35 @@ body.lyrics-fullscreen-active .lyrics-edge-glow {
   background: rgba(255, 255, 255, 0.3);
 }
 
+.spotify-header-auth-btn {
+  background: rgba(29, 185, 84, 0.15);
+  color: #1ed760;
+  border: 1px solid rgba(29, 185, 84, 0.35);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.spotify-header-auth-btn:hover {
+  background: rgba(29, 185, 84, 0.25);
+  color: #fff;
+}
+
+.spotify-header-auth-btn.disconnect-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e0e0e0;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.spotify-header-auth-btn.disconnect-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
 .import-field-label {
   display: block;
   font-size: 0.82rem;
@@ -15600,6 +15676,8 @@ body.lyrics-fullscreen-active .lyrics-edge-glow {
   border-radius: 12px;
   padding: 4px 6px 4px 14px;
   transition: border-color 0.2s;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .import-input-wrap:focus-within {
@@ -15608,15 +15686,18 @@ body.lyrics-fullscreen-active .lyrics-edge-glow {
 
 .import-text-input {
   flex: 1;
+  min-width: 0;
   background: transparent;
   border: none;
   color: #fff;
-  font-size: 0.95rem;
-  padding: 8px 0;
+  font-size: 0.92rem;
+  padding: 8px 8px 8px 0;
   outline: none;
+  overflow-x: auto;
 }
 
 .import-paste-btn {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -15629,6 +15710,7 @@ body.lyrics-fullscreen-active .lyrics-edge-glow {
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.2s;
+  white-space: nowrap;
 }
 
 .import-paste-btn svg {
@@ -15734,10 +15816,45 @@ body.lyrics-fullscreen-active .lyrics-edge-glow {
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.35);
   color: #fca5a5;
-  padding: 10px 14px;
+  padding: 12px 14px;
   border-radius: 8px;
   font-size: 0.85rem;
   margin-top: 14px;
+  line-height: 1.45;
+}
+
+.import-error-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.import-error-action-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.import-error-action-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.import-error-action-btn.primary-action {
+  background: rgba(29, 185, 84, 0.25);
+  border-color: rgba(29, 185, 84, 0.5);
+  color: #1ed760;
+}
+
+.import-error-action-btn.primary-action:hover {
+  background: rgba(29, 185, 84, 0.4);
+  color: #fff;
 }
 
 /* Footer */

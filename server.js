@@ -2688,7 +2688,8 @@ app.post('/api/import/parse', async (req, res) => {
       error: err.message,
       code: err.code || 'ERR_IMPORT_PARSE_FAILED',
       requiresAuth: Boolean(err.requiresAuth),
-      playlistId: err.playlistId || null
+      playlistId: err.playlistId || null,
+      playlistMeta: err.playlistMeta || null
     });
   }
 });

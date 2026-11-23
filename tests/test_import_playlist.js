@@ -109,9 +109,11 @@ async function runTestSuite() {
   const userExtractedInfo = extractSpotifyPlaylistInfo(userSpotifyUrl);
   assert.strictEqual(userExtractedInfo.id, '1XBjvHvMsZlZaFoNtRKpTl');
   assert.strictEqual(userExtractedInfo.hasPtToken, true, 'Must detect presence of pt collaborative/invite sharing token');
+  assert.strictEqual(userExtractedInfo.hasSharingParams, true, 'Must flag presence of sharing parameters');
   assert.strictEqual(userExtractedInfo.pt, 'dc66b12165ace170f7531562d85333b9');
+  assert.strictEqual(userExtractedInfo.si, 'a0081be864944c0f');
 
-  console.log('  ✓ User exact Spotify playlist link parsed with full 22-char ID and sharing token detected');
+  console.log('  ✓ User exact Spotify playlist link parsed with full 22-char ID and sharing parameters detected without false private assumptions');
 
   // YouTube Music URL & ID validation
   console.log('\n--- SUITE A2: YOUTUBE MUSIC URL & PLAYLIST ID EXTRACTION ---');

@@ -2,6 +2,12 @@
  * Spotify Playlist Provider Adapter for MusiSurf
  * Handles Spotify URL validation, identifier extraction, Web API pagination,
  * and public embed fallback extraction with zero configuration required.
+ *
+ * Implements Spotify Web API standards:
+ * - Playlist metadata: GET https://api.spotify.com/v1/playlists/{playlist_id}
+ * - Playlist items: GET https://api.spotify.com/v1/playlists/{playlist_id}/items
+ * - Never infers privacy from URL sharing parameters (pt, si).
+ * - Discrete error codes for Scenarios A through H.
  */
 
 const { sanitizeString } = require('./playlistParser');
@@ -10,7 +16,8 @@ const { sanitizeString } = require('./playlistParser');
 const SPOTIFY_ID_REGEX = /^[a-zA-Z0-9]{15,35}$/;
 
 /**
- * Validates a Spotify playlist URL or URI and extracts detailed info including sharing tokens.
+ * Validates a Spotify playlist URL or URI and extracts clean identifier and diagnostic parameters.
+ * Note: Sharing tokens (pt, si) are URL metadata only and must NEVER be used to infer privacy.
  */
 function extractSpotifyPlaylistInfo(input) {
   if (!input || typeof input !== 'string') return null;
@@ -30,6 +37,7 @@ function extractSpotifyPlaylistInfo(input) {
     return {
       id,
       hasPtToken: Boolean(pt),
+      hasSharingParams: Boolean(pt || si),
       pt,
       si,
       originalUrl: trimmed
@@ -56,13 +64,13 @@ function extractSpotifyPlaylistInfo(input) {
       return {
         id,
         hasPtToken: Boolean(pt),
+        hasSharingParams: Boolean(pt || si),
         pt,
         si,
         originalUrl: trimmed
       };
     }
   } catch (err) {
-    // Not a valid URL
     return null;
   }
 
@@ -106,22 +114,47 @@ async function getSpotifyApiToken() {
 }
 
 /**
- * Fetches playlist tracks via official Spotify Web API using client credentials.
+ * Fetches playlist tracks via official Spotify Web API.
+ * Uses separate requests for:
+ * 1. Playlist metadata: GET https://api.spotify.com/v1/playlists/{playlist_id}
+ * 2. Playlist items: GET https://api.spotify.com/v1/playlists/{playlist_id}/items
+ *
+ * Implements strict error code mapping (Scenarios A through H).
  */
 async function fetchViaWebApi(playlistId, token) {
-  const metaRes = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}`, {
-    headers: { 'Authorization': `Bearer ${token}` },
-    signal: AbortSignal.timeout(8000)
-  });
-
-  if (metaRes.status === 404) {
-    throw new Error('Spotify playlist not found or has been deleted');
+  // 1. Fetch Playlist Metadata
+  let metaRes;
+  try {
+    metaRes = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}?fields=id,name,description,owner,images`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+      signal: AbortSignal.timeout(8000)
+    });
+  } catch (netErr) {
+    const err = new Error("We couldn't connect to Spotify. Check your connection and retry.");
+    err.code = 'ERR_SPOTIFY_NETWORK';
+    throw err;
   }
-  if (metaRes.status === 401 || metaRes.status === 403) {
-    throw new Error('Spotify playlist is private and requires user authorization');
+
+  if (metaRes.status === 401) {
+    const err = new Error('Your Spotify connection has expired. Reconnect your account to continue.');
+    err.code = 'ERR_SPOTIFY_AUTH_EXPIRED';
+    err.requiresAuth = true;
+    throw err;
+  }
+  if (metaRes.status === 404) {
+    const err = new Error("We couldn't find this Spotify playlist. Check the link and try again.");
+    err.code = 'ERR_SPOTIFY_NOT_FOUND';
+    throw err;
+  }
+  if (metaRes.status === 429) {
+    const err = new Error('Spotify is temporarily limiting requests. Please try again shortly.');
+    err.code = 'ERR_SPOTIFY_RATE_LIMIT';
+    throw err;
   }
   if (!metaRes.ok) {
-    throw new Error(`Spotify Web API error (${metaRes.status})`);
+    const err = new Error(`Spotify metadata request failed (HTTP ${metaRes.status})`);
+    err.code = 'ERR_SPOTIFY_API_ERROR';
+    throw err;
   }
 
   const meta = await metaRes.json();
@@ -129,28 +162,57 @@ async function fetchViaWebApi(playlistId, token) {
   const playlistDesc = sanitizeString(meta.description || '');
   const creator = sanitizeString(meta.owner?.display_name || 'Spotify');
   const artwork = meta.images?.[0]?.url || '';
-  const totalTracks = meta.tracks?.total || 0;
 
-  let allItems = meta.tracks?.items || [];
-  let nextUrl = meta.tracks?.next;
+  // 2. Fetch Playlist Items via /items endpoint (Spotify Web API 2026 standard)
+  let itemsUrl = `https://api.spotify.com/v1/playlists/${playlistId}/items?limit=100`;
+  let allItems = [];
 
-  // Page through paginated track results (up to 1,000 tracks max safety limit)
-  while (nextUrl && allItems.length < 1000) {
+  while (itemsUrl && allItems.length < 1000) {
+    let itemsRes;
     try {
-      const pageRes = await fetch(nextUrl, {
+      itemsRes = await fetch(itemsUrl, {
         headers: { 'Authorization': `Bearer ${token}` },
         signal: AbortSignal.timeout(8000)
       });
-      if (!pageRes.ok) break;
-      const pageData = await pageRes.json();
-      if (Array.isArray(pageData.items)) {
-        allItems.push(...pageData.items);
-      }
-      nextUrl = pageData.next;
-    } catch (err) {
-      console.warn('[SpotifyAdapter] Pagination fetch interrupted:', err.message);
-      break;
+    } catch (netErr) {
+      if (allItems.length > 0) break; // If we already collected tracks, use what we have
+      const err = new Error("We couldn't connect to Spotify. Check your connection and retry.");
+      err.code = 'ERR_SPOTIFY_NETWORK';
+      throw err;
     }
+
+    if (itemsRes.status === 403) {
+      // Scenario B: Playlist identified, but items endpoint restricted by Spotify permissions
+      const err = new Error('Spotify can identify this playlist, but your connected account does not have permission to retrieve its songs through the current API. The API only permits item retrieval for playlists owned by or collaborated on by your connected account.');
+      err.code = 'ERR_SPOTIFY_ITEMS_RESTRICTED';
+      err.requiresAuth = true;
+      err.playlistMeta = { name: playlistName, creator, artwork };
+      throw err;
+    }
+    if (itemsRes.status === 401) {
+      const err = new Error('Your Spotify connection has expired. Reconnect your account to continue.');
+      err.code = 'ERR_SPOTIFY_AUTH_EXPIRED';
+      err.requiresAuth = true;
+      throw err;
+    }
+    if (itemsRes.status === 429) {
+      if (allItems.length > 0) break;
+      const err = new Error('Spotify is temporarily limiting requests. Please try again shortly.');
+      err.code = 'ERR_SPOTIFY_RATE_LIMIT';
+      throw err;
+    }
+    if (!itemsRes.ok) {
+      if (allItems.length > 0) break;
+      const err = new Error(`Spotify items request failed (HTTP ${itemsRes.status})`);
+      err.code = 'ERR_SPOTIFY_API_ERROR';
+      throw err;
+    }
+
+    const pageData = await itemsRes.json();
+    if (Array.isArray(pageData.items)) {
+      allItems.push(...pageData.items);
+    }
+    itemsUrl = pageData.next || null;
   }
 
   const tracks = [];
@@ -182,6 +244,12 @@ async function fetchViaWebApi(playlistId, token) {
     });
   });
 
+  if (tracks.length === 0) {
+    const err = new Error('This playlist contains no accessible tracks.');
+    err.code = 'ERR_SPOTIFY_EMPTY';
+    throw err;
+  }
+
   return {
     provider: 'spotify',
     externalPlaylistId: playlistId,
@@ -197,73 +265,72 @@ async function fetchViaWebApi(playlistId, token) {
 
 /**
  * Fetches playlist metadata & tracks via public Spotify Embed (zero-config fallback).
+ * Never assumes a playlist is private based on sharing tokens.
  */
-async function fetchViaPublicEmbed(playlistId, hasPtToken = false) {
+async function fetchViaPublicEmbed(playlistId) {
   const embedUrl = `https://open.spotify.com/embed/playlist/${playlistId}`;
 
   let res;
   try {
     res = await fetch(embedUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9'
       },
       signal: AbortSignal.timeout(10000)
     });
   } catch (netErr) {
-    throw new Error(`Failed to connect to Spotify (${netErr.message})`);
+    const err = new Error("We couldn't connect to Spotify. Check your connection and retry.");
+    err.code = 'ERR_SPOTIFY_NETWORK';
+    throw err;
   }
 
-  if (res.status === 404 || res.status === 403 || res.status === 401) {
-    if (hasPtToken) {
-      const err = new Error('This Spotify playlist is invite-only, collaborative, or private (sharing token detected). To import it, connect your Spotify account below or set the playlist to Public on Spotify.');
-      err.code = 'ERR_SPOTIFY_AUTH_REQUIRED';
-      err.requiresAuth = true;
-      err.playlistId = playlistId;
-      throw err;
-    }
-    const err = new Error('Spotify playlist not found or has been set to private. Make sure the playlist is public on Spotify or connect your Spotify account.');
-    err.code = 'ERR_SPOTIFY_NOT_FOUND_OR_PRIVATE';
+  if (res.status === 404) {
+    const err = new Error("We couldn't find this Spotify playlist. Check the link and try again.");
+    err.code = 'ERR_SPOTIFY_NOT_FOUND';
     err.requiresAuth = true;
     err.playlistId = playlistId;
     throw err;
   }
+  if (res.status === 429) {
+    const err = new Error('Spotify is temporarily limiting requests. Please try again shortly.');
+    err.code = 'ERR_SPOTIFY_RATE_LIMIT';
+    throw err;
+  }
   if (!res.ok) {
-    throw new Error(`Failed to retrieve Spotify playlist (HTTP ${res.status})`);
+    const err = new Error('Connect your Spotify account to check whether you can access this playlist.');
+    err.code = 'ERR_SPOTIFY_AUTH_REQUIRED';
+    err.requiresAuth = true;
+    err.playlistId = playlistId;
+    throw err;
   }
 
   const html = await res.text();
   const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
   if (!nextDataMatch) {
-    if (hasPtToken) {
-      const err = new Error('This Spotify playlist is invite-only, collaborative, or private (sharing token detected). To import it, connect your Spotify account below or set the playlist to Public on Spotify.');
-      err.code = 'ERR_SPOTIFY_AUTH_REQUIRED';
-      err.requiresAuth = true;
-      err.playlistId = playlistId;
-      throw err;
-    }
-    throw new Error('Unable to extract Spotify playlist data from public embed');
+    const err = new Error('Connect your Spotify account to check whether you can access this playlist.');
+    err.code = 'ERR_SPOTIFY_AUTH_REQUIRED';
+    err.requiresAuth = true;
+    err.playlistId = playlistId;
+    throw err;
   }
 
   let json;
   try {
     json = JSON.parse(nextDataMatch[1]);
   } catch (err) {
-    throw new Error('Failed to parse Spotify embed playlist payload');
+    const parseErr = new Error('Connect your Spotify account to check whether you can access this playlist.');
+    parseErr.code = 'ERR_SPOTIFY_AUTH_REQUIRED';
+    parseErr.requiresAuth = true;
+    parseErr.playlistId = playlistId;
+    throw parseErr;
   }
 
   // Check if pageProps returned a 404 or auth challenge inside Next.js payload
   if (json.props?.pageProps?.status === 404 || json.props?.pageProps?.state?.data?.entity === null) {
-    if (hasPtToken) {
-      const err = new Error('This Spotify playlist is invite-only, collaborative, or private (sharing token detected). To import it, connect your Spotify account below or set the playlist to Public on Spotify.');
-      err.code = 'ERR_SPOTIFY_AUTH_REQUIRED';
-      err.requiresAuth = true;
-      err.playlistId = playlistId;
-      throw err;
-    }
-    const err = new Error('Spotify playlist contains no accessible entity data or is private. Connect your Spotify account to import private playlists.');
-    err.code = 'ERR_SPOTIFY_NOT_FOUND_OR_PRIVATE';
+    const err = new Error('Connect your Spotify account to check whether you can access this playlist.');
+    err.code = 'ERR_SPOTIFY_AUTH_REQUIRED';
     err.requiresAuth = true;
     err.playlistId = playlistId;
     throw err;
@@ -271,15 +338,8 @@ async function fetchViaPublicEmbed(playlistId, hasPtToken = false) {
 
   const entity = json.props?.pageProps?.state?.data?.entity;
   if (!entity) {
-    if (hasPtToken) {
-      const err = new Error('This Spotify playlist is invite-only, collaborative, or private (sharing token detected). To import it, connect your Spotify account below or set the playlist to Public on Spotify.');
-      err.code = 'ERR_SPOTIFY_AUTH_REQUIRED';
-      err.requiresAuth = true;
-      err.playlistId = playlistId;
-      throw err;
-    }
-    const err = new Error('Spotify playlist contains no accessible entity data or is private');
-    err.code = 'ERR_SPOTIFY_NOT_FOUND_OR_PRIVATE';
+    const err = new Error('Connect your Spotify account to check whether you can access this playlist.');
+    err.code = 'ERR_SPOTIFY_AUTH_REQUIRED';
     err.requiresAuth = true;
     err.playlistId = playlistId;
     throw err;
@@ -316,6 +376,12 @@ async function fetchViaPublicEmbed(playlistId, hasPtToken = false) {
     });
   });
 
+  if (tracks.length === 0) {
+    const err = new Error('This playlist contains no accessible tracks.');
+    err.code = 'ERR_SPOTIFY_EMPTY';
+    throw err;
+  }
+
   return {
     provider: 'spotify',
     externalPlaylistId: playlistId,
@@ -332,7 +398,7 @@ async function fetchViaPublicEmbed(playlistId, hasPtToken = false) {
 /**
  * Universal Spotify Playlist Fetcher.
  * Tries user OAuth token first, then official Web API client credentials (if configured),
- * then seamlessly falls back to high-fidelity public embed extraction.
+ * then seamlessly falls back to public embed extraction.
  */
 async function fetchSpotifyPlaylist(input, userToken = null) {
   const info = extractSpotifyPlaylistInfo(input);
@@ -344,11 +410,7 @@ async function fetchSpotifyPlaylist(input, userToken = null) {
 
   // 1. If user provided an active Spotify OAuth token, use it directly (supports private & collaborative)
   if (userToken && typeof userToken === 'string') {
-    try {
-      return await fetchViaWebApi(playlistId, userToken);
-    } catch (userTokenErr) {
-      console.warn('[SpotifyAdapter] User token fetch error, falling back:', userTokenErr.message);
-    }
+    return await fetchViaWebApi(playlistId, userToken);
   }
 
   // 2. Try official Web API with app client credentials (if configured)
@@ -357,12 +419,13 @@ async function fetchSpotifyPlaylist(input, userToken = null) {
     try {
       return await fetchViaWebApi(playlistId, appToken);
     } catch (apiErr) {
-      console.warn('[SpotifyAdapter] Web API fetch error, falling back to public embed:', apiErr.message);
+      // If client credentials are not permitted for user playlists, continue to embed fallback
+      console.warn('[SpotifyAdapter] Web API app token returned error, trying embed fallback:', apiErr.message);
     }
   }
 
-  // 3. Fallback to public embed extractor with token awareness
-  return await fetchViaPublicEmbed(playlistId, info.hasPtToken);
+  // 3. Fallback to public embed extractor
+  return await fetchViaPublicEmbed(playlistId);
 }
 
 module.exports = {

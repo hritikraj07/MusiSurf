@@ -523,6 +523,8 @@
     ytDetectedIdPill: document.getElementById('ytDetectedIdPill'),
     spotifyAuthActionRow: document.getElementById('spotifyAuthActionRow'),
     spotifyConnectBtn: document.getElementById('spotifyConnectBtn'),
+    spotifyConnectHeaderBtn: document.getElementById('spotifyConnectHeaderBtn'),
+    spotifyDisconnectHeaderBtn: document.getElementById('spotifyDisconnectHeaderBtn'),
     spotifyAuthStatusDot: document.getElementById('spotifyAuthStatusDot'),
     spotifyAuthStatusText: document.getElementById('spotifyAuthStatusText'),
     importDropZone: document.getElementById('importDropZone'),
@@ -9154,11 +9156,15 @@
         if (elements.spotifyAuthStatusDot && elements.spotifyAuthStatusText) {
           if (data && data.connected) {
             elements.spotifyAuthStatusDot.className = 'status-indicator-dot dot-green';
-            elements.spotifyAuthStatusText.textContent = 'Account connected';
+            elements.spotifyAuthStatusText.textContent = 'Spotify Connected';
+            if (elements.spotifyConnectHeaderBtn) elements.spotifyConnectHeaderBtn.style.display = 'none';
+            if (elements.spotifyDisconnectHeaderBtn) elements.spotifyDisconnectHeaderBtn.style.display = 'inline-block';
             if (elements.spotifyAuthActionRow) elements.spotifyAuthActionRow.style.display = 'none';
           } else {
             elements.spotifyAuthStatusDot.className = 'status-indicator-dot dot-gray';
             elements.spotifyAuthStatusText.textContent = 'Not connected';
+            if (elements.spotifyConnectHeaderBtn) elements.spotifyConnectHeaderBtn.style.display = 'inline-block';
+            if (elements.spotifyDisconnectHeaderBtn) elements.spotifyDisconnectHeaderBtn.style.display = 'none';
           }
         }
       })
@@ -9172,16 +9178,35 @@
       const parts = trimmed.replace('spotify:playlist:', '').split('?');
       const id = parts[0].trim();
       const params = new URLSearchParams(parts[1] || '');
-      return /^[a-zA-Z0-9]{15,35}$/.test(id) ? { id, hasPtToken: Boolean(params.get('pt')) } : null;
+      const hasPt = Boolean(params.get('pt'));
+      const hasSi = Boolean(params.get('si'));
+      return /^[a-zA-Z0-9]{15,35}$/.test(id) ? {
+        id,
+        hasPtToken: hasPt,
+        hasSharingParams: hasPt || hasSi,
+        pt: params.get('pt') || '',
+        si: params.get('si') || ''
+      } : null;
     }
     try {
       const parsed = new URL(trimmed);
+      const host = parsed.hostname.toLowerCase();
+      if (host !== 'open.spotify.com' && host !== 'play.spotify.com' && host !== 'spotify.com') {
+        return null;
+      }
       const segments = parsed.pathname.split('/').filter(Boolean);
       const idx = segments.indexOf('playlist');
       if (idx !== -1 && segments[idx + 1]) {
         const id = segments[idx + 1].trim();
         const hasPt = Boolean(parsed.searchParams.get('pt'));
-        return /^[a-zA-Z0-9]{15,35}$/.test(id) ? { id, hasPtToken: hasPt } : null;
+        const hasSi = Boolean(parsed.searchParams.get('si'));
+        return /^[a-zA-Z0-9]{15,35}$/.test(id) ? {
+          id,
+          hasPtToken: hasPt,
+          hasSharingParams: hasPt || hasSi,
+          pt: parsed.searchParams.get('pt') || '',
+          si: parsed.searchParams.get('si') || ''
+        } : null;
       }
     } catch (e) {}
     return null;
@@ -9222,16 +9247,99 @@
     if (elements.importValidationError) elements.importValidationError.style.display = 'none';
   }
 
-  function showImportError(msg, requiresAuth = false) {
-    if (elements.importValidationError) {
-      elements.importValidationError.textContent = msg;
-      elements.importValidationError.style.display = 'block';
-    } else {
+  function promptSpotifyConnect() {
+    fetch('/api/auth/spotify/status')
+      .then(res => res.json())
+      .then(statusData => {
+        if (statusData && statusData.configured) {
+          window.location.href = '/api/auth/spotify/login';
+        } else {
+          promptSpotifyTokenInput();
+        }
+      })
+      .catch(() => {
+        promptSpotifyTokenInput();
+      });
+  }
+
+  function promptSpotifyTokenInput() {
+    const token = prompt('Paste your Spotify Access Token to connect your Spotify account:');
+    if (token && token.trim()) {
+      fetch('/api/auth/spotify/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: token.trim() })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            showToast('Spotify account connected successfully!', '🟢');
+            checkSpotifyAuthStatus();
+            if (elements.importValidationError) elements.importValidationError.style.display = 'none';
+          } else {
+            showToast('Failed to save Spotify token: ' + (data.error || 'Invalid token'), '⚠️');
+          }
+        })
+        .catch(err => {
+          showToast('Error connecting token: ' + err.message, '⚠️');
+        });
+    }
+  }
+
+  function showImportError(msg, requiresAuth = false, code = null) {
+    if (!elements.importValidationError) {
       showToast(msg, '⚠️');
+      return;
     }
-    if (requiresAuth && elements.spotifyAuthActionRow) {
-      elements.spotifyAuthActionRow.style.display = 'flex';
+
+    elements.importValidationError.style.display = 'block';
+
+    if (code === 'ERR_SPOTIFY_ITEMS_RESTRICTED') {
+      elements.importValidationError.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 5px;">Spotify API Permission Restriction</div>
+        <p style="margin: 0 0 10px 0; font-size: 0.83rem; line-height: 1.45; opacity: 0.95;">${escapeHtml(msg)}</p>
+        <div class="import-error-actions">
+          <button type="button" class="import-error-action-btn primary-action" id="errorBtnConnectOwner">
+            Connect Owner Account
+          </button>
+          <button type="button" class="import-error-action-btn" id="errorBtnFallbackFile">
+            Import via Playlist File (CSV/M3U)
+          </button>
+        </div>
+      `;
+      const btnOwner = elements.importValidationError.querySelector('#errorBtnConnectOwner');
+      if (btnOwner) btnOwner.onclick = () => promptSpotifyConnect();
+      const btnFile = elements.importValidationError.querySelector('#errorBtnFallbackFile');
+      if (btnFile) btnFile.onclick = () => switchImportTab('file');
+      return;
     }
+
+    if (code === 'ERR_SPOTIFY_AUTH_REQUIRED' || requiresAuth) {
+      elements.importValidationError.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 5px;">Spotify Authentication Required</div>
+        <p style="margin: 0 0 10px 0; font-size: 0.83rem; line-height: 1.45; opacity: 0.95;">${escapeHtml(msg)}</p>
+        <div class="import-error-actions">
+          <button type="button" class="import-error-action-btn primary-action" id="errorBtnConnectSpotify">
+            Connect Spotify Account
+          </button>
+          <button type="button" class="import-error-action-btn" id="errorBtnPasteToken">
+            Paste Access Token
+          </button>
+          <button type="button" class="import-error-action-btn" id="errorBtnSwitchFile">
+            Import via Playlist File
+          </button>
+        </div>
+      `;
+      const btnConn = elements.importValidationError.querySelector('#errorBtnConnectSpotify');
+      if (btnConn) btnConn.onclick = () => promptSpotifyConnect();
+      const btnTok = elements.importValidationError.querySelector('#errorBtnPasteToken');
+      if (btnTok) btnTok.onclick = () => promptSpotifyTokenInput();
+      const btnFile = elements.importValidationError.querySelector('#errorBtnSwitchFile');
+      if (btnFile) btnFile.onclick = () => switchImportTab('file');
+      return;
+    }
+
+    elements.importValidationError.textContent = msg;
   }
 
   function openImportPlaylistModal() {
@@ -9393,7 +9501,7 @@
       console.error('[Import] Workflow error:', err);
       if (elements.importStepProgress) elements.importStepProgress.style.display = 'none';
       if (elements.importStepChoose) elements.importStepChoose.style.display = 'block';
-      showImportError(err.message || 'Import failed. Check the URL/file and try again.', err.requiresAuth);
+      showImportError(err.message || 'Import failed. Check the URL/file and try again.', err.requiresAuth, err.code);
     }
   }
 
@@ -11584,123 +11692,6 @@
       if (elements.searchAutocompleteDropdown &&
           elements.globalSearchInput &&
           !elements.globalSearchInput.contains(e.target) &&
-          !elements.searchAutocompleteDropdown.contains(e.target)) {
-        elements.searchAutocompleteDropdown.style.display = 'none';
-      }
-    });
-
-    if (elements.clearRecentBtn) {
-      elements.clearRecentBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        state.recentlyPlayed = [];
-        try {
-          localStorage.removeItem('musisurf_recently_played');
-        } catch (err) {}
-        renderSearchRecentUI();
-      });
-    }
-
-    // Category / Mood Cards in Search View
-    document.querySelectorAll('.category-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const query = card.dataset.query;
-        if (query) {
-          elements.globalSearchInput.value = query;
-          elements.clearSearchBtn.style.display = 'flex';
-          switchView('search');
-          performSearch(query);
-        }
-      });
-    });
-
-    // Source Filter Pills in Search View
-    document.querySelectorAll('.source-pill').forEach(pill => {
-      pill.addEventListener('click', () => {
-        document.querySelectorAll('.source-pill').forEach(p => p.classList.remove('active'));
-        pill.classList.add('active');
-        state.searchSource = pill.dataset.source;
-        const currentQ = elements.globalSearchInput.value.trim();
-        if (currentQ) performSearch(currentQ);
-      });
-    });
-
-    // Home Filter Pills (100% Bollywood Moods & Dynamic Quick Picks Update)
-    document.querySelectorAll('.filter-pill').forEach(pill => {
-      pill.addEventListener('click', () => {
-        document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
-        pill.classList.add('active');
-        const filter = pill.dataset.filter;
-
-        const visibleTracks = [];
-        document.querySelectorAll('.shelf-section').forEach(shelf => {
-          const match = (filter === 'all' || shelf.dataset.shelfId === filter);
-          if (match) {
-            shelf.style.display = 'flex';
-            if (shelf._sectionData && Array.isArray(shelf._sectionData.tracks)) {
-              visibleTracks.push(...shelf._sectionData.tracks);
-            }
-          } else {
-            shelf.style.display = 'none';
-          }
-        });
-
-        // Dynamically update Quick Picks at the top of the Home page with songs matching the chosen category!
-        if (filter === 'all' && state.dailyTopTracks && state.dailyTopTracks.length >= 6) {
-          renderQuickPicks(deduplicateAndShuffleAlbums(state.dailyTopTracks, 6));
-        } else if (visibleTracks.length > 0) {
-          renderQuickPicks(deduplicateAndShuffleAlbums(visibleTracks, 6));
-        } else if (state.allAvailableTracks && state.allAvailableTracks.length > 0) {
-          renderQuickPicks(deduplicateAndShuffleAlbums(state.allAvailableTracks, 6));
-        }
-      });
-    });
-
-    // Player Controls
-    elements.playPauseBtn.addEventListener('click', togglePlayPause);
-    elements.nextBtn.addEventListener('click', nextTrack);
-    elements.prevBtn.addEventListener('click', prevTrack);
-    elements.playerHeartBtn.addEventListener('click', () => {
-      if (state.currentTrack) toggleLikeSong(state.currentTrack);
-    });
-
-    // Repeat Mode: 3-way toggle ('off' -> 'all' -> 'one' -> 'off')
-    elements.repeatBtn.addEventListener('click', toggleRepeatMode);
-    if (elements.mobRepeatBtn) elements.mobRepeatBtn.addEventListener('click', toggleRepeatMode);
-    updateRepeatUI();
-
-    // Shuffle Mode Toggle (Synchronized 3-Mode Shuffle Engine)
-    elements.shuffleBtn.addEventListener('click', cyclePlaylistMode);
-
-    // Interactive Draggable Scrubber Engine (Desktop & Mobile, Mouse & Touch)
-    function setupDraggableScrubber(barEl, fillEl, timeLabelEl, isMobileScrubber = false) {
-      if (!barEl) return;
-
-      let isDragging = false;
-      let dragPct = 0;
-
-      function updateScrubUI(pct) {
-        dragPct = Math.max(0, Math.min(1, pct));
-        const dur = getTotalDuration();
-        const displayTime = formatTime(dragPct * dur);
-
-        if (fillEl) fillEl.style.width = `${dragPct * 100}%`;
-        if (timeLabelEl) timeLabelEl.textContent = displayTime;
-
-        // Keep desktop and mobile scrubber bars in sync during drag
-        if (elements.progressFill && fillEl !== elements.progressFill) {
-          elements.progressFill.style.width = `${dragPct * 100}%`;
-        }
-        if (elements.mobProgressFill && fillEl !== elements.mobProgressFill) {
-          elements.mobProgressFill.style.width = `${dragPct * 100}%`;
-        }
-        if (elements.miniPlayerFill) {
-          elements.miniPlayerFill.style.width = `${dragPct * 100}%`;
-        }
-        if (elements.currentTimeLabel) elements.currentTimeLabel.textContent = displayTime;
-        if (elements.mobCurrentTime) elements.mobCurrentTime.textContent = displayTime;
-      }
-
-      function getClientX(e) {
         if (e.touches && e.touches.length > 0) return e.touches[0].clientX;
         if (e.changedTouches && e.changedTouches.length > 0) return e.changedTouches[0].clientX;
         return e.clientX || 0;
@@ -12774,17 +12765,39 @@
       elements.importMethodFileTab.addEventListener('click', () => switchImportTab('file'));
     }
 
-    // Spotify Live ID Detection Pill & Paste Button
+    // Spotify Live ID Detection Card & Paste Button
     function updateSpotifyLiveDetection() {
       const val = (elements.importPlaylistUrlInput?.value || '').trim();
       const info = clientExtractSpotifyPlaylistInfo(val);
       if (elements.spotifyDetectedIdPill) {
         if (info && info.id) {
-          elements.spotifyDetectedIdPill.style.display = 'inline-flex';
-          elements.spotifyDetectedIdPill.innerHTML = `✓ Detected Spotify Playlist ID: <strong>${escapeHtml(info.id)}</strong> (${info.id.length} chars)${info.hasPtToken ? ' <span style="opacity:0.85;font-size:0.7rem;margin-left:4px;">(Sharing Token Present)</span>' : ''}`;
-          if (info.hasPtToken && elements.spotifyAuthActionRow) {
-            elements.spotifyAuthActionRow.style.display = 'flex';
-          }
+          elements.spotifyDetectedIdPill.style.display = 'block';
+          elements.spotifyDetectedIdPill.className = 'detected-playlist-card';
+          const sharingText = info.hasSharingParams
+            ? 'Present (diagnostic only, does NOT imply private)'
+            : 'None';
+          elements.spotifyDetectedIdPill.innerHTML = `
+            <div class="detected-card-header">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 14px; height: 14px; display: inline-block;">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span>Spotify playlist detected</span>
+            </div>
+            <div class="detected-card-body">
+              <div class="detected-row">
+                <span class="row-label">Playlist ID:</span>
+                <span class="row-value mono">${escapeHtml(info.id)}</span>
+              </div>
+              <div class="detected-row">
+                <span class="row-label">Length:</span>
+                <span class="row-value">${info.id.length} characters</span>
+              </div>
+              <div class="detected-row">
+                <span class="row-label">Sharing parameters:</span>
+                <span class="row-value" style="color: ${info.hasSharingParams ? '#cfcfcf' : '#888'}; font-size: 0.76rem;">${sharingText}</span>
+              </div>
+            </div>
+          `;
         } else {
           elements.spotifyDetectedIdPill.style.display = 'none';
         }
@@ -12816,15 +12829,32 @@
       });
     }
 
-    // YouTube Music Live ID Detection Pill & Paste Button
+    // YouTube Music Live ID Detection Card & Paste Button
     function updateYtMusicLiveDetection() {
       const val = (elements.importYtMusicUrlInput?.value || '').trim();
       const ytId = clientExtractYouTubePlaylistId(val);
       if (elements.ytDetectedIdPill) {
         if (ytId) {
-          elements.ytDetectedIdPill.style.display = 'inline-flex';
-          elements.ytDetectedIdPill.className = 'import-detected-id-pill ytmusic-pill';
-          elements.ytDetectedIdPill.innerHTML = `✓ Detected YouTube Playlist ID: <strong>${escapeHtml(ytId)}</strong> (${ytId.length} chars)`;
+          elements.ytDetectedIdPill.style.display = 'block';
+          elements.ytDetectedIdPill.className = 'detected-playlist-card ytmusic-card';
+          elements.ytDetectedIdPill.innerHTML = `
+            <div class="detected-card-header">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 14px; height: 14px; display: inline-block;">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span>YouTube Music playlist detected</span>
+            </div>
+            <div class="detected-card-body">
+              <div class="detected-row">
+                <span class="row-label">Playlist ID:</span>
+                <span class="row-value mono">${escapeHtml(ytId)}</span>
+              </div>
+              <div class="detected-row">
+                <span class="row-label">Length:</span>
+                <span class="row-value">${ytId.length} characters</span>
+              </div>
+            </div>
+          `;
         } else {
           elements.ytDetectedIdPill.style.display = 'none';
         }
@@ -12856,10 +12886,25 @@
       });
     }
 
-    // Spotify Connect Button
+    // Spotify Connect & Disconnect Buttons
     if (elements.spotifyConnectBtn) {
-      elements.spotifyConnectBtn.addEventListener('click', () => {
-        window.location.href = '/api/auth/spotify/login';
+      elements.spotifyConnectBtn.addEventListener('click', promptSpotifyConnect);
+    }
+    if (elements.spotifyConnectHeaderBtn) {
+      elements.spotifyConnectHeaderBtn.addEventListener('click', promptSpotifyConnect);
+    }
+    if (elements.spotifyDisconnectHeaderBtn) {
+      elements.spotifyDisconnectHeaderBtn.addEventListener('click', async () => {
+        try {
+          const res = await fetch('/api/auth/spotify/disconnect', { method: 'POST' });
+          const d = await res.json();
+          if (d.success) {
+            showToast('Spotify disconnected', '🔌');
+            checkSpotifyAuthStatus();
+          }
+        } catch (e) {
+          showToast('Failed to disconnect Spotify', '⚠️');
+        }
       });
     }
 
