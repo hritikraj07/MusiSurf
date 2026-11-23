@@ -112,5 +112,25 @@ CREATE TABLE IF NOT EXISTS daily_trending_hindi_songs (
 CREATE INDEX IF NOT EXISTS idx_daily_trending_date_ist ON daily_trending_hindi_songs(date_ist DESC);
 CREATE INDEX IF NOT EXISTS idx_daily_trending_canonical_id ON daily_trending_hindi_songs(canonical_id);
 
+-- 7. User Listening History Table (Personal Soundtrack & Sound Capsule)
+CREATE TABLE IF NOT EXISTS user_listening_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES neon_auth."user"(id) ON DELETE CASCADE,
+  track_id VARCHAR(64) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  artist VARCHAR(255) NOT NULL,
+  album VARCHAR(255),
+  thumbnail_url TEXT,
+  duration_seconds INTEGER NOT NULL DEFAULT 0,
+  listened_seconds INTEGER NOT NULL DEFAULT 0,
+  is_completed BOOLEAN NOT NULL DEFAULT FALSE,
+  listened_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_listening_history_user_id ON user_listening_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_listening_history_user_time ON user_listening_history(user_id, listened_at DESC);
+CREATE INDEX IF NOT EXISTS idx_listening_history_user_track ON user_listening_history(user_id, track_id);
+
+
 
 

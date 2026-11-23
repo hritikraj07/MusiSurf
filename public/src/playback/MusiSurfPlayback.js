@@ -87,13 +87,20 @@
     }
 
     _computeStreamUrl() {
+      let base = '';
+      if (typeof window !== 'undefined') {
+        const isNative = window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform();
+        if (isNative || window.location.hostname === 'localhost' || window.location.protocol === 'capacitor:') {
+          base = 'https://musi-surf.vercel.app';
+        }
+      }
       if (this.audioUrl) {
-        return `/api/stream?url=${encodeURIComponent(this.audioUrl)}`;
+        return `${base}/api/stream?url=${encodeURIComponent(this.audioUrl)}`;
       }
       if (this.ytId) {
-        return `/api/yt-stream?v=${encodeURIComponent(this.ytId)}`;
+        return `${base}/api/yt-stream?v=${encodeURIComponent(this.ytId)}`;
       }
-      return `/api/download?title=${encodeURIComponent(this.title)}&artist=${encodeURIComponent(this.artist)}`;
+      return `${base}/api/download?title=${encodeURIComponent(this.title)}&artist=${encodeURIComponent(this.artist)}`;
     }
 
     toDict() {
@@ -397,6 +404,17 @@
         }
       } catch (err) {
         console.warn('[NativeAudioEngine] setVolume failed:', err);
+      }
+    }
+
+    async setLoudness(mode) {
+      if (!this.isAvailable()) return;
+      try {
+        if (typeof this._plugin.setLoudness === 'function') {
+          await this._plugin.setLoudness({ mode: String(mode || 'off') });
+        }
+      } catch (err) {
+        console.warn('[NativeAudioEngine] setLoudness failed:', err);
       }
     }
 

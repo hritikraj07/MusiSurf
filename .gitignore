@@ -8,3 +8,12 @@ Thumbs.db
 .neon
 neon.ts
 
+# Android build outputs & local config
+.gradle/
+build/
+android/.gradle/
+android/app/build/
+android/local.properties
+*.apk
+*.aab
+

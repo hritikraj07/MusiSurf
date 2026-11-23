@@ -1795,7 +1795,8 @@ html, body {
   padding: 6px 8px;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color 0.15s ease, background-color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
+  will-change: transform, opacity;
   text-decoration: none;
   user-select: none !important;
   -webkit-user-select: none !important;
@@ -6869,17 +6870,18 @@ div[data-track-id].playing:hover .song-more-trigger {
   width: 100%;
   border-radius: 22px;
   background: linear-gradient(175deg, 
-    rgba(var(--lyrics-card-rgb, var(--lyrics-theme-rgb, 120, 32, 24)), 0.58) 0%, 
-    rgba(var(--lyrics-card-rgb, var(--lyrics-theme-rgb, 75, 18, 14)), 0.28) 42%, 
-    rgba(14, 16, 22, 0.95) 85%, 
+    rgba(var(--lyrics-card-rgb, 35, 25, 20), 0.38) 0%, 
+    rgba(16, 18, 24, 0.92) 55%, 
     #0c0e14 100%
   ), #101218 !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   padding: 24px 20px 24px 20px;
   margin-top: 48px;
   margin-bottom: 56px;
   flex-shrink: 0;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7), 0 0 32px rgba(var(--lyrics-theme-rgb, 120, 32, 24), 0.28) !important;
-  border: 1px solid rgba(var(--lyrics-theme-rgb, 120, 32, 24), 0.4) !important;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.8), 0 0 32px rgba(var(--lyrics-theme-rgb, 255, 200, 50), 0.22) !important;
+  border: 1px solid rgba(var(--lyrics-theme-rgb, 255, 200, 50), 0.38) !important;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -16554,6 +16556,56 @@ body.in-downloaded-playlist .main-content {
     margin-bottom: 14px !important;
   }
 }
+
+/* 7. First Song Liked Sliding Animation */
+@keyframes slideInFromLeft {
+  0% {
+    transform: translateX(-30px);
+    opacity: 0.2;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.playlist-card-slide-in {
+  animation: slideInFromLeft 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* 8. Downloaded Playlist Section Mobile Top Nav Optimization & Clean Vertical Alignment */
+@media (max-width: 768px) {
+  body.in-downloaded-playlist .top-bar,
+  body.in-downloaded-playlist .top-nav-bar,
+  body.in-downloaded-playlist .view-top-nav,
+  body.in-downloaded-playlist .main-header,
+  body.in-downloaded-playlist .playlist-view-header .desktop-nav-buttons {
+    display: none !important;
+  }
+
+  body.in-downloaded-playlist .playlist-tracks-table {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+  }
+
+  body.in-downloaded-playlist .track-row-spotify {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
+/* 9. Album Art Drop Shadow Enhancement */
+.mobile-player-art-wrap {
+  box-shadow: 0 20px 48px -6px rgba(0, 0, 0, 0.85), 0 0 32px var(--ambient-glow, rgba(255, 255, 255, 0.08)) !important;
+}
+
+.mobile-player-art {
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75) !important;
+}
+
 
 
 

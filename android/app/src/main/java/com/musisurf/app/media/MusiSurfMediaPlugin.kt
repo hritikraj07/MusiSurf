@@ -203,6 +203,13 @@ class MusiSurfMediaPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun setLoudness(call: PluginCall) {
+        val mode = call.getString("mode", "off") ?: "off"
+        mediaService?.setLoudness(mode)
+        call.resolve(JSObject().apply { put("success", true) })
+    }
+
+    @PluginMethod
     fun downloadTrack(call: PluginCall) {
         val track = call.getObject("track")
         if (track != null && mediaService != null) {

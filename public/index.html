@@ -919,8 +919,21 @@
               </div>
             </div>
 
+            <!-- Sign-in Gate for Unauthenticated Guest Users -->
+            <div class="replay-auth-gate" id="replayAuthGate" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; text-align: center;">
+              <div class="replay-gate-lock-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 44px; height: 44px; color: var(--text-muted); margin-bottom: 16px;">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+              </div>
+              <h2 class="replay-gate-title" style="font-size: 1.4rem; font-weight: 700; margin-bottom: 8px;">Sign in to see Your Soundtrack</h2>
+              <p class="replay-gate-subtitle" style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 20px; max-width: 400px; text-align: center;">Track your real listening time, total songs played, and most played track across devices.</p>
+              <button type="button" class="btn-primary-pill" id="replaySignInGateBtn" style="padding: 10px 24px; font-weight: 600;">Sign In / Create Account</button>
+            </div>
+
             <!-- Sleek Compact Replay Dashboard: Most Played on Top, Sound Capsule Below (Matching User Grey Layout) -->
-            <div class="replay-compact-dashboard">
+            <div class="replay-compact-dashboard" id="replayCompactDashboard">
               
               <!-- Section 1: Most Played (Top Song) -->
               <div class="replay-top-song-card">
@@ -2250,22 +2263,6 @@
               <p class="auth-sub-title" id="authSubTitle">Welcome to MusiSurf — An all-access experience</p>
             </div>
 
-            <!-- Sign in with Google Button -->
-            <button type="button" class="auth-google-btn" id="authGoogleBtn">
-              <svg width="18" height="18" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-              </svg>
-              <span>Continue with Google</span>
-            </button>
-
-            <!-- Divider -->
-            <div class="auth-divider">
-              <span>or with email</span>
-            </div>
-
             <!-- Tab Switch between Sign In & Create Account -->
             <div class="auth-tab-switch">
               <button type="button" class="auth-tab-btn active" id="authTabSignIn">Sign In</button>
@@ -2381,10 +2378,6 @@
             <button class="settings-cat-btn" data-target="settingsSoundSection">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="22"/><line x1="6" y1="6" x2="6" y2="18"/><line x1="18" y1="8" x2="18" y2="16"/><line x1="2" y1="10" x2="2" y2="14"/><line x1="22" y1="10" x2="22" y2="14"/></svg>
               <span>Sound</span>
-            </button>
-            <button class="settings-cat-btn" data-target="settingsLibrarySection" style="display: none !important;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M5 10l7 7 7-7M4 19h16"/></svg>
-              <span>Library & Playlists</span>
             </button>
             <button class="settings-cat-btn" data-target="settingsAboutSection">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
@@ -2632,49 +2625,6 @@
           </section>
 
           <!-- LIBRARY & PLAYLISTS TAB CONTENT (Hidden per user request) -->
-          <section class="settings-tab-view" id="settingsLibrarySection" style="display: none !important;">
-            <div class="settings-tab-header">
-              <h1 class="settings-tab-title">Library & Playlists</h1>
-              <p class="settings-tab-desc">Transfer playlists, backup libraries and cloud sync</p>
-            </div>
-
-            <!-- Section: Library & Playlists -->
-            <div class="settings-section-block">
-              <span class="settings-section-label">Library & Playlists</span>
-              <div class="sound-card-item import-playlist-card" id="settingsImportPlaylistBtn" role="button" tabindex="0">
-                <div class="sound-card-left">
-                  <div class="sound-icon-box">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M12 3v12M5 10l7 7 7-7M4 19h16"/>
-                    </svg>
-                  </div>
-                  <div class="sound-meta">
-                    <h3 class="sound-title">Import Playlist</h3>
-                    <p class="sound-desc">Transfer your playlists from Spotify and other supported music platforms to MusiSurf.</p>
-                  </div>
-                </div>
-                <button type="button" class="btn-primary-pill flow-btn-wrap" id="triggerImportModalBtn">
-                  <span>Import Playlist</span>
-                  <svg class="flow-arrow flow-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                    <polyline points="12 5 19 12 12 19"></polyline>
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <!-- Import History Section -->
-            <div class="settings-section-block" id="settingsImportHistoryBlock">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <span class="settings-section-label" style="margin-bottom: 0;">Import History</span>
-                <button type="button" id="refreshImportHistoryBtn" class="sound-pill-btn" style="padding: 4px 10px; font-size: 0.75rem;">Refresh</button>
-              </div>
-              <div id="settingsImportHistoryList" class="import-history-list">
-                <div class="import-history-empty">No playlists imported yet. Paste a link or upload a file above to transfer your playlists!</div>
-              </div>
-            </div>
-          </section>
-
           <!-- ABOUT TAB CONTENT -->
           <section class="settings-tab-view" id="settingsAboutSection">
             <div class="settings-tab-header">
@@ -2751,310 +2701,6 @@
               </div>
             </button>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Dedicated Import Playlist Modal (Spotify Link & File Transfer System) -->
-    <div class="modal-backdrop" id="importPlaylistModal" style="display: none !important; z-index: 3000;">
-      <div class="modal-card import-playlist-modal-card">
-        <!-- Modal Top Bar -->
-        <div class="modal-header import-modal-header">
-          <div class="import-modal-title-wrap">
-            <div class="import-modal-icon-badge">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 3v12M5 10l7 7 7-7M4 19h16"/>
-              </svg>
-            </div>
-            <div>
-              <h3 id="importModalHeading">Import Playlist</h3>
-              <p class="import-modal-sub" id="importModalSub">Bring your favourite playlists to MusiSurf. Paste a playlist link or upload an exported playlist file, and we'll find the available songs in your MusiSurf library.</p>
-            </div>
-          </div>
-          <button class="modal-close-btn" id="closeImportPlaylistModalBtn" title="Close">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-
-        <!-- STEP 1: METHOD CHOOSER & INPUT -->
-        <div class="import-modal-step" id="importStepChoose">
-          <!-- Method Selection Tabs (3 Supported Sources) -->
-          <div class="import-methods-tabs">
-            <button type="button" class="import-method-tab active" data-method="spotify" id="importMethodSpotifyTab">
-              <svg viewBox="0 0 24 24" fill="currentColor" style="width: 17px; height: 17px;">
-                <path d="M12 2C6.477 2 2 6.477 2 12c0 5.524 4.477 10 10 10 5.524 0 10-4.476 10-10 0-5.523-4.476-10-10-10zm4.587 14.428a.747.747 0 0 1-1.03.248c-2.822-1.724-6.375-2.114-10.56-1.158a.751.751 0 0 1-.337-1.464c4.584-1.047 8.52-.601 11.68 1.344.349.213.46.669.247 1.03zm1.226-2.727a.936.936 0 0 1-1.288.309c-3.23-1.986-8.156-2.56-11.977-1.4a.937.937 0 1 1-.547-1.791c4.372-1.328 9.799-.687 13.503 1.593.415.257.548.803.309 1.289zm.106-2.842c-3.874-2.3-10.26-2.512-13.966-1.388a1.124 1.124 0 1 1-.652-2.152c4.258-1.293 11.31-1.048 15.77 1.597a1.124 1.124 0 0 1-1.152 1.943z"/>
-              </svg>
-              <span>Spotify</span>
-            </button>
-            <button type="button" class="import-method-tab" data-method="ytmusic" id="importMethodYtMusicTab">
-              <svg viewBox="0 0 24 24" fill="currentColor" style="width: 17px; height: 17px; color: #ff0000;">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1zm-2-2.8l5 2.8-5 2.8V8.2z"/>
-              </svg>
-              <span>YouTube Music</span>
-            </button>
-            <button type="button" class="import-method-tab" data-method="file" id="importMethodFileTab">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="12" y1="18" x2="12" y2="12"/>
-                <line x1="9" y1="15" x2="15" y2="15"/>
-              </svg>
-              <span>Playlist File</span>
-            </button>
-          </div>
-
-          <!-- Tab Content A: Spotify URL Link Input -->
-          <div class="import-tab-body" id="importLinkBody">
-            <div class="import-provider-pill-badge" style="justify-content: space-between;">
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <span class="provider-dot spotify-dot"></span>
-                <span id="spotifyConnectionTitle">Spotify — Not Connected</span>
-              </div>
-              <div id="spotifyAuthStatusBadge" class="spotify-auth-status-badge">
-                <span id="spotifyAuthStatusDot" class="status-indicator-dot dot-gray"></span>
-                <button type="button" id="spotifyConnectHeaderBtn" class="spotify-header-auth-btn">Connect Spotify</button>
-                <button type="button" id="spotifyDisconnectHeaderBtn" class="spotify-header-auth-btn disconnect-btn" style="display: none;">Disconnect</button>
-              </div>
-            </div>
-            <p id="spotifyConnectionDesc" class="import-connection-desc" style="font-size: 0.78rem; color: var(--text-muted); margin: -4px 0 12px 0;">Connect your Spotify account to import playlists.</p>
-            <label class="import-field-label" for="importPlaylistUrlInput">Spotify Playlist Link or URI</label>
-            <div class="import-input-wrap">
-              <input type="text" id="importPlaylistUrlInput" class="import-text-input" placeholder="https://open.spotify.com/playlist/... or spotify:playlist:..." />
-              <button type="button" class="import-paste-btn" id="importPasteUrlBtn" title="Paste from clipboard">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
-                </svg>
-                <span>Paste</span>
-              </button>
-            </div>
-            <!-- Live Structured ID Detection Feedback Card -->
-            <div id="spotifyDetectedIdPill" class="detected-playlist-card" style="display: none;"></div>
-            <p class="import-hint-text">Supported: <code>https://open.spotify.com/playlist/{id}</code> and <code>spotify:playlist:{id}</code></p>
-          </div>
-
-          <!-- Tab Content B: YouTube Music URL Link Input -->
-          <div class="import-tab-body" id="importYtMusicBody" style="display: none;">
-            <div class="import-provider-pill-badge" style="justify-content: space-between;">
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <span class="provider-dot ytmusic-dot" style="background: #ff0000; box-shadow: 0 0 6px rgba(255, 0, 0, 0.6);"></span>
-                <span id="ytConnectionTitle">YouTube Music — Not Connected</span>
-              </div>
-              <div id="ytAuthStatusBadge" class="spotify-auth-status-badge">
-                <span id="ytAuthStatusDot" class="status-indicator-dot dot-gray"></span>
-                <button type="button" id="ytConnectHeaderBtn" class="spotify-header-auth-btn" style="background: rgba(255, 0, 0, 0.15); color: #ff5252; border-color: rgba(255, 0, 0, 0.35);">Connect Google Account</button>
-                <button type="button" id="ytDisconnectHeaderBtn" class="spotify-header-auth-btn disconnect-btn" style="display: none;">Disconnect</button>
-              </div>
-            </div>
-            <p id="ytConnectionDesc" class="import-connection-desc" style="font-size: 0.78rem; color: var(--text-muted); margin: -4px 0 12px 0;">Connect your Google account to import supported YouTube Music playlists.</p>
-            <label class="import-field-label" for="importYtMusicUrlInput">YouTube Music or YouTube Playlist Link</label>
-            <div class="import-input-wrap">
-              <input type="text" id="importYtMusicUrlInput" class="import-text-input" placeholder="https://music.youtube.com/playlist?list=... or youtube.com/playlist?list=..." />
-              <button type="button" class="import-paste-btn" id="importPasteYtMusicUrlBtn" title="Paste from clipboard">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
-                </svg>
-                <span>Paste</span>
-              </button>
-            </div>
-            <!-- Live ID Detection Feedback Card -->
-            <div id="ytDetectedIdPill" class="detected-playlist-card ytmusic-card" style="display: none;"></div>
-            <p class="import-hint-text">Supported: <code>https://music.youtube.com/playlist?list={id}</code> and <code>https://www.youtube.com/playlist?list={id}</code></p>
-          </div>
-
-          <!-- Tab Content C: File Upload -->
-          <div class="import-tab-body" id="importFileBody" style="display: none;">
-            <div class="import-dropzone" id="importDropZone">
-              <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
-              </svg>
-              <h4 class="dropzone-title">Drag & drop your playlist file here</h4>
-              <p class="dropzone-sub">or click to browse from device</p>
-              <input type="file" id="importPlaylistFileInput" accept=".m3u,.m3u8,.pls,.xspf,.csv,.json,.txt" style="display: none;" />
-              <button type="button" class="btn-secondary" id="importBrowseFileBtn" style="margin-top: 10px;">Select File</button>
-              <div class="import-file-badge-row">
-                <span class="file-format-badge">M3U</span>
-                <span class="file-format-badge">M3U8</span>
-                <span class="file-format-badge">PLS</span>
-                <span class="file-format-badge">XSPF</span>
-                <span class="file-format-badge">CSV</span>
-                <span class="file-format-badge">JSON</span>
-                <span class="file-format-badge">TXT</span>
-              </div>
-            </div>
-            <div id="importSelectedFileInfo" class="import-selected-file-card" style="display: none;">
-              <span id="importSelectedFileName" class="selected-filename">filename.m3u</span>
-              <button type="button" id="importClearSelectedFileBtn" class="clear-file-btn" title="Remove file">&times;</button>
-            </div>
-          </div>
-
-          <!-- Validation Error Alert Box -->
-          <div id="importValidationError" class="import-error-banner" style="display: none;"></div>
-
-          <!-- Step 1 Footer -->
-          <div class="import-modal-footer">
-            <button type="button" class="btn-secondary" id="cancelImportModalBtn">Cancel</button>
-            <button type="button" class="btn-primary-pill" id="startImportFetchBtn">
-              <span>Continue</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width: 16px; height: 16px; margin-left: 6px;">
-                <polyline points="9 18 15 12 9 6"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- STEP 2: REAL-TIME PROGRESS & MATCHING SPINNER -->
-        <div class="import-modal-step" id="importStepProgress" style="display: none;">
-          <div class="import-progress-wrap">
-            <div class="import-spinner-circle"></div>
-            <h4 class="import-progress-status" id="importProgressStatusText">Connecting to provider...</h4>
-            <div class="import-progress-bar-shell">
-              <div class="import-progress-bar-fill" id="importProgressBarFill" style="width: 10%;"></div>
-            </div>
-            <div class="import-progress-meta-row">
-              <span id="importProgressCountText">Finding songs: 0 of 0</span>
-              <span id="importProgressLiveStats">0 matched</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- STEP 3: IMPORT PREVIEW & CANDIDATE REVIEW (MANDATORY SCREEN) -->
-        <div class="import-modal-step" id="importStepPreview" style="display: none;">
-          <!-- Playlist Header Card -->
-          <div class="import-preview-header">
-            <img src="" id="importPreviewCover" class="import-preview-artwork" alt="Playlist Cover" />
-            <div class="import-preview-meta">
-              <div class="import-preview-badge-row">
-                <span class="import-provider-tag" id="importPreviewProviderTag">Spotify</span>
-                <span class="import-track-count-badge" id="importPreviewCountBadge">0 tracks</span>
-              </div>
-              <h3 class="import-preview-name" id="importPreviewName">Imported Playlist</h3>
-              <p class="import-preview-desc" id="importPreviewDesc">Source description</p>
-            </div>
-          </div>
-
-          <!-- Stats Overview Row -->
-          <div class="import-stats-grid">
-            <div class="import-stat-card">
-              <span class="stat-number" id="statSourceTotal">0</span>
-              <span class="stat-label">Source Songs</span>
-            </div>
-            <div class="import-stat-card stat-matched">
-              <span class="stat-number" id="statMatchedCount">0</span>
-              <span class="stat-label">Matched (Playable)</span>
-            </div>
-            <div class="import-stat-card stat-review">
-              <span class="stat-number" id="statReviewCount">0</span>
-              <span class="stat-label">Needs Review</span>
-            </div>
-            <div class="import-stat-card stat-unmatched">
-              <span class="stat-number" id="statUnmatchedCount">0</span>
-              <span class="stat-label">Not Found</span>
-            </div>
-          </div>
-
-          <!-- Duplicate Alert Warning (if playlist with same name exists) -->
-          <div id="importDuplicateNotice" class="import-duplicate-banner" style="display: none;">
-            <div class="duplicate-banner-icon">⚠️</div>
-            <div class="duplicate-banner-content">
-              <strong>This playlist may already exist in your MusiSurf library.</strong>
-              <div class="duplicate-choices-row">
-                <label class="duplicate-radio-label">
-                  <input type="radio" name="duplicateAction" value="create_new" checked />
-                  <span>Import as a new playlist</span>
-                </label>
-                <label class="duplicate-radio-label">
-                  <input type="radio" name="duplicateAction" value="merge" />
-                  <span>Merge into existing playlist</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <!-- Scrollable Track List -->
-          <div class="import-tracks-scroll-area">
-            <div class="import-tracks-table-header">
-              <span class="col-num">#</span>
-              <span class="col-title">TITLE</span>
-              <span class="col-artist">ARTIST</span>
-              <span class="col-status">MATCH STATUS</span>
-              <span class="col-action">ACTION</span>
-            </div>
-            <div class="import-tracks-body" id="importPreviewTracksBody">
-              <!-- Dynamically populated rows -->
-            </div>
-          </div>
-
-          <!-- Step 3 Footer -->
-          <div class="import-modal-footer preview-footer">
-            <div class="preview-summary-text" id="importPreviewSummaryText">
-              Ready to import 0 playable songs. Unmatched songs will be excluded from playback.
-            </div>
-            <div class="preview-footer-btns">
-              <button type="button" class="btn-secondary" id="backToChooseMethodBtn">Back</button>
-              <button type="button" class="btn-primary-pill" id="confirmCreatePlaylistBtn">
-                <span>Confirm & Create Playlist</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- STEP 4: CELEBRATORY SUCCESS VIEW -->
-        <div class="import-modal-step" id="importStepSuccess" style="display: none;">
-          <div class="import-success-wrap">
-            <div class="import-success-icon-wrap">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-            </div>
-            <h3 class="import-success-title">Playlist Imported!</h3>
-            <p class="import-success-sub" id="importSuccessSub">Created playlist in your library with 0 playable songs.</p>
-            <div class="import-success-actions">
-              <button type="button" class="btn-secondary" id="closeImportSuccessBtn">Close</button>
-              <button type="button" class="btn-primary-pill" id="openImportedPlaylistBtn">
-                <span>Go to Playlist</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; margin-left: 6px;">
-                  <polyline points="9 18 15 12 9 6"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- Candidate Review / Alternate Picker Modal -->
-    <div class="modal-backdrop" id="candidateReviewModal" style="display: none; z-index: 3100;">
-      <div class="modal-card candidate-review-card">
-        <div class="modal-header">
-          <h3>Review Track Candidates</h3>
-          <button class="modal-close-btn" id="closeCandidateReviewBtn" title="Close">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-        <div class="candidate-review-body">
-          <div class="candidate-source-info">
-            <span class="source-info-label">SOURCE PLAYLIST TRACK:</span>
-            <div class="source-info-title" id="candReviewSourceTitle">Title</div>
-            <div class="source-info-meta" id="candReviewSourceMeta">Artist • Duration</div>
-          </div>
-          <p class="candidate-prompt">Select the matching MusiSurf song or leave it unmatched:</p>
-          <div class="candidate-options-list" id="candReviewList">
-            <!-- Candidate cards -->
-          </div>
-        </div>
-        <div class="candidate-review-footer">
-          <button type="button" class="btn-secondary" id="candLeaveUnmatchedBtn">Leave Unmatched</button>
         </div>
       </div>
     </div>

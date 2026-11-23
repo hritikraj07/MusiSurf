@@ -15,8 +15,7 @@ const { getCanonicalTrackId, getTrackFingerprint, areTracksIdentical, extractPri
 const searchEngine = require('./scripts/search_engine');
 const { requireAuth, optionalAuth, getAuthenticatedUser } = require('./services/auth');
 const libraryService = require('./services/library');
-const importService = require('./services/import/importService');
-const authManager = require('./services/import/authManager');
+const soundtrackService = require('./services/soundtrackService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1786,9 +1785,21 @@ app.get('/api/recommendations', async (req, res) => {
 
 // Resilient Stream Proxy with HTTP Range Support & Full Length Audio
 app.get('/api/stream', async (req, res) => {
-  const audioUrl = req.query.url;
+  let audioUrl = req.query.url;
   if (!audioUrl || !audioUrl.startsWith('http')) {
     return res.status(400).send('Invalid audio URL');
+  }
+
+  // Functional Streaming Quality Selection (Phase 4)
+  const quality = (req.query.quality || '').toLowerCase();
+  if (audioUrl.includes('saavncdn.com') || audioUrl.includes('.mp4')) {
+    if (quality === 'low') {
+      audioUrl = audioUrl.replace(/_(320|160|96)\.mp4/, '_48.mp4');
+    } else if (quality === 'medium') {
+      audioUrl = audioUrl.replace(/_(320|96|48)\.mp4/, '_160.mp4');
+    } else if (quality === 'high' || quality === 'lossless') {
+      audioUrl = audioUrl.replace(/_(160|96|48)\.mp4/, '_320.mp4');
+    }
   }
 
   const controller = new AbortController();
@@ -1828,7 +1839,6 @@ app.get('/api/stream', async (req, res) => {
       res.setHeader('Content-Length', audioRes.headers.get('content-length'));
     }
 
-    const { Readable } = require('stream');
     const stream = Readable.fromWeb(audioRes.body);
     stream.on('error', (err) => {
       if (!res.headersSent) res.status(500).send('Stream error');
@@ -1912,7 +1922,6 @@ app.get('/api/audio/stream-proxy', async (req, res) => {
       res.setHeader('Content-Length', audioRes.headers.get('content-length'));
     }
 
-    const { Readable } = require('stream');
     const stream = Readable.fromWeb(audioRes.body);
     stream.on('error', (err) => {
       if (!res.headersSent) res.status(500).send('Stream error');
@@ -2468,44 +2477,35 @@ app.post('/api/auth/sign-out', async (req, res) => {
   res.json({ success: true, message: 'Signed out successfully' });
 });
 
-// Social Login URL (Google)
-app.all('/api/auth/social-url', async (req, res) => {
+// --------------------------------------------------------------------------
+// USER SOUNDTRACK & SOUND CAPSULE (NEON POSTGRESQL LISTENING STATS)
+// --------------------------------------------------------------------------
+
+// Record a verified song play (strictly requireAuth)
+app.post('/api/soundtrack/record-play', requireAuth, async (req, res) => {
   try {
-    const provider = req.query.provider || req.body?.provider || 'google';
-    const origin = getAuthOrigin(req);
-    const callbackUrl = req.query.callbackURL || req.body?.callbackURL || `${origin}/`;
-    const resolvedCallback = callbackUrl.startsWith('http') ? callbackUrl : `${origin}${callbackUrl.startsWith('/') ? '' : '/'}${callbackUrl}`;
-
-    const remoteRes = await fetch(`${process.env.NEON_AUTH_BASE_URL}/sign-in/social`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Origin': origin,
-        'User-Agent': req.headers['user-agent'] || 'MusiSurf'
-      },
-      body: JSON.stringify({
-        provider,
-        callbackURL: resolvedCallback
-      })
-    });
-
-    const setCookies = remoteRes.headers.getSetCookie ? remoteRes.headers.getSetCookie() : [remoteRes.headers.get('set-cookie')].filter(Boolean);
-    for (const sc of setCookies) {
-      res.append('Set-Cookie', sc);
-    }
-
-    const data = await remoteRes.json().catch(() => ({}));
-    if (!remoteRes.ok || !data.url) {
-      console.error('[Auth API] Social login initiation failed:', remoteRes.status, data);
-      return res.status(remoteRes.status || 500).json({
-        error: data.message || 'Could not initiate Google Sign-in. Please try again.'
-      });
-    }
-
-    res.json({ url: data.url });
+    const result = await soundtrackService.recordPlay(req.user.id, req.body || {});
+    res.json({ success: true, ...result });
   } catch (err) {
-    console.error('[Auth API] Social url error:', err.message);
-    res.status(500).json({ error: 'Failed to initiate social login' });
+    if (err.message === 'AUTH_REQUIRED') {
+      return res.status(401).json({ error: 'AUTH_REQUIRED' });
+    }
+    console.error('[Soundtrack API] Record play error:', err.message);
+    res.status(500).json({ error: 'Failed to record play' });
+  }
+});
+
+// Get personal soundtrack stats & top song (strictly requireAuth)
+app.get('/api/soundtrack/stats', requireAuth, async (req, res) => {
+  try {
+    const stats = await soundtrackService.getSoundtrackStats(req.user.id);
+    res.json(stats);
+  } catch (err) {
+    if (err.message === 'AUTH_REQUIRED') {
+      return res.status(401).json({ error: 'AUTH_REQUIRED' });
+    }
+    console.error('[Soundtrack API] Get stats error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch soundtrack stats' });
   }
 });
 
@@ -2772,598 +2772,7 @@ const handleSaveProgress = async (req, res) => {
 app.post('/api/library/playlists/:id/progress', requireAuth, handleSaveProgress);
 app.put('/api/library/playlists/:id/progress', requireAuth, handleSaveProgress);
 
-// --------------------------------------------------------------------------
-// EXTERNAL PLAYLIST IMPORT & TRANSFER ENGINE
-// --------------------------------------------------------------------------
-
-// ==========================================================================
-// SPOTIFY AUTOMATIC OAUTH & CONNECTION MANAGEMENT
-// ==========================================================================
-
-// Spotify OAuth & Account Connection Status
-app.get('/api/auth/spotify/status', (req, res) => {
-  const hasToken = Boolean(req.cookies?.spotify_access_token);
-  const hasRefreshToken = Boolean(req.cookies?.spotify_refresh_token);
-  const isConfigured = authManager.isSpotifyConfigured();
-  res.json({
-    success: true,
-    connected: hasToken || hasRefreshToken,
-    configured: isConfigured
-  });
-});
-
-// Spotify OAuth Login Initiation (with automatic pending import capture & PKCE)
-app.get('/api/auth/spotify/login', (req, res) => {
-  if (!authManager.isSpotifyConfigured()) {
-    return res.status(400).json({
-      success: false,
-      configured: false,
-      error: 'Spotify OAuth is not configured on the server. Please add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to .env to enable automatic playlist importing.'
-    });
-  }
-
-  const redirectUri = process.env.SPOTIFY_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/spotify/callback`;
-  const state = authManager.generateRandomString(24);
-  const codeVerifier = authManager.generateRandomString(32);
-  const codeChallenge = authManager.generateCodeChallenge(codeVerifier);
-
-  const pendingUrl = req.query.pending_url || req.query.url || null;
-  const pendingId = req.query.pending_id || null;
-
-  let pendingImportId = null;
-  if (pendingUrl) {
-    const pendingRecord = authManager.createPendingImport({
-      provider: 'spotify',
-      url: pendingUrl,
-      playlistId: pendingId,
-      userId: req.user ? req.user.id : null
-    });
-    pendingImportId = pendingRecord.id;
-  }
-
-  // Save state, PKCE verifier, and pending import link in secure cookie
-  res.cookie('spotify_oauth_state', JSON.stringify({ state, codeVerifier, pendingImportId }), {
-    maxAge: 15 * 60 * 1000,
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/'
-  });
-
-  const authUrl = authManager.getSpotifyAuthUrl({ state, codeChallenge, redirectUri });
-  res.redirect(authUrl);
-});
-
-// Spotify OAuth Callback
-app.get('/api/auth/spotify/callback', async (req, res) => {
-  const { code, state, error } = req.query;
-  let savedStateObj = null;
-  try {
-    if (req.cookies?.spotify_oauth_state) {
-      savedStateObj = JSON.parse(req.cookies.spotify_oauth_state);
-    }
-  } catch (e) {}
-
-  res.clearCookie('spotify_oauth_state', { path: '/' });
-
-  if (error || !code) {
-    if (savedStateObj?.pendingImportId) {
-      authManager.consumePendingImport(savedStateObj.pendingImportId);
-    }
-    return res.redirect('/?oauth_cancelled=1&provider=spotify');
-  }
-
-  if (!savedStateObj || savedStateObj.state !== state) {
-    return res.redirect('/?oauth_error=' + encodeURIComponent('Invalid or expired OAuth state'));
-  }
-
-  const redirectUri = process.env.SPOTIFY_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/spotify/callback`;
-
-  try {
-    const tokens = await authManager.exchangeSpotifyCode({
-      code,
-      codeVerifier: savedStateObj.codeVerifier,
-      redirectUri
-    });
-
-    res.cookie('spotify_access_token', tokens.accessToken, {
-      maxAge: tokens.expiresIn * 1000,
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/'
-    });
-
-    if (tokens.refreshToken) {
-      res.cookie('spotify_refresh_token', tokens.refreshToken, {
-        maxAge: 30 * 24 * 3600 * 1000,
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/'
-      });
-    }
-
-    if (savedStateObj.pendingImportId) {
-      res.cookie('musisurf_pending_import_id', savedStateObj.pendingImportId, {
-        maxAge: 15 * 60 * 1000,
-        httpOnly: false,
-        sameSite: 'lax',
-        path: '/'
-      });
-      return res.redirect('/?import_resume=1&provider=spotify');
-    }
-
-    return res.redirect('/?spotify_connected=1');
-  } catch (err) {
-    console.warn('[Spotify OAuth] Callback exchange error:', err.message);
-    res.redirect('/?oauth_error=' + encodeURIComponent(err.message));
-  }
-});
-
-// Spotify Automatic Token Refresh
-app.post('/api/auth/spotify/refresh', async (req, res) => {
-  const refreshToken = req.cookies?.spotify_refresh_token;
-  if (!refreshToken || !authManager.isSpotifyConfigured()) {
-    return res.status(401).json({ success: false, error: 'No refresh token or Spotify not configured' });
-  }
-
-  try {
-    const tokens = await authManager.refreshSpotifyAccessToken(refreshToken);
-    res.cookie('spotify_access_token', tokens.accessToken, {
-      maxAge: tokens.expiresIn * 1000,
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/'
-    });
-    if (tokens.refreshToken) {
-      res.cookie('spotify_refresh_token', tokens.refreshToken, {
-        maxAge: 30 * 24 * 3600 * 1000,
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/'
-      });
-    }
-    res.json({ success: true, connected: true });
-  } catch (err) {
-    res.clearCookie('spotify_access_token', { path: '/' });
-    res.status(401).json({ success: false, error: err.message });
-  }
-});
-
-// Spotify Disconnect
-app.post('/api/auth/spotify/disconnect', (req, res) => {
-  res.clearCookie('spotify_access_token', { path: '/' });
-  res.clearCookie('spotify_refresh_token', { path: '/' });
-  res.clearCookie('spotify_oauth_state', { path: '/' });
-  res.json({ success: true, message: 'Spotify disconnected' });
-});
-
-// ==========================================================================
-// GOOGLE / YOUTUBE AUTOMATIC OAUTH & CONNECTION MANAGEMENT
-// ==========================================================================
-
-// Google OAuth & Account Connection Status
-app.get('/api/auth/google/status', (req, res) => {
-  const hasToken = Boolean(req.cookies?.google_access_token);
-  const hasRefreshToken = Boolean(req.cookies?.google_refresh_token);
-  const isConfigured = authManager.isGoogleConfigured();
-  res.json({
-    success: true,
-    connected: hasToken || hasRefreshToken,
-    configured: isConfigured
-  });
-});
-
-// Google OAuth Login Initiation (with automatic pending import capture)
-app.get('/api/auth/google/login', (req, res) => {
-  if (!authManager.isGoogleConfigured()) {
-    return res.status(400).json({
-      success: false,
-      configured: false,
-      error: 'Google OAuth is not configured on the server. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env to enable automatic YouTube Music playlist importing.'
-    });
-  }
-
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
-  const state = authManager.generateRandomString(24);
-
-  const pendingUrl = req.query.pending_url || req.query.url || null;
-  const pendingId = req.query.pending_id || null;
-
-  let pendingImportId = null;
-  if (pendingUrl) {
-    const pendingRecord = authManager.createPendingImport({
-      provider: 'youtube_music',
-      url: pendingUrl,
-      playlistId: pendingId,
-      userId: req.user ? req.user.id : null
-    });
-    pendingImportId = pendingRecord.id;
-  }
-
-  res.cookie('google_oauth_state', JSON.stringify({ state, pendingImportId }), {
-    maxAge: 15 * 60 * 1000,
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/'
-  });
-
-  const authUrl = authManager.getGoogleAuthUrl({ state, redirectUri });
-  res.redirect(authUrl);
-});
-
-// Google OAuth Callback
-app.get('/api/auth/google/callback', async (req, res) => {
-  const { code, state, error } = req.query;
-  let savedStateObj = null;
-  try {
-    if (req.cookies?.google_oauth_state) {
-      savedStateObj = JSON.parse(req.cookies.google_oauth_state);
-    }
-  } catch (e) {}
-
-  res.clearCookie('google_oauth_state', { path: '/' });
-
-  if (error || !code) {
-    if (savedStateObj?.pendingImportId) {
-      authManager.consumePendingImport(savedStateObj.pendingImportId);
-    }
-    return res.redirect('/?oauth_cancelled=1&provider=google');
-  }
-
-  if (!savedStateObj || savedStateObj.state !== state) {
-    return res.redirect('/?oauth_error=' + encodeURIComponent('Invalid or expired OAuth state'));
-  }
-
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
-
-  try {
-    const tokens = await authManager.exchangeGoogleCode({
-      code,
-      redirectUri
-    });
-
-    res.cookie('google_access_token', tokens.accessToken, {
-      maxAge: tokens.expiresIn * 1000,
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/'
-    });
-
-    if (tokens.refreshToken) {
-      res.cookie('google_refresh_token', tokens.refreshToken, {
-        maxAge: 60 * 24 * 3600 * 1000,
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/'
-      });
-    }
-
-    if (savedStateObj.pendingImportId) {
-      res.cookie('musisurf_pending_import_id', savedStateObj.pendingImportId, {
-        maxAge: 15 * 60 * 1000,
-        httpOnly: false,
-        sameSite: 'lax',
-        path: '/'
-      });
-      return res.redirect('/?import_resume=1&provider=ytmusic');
-    }
-
-    return res.redirect('/?google_connected=1');
-  } catch (err) {
-    console.warn('[Google OAuth] Callback exchange error:', err.message);
-    res.redirect('/?oauth_error=' + encodeURIComponent(err.message));
-  }
-});
-
-// Google Automatic Token Refresh
-app.post('/api/auth/google/refresh', async (req, res) => {
-  const refreshToken = req.cookies?.google_refresh_token;
-  if (!refreshToken || !authManager.isGoogleConfigured()) {
-    return res.status(401).json({ success: false, error: 'No refresh token or Google not configured' });
-  }
-
-  try {
-    const tokens = await authManager.refreshGoogleAccessToken(refreshToken);
-    res.cookie('google_access_token', tokens.accessToken, {
-      maxAge: tokens.expiresIn * 1000,
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/'
-    });
-    if (tokens.refreshToken) {
-      res.cookie('google_refresh_token', tokens.refreshToken, {
-        maxAge: 60 * 24 * 3600 * 1000,
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/'
-      });
-    }
-    res.json({ success: true, connected: true });
-  } catch (err) {
-    res.clearCookie('google_access_token', { path: '/' });
-    res.status(401).json({ success: false, error: err.message });
-  }
-});
-
-// Google Disconnect
-app.post('/api/auth/google/disconnect', (req, res) => {
-  res.clearCookie('google_access_token', { path: '/' });
-  res.clearCookie('google_refresh_token', { path: '/' });
-  res.clearCookie('google_oauth_state', { path: '/' });
-  res.json({ success: true, message: 'Google account disconnected' });
-});
-
-// ==========================================================================
-// PENDING IMPORT LIFECYCLE API
-// ==========================================================================
-
-// Retrieve & consume pending import (for automatic resume after OAuth redirect)
-app.get('/api/import/pending', (req, res) => {
-  const importId = req.query.id || req.cookies?.musisurf_pending_import_id;
-  if (!importId) {
-    return res.json({ hasPending: false, pending: null });
-  }
-
-  const pending = authManager.consumePendingImport(importId);
-  res.clearCookie('musisurf_pending_import_id', { path: '/' });
-
-  if (!pending) {
-    return res.json({ hasPending: false, pending: null });
-  }
-
-  res.json({ hasPending: true, pending });
-});
-
-// Register a pending import before manual or auto OAuth redirect
-app.post('/api/import/pending', optionalAuth, (req, res) => {
-  const { provider, url, playlistId } = req.body || {};
-  if (!url || !provider) {
-    return res.status(400).json({ success: false, error: 'url and provider are required' });
-  }
-
-  const record = authManager.createPendingImport({
-    provider,
-    url,
-    playlistId,
-    userId: req.user ? req.user.id : null
-  });
-
-  res.cookie('musisurf_pending_import_id', record.id, {
-    maxAge: 15 * 60 * 1000,
-    httpOnly: false,
-    sameSite: 'lax',
-    path: '/'
-  });
-
-  res.json({ success: true, pendingId: record.id, record });
-});
-
-// ==========================================================================
-// CENTRALIZED PLAYLIST PARSER WITH AUTO TOKEN REFRESH
-// ==========================================================================
-
-// 1. Parse playlist from link or uploaded file
-app.post('/api/import/parse', async (req, res) => {
-  try {
-    const { url, fileContent, filename, fileName, format } = req.body || {};
-    let sToken = req.cookies?.spotify_access_token || null;
-    let gToken = req.cookies?.google_access_token || null;
-
-    // Automatic Spotify Token Refresh if access token expired but refresh token exists
-    if (!sToken && req.cookies?.spotify_refresh_token && authManager.isSpotifyConfigured()) {
-      try {
-        const refreshed = await authManager.refreshSpotifyAccessToken(req.cookies.spotify_refresh_token);
-        sToken = refreshed.accessToken;
-        res.cookie('spotify_access_token', refreshed.accessToken, {
-          maxAge: refreshed.expiresIn * 1000,
-          httpOnly: true,
-          sameSite: 'lax',
-          path: '/'
-        });
-        if (refreshed.refreshToken) {
-          res.cookie('spotify_refresh_token', refreshed.refreshToken, {
-            maxAge: 30 * 24 * 3600 * 1000,
-            httpOnly: true,
-            sameSite: 'lax',
-            path: '/'
-          });
-        }
-      } catch (refErr) {
-        console.warn('[Import API] Auto Spotify token refresh failed:', refErr.message);
-      }
-    }
-
-    // Automatic Google Token Refresh if access token expired but refresh token exists
-    if (!gToken && req.cookies?.google_refresh_token && authManager.isGoogleConfigured()) {
-      try {
-        const refreshed = await authManager.refreshGoogleAccessToken(req.cookies.google_refresh_token);
-        gToken = refreshed.accessToken;
-        res.cookie('google_access_token', refreshed.accessToken, {
-          maxAge: refreshed.expiresIn * 1000,
-          httpOnly: true,
-          sameSite: 'lax',
-          path: '/'
-        });
-        if (refreshed.refreshToken) {
-          res.cookie('google_refresh_token', refreshed.refreshToken, {
-            maxAge: 60 * 24 * 3600 * 1000,
-            httpOnly: true,
-            sameSite: 'lax',
-            path: '/'
-          });
-        }
-      } catch (refErr) {
-        console.warn('[Import API] Auto Google token refresh failed:', refErr.message);
-      }
-    }
-
-    let playlist;
-    try {
-      playlist = await importService.parseExternalPlaylist({
-        url,
-        fileContent,
-        filename: filename || fileName,
-        format,
-        spotifyToken: sToken,
-        googleToken: gToken
-      });
-    } catch (parseErr) {
-      // If token expired during request, attempt one auto-refresh and retry seamlessly
-      if ((parseErr.code === 'ERR_SPOTIFY_AUTH_EXPIRED') && req.cookies?.spotify_refresh_token && authManager.isSpotifyConfigured()) {
-        try {
-          const refreshed = await authManager.refreshSpotifyAccessToken(req.cookies.spotify_refresh_token);
-          sToken = refreshed.accessToken;
-          res.cookie('spotify_access_token', refreshed.accessToken, {
-            maxAge: refreshed.expiresIn * 1000,
-            httpOnly: true,
-            sameSite: 'lax',
-            path: '/'
-          });
-          playlist = await importService.parseExternalPlaylist({
-            url,
-            fileContent,
-            filename: filename || fileName,
-            format,
-            spotifyToken: sToken,
-            googleToken: gToken
-          });
-        } catch (retryErr) {
-          throw parseErr;
-        }
-      } else if ((parseErr.code === 'ERR_GOOGLE_AUTH_EXPIRED') && req.cookies?.google_refresh_token && authManager.isGoogleConfigured()) {
-        try {
-          const refreshed = await authManager.refreshGoogleAccessToken(req.cookies.google_refresh_token);
-          gToken = refreshed.accessToken;
-          res.cookie('google_access_token', refreshed.accessToken, {
-            maxAge: refreshed.expiresIn * 1000,
-            httpOnly: true,
-            sameSite: 'lax',
-            path: '/'
-          });
-          playlist = await importService.parseExternalPlaylist({
-            url,
-            fileContent,
-            filename: filename || fileName,
-            format,
-            spotifyToken: sToken,
-            googleToken: gToken
-          });
-        } catch (retryErr) {
-          throw parseErr;
-        }
-      } else {
-        throw parseErr;
-      }
-    }
-
-    res.json({ success: true, playlist });
-  } catch (err) {
-    console.warn('[Import API] Parse error:', err.message);
-    res.status(400).json({
-      success: false,
-      error: err.message,
-      code: err.code || 'ERR_IMPORT_PARSE_FAILED',
-      requiresAuth: Boolean(err.requiresAuth),
-      playlistId: err.playlistId || null,
-      playlistMeta: err.playlistMeta || null
-    });
-  }
-});
-
-// 2. Match external playlist tracks against MusiSurf catalogue
-app.post('/api/import/match', async (req, res) => {
-  try {
-    const { playlist } = req.body || {};
-    if (!playlist || !Array.isArray(playlist.tracks)) {
-      return res.status(400).json({ success: false, error: 'Playlist with tracks array required' });
-    }
-
-    const matchedData = await importService.matchExternalPlaylist(
-      playlist,
-      searchSaavn,
-      searchYouTube
-    );
-
-    res.json({
-      success: true,
-      playlist: matchedData.playlist,
-      stats: matchedData.stats,
-      results: matchedData.results
-    });
-  } catch (err) {
-    console.error('[Import API] Matching error:', err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// 3. Check for potential duplicate imports
-app.post('/api/import/check-duplicate', optionalAuth, async (req, res) => {
-  try {
-    const { name, externalId } = req.body || {};
-    const userId = req.user ? req.user.id : null;
-    const existing = await importService.checkDuplicateImport(userId, name || '', externalId || '');
-    res.json({ success: true, exists: Boolean(existing), existing });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// 4. Confirm and persist imported playlist into MusiSurf library
-app.post('/api/import/confirm', optionalAuth, async (req, res) => {
-  try {
-    const body = req.body || {};
-    const playlistName = body.playlistName || body.name || body.playlist?.playlistName || body.playlist?.name;
-    const description = body.description || body.playlist?.description || '';
-    const coverUrl = body.coverUrl || body.artwork || body.playlist?.artwork || body.playlist?.coverUrl || null;
-    const confirmedTracks = body.confirmedTracks || body.tracks || body.playlist?.tracks || [];
-    const provider = body.provider || body.playlist?.provider || body.playlist?.platform || 'spotify';
-    const externalPlaylistId = body.externalPlaylistId || body.playlist?.externalPlaylistId || '';
-    const duplicateAction = body.duplicateAction || body.mergeStrategy || 'create_new';
-    const targetPlaylistId = body.targetPlaylistId || null;
-
-    if (!playlistName || !playlistName.trim()) {
-      return res.status(400).json({ success: false, error: 'Playlist name is required' });
-    }
-
-    const userId = req.user ? req.user.id : null;
-
-    const result = await importService.confirmAndCreatePlaylist({
-      userId,
-      playlistName,
-      description,
-      coverUrl,
-      confirmedTracks,
-      provider,
-      externalPlaylistId,
-      duplicateAction,
-      targetPlaylistId
-    });
-
-    res.json(result);
-  } catch (err) {
-    console.error('[Import API] Confirm creation error:', err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// 5. Get import history
-app.get('/api/import/history', optionalAuth, (req, res) => {
-  try {
-    const history = importService.getImportHistory();
-    res.json({ success: true, history });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// 6. Delete import history item
-app.delete('/api/import/history/:id', optionalAuth, (req, res) => {
-  try {
-    const removed = importService.deleteImportHistoryItem(req.params.id);
-    res.json({ success: true, removed });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+// External Playlist Import retired (Phase 3)
 
 // Status and Info
 app.get('/api/status', (req, res) => {

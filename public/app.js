@@ -2089,14 +2089,33 @@
   function checkAndRecordSongPlayed(deck) {
     if (!state.currentTrack || state._currentTrackPlayedRecorded) return;
     const dur = (deck && deck.duration) || state.currentTrack.duration || 0;
-    // Meaningful listening threshold: >= 15s (or >= 25% if track is short, e.g. < 60s)
-    const threshold = (dur > 0 && dur < 60) ? Math.max(5, dur * 0.25) : 15;
+    // Meaningful listening threshold: >= 20s (or >= 30% if dur > 0)
+    const threshold = (dur > 0 && dur < 60) ? Math.max(10, dur * 0.3) : 20;
     if (state._currentTrackListeningSeconds >= threshold) {
       state._currentTrackPlayedRecorded = true;
       state.totalSongsPlayed = (state.totalSongsPlayed || 0) + 1;
       saveListeningStats();
       updateSoundCapsuleUI();
       recordTrackPlay(state.currentTrack);
+
+      // Record verified play in Neon Postgres if signed in
+      if (isAuthenticated()) {
+        fetch('/api/soundtrack/record-play', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            trackId: state.currentTrack.id,
+            title: state.currentTrack.title,
+            artist: state.currentTrack.artist,
+            album: state.currentTrack.album,
+            thumbnailUrl: state.currentTrack.image || state.currentTrack.artwork,
+            durationSeconds: Math.round(dur),
+            listenedSeconds: Math.floor(state._currentTrackListeningSeconds || 0),
+            isCompleted: Boolean(dur > 0 && state._currentTrackListeningSeconds >= (dur * 0.9))
+          })
+        }).catch(err => console.warn('[Soundtrack] Play recording error:', err.message));
+      }
     }
   }
 
@@ -8072,6 +8091,17 @@
       const trackWithDate = { ...track, addedAt: track.addedAt || Date.now() };
       state.likedSongs.unshift(trackWithDate);
       showToast(`Added "${track.title}" to Liked Songs`, '♥');
+
+      // Sliding animation if this was first song added to Liked Songs
+      if (state.likedSongs.length === 1) {
+        const likedCard = document.getElementById('libHubLikedCard') || document.querySelector('.library-item[data-playlist-id="liked"]') || document.querySelector('.sidebar-item-liked');
+        if (likedCard) {
+          likedCard.classList.remove('playlist-card-slide-in');
+          void likedCard.offsetWidth;
+          likedCard.classList.add('playlist-card-slide-in');
+          setTimeout(() => likedCard.classList.remove('playlist-card-slide-in'), 1000);
+        }
+      }
     }
     saveStoredLikes();
     updateHeartIcon(state.currentTrack?.id);
@@ -11585,70 +11615,94 @@
   function renderReplayView(period = 'this-month') {
     state._replayPeriod = period;
 
+    const replayAuthGate = document.getElementById('replayAuthGate');
+    const replayDashboard = document.getElementById('replayCompactDashboard');
+    const replaySignInGateBtn = document.getElementById('replaySignInGateBtn');
+
+    if (replaySignInGateBtn && !replaySignInGateBtn._listenerAttached) {
+      replaySignInGateBtn._listenerAttached = true;
+      replaySignInGateBtn.addEventListener('click', () => openAuthModal('signin'));
+    }
+
+    // Strict Sign-In Gate: unauthenticated guest users see clean locked prompt
+    if (!isAuthenticated()) {
+      if (replayAuthGate) replayAuthGate.style.display = 'flex';
+      if (replayDashboard) replayDashboard.style.display = 'none';
+      return;
+    }
+
+    if (replayAuthGate) replayAuthGate.style.display = 'none';
+    if (replayDashboard) replayDashboard.style.display = 'grid';
+
     document.querySelectorAll('.replay-pill').forEach(pill => {
       pill.classList.toggle('active', pill.dataset.period === period);
     });
 
-    // Real dynamic Sound Capsule statistics
-    updateSoundCapsuleUI();
+    // Real dynamic Sound Capsule statistics from Neon Postgres
+    fetchAndRenderSoundtrackStats();
+  }
 
-    // Determine #1 Most Played Song strictly from persistent track play counts
-    let topSong = null;
-    let maxPlays = 0;
-    if (state.trackPlayCounts) {
-      for (const entry of Object.values(state.trackPlayCounts)) {
-        if (entry && entry.track && entry.count > maxPlays) {
-          maxPlays = entry.count;
-          topSong = entry.track;
+  async function fetchAndRenderSoundtrackStats() {
+    try {
+      const res = await fetch('/api/soundtrack/stats', { credentials: 'include' });
+      if (!res.ok) {
+        if (res.status === 401) {
+          const replayAuthGate = document.getElementById('replayAuthGate');
+          const replayDashboard = document.getElementById('replayCompactDashboard');
+          if (replayAuthGate) replayAuthGate.style.display = 'flex';
+          if (replayDashboard) replayDashboard.style.display = 'none';
+          return;
+        }
+        throw new Error('HTTP ' + res.status);
+      }
+      const data = await res.json();
+      if (data && data.success) {
+        const totalMinutes = data.totalMinutesListened || 0;
+        const totalSongs = data.totalSongsPlayed || 0;
+
+        if (elements.replayMinutesCount) {
+          elements.replayMinutesCount.textContent = totalMinutes.toLocaleString();
+        }
+        if (elements.replayTotalSongsCount) {
+          elements.replayTotalSongsCount.textContent = totalSongs.toLocaleString();
+        }
+
+        if (data.topSong) {
+          const topSong = data.topSong;
+          if (elements.replayTopSongImg) elements.replayTopSongImg.src = topSong.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=240&auto=format&fit=crop&q=80';
+          if (elements.replayTopSongTitle) elements.replayTopSongTitle.textContent = topSong.title;
+          if (elements.replayTopSongArtist) elements.replayTopSongArtist.textContent = topSong.artist;
+          const plays = topSong.playCount || 1;
+          if (elements.replayTopSongPlays) elements.replayTopSongPlays.textContent = `${plays} ${plays === 1 ? 'play' : 'plays'}`;
+
+          const replayTopCard = document.querySelector('.replay-top-song-card');
+          if (replayTopCard && topSong.image) {
+            extractDominantColor(topSong.image, topSong.id || 'replay_top').then(([r, g, b]) => {
+              const topR = Math.min(255, Math.floor(r * 0.45 + 12));
+              const topG = Math.min(255, Math.floor(g * 0.45 + 14));
+              const topB = Math.min(255, Math.floor(b * 0.45 + 18));
+              replayTopCard.style.setProperty('--top-song-bg', `linear-gradient(135deg, rgb(${topR}, ${topG}, ${topB}) 0%, #101115 100%)`);
+            }).catch(() => {
+              replayTopCard.style.setProperty('--top-song-bg', `linear-gradient(135deg, #1e2430 0%, #101115 100%)`);
+            });
+          }
+
+          if (elements.playTopSongBtn) {
+            elements.playTopSongBtn.onclick = (e) => {
+              e.stopPropagation();
+              playTrack(topSong);
+              showToast(`Playing #1 Top Song: ${topSong.title}`, '🔥');
+            };
+          }
+        } else {
+          if (elements.replayTopSongImg) elements.replayTopSongImg.src = '/icons/replay-cover.svg';
+          if (elements.replayTopSongTitle) elements.replayTopSongTitle.textContent = 'No plays yet';
+          if (elements.replayTopSongArtist) elements.replayTopSongArtist.textContent = 'Listen to songs to see your #1 track';
+          if (elements.replayTopSongPlays) elements.replayTopSongPlays.textContent = '0 plays';
         }
       }
-    }
-
-    if (!topSong) {
-      topSong = (state.likedSongs && state.likedSongs[0]) || (state.history && state.history[0]) || {
-        title: 'Starboy',
-        artist: 'The Weeknd',
-        image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=240&auto=format&fit=crop&q=80',
-        duration: 230
-      };
-      maxPlays = 0;
-    }
-
-    const finalTopPlays = maxPlays;
-
-    if (elements.replayTopSongImg) {
-      elements.replayTopSongImg.src = topSong.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=240&auto=format&fit=crop&q=80';
-    }
-    if (elements.replayTopSongTitle) {
-      elements.replayTopSongTitle.textContent = topSong.title || 'Starboy';
-    }
-    if (elements.replayTopSongArtist) {
-      elements.replayTopSongArtist.textContent = topSong.artist || 'The Weeknd';
-    }
-    if (elements.replayTopSongPlays) {
-      elements.replayTopSongPlays.textContent = `${finalTopPlays} ${finalTopPlays === 1 ? 'play' : 'plays'}`;
-    }
-
-    // Match top song card background dynamically to song album/cover artwork
-    const replayTopCard = document.querySelector('.replay-top-song-card');
-    if (replayTopCard && topSong.image) {
-      extractDominantColor(topSong.image, topSong.id || 'replay_top').then(([r, g, b]) => {
-        const topR = Math.min(255, Math.floor(r * 0.45 + 12));
-        const topG = Math.min(255, Math.floor(g * 0.45 + 14));
-        const topB = Math.min(255, Math.floor(b * 0.45 + 18));
-        replayTopCard.style.setProperty('--top-song-bg', `linear-gradient(135deg, rgb(${topR}, ${topG}, ${topB}) 0%, #101115 100%)`);
-      }).catch(() => {
-        replayTopCard.style.setProperty('--top-song-bg', `linear-gradient(135deg, #1e2430 0%, #101115 100%)`);
-      });
-    }
-
-    // Wire instant play for the #1 Top Song
-    if (elements.playTopSongBtn) {
-      elements.playTopSongBtn.onclick = (e) => {
-        e.stopPropagation();
-        playTrack(topSong);
-        showToast(`Playing #1 Top Song: ${topSong.title}`, '🔥');
-      };
+    } catch (err) {
+      console.warn('[Soundtrack] Error fetching stats:', err);
     }
   }
 
@@ -11669,14 +11723,28 @@
     }
   }
 
-  function shareReplay() {
-    const minutes = Math.floor((state.totalListenedSeconds || 0) / 60);
-    const songs = state.totalSongsPlayed || 0;
+  async function shareReplay() {
+    const minutes = elements.replayMinutesCount?.textContent || '0';
+    const songs = elements.replayTotalSongsCount?.textContent || '0';
     const topSong = elements.replayTopSongTitle?.textContent || 'Top Track';
     const artist = elements.replayTopSongArtist?.textContent || 'Artist';
-    const text = `🔥 My MusiSurf Sound Capsule: ${minutes.toLocaleString()} mins listened across ${songs.toLocaleString()} songs played! Top Song: ${topSong} by ${artist}! Ride the wave of pure music at ${window.location.origin}`;
+    const origin = (typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost')) ? window.location.origin : 'https://musi-surf.vercel.app';
+    const text = `🔥 My MusiSurf Sound Capsule: ${minutes} mins listened across ${songs} songs played! Top Song: ${topSong} by ${artist}! Ride the wave of pure music at ${origin}`;
+
+    const capShare = window.Capacitor?.Plugins?.Share;
+    if (capShare && typeof capShare.share === 'function') {
+      try {
+        await capShare.share({
+          title: 'MusiSurf Sound Capsule',
+          text: text,
+          dialogTitle: 'Share your Sound Capsule'
+        });
+        return;
+      } catch (e) {}
+    }
+
     if (navigator.share) {
-      navigator.share({ title: 'MusiSurf Sound Capsule', text: text, url: window.location.href }).catch(() => {});
+      navigator.share({ title: 'MusiSurf Sound Capsule', text: text, url: origin }).catch(() => {});
     } else {
       try {
         navigator.clipboard.writeText(text);
@@ -12874,25 +12942,91 @@
       });
     });
 
+    // Helper to map and update streaming quality bitrate URLs (Phase 4)
+    function applyQualityToAudioUrl(url, quality) {
+      if (!url || typeof url !== 'string') return url;
+      if (!url.includes('.mp4')) return url;
+      switch (quality) {
+        case 'low':
+          return url.replace(/_(320|160|96)\.mp4/, '_48.mp4');
+        case 'medium':
+          return url.replace(/_(320|96|48)\.mp4/, '_160.mp4');
+        case 'lossless':
+        case 'high':
+        default:
+          return url.replace(/_(160|96|48)\.mp4/, '_320.mp4');
+      }
+    }
+
+    function applyStreamingQuality(quality) {
+      state.settings.streamingQuality = quality;
+      saveSettings();
+
+      if (quality === 'lossless') {
+        showToast('Streaming quality: Lossless (Source max: 320 kbps AAC)', '📶');
+      } else {
+        const labels = { low: 'Low (48 kbps)', medium: 'Medium (160 kbps)', high: 'High (320 kbps)' };
+        showToast(`Streaming quality: ${labels[quality] || quality}`, '📶');
+      }
+
+      // Live update currently playing track stream URL seamlessly
+      if (state.currentTrack && state.currentTrack.audioUrl) {
+        const newUrl = applyQualityToAudioUrl(state.currentTrack.audioUrl, quality);
+        state.currentTrack.audioUrl = newUrl;
+        const deck = getActiveDeck();
+        if (deck && !deck.paused && !isYouTubeActive()) {
+          const curPos = deck.currentTime;
+          deck.src = `/api/stream?url=${encodeURIComponent(newUrl)}&quality=${quality}`;
+          deck.currentTime = curPos;
+          deck.play().catch(() => {});
+        }
+      }
+    }
+
     // Streaming Quality Pills
     document.querySelectorAll('#streamQualityPills .sound-pill-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('#streamQualityPills .sound-pill-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        state.settings.streamingQuality = btn.dataset.quality;
-        saveSettings();
-        showToast(`Streaming quality: ${btn.textContent}`, '📶');
+        applyStreamingQuality(btn.dataset.quality);
       });
     });
+
+    function applyVolumeLeveling(level) {
+      state.settings.volumeLeveling = level;
+      saveSettings();
+
+      // Native Android engine loudness enhancement (Phase 5)
+      try {
+        if (typeof MusiSurfPlayback !== 'undefined' && MusiSurfPlayback.getEngine()) {
+          MusiSurfPlayback.getEngine().setLoudness(level);
+        }
+      } catch (e) {}
+
+      // Web Audio level scaling
+      let mult = 1.0;
+      if (level === 'quiet') mult = 0.75;
+      else if (level === 'normal') mult = 0.90;
+      else if (level === 'loud') mult = 1.15;
+
+      const effective = Math.max(0, Math.min(1.0, (state.volume || 0.8) * mult));
+      try {
+        const dA = getDeckA();
+        const dB = getDeckB();
+        if (dA) dA.volume = state.isMuted ? 0 : effective;
+        if (dB) dB.volume = state.isMuted ? 0 : effective;
+      } catch (e) {}
+
+      const labels = { off: 'Off', quiet: 'Quiet (-2.5 dB)', normal: 'Normal (Balanced)', loud: 'Loud (+3 dB Boost)' };
+      showToast(`Volume leveling: ${labels[level] || level}`, '🔊');
+    }
 
     // Volume Leveling Pills
     document.querySelectorAll('#volumeLevelingPills .sound-pill-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('#volumeLevelingPills .sound-pill-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        state.settings.volumeLeveling = btn.dataset.level;
-        saveSettings();
-        showToast(`Volume leveling: ${btn.textContent}`, '🔊');
+        applyVolumeLeveling(btn.dataset.level);
       });
     });
 

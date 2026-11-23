@@ -9,14 +9,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
-import android.graphics.drawable.Drawable
+import android.graphics.BitmapFactory
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.media.audiofx.LoudnessEnhancer
 import android.net.Uri
 import android.os.Binder
 import android.os.Build
-import android.os.Bundle
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.AudioAttributes as Media3AudioAttributes
@@ -28,6 +28,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.MediaStyleNotificationHelper
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
 import kotlinx.coroutines.CoroutineScope
@@ -63,9 +64,14 @@ class MusiSurfMediaService : MediaSessionService(), Player.Listener, AudioManage
     private var currentIndex = 0
     private var repeatMode = "off" // "off", "all", "one"
     private var isShuffle = false
+    private var currentVolume = 0.8f
+    private var loudnessMode = "off" // "off", "quiet", "normal", "loud"
+    private var loudnessEnhancer: LoudnessEnhancer? = null
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
     private var progressJob: Job? = null
+    private var isForegroundActive = false
+    private var artworkBitmap: Bitmap? = null
 
     private lateinit var audioManager: AudioManager
     private var audioFocusRequest: AudioFocusRequest? = null
@@ -122,6 +128,21 @@ class MusiSurfMediaService : MediaSessionService(), Player.Listener, AudioManage
 
         registerNoisyReceiver()
         startPositionProgressPolling()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_PREVIOUS -> previous()
+            ACTION_PLAY_PAUSE -> {
+                if (player?.isPlaying == true) pause() else resume()
+            }
+            ACTION_NEXT -> next()
+            ACTION_STOP -> {
+                pause()
+                stopForegroundNotification()
+            }
+        }
+        return super.onStartCommand(intent, flags, startId)
     }
 
     fun setOnPlaybackEventListener(l: PlaybackEventListener) {
@@ -207,10 +228,52 @@ class MusiSurfMediaService : MediaSessionService(), Player.Listener, AudioManage
                 listener?.onAudioFocusChanged("loss_transient_can_duck")
             }
             AudioManager.AUDIOFOCUS_GAIN -> {
-                player?.volume = 1.0f
+                applyVolumeAndLoudness()
                 listener?.onAudioFocusChanged("gain")
             }
         }
+    }
+
+    // =========================================================================
+    // URL RESOLUTION & MEDIA ITEM BUILDER
+    // =========================================================================
+
+    private fun ensureAbsoluteUrl(rawUrl: String?): String? {
+        if (rawUrl.isNullOrEmpty()) return null
+        if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://") || rawUrl.startsWith("file://") || rawUrl.startsWith("content://")) {
+            return rawUrl
+        }
+        if (rawUrl.startsWith("/")) {
+            return "https://musi-surf.vercel.app$rawUrl"
+        }
+        return "https://musi-surf.vercel.app/$rawUrl"
+    }
+
+    private fun buildMediaItem(track: JSObject): MediaItem? {
+        val localUri = track.getString("localFileUri")
+        val remoteStream = track.getString("remoteStreamUrl") ?: track.getString("streamUrl") ?: track.getString("audioUrl")
+        val resolvedRemote = ensureAbsoluteUrl(remoteStream)
+
+        val targetUri = if (!localUri.isNullOrEmpty() && File(Uri.parse(localUri).path ?: "").exists()) {
+            Uri.parse(localUri)
+        } else if (!resolvedRemote.isNullOrEmpty()) {
+            Uri.parse(resolvedRemote)
+        } else {
+            return null
+        }
+
+        val metadata = MediaMetadata.Builder()
+            .setTitle(track.getString("title") ?: "MusiSurf Track")
+            .setArtist(track.getString("artist") ?: "MusiSurf")
+            .setAlbumTitle(track.getString("album") ?: "MusiSurf Music")
+            .setArtworkUri(track.getString("artwork")?.let { Uri.parse(it) })
+            .build()
+
+        return MediaItem.Builder()
+            .setMediaId(track.getString("id") ?: "")
+            .setUri(targetUri)
+            .setMediaMetadata(metadata)
+            .build()
     }
 
     // =========================================================================
@@ -221,50 +284,53 @@ class MusiSurfMediaService : MediaSessionService(), Player.Listener, AudioManage
         if (track == null || player == null) return
         currentTrackObject = track
 
-        val localUri = track.getString("localFileUri")
-        val streamUrl = track.getString("remoteStreamUrl") ?: track.getString("streamUrl") ?: track.getString("audioUrl")
+        val trackId = track.getString("id")
+        val existingIndex = if (trackId != null) queueList.indexOfFirst { it.getString("id") == trackId } else -1
 
-        // Prefer native local file if present and readable off disk, else remote stream URL
-        val targetUri = if (!localUri.isNullOrEmpty() && File(Uri.parse(localUri).path ?: "").exists()) {
-            Uri.parse(localUri)
-        } else if (!streamUrl.isNullOrEmpty()) {
-            Uri.parse(streamUrl)
-        } else {
-            listener?.onError("NO_STREAM_URI", "No playable stream URL available", track.getString("id"))
+        if (existingIndex != -1 && player!!.mediaItemCount > existingIndex) {
+            currentIndex = existingIndex
+            if (requestAudioFocus()) {
+                player?.seekTo(currentIndex, startTimeMs)
+                player?.prepare()
+                player?.play()
+                startForegroundNotification()
+                listener?.onTrackChanged(track, currentIndex, queueList.size)
+            }
             return
         }
 
-        val metadata = MediaMetadata.Builder()
-            .setTitle(track.getString("title") ?: "MusiSurf Track")
-            .setArtist(track.getString("artist") ?: "MusiSurf")
-            .setAlbumTitle(track.getString("album") ?: "MusiSurf")
-            .setArtworkUri(track.getString("artwork")?.let { Uri.parse(it) })
-            .build()
+        // If track is not in current ExoPlayer playlist, rebuild mediaItem
+        val mediaItem = buildMediaItem(track)
+        if (mediaItem == null) {
+            listener?.onError("NO_STREAM_URI", "No playable stream URL available", trackId)
+            return
+        }
 
-        val mediaItem = MediaItem.Builder()
-            .setMediaId(track.getString("id") ?: "")
-            .setUri(targetUri)
-            .setMediaMetadata(metadata)
-            .build()
+        // Add to queue if missing
+        if (existingIndex == -1) {
+            queueList.add(track)
+            currentIndex = queueList.size - 1
+            player?.addMediaItem(mediaItem)
+        }
 
         if (requestAudioFocus()) {
-            player?.setMediaItem(mediaItem)
+            player?.seekTo(currentIndex, startTimeMs)
             player?.prepare()
-            if (startTimeMs > 0) {
-                player?.seekTo(startTimeMs)
-            }
             player?.play()
+            startForegroundNotification()
             listener?.onTrackChanged(track, currentIndex, queueList.size)
         }
     }
 
     fun pause() {
         player?.pause()
+        updateNotification()
     }
 
     fun resume() {
         if (requestAudioFocus()) {
             player?.play()
+            startForegroundNotification()
         }
     }
 
@@ -273,15 +339,31 @@ class MusiSurfMediaService : MediaSessionService(), Player.Listener, AudioManage
     }
 
     fun next() {
-        if (queueList.isNotEmpty() && currentIndex < queueList.size - 1) {
+        if (player != null && player!!.hasNextMediaItem()) {
+            player?.seekToNextMediaItem()
+            player?.prepare()
+            player?.play()
+        } else if (queueList.isNotEmpty() && currentIndex < queueList.size - 1) {
             currentIndex++
             playTrack(queueList[currentIndex])
+        } else if (repeatMode == "all" && queueList.isNotEmpty()) {
+            currentIndex = 0
+            if (player != null && player!!.mediaItemCount > 0) {
+                player?.seekTo(0, 0L)
+                player?.play()
+            } else {
+                playTrack(queueList[0])
+            }
         }
     }
 
     fun previous() {
         if (player != null && player!!.currentPosition > 3000) {
             player?.seekTo(0)
+        } else if (player != null && player!!.hasPreviousMediaItem()) {
+            player?.seekToPreviousMediaItem()
+            player?.prepare()
+            player?.play()
         } else if (currentIndex > 0 && queueList.isNotEmpty()) {
             currentIndex--
             playTrack(queueList[currentIndex])
@@ -292,17 +374,31 @@ class MusiSurfMediaService : MediaSessionService(), Player.Listener, AudioManage
 
     fun setQueue(queue: JSArray, startIndex: Int = 0) {
         queueList.clear()
+        val mediaItems = mutableListOf<MediaItem>()
+
         for (i in 0 until queue.length()) {
             val item = queue.optJSONObject(i)
             if (item != null) {
                 try {
-                    queueList.add(JSObject.fromJSONObject(item))
+                    val jsObj = JSObject.fromJSONObject(item)
+                    queueList.add(jsObj)
+                    val mediaItem = buildMediaItem(jsObj)
+                    if (mediaItem != null) {
+                        mediaItems.add(mediaItem)
+                    }
                 } catch (e: Exception) {
                     // ignore malformed items
                 }
             }
         }
+
         currentIndex = startIndex.coerceIn(0, (queueList.size - 1).coerceAtLeast(0))
+        if (currentIndex < queueList.size) {
+            currentTrackObject = queueList[currentIndex]
+        }
+
+        player?.setMediaItems(mediaItems, currentIndex, 0L)
+        player?.prepare()
         listener?.onQueueUpdated(queue, currentIndex)
     }
 
@@ -321,7 +417,47 @@ class MusiSurfMediaService : MediaSessionService(), Player.Listener, AudioManage
     }
 
     fun setVolume(volume: Float) {
-        player?.volume = volume.coerceIn(0.0f, 1.0f)
+        currentVolume = volume.coerceIn(0.0f, 1.0f)
+        applyVolumeAndLoudness()
+    }
+
+    fun setLoudness(mode: String) {
+        loudnessMode = mode
+        applyVolumeAndLoudness()
+    }
+
+    private fun applyVolumeAndLoudness() {
+        if (player == null) return
+
+        try {
+            if (loudnessEnhancer == null && player != null) {
+                loudnessEnhancer = LoudnessEnhancer(player!!.audioSessionId)
+            }
+        } catch (e: Exception) {
+            // AudioSessionId might not be attached yet
+        }
+
+        when (loudnessMode) {
+            "quiet" -> {
+                player?.volume = (currentVolume * 0.75f).coerceIn(0f, 1f)
+                try { loudnessEnhancer?.enabled = false } catch (e: Exception) {}
+            }
+            "normal" -> {
+                player?.volume = (currentVolume * 0.90f).coerceIn(0f, 1f)
+                try { loudnessEnhancer?.enabled = false } catch (e: Exception) {}
+            }
+            "loud" -> {
+                player?.volume = currentVolume
+                try {
+                    loudnessEnhancer?.setTargetGain(300) // +3 dB perceived loudness boost
+                    loudnessEnhancer?.enabled = true
+                } catch (e: Exception) {}
+            }
+            else -> { // "off"
+                player?.volume = currentVolume
+                try { loudnessEnhancer?.enabled = false } catch (e: Exception) {}
+            }
+        }
     }
 
     fun getCurrentPosition(): Long = player?.currentPosition ?: 0L
@@ -336,17 +472,95 @@ class MusiSurfMediaService : MediaSessionService(), Player.Listener, AudioManage
         put("currentTrack", currentTrackObject)
         put("repeatMode", repeatMode)
         put("isShuffle", isShuffle)
+        put("loudnessMode", loudnessMode)
         put("activeEngine", "android_native")
     }
 
     // =========================================================================
-    // NATIVE DOWNLOAD PIPELINE (PERSISTENT DIRECT FILE REFERENCE FOR EXOPLAYER)
+    // NOTIFICATION & FOREGROUND SERVICE ARCHITECTURE
+    // =========================================================================
+
+    private fun startForegroundNotification() {
+        val notification = buildForegroundNotification()
+        startForeground(NOTIFICATION_ID, notification)
+        isForegroundActive = true
+    }
+
+    private fun updateNotification() {
+        if (!isForegroundActive) return
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(NOTIFICATION_ID, buildForegroundNotification())
+    }
+
+    private fun stopForegroundNotification() {
+        if (isForegroundActive) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            isForegroundActive = false
+        }
+    }
+
+    private fun buildForegroundNotification(): Notification {
+        val title = currentTrackObject?.getString("title") ?: "MusiSurf Music"
+        val artist = currentTrackObject?.getString("artist") ?: "Streaming"
+        val isPlaying = player?.isPlaying ?: false
+
+        // Launch app intent
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.let {
+            PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        }
+
+        // Action PendingIntents
+        val prevPending = PendingIntent.getService(
+            this, 101,
+            Intent(this, MusiSurfMediaService::class.java).apply { action = ACTION_PREVIOUS },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val playPausePending = PendingIntent.getService(
+            this, 102,
+            Intent(this, MusiSurfMediaService::class.java).apply { action = ACTION_PLAY_PAUSE },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val nextPending = PendingIntent.getService(
+            this, 103,
+            Intent(this, MusiSurfMediaService::class.java).apply { action = ACTION_NEXT },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val playPauseIcon = if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
+
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(artist)
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentIntent(launchIntent)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(isPlaying)
+            .addAction(android.R.drawable.ic_media_previous, "Previous", prevPending)
+            .addAction(playPauseIcon, if (isPlaying) "Pause" else "Play", playPausePending)
+            .addAction(android.R.drawable.ic_media_next, "Next", nextPending)
+
+        if (artworkBitmap != null) {
+            builder.setLargeIcon(artworkBitmap)
+        }
+
+        if (mediaSession != null) {
+            builder.setStyle(
+                MediaStyleNotificationHelper.MediaStyle(mediaSession!!)
+                    .setShowActionsInCompactView(0, 1, 2)
+            )
+        }
+
+        return builder.build()
+    }
+
+    // =========================================================================
+    // NATIVE DOWNLOAD PIPELINE
     // =========================================================================
 
     fun downloadTrackFile(track: JSObject, callback: (String?, Boolean) -> Unit) {
         serviceScope.launch(Dispatchers.IO) {
             val trackId = track.getString("id") ?: "track_${System.currentTimeMillis()}"
-            val downloadUrl = track.getString("remoteStreamUrl") ?: track.getString("streamUrl") ?: track.getString("audioUrl")
+            val downloadUrl = ensureAbsoluteUrl(track.getString("remoteStreamUrl") ?: track.getString("streamUrl") ?: track.getString("audioUrl"))
 
             if (downloadUrl.isNullOrEmpty()) {
                 withContext(Dispatchers.Main) { callback(null, false) }
@@ -392,8 +606,18 @@ class MusiSurfMediaService : MediaSessionService(), Player.Listener, AudioManage
     fun getDownloadedTracksList(): JSArray = JSArray()
 
     // =========================================================================
-    // EXOPLAYER EVENT LISTENERS
+    // EXOPLAYER EVENT LISTENERS (CONTINUOUS BACKGROUND PLAYBACK)
     // =========================================================================
+
+    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+        val newIndex = player?.currentMediaItemIndex ?: 0
+        currentIndex = newIndex
+        if (currentIndex in 0 until queueList.size) {
+            currentTrackObject = queueList[currentIndex]
+        }
+        updateNotification()
+        listener?.onTrackChanged(currentTrackObject, currentIndex, queueList.size)
+    }
 
     override fun onIsPlayingChanged(isPlaying: Boolean) {
         val stateStr = when (player?.playbackState) {
@@ -402,6 +626,7 @@ class MusiSurfMediaService : MediaSessionService(), Player.Listener, AudioManage
             Player.STATE_ENDED -> "ended"
             else -> "idle"
         }
+        updateNotification()
         listener?.onPlaybackStateChanged(isPlaying, stateStr, player?.currentPosition ?: 0L, player?.duration ?: 0L)
     }
 
@@ -411,15 +636,29 @@ class MusiSurfMediaService : MediaSessionService(), Player.Listener, AudioManage
             Player.STATE_BUFFERING -> "buffering"
             Player.STATE_READY -> if (isPlaying) "playing" else "paused"
             Player.STATE_ENDED -> {
-                next()
+                // If single item reached end or end of playlist
+                if (repeatMode == "all" && queueList.isNotEmpty()) {
+                    currentIndex = 0
+                    if (player != null && player!!.mediaItemCount > 0) {
+                        player?.seekTo(0, 0L)
+                        player?.play()
+                    }
+                }
                 "ended"
             }
             else -> "idle"
         }
+        updateNotification()
         listener?.onPlaybackStateChanged(isPlaying, stateStr, player?.currentPosition ?: 0L, player?.duration ?: 0L)
     }
 
     override fun onPlayerError(error: PlaybackException) {
+        // Resilient recovery: if a media item fails in the playlist, auto-advance to next track
+        if (player != null && player!!.hasNextMediaItem()) {
+            player?.seekToNextMediaItem()
+            player?.prepare()
+            player?.play()
+        }
         listener?.onError(error.errorCodeName, error.message ?: "Playback error", currentTrackObject?.getString("id"))
     }
 
@@ -443,6 +682,11 @@ class MusiSurfMediaService : MediaSessionService(), Player.Listener, AudioManage
         progressJob?.cancel()
         abandonAudioFocus()
         unregisterNoisyReceiver()
+        stopForegroundNotification()
+        try {
+            loudnessEnhancer?.release()
+            loudnessEnhancer = null
+        } catch (e: Exception) {}
         mediaSession?.run {
             player.release()
             release()
@@ -455,5 +699,10 @@ class MusiSurfMediaService : MediaSessionService(), Player.Listener, AudioManage
     companion object {
         const val CHANNEL_ID = "musisurf_media_playback"
         const val NOTIFICATION_ID = 1001
+
+        const val ACTION_PREVIOUS = "com.musisurf.app.media.ACTION_PREVIOUS"
+        const val ACTION_PLAY_PAUSE = "com.musisurf.app.media.ACTION_PLAY_PAUSE"
+        const val ACTION_NEXT = "com.musisurf.app.media.ACTION_NEXT"
+        const val ACTION_STOP = "com.musisurf.app.media.ACTION_STOP"
     }
 }

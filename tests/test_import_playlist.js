@@ -344,58 +344,27 @@ Mohit Chauhan - Kun Faya Kun`;
   console.log('  ✓ Retains intentional duplicate entries without silent deduplication');
 
   // --------------------------------------------------------------------------
-  // SUITE F: SETTINGS UI & DOM ELEMENTS VERIFICATION
+  // SUITE F: SETTINGS UI & DOM ELEMENTS VERIFICATION (PHASE 3 PURGE CONFIRMATION)
   // --------------------------------------------------------------------------
   console.log('\n--- SUITE F: SETTINGS UI DOM VERIFICATION ---');
 
   const htmlContent = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
-  // Verify Settings tab
+  // Verify that import feature and Google OAuth have been safely removed from index.html (Phase 3)
   assert(
-    htmlContent.includes('data-target="settingsLibrarySection"'),
-    'index.html must have Library & Playlists settings category button'
+    !htmlContent.includes('id="importPlaylistModal"'),
+    'index.html must not contain importPlaylistModal (purged per Phase 3)'
   );
   assert(
-    htmlContent.includes('id="settingsLibrarySection"'),
-    'index.html must have settingsLibrarySection view'
+    !htmlContent.includes('id="settingsImportPlaylistBtn"'),
+    'index.html must not contain settingsImportPlaylistBtn (purged per Phase 3)'
   );
   assert(
-    htmlContent.includes('id="settingsImportPlaylistBtn"'),
-    'index.html must have Import Playlist entry card inside Settings'
-  );
-  assert(
-    htmlContent.includes('id="importPlaylistModal"'),
-    'index.html must have dedicated importPlaylistModal'
-  );
-  assert(
-    htmlContent.includes('id="importStepPreview"'),
-    'index.html must have mandatory Step 3 Import Preview view'
-  );
-  assert(
-    htmlContent.includes('id="candidateReviewModal"'),
-    'index.html must have candidateReviewModal for reviewable tracks'
-  );
-  assert(
-    htmlContent.includes('id="importMethodYtMusicTab"'),
-    'index.html must have YouTube Music method tab button'
-  );
-  assert(
-    htmlContent.includes('id="importYtMusicBody"'),
-    'index.html must have YouTube Music input body'
-  );
-  assert(
-    htmlContent.includes('id="spotifyDetectedIdPill"'),
-    'index.html must have live Spotify ID detection feedback badge'
-  );
-  assert(
-    htmlContent.includes('id="ytDetectedIdPill"'),
-    'index.html must have live YouTube ID detection feedback badge'
+    !htmlContent.includes('id="authGoogleBtn"'),
+    'index.html must not contain authGoogleBtn (purged per Phase 3)'
   );
 
-  console.log('  ✓ "Library & Playlists" category correctly placed in Settings navigation');
-  console.log('  ✓ "Import Playlist" card configured with title, description, and icon');
-  console.log('  ✓ Dedicated multi-step modal with mandatory Preview screen verified');
-  console.log('  ✓ 3 import tabs (Spotify, YouTube Music, File) and live ID detection badges verified');
+  console.log('  ✓ Confirmed Google Auth & Playlist Import purged from UI (Phase 3)');
 
   // --------------------------------------------------------------------------
   // SUITE G: AUTOMATIC OAUTH, PENDING IMPORT & TOKEN HYGIENE
@@ -459,11 +428,9 @@ Mohit Chauhan - Kun Faya Kun`;
   assert(!appJsContent.includes('Paste Access Token'), 'app.js must NOT contain Paste Access Token button');
   assert(!htmlContent.includes('Paste Access Token'), 'index.html must NOT contain Paste Access Token button');
 
-  // 5. Connect & Disconnect Controls
-  assert(htmlContent.includes('id="spotifyConnectHeaderBtn"'), 'index.html must have Spotify Connect button');
-  assert(htmlContent.includes('id="spotifyDisconnectHeaderBtn"'), 'index.html must have Spotify Disconnect button');
-  assert(htmlContent.includes('id="ytConnectHeaderBtn"'), 'index.html must have Google/YouTube Connect button');
-  assert(htmlContent.includes('id="ytDisconnectHeaderBtn"'), 'index.html must have Google/YouTube Disconnect button');
+  // 5. Connect & Disconnect Controls purged from index.html (Phase 3)
+  assert(!htmlContent.includes('id="spotifyConnectHeaderBtn"'), 'index.html must not contain Spotify Connect button');
+  assert(!htmlContent.includes('id="ytConnectHeaderBtn"'), 'index.html must not contain Google/YouTube Connect button');
 
   // 6. Environment Example Verification
   const envExample = fs.readFileSync(path.join(__dirname, '..', '.env.example'), 'utf8');
