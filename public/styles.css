@@ -6675,7 +6675,8 @@ div[data-track-id].playing:hover .song-more-trigger {
   margin: 10px auto 16px !important;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.75);
+  box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.85), 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -9481,7 +9482,7 @@ div[data-track-id].playing:hover .song-more-trigger {
     font-size: 1.8rem;
   }
   .library-hub-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: 1fr !important;
     gap: 10px !important;
   }
   .library-hub-card {
@@ -11559,17 +11560,22 @@ body[data-active-view="lyrics"] .content-scroll {
   height: 16px !important;
 }
 
-/* Mobile: Show Top Bar in Library View & Downloads Section (Requested by User) */
+/* Mobile: Show Top Bar in Library View (Hide in Downloads & Playlists) */
 @media (max-width: 768px) {
   body[data-active-view="library"] .top-header,
-  body[data-active-view="library"] #topHeader,
-  body[data-playlist-id="downloaded"] .top-header,
-  body[data-playlist-id="downloaded"] #topHeader {
+  body[data-active-view="library"] #topHeader {
     display: flex !important;
   }
+  body[data-playlist-id="downloaded"] .top-header,
+  body[data-playlist-id="downloaded"] #topHeader,
+  body[data-playlist-id="downloaded"] .mobile-top-brand,
+  body[data-playlist-id="downloaded"] #mobileTopBrand,
+  body[data-playlist-id="downloaded"] .mobile-top-actions,
+  body[data-playlist-id="downloaded"] #mobileTopActions {
+    display: none !important;
+  }
   body[data-playlist-id="downloaded"] .app-layout {
-    grid-template-rows: auto 1fr var(--player-height, 90px) !important;
-    grid-template-areas: "topbar" "main" !important;
+    grid-template-rows: 1fr var(--player-height, 90px) !important;
   }
   /* Remove top left back option on Downloads section */
   body[data-playlist-id="downloaded"] .playlist-nav-back-row,
@@ -13329,13 +13335,16 @@ body[data-active-view="lyrics"] .content-scroll {
   display: none !important;
 }
 
-/* 4. Inside Playlist: Do NOT show top nav on mobile only (except Downloads section which shows it) */
+/* 4. Inside Playlist: Do NOT show top nav on mobile */
 @media (max-width: 768px) {
-  body[data-active-view="playlist"]:not([data-playlist-id="downloaded"]) .top-header,
-  body[data-active-view="playlist"]:not([data-playlist-id="downloaded"]) #topHeader {
+  body[data-active-view="playlist"] .top-header,
+  body[data-active-view="playlist"] #topHeader,
+  body[data-playlist-id="downloaded"] .top-header,
+  body[data-playlist-id="downloaded"] #topHeader {
     display: none !important;
   }
-  body[data-active-view="playlist"]:not([data-playlist-id="downloaded"]) .app-layout {
+  body[data-active-view="playlist"] .app-layout,
+  body[data-playlist-id="downloaded"] .app-layout {
     grid-template-rows: 1fr var(--player-height, 90px) !important;
     grid-template-areas: "main" !important;
   }
@@ -13385,13 +13394,17 @@ body[data-active-view="lyrics"] .content-scroll {
 
 @media (max-width: 768px) {
   .library-hub-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: 1fr !important;
     gap: 10px !important;
+  }
+  .library-hub-card {
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
   .library-hub-card.lib-hub-soundtrack,
   .library-hub-card.lib-hub-local,
   .library-hub-card.lib-hub-downloaded {
-    grid-column: auto !important;
+    grid-column: 1 !important;
   }
 }
 
@@ -16476,13 +16489,24 @@ body.lyrics-fullscreen-active .lyrics-edge-glow {
 
 /* 4. Hide Top Nav in Downloaded Playlist section */
 body.in-downloaded-playlist .top-header,
+body.in-downloaded-playlist #topHeader,
 body.in-downloaded-playlist .mobile-top-bar,
+body.in-downloaded-playlist .mobile-top-brand,
+body.in-downloaded-playlist #mobileTopBrand,
 body.in-downloaded-playlist .mobile-top-actions,
-body.in-downloaded-playlist #mobileTopActions {
+body.in-downloaded-playlist #mobileTopActions,
+body[data-playlist-id="downloaded"] .top-header,
+body[data-playlist-id="downloaded"] #topHeader,
+body[data-playlist-id="downloaded"] .mobile-top-bar,
+body[data-playlist-id="downloaded"] .mobile-top-brand,
+body[data-playlist-id="downloaded"] #mobileTopBrand,
+body[data-playlist-id="downloaded"] .mobile-top-actions,
+body[data-playlist-id="downloaded"] #mobileTopActions {
   display: none !important;
 }
 
-body.in-downloaded-playlist .app-layout {
+body.in-downloaded-playlist .app-layout,
+body[data-playlist-id="downloaded"] .app-layout {
   grid-template-rows: 0px 1fr var(--player-height) !important;
 }
 

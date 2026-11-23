@@ -361,21 +361,14 @@
             </button>
           </div>
 
-          <!-- Dynamic Jump Back In Section (Image 4) -->
-          <div class="hero-welcome">
+          <!-- Recently Played Section (Visible only when signed in and tracks have been played) -->
+          <div class="hero-welcome" id="heroWelcomeSection" style="display: none;">
             <div class="welcome-heading-row">
-              <h1 class="welcome-heading" id="greetingHeading">Jump back in</h1>
+              <h1 class="welcome-heading" id="greetingHeading">Recently played</h1>
             </div>
 
-            <!-- 6 Quick Play Tiles (Updated Daily with Top Trending Hindi Songs) -->
-            <div class="quick-picks-grid" id="quickPicksGrid">
-              <div class="quick-pick-skeleton skeleton-shimmer"></div>
-              <div class="quick-pick-skeleton skeleton-shimmer"></div>
-              <div class="quick-pick-skeleton skeleton-shimmer"></div>
-              <div class="quick-pick-skeleton skeleton-shimmer"></div>
-              <div class="quick-pick-skeleton skeleton-shimmer"></div>
-              <div class="quick-pick-skeleton skeleton-shimmer"></div>
-            </div>
+            <!-- 6 Quick Play Tiles (Shows real recently played tracks) -->
+            <div class="quick-picks-grid" id="quickPicksGrid"></div>
           </div>
 
           <!-- Filter Pills (100% Bollywood Moods) -->

@@ -945,18 +945,15 @@
     if (elements.mobilePlayerModal && coverUrl) {
       extractDominantColor(coverUrl, track.id).then(([r, g, b]) => {
         if (state.currentTrack?.id !== track.id) return;
-        const darkR = Math.floor(r * 0.28);
-        const darkG = Math.floor(g * 0.28);
-        const darkB = Math.floor(b * 0.28);
-        const topR = Math.min(255, Math.floor(r * 0.72 + 10));
-        const topG = Math.min(255, Math.floor(g * 0.72 + 10));
-        const topB = Math.min(255, Math.floor(b * 0.72 + 14));
-        const midR = Math.min(255, Math.floor(darkR * 0.55 + 8));
-        const midG = Math.min(255, Math.floor(darkG * 0.55 + 9));
-        const midB = Math.min(255, Math.floor(darkB * 0.55 + 11));
+        const topR = Math.min(255, Math.floor(r * 0.32 + 8));
+        const topG = Math.min(255, Math.floor(g * 0.32 + 8));
+        const topB = Math.min(255, Math.floor(b * 0.32 + 10));
+        const midR = Math.min(255, Math.floor(r * 0.10 + 6));
+        const midG = Math.min(255, Math.floor(g * 0.10 + 6));
+        const midB = Math.min(255, Math.floor(b * 0.10 + 8));
         elements.mobilePlayerModal.style.setProperty(
           '--mob-player-bg',
-          `linear-gradient(180deg, rgb(${topR}, ${topG}, ${topB}) 0%, rgb(${midR}, ${midG}, ${midB}) 48%, #08090b 100%)`
+          `linear-gradient(180deg, rgb(${topR}, ${topG}, ${topB}) 0%, rgb(${midR}, ${midG}, ${midB}) 40%, #08090b 80%)`
         );
         const lyricsViewEl = document.getElementById('lyricsView');
         if (lyricsViewEl) {
@@ -1272,6 +1269,7 @@
       localStorage.setItem('musisurf_recently_played', JSON.stringify(state.recentlyPlayed));
     } catch (e) {}
     renderSearchRecentUI();
+    if (typeof updateQuickPicksUI === 'function') updateQuickPicksUI();
   }
 
   // Record recently played playlist & persist to localStorage
@@ -6851,15 +6849,8 @@
         state.dailyTopTracks = [];
       }
 
-      // Populate Quick Picks with dynamic fresh sample of daily trending songs on every page refresh
-      if (state.dailyTopTracks.length >= 6) {
-        renderQuickPicks(deduplicateAndShuffleAlbums(state.dailyTopTracks, 6));
-      } else {
-        const allTracks = [];
-        data.sections.forEach(sec => allTracks.push(...sec.tracks));
-        const quickPicks = deduplicateAndShuffleAlbums(allTracks, 6);
-        renderQuickPicks(quickPicks);
-      }
+      // Populate Recently Played Quick Picks (strictly sign-in gated, rendered only if played)
+      updateQuickPicksUI();
 
       // Populate Curated Shelves - strictly unique albums & non-devotional
       data.sections.forEach(section => {
@@ -6878,13 +6869,15 @@
   }
 
   function renderQuickPicks(tracks) {
+    if (!elements.quickPicksGrid) return;
     elements.quickPicksGrid.innerHTML = '';
     tracks.forEach(track => {
       const tile = document.createElement('div');
       tile.className = 'quick-pick-tile';
       tile._trackData = track;
+      const imgUrl = track.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80';
       tile.innerHTML = `
-        <img src="${track.image}" alt="${track.title}" class="quick-pick-img">
+        <img src="${imgUrl}" alt="${escapeHtml(track.title)}" class="quick-pick-img">
         <div class="quick-pick-info">
           <span class="quick-pick-title">${escapeHtml(track.title)}${getPlaylistTickBadgeHtml(track.id)}${getDownloadedBadgeHtml(track.id)}</span>
         </div>
@@ -6902,6 +6895,22 @@
 
       elements.quickPicksGrid.appendChild(tile);
     });
+  }
+
+  function updateQuickPicksUI() {
+    const heroWelcome = document.getElementById('heroWelcomeSection') || document.querySelector('.hero-welcome');
+    const isSignedIn = !!(state.currentUser && state.currentUser.email);
+    const validRecents = (state.recentlyPlayed || []).filter(t => t && t.id && t.title && t.type !== 'playlist');
+
+    if (!isSignedIn || validRecents.length === 0) {
+      if (heroWelcome) heroWelcome.style.display = 'none';
+      if (elements.quickPicksGrid) elements.quickPicksGrid.innerHTML = '';
+      return;
+    }
+
+    if (heroWelcome) heroWelcome.style.display = 'block';
+    if (elements.greetingHeading) elements.greetingHeading.textContent = 'Recently played';
+    renderQuickPicks(validRecents.slice(0, 6));
   }
 
   function createShelfElement(section) {
@@ -11656,6 +11665,52 @@
     if (uniqueTracks.length > 0) {
       playTrack(uniqueTracks[0], uniqueTracks);
     } else {
+      showToast('No listening history yet, play some songs first!', 'ℹ️');
+    }
+  }
+
+  function shareReplay() {
+    const minutes = Math.floor((state.totalListenedSeconds || 0) / 60);
+    const songs = state.totalSongsPlayed || 0;
+    const topSong = elements.replayTopSongTitle?.textContent || 'Top Track';
+    const artist = elements.replayTopSongArtist?.textContent || 'Artist';
+    const text = `🔥 My MusiSurf Sound Capsule: ${minutes.toLocaleString()} mins listened across ${songs.toLocaleString()} songs played! Top Song: ${topSong} by ${artist}! Ride the wave of pure music at ${window.location.origin}`;
+    if (navigator.share) {
+      navigator.share({ title: 'MusiSurf Sound Capsule', text: text, url: window.location.href }).catch(() => {});
+    } else {
+      try {
+        navigator.clipboard.writeText(text);
+        showToast('Sound Capsule stats copied to clipboard! 📋', '✨');
+      } catch (e) {
+        showToast(text, '🔥');
+      }
+    }
+  }
+
+  // ==========================================================================
+  // EVENT LISTENERS & SETUP
+  // ==========================================================================
+  function setupEventListeners() {
+    // Top Bar Home Button
+    if (elements.topHomeBtn) {
+      elements.topHomeBtn.addEventListener('click', navigateToHomeTop);
+    }
+
+    // Top Bar History Back & Forward (Previous & Ahead)
+    if (elements.historyBackBtn) {
+      elements.historyBackBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        appHistory.back();
+      });
+    }
+    if (elements.historyForwardBtn) {
+      elements.historyForwardBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        appHistory.forward();
+      });
+    }
+    appHistory.updateButtons();
+
     // Top Bar Compass / Explore Categories (Shows browse categories, no recents)
     if (elements.topCompassBtn) {
       elements.topCompassBtn.addEventListener('click', (e) => {
@@ -14978,6 +15033,7 @@
         if (settingsSubBlock) settingsSubBlock.style.setProperty('display', 'none', 'important');
         if (settingsChangeAvatarBtn) settingsChangeAvatarBtn.style.setProperty('display', 'none', 'important');
       }
+      if (typeof updateQuickPicksUI === 'function') updateQuickPicksUI();
     }
 
     function openAuthModal(mode = 'signin', promptMessage = null) {

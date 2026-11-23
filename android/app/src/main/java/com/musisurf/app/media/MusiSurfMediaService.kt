@@ -295,7 +295,11 @@ class MusiSurfMediaService : MediaSessionService(), Player.Listener, AudioManage
         for (i in 0 until queue.length()) {
             val item = queue.optJSONObject(i)
             if (item != null) {
-                queueList.add(item)
+                try {
+                    queueList.add(JSObject.fromJSONObject(item))
+                } catch (e: Exception) {
+                    // ignore malformed items
+                }
             }
         }
         currentIndex = startIndex.coerceIn(0, (queueList.size - 1).coerceAtLeast(0))
