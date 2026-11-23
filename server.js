@@ -34,8 +34,23 @@ async function getYtdl() {
   }
 }
 
+const ALLOWED_AUTH_ORIGINS = [
+  'https://musi-surf.vercel.app',
+  'https://musisurf.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000'
+];
+
 app.use(cors({
-  origin: true,
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    const cleanOrigin = origin.replace(/\/$/, '');
+    if (ALLOWED_AUTH_ORIGINS.includes(cleanOrigin) || origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
   credentials: true
 }));
 app.use(cookieParser());
@@ -2221,7 +2236,7 @@ function getAuthOrigin(req) {
   let origin = req.headers.origin;
   if (!origin) {
     const host = req.get('host');
-    if (host) {
+    if (host && (host.includes('localhost') || host.includes('127.0.0.1'))) {
       const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
       origin = `${proto}://${host}`;
     }
@@ -2229,10 +2244,7 @@ function getAuthOrigin(req) {
   if (origin) {
     origin = origin.replace(/\/$/, '');
   }
-  if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
-    return origin;
-  }
-  return origin || (process.env.APP_URL ? process.env.APP_URL.replace(/\/$/, '') : 'https://musi-surf.vercel.app');
+  return origin || process.env.APP_URL || 'https://musi-surf.vercel.app';
 }
 
 // Proxy Sign-Up to Neon Auth
@@ -2265,8 +2277,7 @@ app.post('/api/auth/sign-up', async (req, res) => {
       body: JSON.stringify({
         email: cleanEmail,
         password,
-        name: cleanName,
-        callbackURL: `${origin}/`
+        name: cleanName
       })
     });
 

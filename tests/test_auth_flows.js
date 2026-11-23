@@ -66,8 +66,7 @@ async function runAuthTests() {
     body: JSON.stringify({
       email: testEmail,
       password: testPassword,
-      name: testName,
-      callbackURL: 'https://musi-surf.vercel.app/'
+      name: testName
     })
   });
   const prodData = await prodRes.json().catch(() => ({}));
