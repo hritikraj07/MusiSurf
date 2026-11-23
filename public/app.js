@@ -1137,47 +1137,46 @@
           }
         }
       }
-    } catch (e) {}
 
-    // Only load user-created custom playlists and liked songs if signed in
-    if (state.currentUser && (state.currentUser.id || state.currentUser.email)) {
-      try {
-        const storedLikes = localStorage.getItem('musisurf_liked');
-        if (storedLikes) {
-          state.likedSongs = JSON.parse(storedLikes);
-          if (Array.isArray(state.likedSongs)) {
-            const nowBase = Date.now();
-            state.likedSongs.forEach((t, i) => {
-              if (!t.addedAt) {
-                t.addedAt = nowBase - ((state.likedSongs.length - i) * 86400000);
-              }
-            });
+      // Only load user-created custom playlists and liked songs if signed in
+      if (state.currentUser && (state.currentUser.id || state.currentUser.email)) {
+        try {
+          const storedLikes = localStorage.getItem('musisurf_liked');
+          if (storedLikes) {
+            state.likedSongs = JSON.parse(storedLikes);
+            if (Array.isArray(state.likedSongs)) {
+              const nowBase = Date.now();
+              state.likedSongs.forEach((t, i) => {
+                if (!t.addedAt) {
+                  t.addedAt = nowBase - ((state.likedSongs.length - i) * 86400000);
+                }
+              });
+            }
           }
-        }
 
-        const storedPlaylists = localStorage.getItem('musisurf_playlists');
-        if (storedPlaylists) {
-          state.customPlaylists = JSON.parse(storedPlaylists);
-          if (Array.isArray(state.customPlaylists)) {
-            const nowBase = Date.now();
-            state.customPlaylists.forEach(pl => {
-              if (Array.isArray(pl.tracks)) {
-                pl.tracks.forEach((t, i) => {
-                  if (!t.addedAt) {
-                    t.addedAt = nowBase - ((pl.tracks.length - i) * 86400000);
-                  }
-                });
-              }
-            });
+          const storedPlaylists = localStorage.getItem('musisurf_playlists');
+          if (storedPlaylists) {
+            state.customPlaylists = JSON.parse(storedPlaylists);
+            if (Array.isArray(state.customPlaylists)) {
+              const nowBase = Date.now();
+              state.customPlaylists.forEach(pl => {
+                if (Array.isArray(pl.tracks)) {
+                  pl.tracks.forEach((t, i) => {
+                    if (!t.addedAt) {
+                      t.addedAt = nowBase - ((pl.tracks.length - i) * 86400000);
+                    }
+                  });
+                }
+              });
+            }
           }
+        } catch (e) {
+          console.warn('Error loading user library data:', e);
         }
-      } catch (e) {
-        console.warn('Error loading user library data:', e);
+      } else {
+        state.likedSongs = [];
+        state.customPlaylists = [];
       }
-    } else {
-      state.likedSongs = [];
-      state.customPlaylists = [];
-    }
 
       const storedOffline = localStorage.getItem('musisurf_offline_tracks');
       if (storedOffline) {
